@@ -8,11 +8,27 @@ build:
 # Clean build artifacts
 clean:
 	rm -f spooky
-	go clean
+	rm -f coverage.out coverage-integration.out
+	rm -f coverage.html coverage-integration.html
+	go clean -testcache
 
 # Run tests
-test:
-	go test ./...
+test: test-unit test-integration
+
+# Run unit tests only
+test-unit:
+	go test -v ./...
+
+# Run integration tests only
+test-integration:
+	go test -v -tags=integration ./tests/integration/...
+
+# Run all tests with coverage
+test-coverage:
+	go test -v -coverprofile=coverage.out ./...
+	go test -v -tags=integration -coverprofile=coverage-integration.out ./tests/integration/...
+	go tool cover -html=coverage.out -o coverage.html
+	go tool cover -html=coverage-integration.out -o coverage-integration.html
 
 # Run the tool with example configuration
 run: build

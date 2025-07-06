@@ -187,13 +187,55 @@ Spooky provides detailed error reporting:
 - Configuration validation errors prevent execution
 - Parallel execution continues even if some servers fail
 
+## Testing
+
+Spooky includes comprehensive unit and integration tests to ensure reliability and correctness.
+
+### Running Tests
+
+You can run tests directly using Go commands:
+
+```bash
+# Run all tests (unit + integration)
+go test ./... -tags=integration
+
+# Run unit tests only (exclude integration tests)
+go test ./...
+
+# Run integration tests only
+go test -tags=integration ./tests/integration/...
+
+# Run tests with coverage report
+go test -cover ./...
+```
+
+### Test Structure
+
+- **Unit Tests**: Co-located with source files (e.g., `config_test.go`)
+- **Integration Tests**: Located in `tests/integration/` using [gliderlabs/ssh](https://github.com/gliderlabs/ssh) for mock SSH servers
+- **Test Fixtures**: Sample configurations and scripts in `tests/fixtures/`
+- **Test Helpers**: Common utilities in `tests/helpers/`
+
+### Test Coverage
+
+The test suite covers:
+- Configuration parsing and validation
+- SSH connection and authentication
+- Command and script execution
+- Sequential and parallel execution
+- Error handling and edge cases
+- Server targeting and tag-based selection
+
+For detailed testing information, see [tests/README.md](tests/README.md).
+
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+4. Add tests for new functionality
+5. Ensure all tests pass (see above for Go test commands)
+6. Submit a pull request
 
 ## License
 
