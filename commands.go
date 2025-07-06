@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"spooky-tool/spooky"
 )
 
 var (
@@ -33,12 +35,12 @@ var executeCmd = &cobra.Command{
 		}
 
 		// Parse and execute configuration
-		config, err := parseConfig(configFile)
+		config, err := spooky.ParseConfig(configFile)
 		if err != nil {
 			return fmt.Errorf("failed to parse config: %w", err)
 		}
 
-		return executeConfig(config)
+		return spooky.ExecuteConfig(config)
 	},
 }
 
@@ -62,7 +64,7 @@ var validateCmd = &cobra.Command{
 		}
 
 		// Parse configuration
-		config, err := parseConfig(configFile)
+		config, err := spooky.ParseConfig(configFile)
 		if err != nil {
 			return fmt.Errorf("validation failed: %w", err)
 		}
@@ -94,7 +96,7 @@ var listCmd = &cobra.Command{
 		}
 
 		// Parse configuration
-		config, err := parseConfig(configFile)
+		config, err := spooky.ParseConfig(configFile)
 		if err != nil {
 			return fmt.Errorf("failed to parse config: %w", err)
 		}
