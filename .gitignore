@@ -30,3 +30,14 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# SFTP test directories
+test_sftp_dir*
+tests/test_sftp_dir*
+
+# Generated SSH keys
+generated_keys/
+*.pem
+*.pub
+*_password.txt
+*_keys.txt
