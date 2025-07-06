@@ -1,4 +1,4 @@
-package main
+package spooky
 
 import (
 	"bufio"
@@ -103,8 +103,8 @@ func (s *SSHClient) ExecuteScript(scriptPath string) (string, error) {
 	return s.ExecuteCommand(string(scriptContent))
 }
 
-// executeConfig executes all actions in the configuration
-func executeConfig(config *Config) error {
+// ExecuteConfig executes all actions in the configuration
+func ExecuteConfig(config *Config) error {
 	fmt.Printf("🚀 Starting execution of %d actions...\n", len(config.Actions))
 
 	for _, action := range config.Actions {
@@ -114,7 +114,7 @@ func executeConfig(config *Config) error {
 		}
 
 		// Get target servers for this action
-		targetServers, err := getServersForAction(&action, config)
+		targetServers, err := GetServersForAction(&action, config)
 		if err != nil {
 			return fmt.Errorf("failed to get servers for action %s: %w", action.Name, err)
 		}
@@ -122,7 +122,7 @@ func executeConfig(config *Config) error {
 		fmt.Printf("🌐 Target servers: %d\n", len(targetServers))
 
 		// Execute on each server
-		if action.Parallel || parallel {
+		if action.Parallel {
 			err = executeActionParallel(&action, targetServers)
 		} else {
 			err = executeActionSequential(&action, targetServers)
@@ -143,7 +143,7 @@ func executeActionSequential(action *Action, servers []*Server) error {
 		fmt.Printf("  🔗 Connecting to %s (%s@%s:%d)...\n", server.Name, server.User, server.Host, server.Port)
 
 		// Create SSH client
-		client, err := NewSSHClient(server, timeout)
+		client, err := NewSSHClient(server, 30) // Default timeout
 		if err != nil {
 			fmt.Printf("  ❌ Failed to connect to %s: %v\n", server.Name, err)
 			continue
@@ -186,7 +186,7 @@ func executeActionParallel(action *Action, servers []*Server) error {
 			fmt.Printf("  🔗 Connecting to %s (%s@%s:%d)...\n", s.Name, s.User, s.Host, s.Port)
 
 			// Create SSH client
-			client, err := NewSSHClient(s, timeout)
+			client, err := NewSSHClient(s, 30) // Default timeout
 			if err != nil {
 				errors <- fmt.Errorf("failed to connect to %s: %w", s.Name, err)
 				return
