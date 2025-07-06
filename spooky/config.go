@@ -1,4 +1,4 @@
-package main
+package spooky
 
 import (
 	"fmt"
@@ -36,8 +36,8 @@ type Action struct {
 	Parallel    bool     `hcl:"parallel,optional"`
 }
 
-// parseConfig parses an HCL2 configuration file
-func parseConfig(filename string) (*Config, error) {
+// ParseConfig parses an HCL2 configuration file
+func ParseConfig(filename string) (*Config, error) {
 	parser := hclparse.NewParser()
 
 	// Read the file
@@ -119,8 +119,8 @@ func validateConfig(config *Config) error {
 	return nil
 }
 
-// getServersForAction returns the list of servers that should execute an action
-func getServersForAction(action *Action, config *Config) ([]*Server, error) {
+// GetServersForAction returns the list of servers that should execute an action
+func GetServersForAction(action *Action, config *Config) ([]*Server, error) {
 	var targetServers []*Server
 
 	// If specific servers are specified, use those
