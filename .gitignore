@@ -41,3 +41,4 @@ generated_keys/
 *.pub
 *_password.txt
 *_keys.txt
+spooky.exe
