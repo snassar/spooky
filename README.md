@@ -2,6 +2,8 @@
 
 Spooky is a powerful SSH automation tool written in Go that allows you to execute commands and scripts on multiple remote servers using HCL2 configuration files. It provides a declarative way to manage server operations with support for parallel execution and flexible server targeting.
 
+**Notice**: This project is heavily agentic coding and LLM influenced as part of my learning process.
+
 ## Features
 
 - 🚀 **Declarative Configuration**: Use HCL2 files to define servers and actions
@@ -257,4 +259,32 @@ This project is licensed under the GNU Affero General Public License v3 - see th
 - [golang.org/x/text](https://pkg.go.dev/golang.org/x/text) - Text processing utilities
 - [zclconf/go-cty](https://github.com/zclconf/go-cty) - Type system for HCL2
 - [apparentlymart/go-textseg](https://github.com/apparentlymart/go-textseg) - Text segmentation for HCL2
-- [kr/fs](https://github.com/kr/fs) - File system utilities for SFTP 
+- [kr/fs](https://github.com/kr/fs) - File system utilities for SFTP
+
+## Project Assumptions
+
+### Core Assumptions
+- SSH key authentication is preferred over passwords
+- We currently only support Ed25519 keys only
+- We currently do not support RSA keys
+- We currently do not support DSA keys
+- Windows compatibility is required
+- macOS compatibility is required
+- linux compatibility is required
+- Integration tests use https://github.com/gliderlabs/ssh
+- Unit tests must be co-located with source files
+- Integration tests must be located under `./tests/`
+- Example configuration files and snippets must be located under `./examples/`
+
+### Design Decisions
+- Use HCL2 for configuratio files
+- Do not use JSON for configuration files
+- Do not use YAML for configuration files
+- Parallel execution is optional per action
+- Server targeting via tags or explicit names
+- No persistent state or database required
+
+### Constraints
+- Make is supported
+- Must work without Make
+- Focus on basic functionality first
