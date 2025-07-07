@@ -189,7 +189,7 @@ Spooky provides detailed error reporting:
 
 ## Testing
 
-Spooky includes comprehensive unit and integration tests to ensure reliability and correctness.
+Spooky includes basic unit and integration tests to help ensure reliability.
 
 ### Running Tests
 
@@ -216,15 +216,15 @@ go test -cover ./...
 - **Test Fixtures**: Sample configurations and scripts in `tests/fixtures/`
 - **Test Helpers**: Common utilities in `tests/helpers/`
 
-### Test Coverage
+### Current Test Coverage
 
-The test suite covers:
-- Configuration parsing and validation
+The test suite currently covers:
+- Basic configuration parsing and validation
 - SSH connection and authentication
-- Command and script execution
-- Sequential and parallel execution
-- Error handling and edge cases
-- Server targeting and tag-based selection
+- Simple command execution
+- Basic error handling
+
+**Note**: This is a work in progress. Additional test coverage for advanced features, edge cases, and parallel execution is planned.
 
 For detailed testing information, see [tests/README.md](tests/README.md).
 
