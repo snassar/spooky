@@ -239,10 +239,22 @@ For detailed testing information, see [tests/README.md](tests/README.md).
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the GNU Affero General Public License v3 - see the LICENSE file for details.
 
 ## Dependencies
 
-- [Cobra](https://github.com/spf13/cobra) - CLI framework
-- [golang.org/x/crypto/ssh](https://pkg.go.dev/golang.org/x/crypto/ssh) - SSH client
-- [HCL2](https://github.com/hashicorp/hcl) - Configuration language 
+### Core Dependencies
+- [Cobra](https://github.com/spf13/cobra) - CLI framework for command-line interface
+- [golang.org/x/crypto/ssh](https://pkg.go.dev/golang.org/x/crypto/ssh) - SSH client implementation
+- [HCL2](https://github.com/hashicorp/hcl) - HashiCorp Configuration Language for config files
+
+### Testing Dependencies
+- [gliderlabs/ssh](https://github.com/gliderlabs/ssh) - SSH server for integration testing
+- [github.com/pkg/sftp](https://github.com/pkg/sftp) - SFTP client for file transfer testing
+
+### Indirect Dependencies
+- [golang.org/x/sys](https://pkg.go.dev/golang.org/x/sys) - System calls and OS-specific functionality
+- [golang.org/x/text](https://pkg.go.dev/golang.org/x/text) - Text processing utilities
+- [zclconf/go-cty](https://github.com/zclconf/go-cty) - Type system for HCL2
+- [apparentlymart/go-textseg](https://github.com/apparentlymart/go-textseg) - Text segmentation for HCL2
+- [kr/fs](https://github.com/kr/fs) - File system utilities for SFTP 
