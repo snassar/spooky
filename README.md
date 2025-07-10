@@ -225,6 +225,12 @@ Then run:
 go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
 ```
 
+Run the code coverage tool
+
+```bash
+go-test-coverage --config=./tests/testcoverage.yml
+```
+
 ### Test Structure
 
 - **Unit Tests**: Co-located with source files (e.g., `config_test.go`)
