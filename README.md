@@ -254,6 +254,34 @@ The test suite currently covers:
 
 For detailed testing information, see [tests/README.md](tests/README.md).
 
+### Coverage Visualization
+
+#### Local Development
+Generate an HTML coverage report locally:
+```bash
+make coverage-html
+```
+Then open `coverage.html` in your browser to view detailed coverage information.
+
+#### CI/CD
+Coverage reports are automatically generated in CI/CD and available as workflow artifacts:
+
+1. Go to the **Actions** tab in GitHub
+2. Click on a workflow run (e.g., "Test Coverage")
+3. Scroll down to **Artifacts**
+4. Download `coverage-reports` to get:
+   - `cover.out` - Raw coverage data
+   - `coverage.html` - Interactive HTML report
+
+#### Viewing HTML Reports
+The HTML coverage report provides:
+- File-by-file coverage breakdown
+- Line-by-line coverage highlighting
+- Overall project coverage statistics
+- Coverage trends and gaps
+
+Open `coverage.html` in any web browser to explore coverage details.
+
 ## Contributing
 
 1. Fork the repository

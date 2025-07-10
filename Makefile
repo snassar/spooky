@@ -40,6 +40,13 @@ check-coverage:
 	go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
 	go run github.com/vladopajic/go-test-coverage/v2@latest --config=./tests/testcoverage.yml
 
+# Generate HTML coverage report locally
+coverage-html:
+	go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+	go tool cover -html=./cover.out -o coverage.html
+	@echo "HTML coverage report generated: coverage.html"
+	@echo "Open coverage.html in your browser to view the report"
+
 # Run the tool with example configuration
 run: build
 	./spooky execute example.hcl
