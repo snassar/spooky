@@ -211,6 +211,20 @@ go test -tags=integration ./tests/integration/...
 go test -cover ./...
 ```
 
+### Test Coverage Tool
+
+For detailed coverage analysis, install the go-test-coverage tool:
+
+```bash
+go install github.com/vladopajic/go-test-coverage/v2@latest
+```
+
+Then run:
+
+```bash
+go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+```
+
 ### Test Structure
 
 - **Unit Tests**: Co-located with source files (e.g., `config_test.go`)

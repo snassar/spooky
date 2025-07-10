@@ -1,4 +1,4 @@
-.PHONY: build clean test run validate list help
+.PHONY: build clean test run validate list help check-coverage test-unit test-integration test-coverage
 
 # Build the spooky binary
 build:
@@ -13,7 +13,7 @@ clean:
 	go clean -testcache
 
 # Run tests
-test: test-unit test-integration
+test: test-unit test-integration check-coverage 
 
 # Run unit tests only
 test-unit:
@@ -29,6 +29,10 @@ test-coverage:
 	go test -v -tags=integration -coverprofile=coverage-integration.out ./tests/integration/...
 	go tool cover -html=coverage.out -o coverage.html
 	go tool cover -html=coverage-integration.out -o coverage-integration.html
+
+check-coverage:
+	go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+	go run github.com/vladopajic/go-test-coverage/v2@latest --config=./tests/testcoverage.yml
 
 # Run the tool with example configuration
 run: build
