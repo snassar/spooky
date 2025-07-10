@@ -1,0 +1,1006 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>spooky-tool: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">spooky-tool/commands.go (0.0%)</option>
+				
+				<option value="file1">spooky-tool/examples/ssh_keygen_example.go (0.0%)</option>
+				
+				<option value="file2">spooky-tool/main.go (0.0%)</option>
+				
+				<option value="file3">spooky-tool/spooky/config.go (95.1%)</option>
+				
+				<option value="file4">spooky-tool/spooky/ssh.go (42.5%)</option>
+				
+				<option value="file5">spooky-tool/ssh_keygen.go (0.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">no coverage</span>
+				<span class="cov1">low coverage</span>
+				<span class="cov2">*</span>
+				<span class="cov3">*</span>
+				<span class="cov4">*</span>
+				<span class="cov5">*</span>
+				<span class="cov6">*</span>
+				<span class="cov7">*</span>
+				<span class="cov8">*</span>
+				<span class="cov9">*</span>
+				<span class="cov10">high coverage</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package main
+
+import (
+        "fmt"
+        "os"
+
+        "github.com/spf13/cobra"
+
+        "spooky-tool/spooky"
+)
+
+var (
+        configFile string
+        parallel   bool
+        timeout    int
+)
+
+var executeCmd = &amp;cobra.Command{
+        Use:   "execute [config-file]",
+        Short: "Execute actions from HCL2 configuration file",
+        Long:  `Execute actions defined in an HCL2 configuration file on remote servers via SSH`,
+        Args:  cobra.MaximumNArgs(1),
+        RunE: func(cmd *cobra.Command, args []string) error <span class="cov0" title="0">{
+                if len(args) &gt; 0 </span><span class="cov0" title="0">{
+                        configFile = args[0]
+                }</span>
+
+                <span class="cov0" title="0">if configFile == "" </span><span class="cov0" title="0">{
+                        return fmt.Errorf("config file is required") // coverage-ignore: CLI validation error, tested via integration
+                }</span>
+
+                // Validate config file exists
+                <span class="cov0" title="0">if _, err := os.Stat(configFile); os.IsNotExist(err) </span><span class="cov0" title="0">{
+                        return fmt.Errorf("config file %s does not exist", configFile) // coverage-ignore: file system error, hard to test
+                }</span>
+
+                // Parse and execute configuration
+                <span class="cov0" title="0">config, err := spooky.ParseConfig(configFile)
+                if err != nil </span><span class="cov0" title="0">{
+                        return fmt.Errorf("failed to parse config: %w", err)
+                }</span>
+
+                <span class="cov0" title="0">return spooky.ExecuteConfig(config)</span>
+        },
+}
+
+var validateCmd = &amp;cobra.Command{
+        Use:   "validate [config-file]",
+        Short: "Validate HCL2 configuration file",
+        Long:  `Validate the syntax and structure of an HCL2 configuration file`,
+        Args:  cobra.MaximumNArgs(1),
+        RunE: func(cmd *cobra.Command, args []string) error <span class="cov0" title="0">{
+                if len(args) &gt; 0 </span><span class="cov0" title="0">{
+                        configFile = args[0]
+                }</span>
+
+                <span class="cov0" title="0">if configFile == "" </span><span class="cov0" title="0">{
+                        return fmt.Errorf("config file is required")
+                }</span>
+
+                // Validate config file exists
+                <span class="cov0" title="0">if _, err := os.Stat(configFile); os.IsNotExist(err) </span><span class="cov0" title="0">{
+                        return fmt.Errorf("config file %s does not exist", configFile)
+                }</span>
+
+                // Parse configuration
+                <span class="cov0" title="0">config, err := spooky.ParseConfig(configFile)
+                if err != nil </span><span class="cov0" title="0">{
+                        return fmt.Errorf("validation failed: %w", err)
+                }</span>
+
+                <span class="cov0" title="0">fmt.Printf("✅ Configuration file '%s' is valid\n", configFile)
+                fmt.Printf("📊 Found %d servers and %d actions\n", len(config.Servers), len(config.Actions))
+
+                return nil</span>
+        },
+}
+
+var listCmd = &amp;cobra.Command{
+        Use:   "list [config-file]",
+        Short: "List servers and actions from configuration file",
+        Long:  `Display all servers and actions defined in an HCL2 configuration file`,
+        Args:  cobra.MaximumNArgs(1),
+        RunE: func(cmd *cobra.Command, args []string) error <span class="cov0" title="0">{
+                if len(args) &gt; 0 </span><span class="cov0" title="0">{
+                        configFile = args[0]
+                }</span>
+
+                <span class="cov0" title="0">if configFile == "" </span><span class="cov0" title="0">{
+                        return fmt.Errorf("config file is required")
+                }</span>
+
+                // Validate config file exists
+                <span class="cov0" title="0">if _, err := os.Stat(configFile); os.IsNotExist(err) </span><span class="cov0" title="0">{
+                        return fmt.Errorf("config file %s does not exist", configFile)
+                }</span>
+
+                // Parse configuration
+                <span class="cov0" title="0">config, err := spooky.ParseConfig(configFile)
+                if err != nil </span><span class="cov0" title="0">{
+                        return fmt.Errorf("failed to parse config: %w", err)
+                }</span>
+
+                // Display servers
+                <span class="cov0" title="0">fmt.Println("🌐 Servers:")
+                for _, server := range config.Servers </span><span class="cov0" title="0">{
+                        fmt.Printf("  - %s (%s@%s:%d)\n", server.Name, server.User, server.Host, server.Port)
+                }</span>
+
+                // Display actions
+                <span class="cov0" title="0">fmt.Println("\n⚡ Actions:")
+                for _, action := range config.Actions </span><span class="cov0" title="0">{
+                        fmt.Printf("  - %s: %s\n", action.Name, action.Description)
+                }</span>
+
+                <span class="cov0" title="0">return nil</span>
+        },
+}
+
+func init() <span class="cov0" title="0">{
+        // Global flags
+        executeCmd.Flags().BoolVarP(&amp;parallel, "parallel", "p", false, "Execute actions in parallel")
+        executeCmd.Flags().IntVarP(&amp;timeout, "timeout", "t", 30, "SSH connection timeout in seconds")
+
+        validateCmd.Flags().StringVarP(&amp;configFile, "config", "c", "", "Configuration file path")
+        listCmd.Flags().StringVarP(&amp;configFile, "config", "c", "", "Configuration file path")
+}</span>
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package main
+
+import (
+        "crypto/ed25519"
+        cryptorand "crypto/rand"
+        "encoding/pem"
+        "fmt"
+        "math/rand"
+        "os"
+        "time"
+
+        "golang.org/x/crypto/ssh"
+)
+
+// generatePassword creates a 25-character password with ASCII letters and numbers
+func generatePassword() string <span class="cov0" title="0">{
+        const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        password := make([]byte, 25)
+        for i := range password </span><span class="cov0" title="0">{
+                password[i] = charset[rand.Intn(len(charset))]
+        }</span>
+        <span class="cov0" title="0">return string(password)</span>
+}
+
+// generateEd25519KeyPair generates an Ed25519 key pair and returns it in OpenSSH format
+func generateEd25519KeyPair(password string) (privateKeyPEM []byte, publicKeyBytes []byte, err error) <span class="cov0" title="0">{
+        // Generate Ed25519 key pair
+        publicKeyRaw, privateKeyRaw, err := ed25519.GenerateKey(cryptorand.Reader)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, nil, fmt.Errorf("failed to generate Ed25519 key: %w", err)
+        }</span>
+
+        // Create SSH public key
+        <span class="cov0" title="0">publicKey, err := ssh.NewPublicKey(publicKeyRaw)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, nil, fmt.Errorf("failed to create SSH public key: %w", err)
+        }</span>
+
+        // For Ed25519, we'll create a simple PEM format that's compatible
+        // with OpenSSH. The private key contains both private and public key data.
+
+        // Create the key data: [private key (32 bytes)][public key (32 bytes)]
+        <span class="cov0" title="0">keyData := make([]byte, 64)
+        copy(keyData[:32], privateKeyRaw)
+        copy(keyData[32:], publicKeyRaw)
+
+        // Create PEM block for private key
+        privateKeyPEM = pem.EncodeToMemory(&amp;pem.Block{
+                Type:  "OPENSSH PRIVATE KEY",
+                Bytes: keyData,
+        })
+
+        return privateKeyPEM, ssh.MarshalAuthorizedKey(publicKey), nil</span>
+}
+
+// writeKeyFiles writes the private key, public key, and password to files
+func writeKeyFiles(privateKeyPEM []byte, publicKey []byte, password string) (string, error) <span class="cov0" title="0">{
+        // Create output directory with timestamp and counter
+        now := time.Now()
+        dateStr := now.Format("20060102")
+
+        // Find the next available counter
+        var counter int
+        var outputDir string
+        for counter = 0; counter &lt; 1000; counter++ </span><span class="cov0" title="0">{
+                outputDir = fmt.Sprintf("generated_keys/%s%03d", dateStr, counter)
+                if _, err := os.Stat(outputDir); os.IsNotExist(err) </span><span class="cov0" title="0">{
+                        break</span>
+                }
+        }
+
+        <span class="cov0" title="0">if counter &gt;= 1000 </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("too many key directories for today, maximum 1000 reached")
+        }</span>
+
+        // Create the directory
+        <span class="cov0" title="0">if err := os.MkdirAll(outputDir, 0755); err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to create output directory: %w", err)
+        }</span>
+
+        // Write private key file
+        <span class="cov0" title="0">privateKeyPath := fmt.Sprintf("%s/id_ed25519", outputDir)
+        if err := os.WriteFile(privateKeyPath, privateKeyPEM, 0600); err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to write private key: %w", err)
+        }</span>
+
+        // Write public key file
+        <span class="cov0" title="0">publicKeyPath := fmt.Sprintf("%s/id_ed25519.pub", outputDir)
+        if err := os.WriteFile(publicKeyPath, publicKey, 0644); err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to write public key: %w", err)
+        }</span>
+
+        // Write password file
+        <span class="cov0" title="0">passwordPath := fmt.Sprintf("%s/ed25519_password.txt", outputDir)
+        passwordContent := fmt.Sprintf("Generated password for Ed25519 key: %s\n", password)
+        if err := os.WriteFile(passwordPath, []byte(passwordContent), 0600); err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to write password file: %w", err)
+        }</span>
+
+        // Write combined file with all information
+        <span class="cov0" title="0">combinedPath := fmt.Sprintf("%s/ed25519_keys.txt", outputDir)
+        combinedContent := fmt.Sprintf("=== ED25519 SSH Key Pair ===\n\n")
+        combinedContent += "Private Key:\n"
+        combinedContent += string(privateKeyPEM)
+        combinedContent += "\n\nPublic Key:\n"
+        combinedContent += string(publicKey)
+        combinedContent += "\n\nPassword: " + password + "\n"
+
+        if err := os.WriteFile(combinedPath, []byte(combinedContent), 0600); err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to write combined file: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">return outputDir, nil</span>
+}
+
+func main() <span class="cov0" title="0">{
+        // Seed the random number generator
+        rand.Seed(time.Now().UnixNano())
+
+        fmt.Println("🔐 Ed25519 SSH Key Generator")
+        fmt.Println("============================")
+
+        // Generate password
+        password := generatePassword()
+        fmt.Printf("Generated password: %s\n", password)
+
+        // Generate Ed25519 keys
+        fmt.Println("\n📝 Generating Ed25519 keys...")
+        privateKeyPEM, publicKey, err := generateEd25519KeyPair(password)
+        if err != nil </span><span class="cov0" title="0">{
+                fmt.Printf("❌ Failed to generate Ed25519 keys: %v\n", err)
+                os.Exit(1)
+        }</span>
+
+        // Write Ed25519 key files
+        <span class="cov0" title="0">outputDir, err := writeKeyFiles(privateKeyPEM, publicKey, password)
+        if err != nil </span><span class="cov0" title="0">{
+                fmt.Printf("❌ Failed to write Ed25519 key files: %v\n", err)
+                os.Exit(1)
+        }</span>
+
+        <span class="cov0" title="0">fmt.Println("✅ Ed25519 keys generated successfully!")
+
+        // Display file locations
+        fmt.Println("\n📁 Generated files:")
+        fmt.Printf("  %s/\n", outputDir)
+        fmt.Println("  ├── id_ed25519          (Ed25519 private key)")
+        fmt.Println("  ├── id_ed25519.pub      (Ed25519 public key)")
+        fmt.Println("  ├── ed25519_keys.txt    (Ed25519 combined file)")
+        fmt.Println("  └── ed25519_password.txt (Ed25519 password)")
+
+        fmt.Printf("\n🔑 Password: %s\n", password)
+        fmt.Println("\n⚠️  IMPORTANT: Keep the password secure and backup the key files!")</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package main
+
+import (
+        "fmt"
+        "os"
+
+        "github.com/spf13/cobra"
+)
+
+func main() <span class="cov0" title="0">{
+        // coverage-ignore: main function is entry point, tested via integration tests
+        var rootCmd = &amp;cobra.Command{
+                Use:   "spooky",
+                Short: "Spooky is a SSH automation tool that runs actions from HCL2 configuration files",
+                Long: `Spooky is a powerful SSH automation tool that allows you to:
+- Connect to multiple servers via SSH
+- Execute commands and scripts from HCL2 configuration files
+- Manage server operations in a declarative way
+- Support for parallel execution and error handling`,
+        }
+
+        // Add subcommands
+        rootCmd.AddCommand(executeCmd)
+        rootCmd.AddCommand(validateCmd)
+        rootCmd.AddCommand(listCmd)
+
+        if err := rootCmd.Execute(); err != nil </span><span class="cov0" title="0">{
+                fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+                os.Exit(1)
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package spooky
+
+import (
+        "fmt"
+
+        "github.com/hashicorp/hcl/v2/gohcl"
+        "github.com/hashicorp/hcl/v2/hclparse"
+)
+
+// Config represents the main configuration structure
+type Config struct {
+        Servers []Server `hcl:"server,block"`
+        Actions []Action `hcl:"action,block"`
+}
+
+// Server represents a remote server configuration
+type Server struct {
+        Name     string            `hcl:"name,label"`
+        Host     string            `hcl:"host"`
+        Port     int               `hcl:"port,optional"`
+        User     string            `hcl:"user"`
+        Password string            `hcl:"password,optional"`
+        KeyFile  string            `hcl:"key_file,optional"`
+        Tags     map[string]string `hcl:"tags,optional"`
+}
+
+// Action represents an action to be executed on servers
+type Action struct {
+        Name        string   `hcl:"name,label"`
+        Description string   `hcl:"description,optional"`
+        Command     string   `hcl:"command,optional"`
+        Script      string   `hcl:"script,optional"`
+        Servers     []string `hcl:"servers,optional"`
+        Tags        []string `hcl:"tags,optional"`
+        Timeout     int      `hcl:"timeout,optional"`
+        Parallel    bool     `hcl:"parallel,optional"`
+}
+
+// ParseConfig parses an HCL2 configuration file
+func ParseConfig(filename string) (*Config, error) <span class="cov8" title="8">{
+        parser := hclparse.NewParser()
+
+        // Read the file
+        file, diags := parser.ParseHCLFile(filename)
+        if diags.HasErrors() </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to parse HCL file: %s", diags.Error())
+        }</span>
+
+        // Decode the configuration
+        <span class="cov8" title="8">var config Config
+        diags = gohcl.DecodeBody(file.Body, nil, &amp;config)
+        if diags.HasErrors() </span><span class="cov3" title="2">{
+                return nil, fmt.Errorf("failed to decode configuration: %s", diags.Error())
+        }</span>
+
+        // Validate configuration
+        <span class="cov7" title="6">if err := validateConfig(&amp;config); err != nil </span><span class="cov5" title="4">{
+                return nil, fmt.Errorf("configuration validation failed: %w", err)
+        }</span>
+
+        <span class="cov3" title="2">return &amp;config, nil</span>
+}
+
+// validateConfig validates the configuration structure
+func validateConfig(config *Config) error <span class="cov9" title="12">{
+        if len(config.Servers) == 0 </span><span class="cov1" title="1">{
+                return fmt.Errorf("at least one server must be defined")
+        }</span>
+
+        // Actions are optional - you can have a config with just servers for listing purposes
+        // if len(config.Actions) == 0 {
+        //         return fmt.Errorf("at least one action must be defined")
+        // }
+
+        // Validate servers
+        <span class="cov9" title="11">serverNames := make(map[string]bool)
+        for _, server := range config.Servers </span><span class="cov10" title="13">{
+                if server.Name == "" </span><span class="cov1" title="1">{
+                        return fmt.Errorf("server name cannot be empty")
+                }</span>
+                <span class="cov9" title="12">if server.Host == "" </span><span class="cov1" title="1">{
+                        return fmt.Errorf("server host cannot be empty for server %s", server.Name)
+                }</span>
+                <span class="cov9" title="11">if server.User == "" </span><span class="cov1" title="1">{
+                        return fmt.Errorf("server user cannot be empty for server %s", server.Name)
+                }</span>
+                <span class="cov9" title="10">if server.Port == 0 </span><span class="cov8" title="8">{
+                        server.Port = 22 // Default SSH port
+                }</span>
+                <span class="cov9" title="10">if server.Password == "" &amp;&amp; server.KeyFile == "" </span><span class="cov3" title="2">{
+                        return fmt.Errorf("either password or key_file must be specified for server %s", server.Name)
+                }</span>
+
+                <span class="cov8" title="8">if serverNames[server.Name] </span><span class="cov1" title="1">{
+                        return fmt.Errorf("duplicate server name: %s", server.Name)
+                }</span>
+                <span class="cov7" title="7">serverNames[server.Name] = true</span>
+        }
+
+        // Validate actions
+        <span class="cov6" title="5">actionNames := make(map[string]bool)
+        for _, action := range config.Actions </span><span class="cov6" title="5">{
+                if action.Name == "" </span><span class="cov0" title="0">{
+                        return fmt.Errorf("action name cannot be empty")
+                }</span>
+                <span class="cov6" title="5">if action.Command == "" &amp;&amp; action.Script == "" </span><span class="cov1" title="1">{
+                        return fmt.Errorf("either command or script must be specified for action %s", action.Name)
+                }</span>
+                <span class="cov5" title="4">if action.Command != "" &amp;&amp; action.Script != "" </span><span class="cov1" title="1">{
+                        return fmt.Errorf("cannot specify both command and script for action %s", action.Name)
+                }</span>
+
+                <span class="cov4" title="3">if actionNames[action.Name] </span><span class="cov0" title="0">{
+                        return fmt.Errorf("duplicate action name: %s", action.Name)
+                }</span>
+                <span class="cov4" title="3">actionNames[action.Name] = true</span>
+        }
+
+        <span class="cov4" title="3">return nil</span>
+}
+
+// GetServersForAction returns the list of servers that should execute an action
+func GetServersForAction(action *Action, config *Config) ([]*Server, error) <span class="cov6" title="5">{
+        var targetServers []*Server
+
+        // If specific servers are specified, use those
+        if len(action.Servers) &gt; 0 </span><span class="cov3" title="2">{
+                serverMap := make(map[string]*Server)
+                for i := range config.Servers </span><span class="cov7" title="6">{
+                        serverMap[config.Servers[i].Name] = &amp;config.Servers[i]
+                }</span>
+
+                <span class="cov3" title="2">for _, serverName := range action.Servers </span><span class="cov4" title="3">{
+                        if server, exists := serverMap[serverName]; exists </span><span class="cov3" title="2">{
+                                targetServers = append(targetServers, server)
+                        }</span> else<span class="cov1" title="1"> {
+                                return nil, fmt.Errorf("server '%s' not found for action '%s'", serverName, action.Name)
+                        }</span>
+                }
+                <span class="cov1" title="1">return targetServers, nil</span>
+        }
+
+        // If tags are specified, find servers with matching tags
+        <span class="cov4" title="3">if len(action.Tags) &gt; 0 </span><span class="cov3" title="2">{
+                for i := range config.Servers </span><span class="cov7" title="6">{
+                        server := &amp;config.Servers[i]
+                        for _, tag := range action.Tags </span><span class="cov7" title="6">{
+                                if value, exists := server.Tags[tag]; exists &amp;&amp; value != "" </span><span class="cov7" title="6">{
+                                        targetServers = append(targetServers, server)
+                                        break</span>
+                                }
+                        }
+                }
+                <span class="cov3" title="2">return targetServers, nil</span>
+        }
+
+        // If no servers or tags specified, use all servers
+        <span class="cov1" title="1">for i := range config.Servers </span><span class="cov4" title="3">{
+                targetServers = append(targetServers, &amp;config.Servers[i])
+        }</span>
+
+        <span class="cov1" title="1">return targetServers, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package spooky
+
+import (
+        "bufio"
+        "fmt"
+        "os"
+        "strings"
+        "sync"
+        "time"
+
+        "golang.org/x/crypto/ssh"
+)
+
+// SSHClient represents an SSH client connection
+type SSHClient struct {
+        client *ssh.Client
+        server *Server
+}
+
+// NewSSHClient creates a new SSH client connection
+func NewSSHClient(server *Server, timeout int) (*SSHClient, error) <span class="cov10" title="11">{
+        var authMethods []ssh.AuthMethod
+
+        // Add password authentication if provided
+        if server.Password != "" </span><span class="cov9" title="9">{
+                authMethods = append(authMethods, ssh.Password(server.Password))
+        }</span>
+
+        // Add key-based authentication if provided
+        <span class="cov10" title="11">if server.KeyFile != "" </span><span class="cov1" title="1">{
+                key, err := os.ReadFile(server.KeyFile)
+                if err != nil </span><span class="cov1" title="1">{
+                        return nil, fmt.Errorf("failed to read key file %s: %w", server.KeyFile, err) // coverage-ignore: file system error, tested via integration
+                }</span>
+
+                <span class="cov0" title="0">signer, err := ssh.ParsePrivateKey(key)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("failed to parse private key: %w", err)
+                }</span>
+                <span class="cov0" title="0">authMethods = append(authMethods, ssh.PublicKeys(signer))</span>
+        }
+
+        <span class="cov9" title="10">if len(authMethods) == 0 </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("no authentication method available for server %s", server.Name)
+        }</span>
+
+        // SSH client configuration
+        <span class="cov9" title="9">config := &amp;ssh.ClientConfig{
+                User:            server.User,
+                Auth:            authMethods,
+                HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+                Timeout:         time.Duration(timeout) * time.Second,
+        }
+
+        // Connect to the server
+        client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", server.Host, server.Port), config)
+        if err != nil </span><span class="cov9" title="9">{
+                return nil, fmt.Errorf("failed to connect to %s@%s:%d: %w", server.User, server.Host, server.Port, err)
+        }</span>
+
+        <span class="cov0" title="0">return &amp;SSHClient{
+                client: client,
+                server: server,
+        }, nil</span>
+}
+
+// Close closes the SSH connection
+func (s *SSHClient) Close() error <span class="cov0" title="0">{
+        return s.client.Close()
+}</span>
+
+// ExecuteCommand executes a command on the remote server
+func (s *SSHClient) ExecuteCommand(command string) (string, error) <span class="cov0" title="0">{
+        session, err := s.client.NewSession()
+        if err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to create session: %w", err)
+        }</span>
+        <span class="cov0" title="0">defer session.Close()
+
+        // Capture stdout and stderr
+        var stdout, stderr strings.Builder
+        session.Stdout = &amp;stdout
+        session.Stderr = &amp;stderr
+
+        // Execute the command
+        err = session.Run(command)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("command execution failed: %s, stderr: %s", err, stderr.String())
+        }</span>
+
+        <span class="cov0" title="0">return stdout.String(), nil</span>
+}
+
+// ExecuteScript executes a script file on the remote server
+func (s *SSHClient) ExecuteScript(scriptPath string) (string, error) <span class="cov0" title="0">{
+        // Read the script file
+        scriptContent, err := os.ReadFile(scriptPath)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to read script file %s: %w", scriptPath, err)
+        }</span>
+
+        // Execute the script content
+        <span class="cov0" title="0">return s.ExecuteCommand(string(scriptContent))</span>
+}
+
+// ExecuteConfig executes all actions in the configuration
+func ExecuteConfig(config *Config) error <span class="cov0" title="0">{
+        fmt.Printf("🚀 Starting execution of %d actions...\n", len(config.Actions))
+
+        for _, action := range config.Actions </span><span class="cov0" title="0">{
+                fmt.Printf("\n⚡ Executing action: %s\n", action.Name)
+                if action.Description != "" </span><span class="cov0" title="0">{
+                        fmt.Printf("📝 Description: %s\n", action.Description)
+                }</span>
+
+                // Get target servers for this action
+                <span class="cov0" title="0">targetServers, err := GetServersForAction(&amp;action, config)
+                if err != nil </span><span class="cov0" title="0">{
+                        return fmt.Errorf("failed to get servers for action %s: %w", action.Name, err)
+                }</span>
+
+                <span class="cov0" title="0">fmt.Printf("🌐 Target servers: %d\n", len(targetServers))
+
+                // Execute on each server
+                if action.Parallel </span><span class="cov0" title="0">{
+                        err = executeActionParallel(&amp;action, targetServers)
+                }</span> else<span class="cov0" title="0"> {
+                        err = executeActionSequential(&amp;action, targetServers)
+                }</span>
+
+                <span class="cov0" title="0">if err != nil </span><span class="cov0" title="0">{
+                        return fmt.Errorf("failed to execute action %s: %w", action.Name, err)
+                }</span>
+        }
+
+        <span class="cov0" title="0">fmt.Println("\n✅ All actions completed successfully!")
+        return nil</span>
+}
+
+// executeActionSequential executes an action sequentially on all target servers
+func executeActionSequential(action *Action, servers []*Server) error <span class="cov1" title="1">{
+        for _, server := range servers </span><span class="cov3" title="2">{
+                fmt.Printf("  🔗 Connecting to %s (%s@%s:%d)...\n", server.Name, server.User, server.Host, server.Port)
+
+                // Create SSH client
+                client, err := NewSSHClient(server, 30) // Default timeout
+                if err != nil </span><span class="cov3" title="2">{
+                        fmt.Printf("  ❌ Failed to connect to %s: %v\n", server.Name, err)
+                        continue</span>
+                }
+                <span class="cov0" title="0">defer client.Close()
+
+                // Execute the action
+                var output string
+                if action.Command != "" </span><span class="cov0" title="0">{
+                        output, err = client.ExecuteCommand(action.Command)
+                }</span> else<span class="cov0" title="0"> if action.Script != "" </span><span class="cov0" title="0">{
+                        output, err = client.ExecuteScript(action.Script)
+                }</span>
+
+                <span class="cov0" title="0">if err != nil </span><span class="cov0" title="0">{
+                        fmt.Printf("  ❌ Failed to execute action on %s: %v\n", server.Name, err)
+                        continue</span>
+                }
+
+                <span class="cov0" title="0">fmt.Printf("  ✅ Success on %s\n", server.Name)
+                if output != "" </span><span class="cov0" title="0">{
+                        fmt.Printf("  📄 Output:\n%s\n", indentOutput(output))
+                }</span>
+        }
+
+        <span class="cov1" title="1">return nil</span>
+}
+
+// executeActionParallel executes an action in parallel on all target servers
+func executeActionParallel(action *Action, servers []*Server) error <span class="cov1" title="1">{
+        var wg sync.WaitGroup
+        results := make(chan string, len(servers))
+        errors := make(chan error, len(servers))
+
+        for _, server := range servers </span><span class="cov3" title="2">{
+                wg.Add(1)
+                go func(s *Server) </span><span class="cov3" title="2">{
+                        defer wg.Done()
+
+                        fmt.Printf("  🔗 Connecting to %s (%s@%s:%d)...\n", s.Name, s.User, s.Host, s.Port)
+
+                        // Create SSH client
+                        client, err := NewSSHClient(s, 30) // Default timeout
+                        if err != nil </span><span class="cov3" title="2">{
+                                errors &lt;- fmt.Errorf("failed to connect to %s: %w", s.Name, err)
+                                return
+                        }</span>
+                        <span class="cov0" title="0">defer client.Close()
+
+                        // Execute the action
+                        var output string
+                        if action.Command != "" </span><span class="cov0" title="0">{
+                                output, err = client.ExecuteCommand(action.Command)
+                        }</span> else<span class="cov0" title="0"> if action.Script != "" </span><span class="cov0" title="0">{
+                                output, err = client.ExecuteScript(action.Script)
+                        }</span>
+
+                        <span class="cov0" title="0">if err != nil </span><span class="cov0" title="0">{
+                                errors &lt;- fmt.Errorf("failed to execute action on %s: %w", s.Name, err)
+                                return
+                        }</span>
+
+                        <span class="cov0" title="0">results &lt;- fmt.Sprintf("✅ Success on %s\n%s", s.Name, indentOutput(output))</span>
+                }(server)
+        }
+
+        // Wait for all goroutines to complete
+        <span class="cov1" title="1">wg.Wait()
+        close(results)
+        close(errors)
+
+        // Collect results
+        for result := range results </span><span class="cov0" title="0">{
+                fmt.Println(result)
+        }</span>
+
+        // Check for errors
+        <span class="cov1" title="1">select </span>{
+        case err := &lt;-errors:<span class="cov1" title="1">
+                return err</span>
+        default:<span class="cov0" title="0">
+                return nil</span>
+        }
+}
+
+// indentOutput indents the output for better readability
+func indentOutput(output string) string <span class="cov6" title="4">{
+        if output == "" </span><span class="cov1" title="1">{
+                return ""
+        }</span>
+
+        <span class="cov5" title="3">var indented strings.Builder
+        scanner := bufio.NewScanner(strings.NewReader(output))
+        for scanner.Scan() </span><span class="cov7" title="6">{
+                indented.WriteString("    " + scanner.Text() + "\n")
+        }</span>
+        <span class="cov5" title="3">return indented.String()</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package main
+
+import (
+        "crypto/ed25519"
+        cryptorand "crypto/rand"
+        "encoding/pem"
+        "fmt"
+        "math/rand"
+        "os"
+        "time"
+
+        "golang.org/x/crypto/ssh"
+)
+
+// generatePassword creates a 25-character password with ASCII letters and numbers
+func generatePassword() string <span class="cov0" title="0">{
+        const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        password := make([]byte, 25)
+        for i := range password </span><span class="cov0" title="0">{
+                password[i] = charset[rand.Intn(len(charset))]
+        }</span>
+        <span class="cov0" title="0">return string(password)</span>
+}
+
+// generateEd25519KeyPair generates an Ed25519 key pair and returns it in OpenSSH format
+func generateEd25519KeyPair(password string) (privateKeyPEM []byte, publicKeyBytes []byte, err error) <span class="cov0" title="0">{
+        // Generate Ed25519 key pair
+        publicKeyRaw, privateKeyRaw, err := ed25519.GenerateKey(cryptorand.Reader)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, nil, fmt.Errorf("failed to generate Ed25519 key: %w", err)
+        }</span>
+
+        // Create SSH public key
+        <span class="cov0" title="0">publicKey, err := ssh.NewPublicKey(publicKeyRaw)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, nil, fmt.Errorf("failed to create SSH public key: %w", err)
+        }</span>
+
+        // For Ed25519, we'll create a simple PEM format that's compatible
+        // with OpenSSH. The private key contains both private and public key data.
+
+        // Create the key data: [private key (32 bytes)][public key (32 bytes)]
+        <span class="cov0" title="0">keyData := make([]byte, 64)
+        copy(keyData[:32], privateKeyRaw)
+        copy(keyData[32:], publicKeyRaw)
+
+        // Create PEM block for private key
+        privateKeyPEM = pem.EncodeToMemory(&amp;pem.Block{
+                Type:  "OPENSSH PRIVATE KEY",
+                Bytes: keyData,
+        })
+
+        return privateKeyPEM, ssh.MarshalAuthorizedKey(publicKey), nil</span>
+}
+
+// writeKeyFiles writes the private key, public key, and password to files
+func writeKeyFiles(privateKeyPEM []byte, publicKey []byte, password string) (string, error) <span class="cov0" title="0">{
+        // Create output directory with timestamp and counter
+        now := time.Now()
+        dateStr := now.Format("20060102")
+
+        // Find the next available counter
+        var counter int
+        var outputDir string
+        for counter = 0; counter &lt; 1000; counter++ </span><span class="cov0" title="0">{
+                outputDir = fmt.Sprintf("generated_keys/%s%03d", dateStr, counter)
+                if _, err := os.Stat(outputDir); os.IsNotExist(err) </span><span class="cov0" title="0">{
+                        break</span>
+                }
+        }
+
+        <span class="cov0" title="0">if counter &gt;= 1000 </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("too many key directories for today, maximum 1000 reached")
+        }</span>
+
+        // Create the directory
+        <span class="cov0" title="0">if err := os.MkdirAll(outputDir, 0755); err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to create output directory: %w", err)
+        }</span>
+
+        // Write private key file
+        <span class="cov0" title="0">privateKeyPath := fmt.Sprintf("%s/id_ed25519", outputDir)
+        if err := os.WriteFile(privateKeyPath, privateKeyPEM, 0600); err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to write private key: %w", err)
+        }</span>
+
+        // Write public key file
+        <span class="cov0" title="0">publicKeyPath := fmt.Sprintf("%s/id_ed25519.pub", outputDir)
+        if err := os.WriteFile(publicKeyPath, publicKey, 0644); err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to write public key: %w", err)
+        }</span>
+
+        // Write password file
+        <span class="cov0" title="0">passwordPath := fmt.Sprintf("%s/ed25519_password.txt", outputDir)
+        passwordContent := fmt.Sprintf("Generated password for Ed25519 key: %s\n", password)
+        if err := os.WriteFile(passwordPath, []byte(passwordContent), 0600); err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to write password file: %w", err)
+        }</span>
+
+        // Write combined file with all information
+        <span class="cov0" title="0">combinedPath := fmt.Sprintf("%s/ed25519_keys.txt", outputDir)
+        combinedContent := fmt.Sprintf("=== ED25519 SSH Key Pair ===\n\n")
+        combinedContent += "Private Key:\n"
+        combinedContent += string(privateKeyPEM)
+        combinedContent += "\n\nPublic Key:\n"
+        combinedContent += string(publicKey)
+        combinedContent += "\n\nPassword: " + password + "\n"
+
+        if err := os.WriteFile(combinedPath, []byte(combinedContent), 0600); err != nil </span><span class="cov0" title="0">{
+                return "", fmt.Errorf("failed to write combined file: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">return outputDir, nil</span>
+}
+
+func generateSSHKeys() <span class="cov0" title="0">{
+        // coverage-ignore: CLI entry point, tested via integration tests
+        // Seed the random number generator
+        rand.Seed(time.Now().UnixNano())
+
+        fmt.Println("🔐 Ed25519 SSH Key Generator")
+        fmt.Println("============================")
+
+        // Generate password
+        password := generatePassword()
+        fmt.Printf("Generated password: %s\n", password)
+
+        // Generate Ed25519 keys
+        fmt.Println("\n📝 Generating Ed25519 keys...")
+        privateKeyPEM, publicKey, err := generateEd25519KeyPair(password)
+        if err != nil </span><span class="cov0" title="0">{
+                fmt.Printf("❌ Failed to generate Ed25519 keys: %v\n", err)
+                os.Exit(1) // coverage-ignore: exit on error is expected behavior
+        }</span>
+
+        // Write Ed25519 key files
+        <span class="cov0" title="0">outputDir, err := writeKeyFiles(privateKeyPEM, publicKey, password)
+        if err != nil </span><span class="cov0" title="0">{
+                fmt.Printf("❌ Failed to write Ed25519 key files: %v\n", err)
+                os.Exit(1)
+        }</span>
+
+        <span class="cov0" title="0">fmt.Println("✅ Ed25519 keys generated successfully!")
+
+        // Display file locations
+        fmt.Println("\n📁 Generated files:")
+        fmt.Printf("  %s/\n", outputDir)
+        fmt.Println("  ├── id_ed25519          (Ed25519 private key)")
+        fmt.Println("  ├── id_ed25519.pub      (Ed25519 public key)")
+        fmt.Println("  ├── ed25519_keys.txt    (Ed25519 combined file)")
+        fmt.Println("  └── ed25519_password.txt (Ed25519 password)")
+
+        fmt.Printf("\n🔑 Password: %s\n", password)
+        fmt.Println("\n⚠️  IMPORTANT: Keep the password secure and backup the key files!")</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

@@ -67,3 +67,36 @@ go run github.com/vladopajic/go-test-coverage/v2@latest --config=./tests/testcov
 ```
 
 This approach will make coverage metrics more meaningful by focusing on code that can actually be unit tested, while ensuring that untestable code is still covered by integration tests.
+
+## Coverage Visualization
+
+### HTML Reports
+HTML coverage reports provide detailed, interactive coverage analysis:
+
+#### Features
+- **File navigation** - Browse through all source files
+- **Line highlighting** - Red (uncovered), green (covered), gray (ignored)
+- **Coverage statistics** - Per-file and overall percentages
+- **Function breakdown** - Coverage by function within files
+
+#### Generating Reports
+```bash
+# Local development
+make coverage-html
+
+# Manual generation
+go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+go tool cover -html=./cover.out -o coverage.html
+```
+
+#### CI/CD Integration
+- Reports are automatically generated in GitHub Actions
+- Available as downloadable artifacts
+- Retention period: 30 days
+- Access via Actions tab → Workflow run → Artifacts
+
+### Interpreting Coverage Reports
+- **Green lines**: Code that is executed during tests
+- **Red lines**: Code that is not executed during tests
+- **Gray lines**: Code excluded from coverage (e.g., comments, blank lines)
+- **Coverage percentage**: Ratio of covered lines to total lines
