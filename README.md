@@ -1,8 +1,12 @@
 # Spooky - SSH Automation Tool
 
-Spooky is a powerful SSH automation tool written in Go that allows you to execute commands and scripts on multiple remote servers using HCL2 configuration files. It provides a declarative way to manage server operations with support for parallel execution and flexible server targeting.
+[![Test Coverage](coverage.svg)](https://github.com/snassar/spooky)
 
-**Notice**: This project is heavily agentic coding and LLM influenced as part of my learning process.
+Spooky is an automation tool written in Go that allows you to execute commands and scripts on multiple remote servers using HCL2 configuration files. It provides a declarative way to manage server operations with support for parallel execution and flexible server targeting. spooky uses SSH to communicate with other computers 
+
+When spooky grows up it wants to be Ansible.
+
+**Notice**: This project is influenced heavily by agentic coding as part of the process of learning go.
 
 ## Features
 
@@ -18,13 +22,13 @@ Spooky is a powerful SSH automation tool written in Go that allows you to execut
 
 ### Prerequisites
 
-- Go 1.21 or later
-- SSH access to target servers
+- Go 1.24 or later
+- target systems must be accessible via SSH
 
 ### Build from Source
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/snassar/spooky.git
 cd spooky
 go mod tidy
 go build -o spooky
