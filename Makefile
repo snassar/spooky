@@ -1,4 +1,4 @@
-.PHONY: build clean test run validate list help check-coverage test-unit test-integration test-coverage
+.PHONY: build clean test run validate list help check-coverage test-unit test-integration test-coverage install-coverage-tool
 
 # Build the spooky binary
 build:
@@ -30,6 +30,12 @@ test-coverage:
 	go tool cover -html=coverage.out -o coverage.html
 	go tool cover -html=coverage-integration.out -o coverage-integration.html
 
+# Install go-test-coverage tool
+install-coverage-tool:
+	go install github.com/vladopajic/go-test-coverage/v2@latest
+
+# Check test coverage using go-test-coverage tool
+# Note: Uses 'go run' to avoid requiring local installation
 check-coverage:
 	go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
 	go run github.com/vladopajic/go-test-coverage/v2@latest --config=./tests/testcoverage.yml
