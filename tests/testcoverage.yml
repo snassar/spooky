@@ -22,3 +22,4 @@ exclude:
     # Generated and temporary files
     - generated_keys/
     - test_.*\.go$
+breakdown-file-name: coverage-breakdown.json

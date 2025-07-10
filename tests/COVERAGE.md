@@ -15,7 +15,6 @@ go-test-coverage --config=./tests/testcoverage.yml
 # Generate HTML report
 go tool cover -html=./cover.out -o coverage.html
 ```
-```
 
 ---
 
@@ -385,3 +384,110 @@ threshold:
 2. Update documentation
 3. Communicate changes to team
 4. Monitor impact on development velocity
+```
+
+---
+
+## Coverage Diff Tracking
+
+### Overview
+The project tracks coverage changes between branches to ensure code quality improvements.
+
+### How It Works
+1. **Base Coverage**: Coverage from the target branch (main) is stored as a baseline
+2. **PR Coverage**: Coverage from the PR branch is calculated
+3. **Diff Analysis**: Changes are computed and reported
+4. **PR Comments**: Coverage changes are posted as PR comments
+
+### Coverage Reports
+- **Current Coverage**: Coverage percentage for the PR branch
+- **Base Coverage**: Coverage percentage from the target branch
+- **Change**: Difference between current and base coverage
+- **Details**: File, package, and total coverage breakdown
+
+### PR Comments
+Coverage changes are automatically posted to PRs:
+- 📈 **Green arrow**: Coverage increased
+- 📉 **Red arrow**: Coverage decreased
+- ⚠️ **Warning**: Coverage decreased (requires attention)
+
+### Example PR Comment
+```markdown
+## Test Coverage Report 📈
+
+**Current Coverage:** 62.3%
+**Base Coverage:** 61.7%
+**Change:** +0.6%
+
+### Coverage Details
+- **File Coverage:** 52%
+- **Package Coverage:** 67%
+- **Total Coverage:** 62.3%
+
+📊 [View detailed coverage report](https://github.com/...)
+```
+
+### Local Diff Analysis
+```bash
+# Generate current coverage breakdown
+go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+go run github.com/vladopajic/go-test-coverage/v2@latest \
+  --config=./tests/testcoverage.yml \
+  --breakdown-file-name=coverage-breakdown.json
+
+# Compare with base (if available)
+go run github.com/vladopajic/go-test-coverage/v2@latest \
+  --config=./tests/testcoverage.yml \
+  --diff-base-breakdown-file-name=base-coverage-breakdown.json
+```
+
+## Task 6: Update README.md
+
+**File to modify:** `README.md`
+
+**Add to Test Coverage section:**
+```markdown
+### Coverage Diff Tracking
+
+- Coverage changes are automatically tracked in pull requests
+- PR comments show coverage increases/decreases
+- Coverage reports are available as workflow artifacts
+- Decreases in coverage trigger warnings
+
+For detailed coverage analysis, see [tests/COVERAGE.md](tests/COVERAGE.md).
+```
+
+## Task 7: Test diff tracking functionality
+
+**Commands to test locally:**
+```bash
+# Generate current coverage breakdown
+go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+go run github.com/vladopajic/go-test-coverage/v2@latest \
+  --config=./tests/testcoverage.yml \
+  --breakdown-file-name=coverage-breakdown.json
+
+# Verify breakdown file was created
+ls -la coverage-breakdown.json
+
+# Check breakdown file content
+cat coverage-breakdown.json
+```
+
+## Expected outcomes:
+
+1. ✅ **Breakdown files generated** - JSON files with detailed coverage data
+2. ✅ **Diff analysis** - Comparison between PR and base branch coverage
+3. ✅ **PR comments** - Automatic coverage change notifications
+4. ✅ **Documentation** - Clear explanation of diff tracking functionality
+5. ✅ **Local testing** - Ability to test diff tracking locally
+
+## Benefits:
+
+- **Visibility**: Clear coverage changes in PRs
+- **Accountability**: Developers see impact of their changes
+- **Quality**: Prevents coverage regression
+- **Transparency**: Coverage data available to all contributors
+- **Automation**: No manual coverage tracking required
+
+This implementation will provide comprehensive coverage diff tracking that helps maintain and improve code quality through automated reporting and notifications.

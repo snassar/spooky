@@ -713,3 +713,12 @@ This project is licensed under the GNU Affero General Public License v3 - see th
 - Make is supported
 - Must work without Make
 - Focus on basic functionality first
+
+### Coverage Diff Tracking
+
+- Coverage changes are automatically tracked in pull requests
+- PR comments show coverage increases/decreases
+- Coverage reports are available as workflow artifacts
+- Decreases in coverage trigger warnings
+
+For detailed coverage analysis, see [tests/COVERAGE.md](tests/COVERAGE.md).
