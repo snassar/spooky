@@ -1,6 +1,6 @@
 module sftp_server
 
-go 1.21
+go 1.24
 
 require (
 	github.com/gliderlabs/ssh v0.3.8
