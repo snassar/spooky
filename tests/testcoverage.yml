@@ -1,11 +1,24 @@
 profile: cover.out
 threshold:
-  file: 50      # Individual files should have at least 50% coverage
-  package: 65   # Packages should have at least 65% coverage  
-  total: 60     # Overall project should have at least 60% coverage
+  file: 50
+  package: 65
+  total: 60
 exclude:
   paths:
-    - _test\.go$     # Exclude test files from coverage requirements
-    - ^tests/        # Exclude test directory
-    - ^examples/     # Exclude example files
-    - main\.go$      # Exclude main.go (minimal logic)
+    # Test files
+    - _test\.go$
+    - integration_test\.go$
+    
+    # Test directories
+    - ^tests/
+    - ^tests/infrastructure/
+    - ^tests/helpers/
+    - ^tests/fixtures/
+    
+    # Examples and utilities
+    - ^examples/
+    - main\.go$  # Minimal logic, mostly just CLI setup
+    
+    # Generated and temporary files
+    - generated_keys/
+    - test_.*\.go$
