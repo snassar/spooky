@@ -25,23 +25,95 @@ jobs:
     - name: Generate coverage profile
       run: go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
       
-    - name: Run coverage check
+    - name: Run coverage check and generate breakdown
       run: |
         go run github.com/vladopajic/go-test-coverage/v2@latest \
           --config=./tests/testcoverage.yml \
-          --profile=./cover.out
-
-    - name: Generate coverage badge
-      run: |
-        go run github.com/vladopajic/go-test-coverage/v2@latest \
-          --config=./tests/testcoverage.yml \
-          --badge-file-name=coverage.svg
+          --profile=./cover.out \
+          --breakdown-file-name=coverage-breakdown.json
         
-    - name: Upload coverage reports
+    - name: Upload coverage artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: coverage-report
+        name: coverage-reports
         path: |
           cover.out
           coverage.html
+          coverage-breakdown.json
         retention-days: 30
+
+    - name: Download base coverage (for PRs)
+      if: github.event_name == 'pull_request'
+      uses: actions/download-artifact@v4
+      with:
+        name: coverage-reports
+        path: base-coverage/
+        
+    - name: Run coverage diff analysis
+      if: github.event_name == 'pull_request'
+      run: |
+        if [ -f "base-coverage/coverage-breakdown.json" ]; then
+          go run github.com/vladopajic/go-test-coverage/v2@latest \
+            --config=./tests/testcoverage.yml \
+            --profile=./cover.out \
+            --diff-base-breakdown-file-name=base-coverage/coverage-breakdown.json
+        else
+          echo "No base coverage found, skipping diff analysis"
+        fi
+
+    - name: Comment PR with coverage changes
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          // Read coverage breakdown
+          let coverageData = {};
+          try {
+            coverageData = JSON.parse(fs.readFileSync('coverage-breakdown.json', 'utf8'));
+          } catch (error) {
+            console.log('No coverage breakdown found');
+            return;
+          }
+          
+          // Read base coverage if available
+          let baseCoverageData = {};
+          try {
+            baseCoverageData = JSON.parse(fs.readFileSync('base-coverage/coverage-breakdown.json', 'utf8'));
+          } catch (error) {
+            console.log('No base coverage found for comparison');
+          }
+          
+          // Calculate changes
+          const currentTotal = coverageData.total || 0;
+          const baseTotal = baseCoverageData.total || 0;
+          const change = currentTotal - baseTotal;
+          const changeSymbol = change >= 0 ? '📈' : '📉';
+          
+          // Create comment
+          let comment = `## Test Coverage Report ${changeSymbol}\n\n`;
+          comment += `**Current Coverage:** ${currentTotal.toFixed(1)}%\n`;
+          
+          if (baseCoverageData.total !== undefined) {
+            comment += `**Base Coverage:** ${baseTotal.toFixed(1)}%\n`;
+            comment += `**Change:** ${change >= 0 ? '+' : ''}${change.toFixed(1)}%\n\n`;
+          }
+          
+          comment += `### Coverage Details\n`;
+          comment += `- **File Coverage:** ${coverageData.file || 0}%\n`;
+          comment += `- **Package Coverage:** ${coverageData.package || 0}%\n`;
+          comment += `- **Total Coverage:** ${coverageData.total || 0}%\n\n`;
+          
+          if (change < 0) {
+            comment += `⚠️ **Warning:** Coverage has decreased. Please add tests for new code.\n\n`;
+          }
+          
+          comment += `📊 [View detailed coverage report](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
