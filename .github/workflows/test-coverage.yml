@@ -30,6 +30,12 @@ jobs:
         go run github.com/vladopajic/go-test-coverage/v2@latest \
           --config=./tests/testcoverage.yml \
           --profile=./cover.out
+
+    - name: Generate coverage badge
+      run: |
+        go run github.com/vladopajic/go-test-coverage/v2@latest \
+          --config=./tests/testcoverage.yml \
+          --badge-file-name=coverage.svg
         
     - name: Upload coverage reports
       uses: actions/upload-artifact@v4
