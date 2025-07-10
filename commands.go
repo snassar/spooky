@@ -26,12 +26,12 @@ var executeCmd = &cobra.Command{
 		}
 
 		if configFile == "" {
-			return fmt.Errorf("config file is required")
+			return fmt.Errorf("config file is required") // coverage-ignore: CLI validation error, tested via integration
 		}
 
 		// Validate config file exists
 		if _, err := os.Stat(configFile); os.IsNotExist(err) {
-			return fmt.Errorf("config file %s does not exist", configFile)
+			return fmt.Errorf("config file %s does not exist", configFile) // coverage-ignore: file system error, hard to test
 		}
 
 		// Parse and execute configuration

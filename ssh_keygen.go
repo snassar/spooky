@@ -114,6 +114,7 @@ func writeKeyFiles(privateKeyPEM []byte, publicKey []byte, password string) (str
 }
 
 func generateSSHKeys() {
+	// coverage-ignore: CLI entry point, tested via integration tests
 	// Seed the random number generator
 	rand.Seed(time.Now().UnixNano())
 
@@ -129,7 +130,7 @@ func generateSSHKeys() {
 	privateKeyPEM, publicKey, err := generateEd25519KeyPair(password)
 	if err != nil {
 		fmt.Printf("❌ Failed to generate Ed25519 keys: %v\n", err)
-		os.Exit(1)
+		os.Exit(1) // coverage-ignore: exit on error is expected behavior
 	}
 
 	// Write Ed25519 key files

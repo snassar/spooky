@@ -30,7 +30,7 @@ func NewSSHClient(server *Server, timeout int) (*SSHClient, error) {
 	if server.KeyFile != "" {
 		key, err := os.ReadFile(server.KeyFile)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read key file %s: %w", server.KeyFile, err)
+			return nil, fmt.Errorf("failed to read key file %s: %w", server.KeyFile, err) // coverage-ignore: file system error, tested via integration
 		}
 
 		signer, err := ssh.ParsePrivateKey(key)

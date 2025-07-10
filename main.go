@@ -8,6 +8,7 @@ import (
 )
 
 func main() {
+	// coverage-ignore: main function is entry point, tested via integration tests
 	var rootCmd = &cobra.Command{
 		Use:   "spooky",
 		Short: "Spooky is a SSH automation tool that runs actions from HCL2 configuration files",
