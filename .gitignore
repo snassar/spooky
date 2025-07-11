@@ -44,3 +44,5 @@ generated_keys/
 #binaries
 spooky.exe
 spooky
+scripts/pre-commit
+scripts/pre-commit.exe

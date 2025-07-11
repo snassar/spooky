@@ -15,6 +15,54 @@
 - **Test Infrastructure** (40-50%): Test helpers and infrastructure
   - Supporting code with moderate coverage requirements
 
+## Pre-commit Hooks
+
+### Setup Options
+
+#### Option 1: Go Script (Cross-Platform - Recommended)
+```bash
+# Build the pre-commit script
+go build -o scripts/pre-commit scripts/pre-commit.go
+
+# Install on Windows
+copy scripts\pre-commit.exe .git\hooks\pre-commit.exe
+
+# Install on Unix-like systems
+cp scripts/pre-commit .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+#### Option 2: pre-commit Framework
+```bash
+# Install pre-commit framework
+pip install pre-commit
+
+# Install hooks
+pre-commit install
+```
+
+#### Option 3: PowerShell (Windows Only)
+```powershell
+# Set execution policy (run as administrator)
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# Copy PowerShell script
+Copy-Item .git\hooks\pre-commit.ps1 .git\hooks\pre-commit
+```
+
+### What the Pre-commit Hook Does
+1. Checks if Go files are staged for commit
+2. Runs tests with coverage profiling
+3. Validates coverage against configured thresholds
+4. Prevents commit if coverage thresholds are not met
+5. Provides helpful error messages and suggestions
+
+### Bypassing Pre-commit Hooks
+If you need to bypass coverage checks (emergency fixes, etc.):
+```bash
+git commit --no-verify -m "Emergency fix - bypassing coverage checks"
+```
+
 ### Local Coverage Check
 
 ```bash
