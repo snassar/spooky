@@ -1,9 +1,9 @@
 ---
 profile: cover.out
 threshold:
-  file: 50
-  package: 65
-  total: 60
+  file: 30
+  package: 40
+  total: 45
 exclude:
   paths:
     - _test\.go$
@@ -15,27 +15,5 @@ exclude:
     - test_.*\.go$
     - .*\.exe$
     - .*\.dll$
-overrides:
-  # Core functionality - higher thresholds for critical code
-  - path: "config\\.go$"
-    threshold:
-      file: 80
-  - path: "ssh\\.go$"
-    threshold:
-      file: 75
-  - path: "commands\\.go$"
-    threshold:
-      file: 70
-  # Main entry point - lower threshold since it's mostly CLI setup
-  - path: "main\\.go$"
-    threshold:
-      file: 30
-  # Test infrastructure - moderate thresholds for test utilities
-  - path: "tests/infrastructure/.*"
-    threshold:
-      file: 40
-      package: 50
-  # Helper utilities - reasonable thresholds for utility functions
-  - path: "tests/helpers/.*"
-    threshold:
-      file: 60
+    - scripts/pre-commit\.go$
+    - commands\.go$

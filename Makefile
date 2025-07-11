@@ -1,4 +1,4 @@
-.PHONY: build clean test run validate list help check-coverage test-unit test-integration test-coverage install-coverage-tool
+.PHONY: build clean test run validate list help check-coverage test-unit test-integration test-coverage install-coverage-tool install-pre-commit-hook build-pre-commit-hook
 
 # Build the spooky binary
 build:
@@ -80,6 +80,23 @@ release: clean
 	GOOS=linux GOARCH=amd64 go build -o spooky-linux-amd64
 	GOOS=darwin GOARCH=amd64 go build -o spooky-darwin-amd64
 	GOOS=windows GOARCH=amd64 go build -o spooky-windows-amd64.exe
+
+# Build pre-commit hook
+build-pre-commit-hook:
+ifeq ($(OS),Windows_NT)
+	go build -o scripts/pre-commit.exe scripts/pre-commit.go
+else
+	go build -o scripts/pre-commit scripts/pre-commit.go
+endif
+
+# Install pre-commit hook (builds and copies to .git/hooks)
+install-pre-commit-hook: build-pre-commit-hook
+ifeq ($(OS),Windows_NT)
+	copy scripts\pre-commit.exe .git\hooks\pre-commit
+else
+	cp scripts/pre-commit .git/hooks/pre-commit
+endif
+	@echo "Pre-commit hook installed successfully"
 
 # Default target
 all: deps build test 
