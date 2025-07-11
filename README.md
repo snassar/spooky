@@ -366,6 +366,45 @@ go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
 go run github.com/vladopajic/go-test-coverage/v2@latest --config=./tests/testcoverage.yml
 ```
 
+### Pre-commit Hook Setup
+
+To automatically check coverage before each commit, install the pre-commit hook:
+
+```bash
+# Build and install the pre-commit hook
+make install-pre-commit-hook
+```
+
+This will:
+1. Build the Go-based pre-commit hook from `scripts/pre-commit.go`
+2. Install it as a Git hook in `.git/hooks/pre-commit`
+3. Automatically run coverage checks before each commit
+
+**Manual Setup:**
+```bash
+# Build the hook (cross-platform)
+make build-pre-commit-hook
+
+# Or build manually:
+# Unix/Linux/macOS: go build -o scripts/pre-commit scripts/pre-commit.go
+# Windows: go build -o scripts/pre-commit.exe scripts/pre-commit.go
+
+# Install the hook (cross-platform)
+make install-pre-commit-hook
+
+# Or install manually:
+# Unix/Linux/macOS: cp scripts/pre-commit .git/hooks/pre-commit
+# Windows: copy scripts\pre-commit.exe .git\hooks\pre-commit
+```
+
+**What the Hook Does:**
+- Runs tests with coverage profiling
+- Verifies coverage meets thresholds
+- Blocks commits if coverage is insufficient
+- Allows commits if coverage passes
+
+**Note:** The pre-commit hook is a pure Go solution with no external dependencies.
+
 ### Viewing Coverage Reports
 
 - Open `coverage.html` in your browser for a detailed report.
@@ -384,4 +423,4 @@ go run github.com/vladopajic/go-test-coverage/v2@latest --config=./tests/testcov
 - Decreases in coverage trigger warnings
 
 For detailed coverage analysis, see [tests/COVERAGE.md](tests/COVERAGE.md).
-# Test commit
+# Test pre-commit hook 2
