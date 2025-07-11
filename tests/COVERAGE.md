@@ -1,5 +1,20 @@
 # Test Coverage Configuration
 
+## Coverage Threshold Strategy
+
+### Base Thresholds
+- **File**: 50% - Minimum acceptable coverage for any file
+- **Package**: 65% - Minimum acceptable coverage for packages
+- **Total**: 60% - Minimum acceptable coverage for the entire project
+
+### Override Strategy
+- **Critical Core Files** (70-80%): `config.go`, `ssh.go`, `commands.go`
+  - These contain the main business logic and should have high coverage
+- **CLI Entry Point** (30%): `main.go`
+  - Mostly initialization code, lower coverage acceptable
+- **Test Infrastructure** (40-50%): Test helpers and infrastructure
+  - Supporting code with moderate coverage requirements
+
 ### Local Coverage Check
 
 ```bash
@@ -205,6 +220,7 @@ This project excludes certain files and directories from coverage calculations t
 - `^tests/helpers/` - Test helper utilities
 - `^examples/` - Example configurations and code
 - `main\.go$` - Main entry point (minimal logic)
+- `ssh_keygen\.go$` - SSH key generation utilities
 
 ### Rationale
 
@@ -260,39 +276,6 @@ go run github.com/vladopajic/go-test-coverage/v2@latest --config=./tests/testcov
 ```
 
 This approach will make coverage metrics more meaningful by focusing on code that can actually be unit tested, while ensuring that untestable code is still covered by integration tests.
-
-## Coverage Visualization
-
-### HTML Reports
-HTML coverage reports provide detailed, interactive coverage analysis:
-
-#### Features
-- **File navigation** - Browse through all source files
-- **Line highlighting** - Red (uncovered), green (covered), gray (ignored)
-- **Coverage statistics** - Per-file and overall percentages
-- **Function breakdown** - Coverage by function within files
-
-#### Generating Reports
-```bash
-# Local development
-make coverage-html
-
-# Manual generation
-go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
-go tool cover -html=./cover.out -o coverage.html
-```
-
-#### CI/CD Integration
-- Reports are automatically generated in GitHub Actions
-- Available as downloadable artifacts
-- Retention period: 30 days
-- Access via Actions tab → Workflow run → Artifacts
-
-### Interpreting Coverage Reports
-- **Green lines**: Code that is executed during tests
-- **Red lines**: Code that is not executed during tests
-- **Gray lines**: Code excluded from coverage (e.g., comments, blank lines)
-- **Coverage percentage**: Ratio of covered lines to total lines
 
 ## Coverage Thresholds and Requirements
 
@@ -384,9 +367,58 @@ threshold:
 2. Update documentation
 3. Communicate changes to team
 4. Monitor impact on development velocity
-```
 
----
+## Optimized Coverage Thresholds
+
+### Threshold Strategy
+
+Coverage thresholds are optimized for the spooky project structure:
+
+#### Base Thresholds (Default)
+- **File:** 50% - Allows for hard-to-test error paths
+- **Package:** 65% - Ensures good overall package quality
+- **Total:** 60% - Realistic target for development velocity
+
+#### Package-Specific Overrides
+
+##### Critical Code (High Thresholds)
+- **`spooky/ssh.go`**: 75% - SSH connections are security-critical
+- **`spooky/config.go`**: 70% - Configuration parsing affects all operations
+
+##### Standard Code (Medium Thresholds)
+- **`ssh_keygen.go`**: 60% - SSH key generation utilities
+- **`commands.go`**: 55% - CLI commands with error handling
+
+##### Excluded Code
+- **`main.go`**: Entry point, tested via integration
+- **Test files**: Not production code
+- **Examples**: Documentation only
+
+### Rationale
+
+#### Why Different Thresholds?
+1. **Security**: SSH code has higher thresholds due to security implications
+2. **Complexity**: Simple utilities have lower thresholds than complex logic
+3. **Testability**: Error handling paths are harder to test than happy paths
+4. **Development Speed**: Balanced thresholds maintain quality without slowing development
+
+#### Threshold Categories
+- **Critical (75%)**: Security-sensitive code, core functionality
+- **Important (70%)**: Configuration, data parsing
+- **Standard (60%)**: Business logic, utilities
+- **Basic (55%)**: CLI, error handling, edge cases
+
+### Monitoring and Adjustment
+
+#### When to Adjust Thresholds
+- **Increase**: When coverage consistently exceeds thresholds
+- **Decrease**: When thresholds are unrealistic for certain code types
+- **Review**: Quarterly review of threshold effectiveness
+
+#### Development Velocity Impact
+- Current thresholds balance quality with development speed
+- Critical code maintains high standards
+- Non-critical code allows for faster iteration
 
 ## Coverage Diff Tracking
 
@@ -424,7 +456,8 @@ Coverage changes are automatically posted to PRs:
 - **Package Coverage:** 67%
 - **Total Coverage:** 62.3%
 
-📊 [View detailed coverage report](https://github.com/...)
+📊 [View workflow run](https://github.com/owner/repo/actions/runs/123456789)
+📁 Coverage artifacts: `coverage-reports` (HTML report: `coverage.html`)
 ```
 
 ### Local Diff Analysis

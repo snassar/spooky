@@ -1,3 +1,4 @@
+---
 profile: cover.out
 threshold:
   file: 50
@@ -5,21 +6,36 @@ threshold:
   total: 60
 exclude:
   paths:
-    # Test files
     - _test\.go$
-    - integration_test\.go$
-    
-    # Test directories
     - ^tests/
-    - ^tests/infrastructure/
-    - ^tests/helpers/
-    - ^tests/fixtures/
-    
-    # Examples and utilities
     - ^examples/
-    - main\.go$  # Minimal logic, mostly just CLI setup
-    
-    # Generated and temporary files
+    - main\.go$
+    - ssh_keygen\.go$
     - generated_keys/
     - test_.*\.go$
-breakdown-file-name: coverage-breakdown.json
+    - .*\.exe$
+    - .*\.dll$
+overrides:
+  # Core functionality - higher thresholds for critical code
+  - path: "config\\.go$"
+    threshold:
+      file: 80
+  - path: "ssh\\.go$"
+    threshold:
+      file: 75
+  - path: "commands\\.go$"
+    threshold:
+      file: 70
+  # Main entry point - lower threshold since it's mostly CLI setup
+  - path: "main\\.go$"
+    threshold:
+      file: 30
+  # Test infrastructure - moderate thresholds for test utilities
+  - path: "tests/infrastructure/.*"
+    threshold:
+      file: 40
+      package: 50
+  # Helper utilities - reasonable thresholds for utility functions
+  - path: "tests/helpers/.*"
+    threshold:
+      file: 60

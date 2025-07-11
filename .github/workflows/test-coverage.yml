@@ -109,7 +109,8 @@ jobs:
             comment += `⚠️ **Warning:** Coverage has decreased. Please add tests for new code.\n\n`;
           }
           
-          comment += `📊 [View detailed coverage report](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n`;
+          comment += `📊 [View workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n`;
+          comment += `📁 Coverage artifacts: \`coverage-reports\` (HTML report: \`coverage.html\`)\n`;
           
           github.rest.issues.createComment({
             issue_number: context.issue.number,

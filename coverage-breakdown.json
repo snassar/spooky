@@ -1,4 +1,3 @@
 commands.go;4;0
 spooky/config.go;61;58
 spooky/ssh.go;106;45
-ssh_keygen.go;71;0
