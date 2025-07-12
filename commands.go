@@ -6,7 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"spooky-tool/spooky"
+	"spooky/internal/config"
+	"spooky/internal/keygen"
+	"spooky/internal/ssh"
 )
 
 var (
@@ -35,12 +37,12 @@ var executeCmd = &cobra.Command{
 		}
 
 		// Parse and execute configuration
-		config, err := spooky.ParseConfig(configFile)
+		config, err := config.ParseConfig(configFile)
 		if err != nil {
 			return fmt.Errorf("failed to parse config: %w", err)
 		}
 
-		return spooky.ExecuteConfig(config)
+		return ssh.ExecuteConfig(config)
 	},
 }
 
@@ -64,7 +66,7 @@ var validateCmd = &cobra.Command{
 		}
 
 		// Parse configuration
-		config, err := spooky.ParseConfig(configFile)
+		config, err := config.ParseConfig(configFile)
 		if err != nil {
 			return fmt.Errorf("validation failed: %w", err)
 		}
@@ -96,7 +98,7 @@ var listCmd = &cobra.Command{
 		}
 
 		// Parse configuration
-		config, err := spooky.ParseConfig(configFile)
+		config, err := config.ParseConfig(configFile)
 		if err != nil {
 			return fmt.Errorf("failed to parse config: %w", err)
 		}
@@ -114,6 +116,14 @@ var listCmd = &cobra.Command{
 		}
 
 		return nil
+	},
+}
+
+var keygenCmd = &cobra.Command{
+	Use:   "keygen",
+	Short: "Generate SSH key pairs",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return keygen.GenerateSSHKeys()
 	},
 }
 
