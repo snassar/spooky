@@ -383,6 +383,16 @@ func TestGetServersForAction(t *testing.T) {
 			expectedCount: 0,
 			wantErr:       true,
 		},
+		{
+			name: "action with empty servers list",
+			action: &Action{
+				Name:    "test_action",
+				Command: "echo hello",
+				Servers: []string{}, // Empty servers list
+			},
+			expectedCount: 3, // Should return all servers when servers list is empty
+			wantErr:       false,
+		},
 	}
 
 	for _, tt := range tests {
