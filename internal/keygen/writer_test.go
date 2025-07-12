@@ -1,108 +1,14 @@
-package main
+package keygen
 
 import (
-	"encoding/pem"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"golang.org/x/crypto/ssh"
 )
 
-// --- Test generatePassword ---
-func TestGeneratePassword(t *testing.T) {
-	// Test that password is generated with correct length
-	password := generatePassword()
-	if len(password) != 25 {
-		t.Errorf("expected password length 25, got %d", len(password))
-	}
-
-	// Test that password contains only valid characters
-	const validChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	for _, char := range password {
-		if !strings.ContainsRune(validChars, char) {
-			t.Errorf("password contains invalid character: %c", char)
-		}
-	}
-
-	// Test that multiple passwords are different (randomness)
-	password1 := generatePassword()
-	password2 := generatePassword()
-	if password1 == password2 {
-		t.Error("generated passwords should be different")
-	}
-}
-
-// --- Test generateEd25519KeyPair ---
-func TestGenerateEd25519KeyPair(t *testing.T) {
-	// Test successful key generation
-	privateKeyPEM, publicKeyBytes, err := generateEd25519KeyPair("testpassword")
-	if err != nil {
-		t.Fatalf("failed to generate key pair: %v", err)
-	}
-
-	// Test private key PEM format
-	if len(privateKeyPEM) == 0 {
-		t.Error("private key PEM should not be empty")
-	}
-
-	// Verify PEM block structure
-	block, _ := pem.Decode(privateKeyPEM)
-	if block == nil {
-		t.Error("failed to decode private key PEM")
-	}
-	if block.Type != "OPENSSH PRIVATE KEY" {
-		t.Errorf("expected PEM type 'OPENSSH PRIVATE KEY', got '%s'", block.Type)
-	}
-
-	// Test public key format
-	if len(publicKeyBytes) == 0 {
-		t.Error("public key should not be empty")
-	}
-
-	// Verify public key starts with ssh-ed25519
-	publicKeyStr := string(publicKeyBytes)
-	if !strings.HasPrefix(publicKeyStr, "ssh-ed25519 ") {
-		t.Errorf("public key should start with 'ssh-ed25519 ', got: %s", publicKeyStr[:20])
-	}
-
-	// Test that public key can be parsed
-	_, _, _, _, err = ssh.ParseAuthorizedKey(publicKeyBytes)
-	if err != nil {
-		t.Errorf("failed to parse generated public key: %v", err)
-	}
-
-	// Test key data structure (should be 64 bytes: 32 private + 32 public)
-	if len(block.Bytes) != 64 {
-		t.Errorf("expected key data length 64, got %d", len(block.Bytes))
-	}
-}
-
-func TestGenerateEd25519KeyPair_Consistency(t *testing.T) {
-	// Test that multiple key pairs are different
-	privateKey1, publicKey1, err := generateEd25519KeyPair("password1")
-	if err != nil {
-		t.Fatalf("failed to generate first key pair: %v", err)
-	}
-
-	privateKey2, publicKey2, err := generateEd25519KeyPair("password2")
-	if err != nil {
-		t.Fatalf("failed to generate second key pair: %v", err)
-	}
-
-	// Keys should be different
-	if string(privateKey1) == string(privateKey2) {
-		t.Error("generated private keys should be different")
-	}
-	if string(publicKey1) == string(publicKey2) {
-		t.Error("generated public keys should be different")
-	}
-}
-
-// --- Test writeKeyFiles ---
 func TestWriteKeyFiles(t *testing.T) {
 	// Create test data
 	testPrivateKey := []byte("test private key content")
@@ -110,7 +16,7 @@ func TestWriteKeyFiles(t *testing.T) {
 	testPassword := "testpassword123"
 
 	// Test successful file writing
-	outputDir, err := writeKeyFiles(testPrivateKey, testPublicKey, testPassword)
+	outputDir, err := WriteKeyFiles(testPrivateKey, testPublicKey, testPassword)
 	if err != nil {
 		t.Fatalf("failed to write key files: %v", err)
 	}
@@ -196,7 +102,7 @@ func TestWriteKeyFiles_DirectoryNaming(t *testing.T) {
 	testPublicKey := []byte("test public key")
 	testPassword := "testpass"
 
-	outputDir, err := writeKeyFiles(testPrivateKey, testPublicKey, testPassword)
+	outputDir, err := WriteKeyFiles(testPrivateKey, testPublicKey, testPassword)
 	if err != nil {
 		t.Fatalf("failed to write key files: %v", err)
 	}
@@ -220,7 +126,7 @@ func TestWriteKeyFiles_FilePermissions(t *testing.T) {
 	testPublicKey := []byte("test public key")
 	testPassword := "testpass"
 
-	outputDir, err := writeKeyFiles(testPrivateKey, testPublicKey, testPassword)
+	outputDir, err := WriteKeyFiles(testPrivateKey, testPublicKey, testPassword)
 	if err != nil {
 		t.Fatalf("failed to write key files: %v", err)
 	}
@@ -262,32 +168,62 @@ func TestWriteKeyFiles_FilePermissions(t *testing.T) {
 	}
 }
 
-// --- Integration test for full workflow ---
-func TestGenerateAndWriteKeys_Integration(t *testing.T) {
-	// Test the full workflow: generate keys and write files
-	password := generatePassword()
-
-	privateKeyPEM, publicKey, err := generateEd25519KeyPair(password)
-	if err != nil {
-		t.Fatalf("failed to generate key pair: %v", err)
+func TestWriteKeyPair(t *testing.T) {
+	// Create test key pair
+	keyPair := &KeyPair{
+		PrivateKey: []byte("test private key content"),
+		PublicKey:  []byte("ssh-ed25519 test public key"),
+		Password:   "testpassword123",
 	}
 
-	outputDir, err := writeKeyFiles(privateKeyPEM, publicKey, password)
+	// Test successful key pair writing
+	keyFiles, err := WriteKeyPair(keyPair)
 	if err != nil {
-		t.Fatalf("failed to write key files: %v", err)
+		t.Fatalf("failed to write key pair: %v", err)
 	}
 
 	// Clean up after test
 	defer os.RemoveAll("generated_keys")
 
-	// Verify the generated files can be read back
-	privateKeyPath := filepath.Join(outputDir, "id_ed25519")
-	if _, err := os.ReadFile(privateKeyPath); err != nil {
-		t.Errorf("failed to read back private key file: %v", err)
+	// Verify KeyFiles struct is populated
+	if keyFiles == nil {
+		t.Fatal("keyFiles should not be nil")
 	}
 
-	publicKeyPath := filepath.Join(outputDir, "id_ed25519.pub")
-	if _, err := os.ReadFile(publicKeyPath); err != nil {
-		t.Errorf("failed to read back public key file: %v", err)
+	if keyFiles.OutputDir == "" {
+		t.Error("OutputDir should not be empty")
+	}
+
+	if keyFiles.PrivateKeyPath == "" {
+		t.Error("PrivateKeyPath should not be empty")
+	}
+
+	if keyFiles.PublicKeyPath == "" {
+		t.Error("PublicKeyPath should not be empty")
+	}
+
+	if keyFiles.PasswordPath == "" {
+		t.Error("PasswordPath should not be empty")
+	}
+
+	if keyFiles.CombinedPath == "" {
+		t.Error("CombinedPath should not be empty")
+	}
+
+	// Verify files exist
+	if _, err := os.Stat(keyFiles.PrivateKeyPath); os.IsNotExist(err) {
+		t.Errorf("private key file %s was not created", keyFiles.PrivateKeyPath)
+	}
+
+	if _, err := os.Stat(keyFiles.PublicKeyPath); os.IsNotExist(err) {
+		t.Errorf("public key file %s was not created", keyFiles.PublicKeyPath)
+	}
+
+	if _, err := os.Stat(keyFiles.PasswordPath); os.IsNotExist(err) {
+		t.Errorf("password file %s was not created", keyFiles.PasswordPath)
+	}
+
+	if _, err := os.Stat(keyFiles.CombinedPath); os.IsNotExist(err) {
+		t.Errorf("combined file %s was not created", keyFiles.CombinedPath)
 	}
 }
