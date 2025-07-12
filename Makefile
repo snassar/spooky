@@ -92,7 +92,7 @@ endif
 # Install pre-commit hook (builds and copies to .git/hooks)
 install-pre-commit-hook: build-pre-commit-hook
 ifeq ($(OS),Windows_NT)
-	copy scripts\pre-commit.exe .git\hooks\pre-commit
+	copy scripts\pre-commit.exe .git\hooks\pre-commit.exe
 else
 	cp scripts/pre-commit .git/hooks/pre-commit
 endif
