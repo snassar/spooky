@@ -1,4 +1,4 @@
-module spooky-tool
+module spooky
 
 go 1.24
 
@@ -22,5 +22,4 @@ require (
 	github.com/zclconf/go-cty v1.14.1 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
