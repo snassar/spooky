@@ -1,27 +1,58 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 )
 
+type Commander interface {
+	Output(name string, args ...string) ([]byte, error)
+	Run(name string, args ...string) error
+}
+
+type RealCommander struct{}
+
+func (RealCommander) Output(name string, args ...string) ([]byte, error) {
+	return exec.Command(name, args...).Output()
+}
+func (RealCommander) Run(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+// Allow test override
+var stdPrintln = fmt.Println
+var stdPrintf = fmt.Printf
+
 func main() {
-	fmt.Println("Running pre-commit coverage checks...")
+	if err := runPreCommitChecks(RealCommander{}); err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+}
+
+// runPreCommitChecks performs the pre-commit coverage checks
+func runPreCommitChecks(cmdr Commander) error {
+	stdPrintln("Running pre-commit coverage checks...")
 
 	// Check if we're in a git repository
-	if _, err := exec.Command("git", "rev-parse", "--git-dir").Output(); err != nil {
-		fmt.Println("❌ Not in a git repository")
-		os.Exit(1)
+	if _, err := cmdr.Output("git", "rev-parse", "--git-dir"); err != nil {
+		errorMsg := "❌ Not in a git repository"
+		stdPrintln(errorMsg)
+		return errors.New(errorMsg)
 	}
 
 	// Get staged Go files
-	cmd := exec.Command("git", "diff", "--cached", "--name-only", "--diff-filter=ACM")
-	output, err := cmd.Output()
+	output, err := cmdr.Output("git", "diff", "--cached", "--name-only", "--diff-filter=ACM")
 	if err != nil {
-		fmt.Printf("❌ Failed to get staged files: %v\n", err)
-		os.Exit(1)
+		errorMsg := fmt.Sprintf("❌ Failed to get staged files: %v", err)
+		stdPrintln(errorMsg)
+		return errors.New(errorMsg)
 	}
 
 	stagedFiles := strings.Split(strings.TrimSpace(string(output)), "\n")
@@ -33,36 +64,32 @@ func main() {
 	}
 
 	if len(goFiles) == 0 {
-		fmt.Println("No Go files staged, skipping coverage check")
-		os.Exit(0)
+		stdPrintln("No Go files staged, skipping coverage check")
+		return nil
 	}
 
-	fmt.Println("Staged Go files:")
+	stdPrintln("Staged Go files:")
 	for _, file := range goFiles {
-		fmt.Printf("  %s\n", file)
+		stdPrintf("  %s\n", file)
 	}
 
 	// Generate coverage profile
-	fmt.Println("Generating coverage profile...")
-	coverageCmd := exec.Command("go", "test", "./...", "-coverprofile=./cover.out", "-covermode=atomic", "-coverpkg=./...", "-v")
-	coverageCmd.Stdout = os.Stdout
-	coverageCmd.Stderr = os.Stderr
-	if err := coverageCmd.Run(); err != nil {
-		fmt.Printf("❌ Test execution failed: %v\n", err)
-		os.Exit(1)
+	stdPrintln("Generating coverage profile...")
+	if err := cmdr.Run("go", "test", "./...", "-coverprofile=./cover.out", "-covermode=atomic", "-coverpkg=./...", "-v"); err != nil {
+		errorMsg := fmt.Sprintf("❌ Test execution failed: %v", err)
+		stdPrintln(errorMsg)
+		return errors.New(errorMsg)
 	}
 
 	// Run coverage check
-	fmt.Println("Running coverage check...")
-	checkCmd := exec.Command("go", "run", "github.com/vladopajic/go-test-coverage/v2@latest", "--config=./tests/testcoverage.yml")
-	checkCmd.Stdout = os.Stdout
-	checkCmd.Stderr = os.Stderr
-	if err := checkCmd.Run(); err != nil {
-		fmt.Println("❌ Coverage thresholds not met")
-		fmt.Println("Please add tests to improve coverage before committing")
-		fmt.Println("Run 'make check-coverage' for detailed coverage report")
-		os.Exit(1)
+	stdPrintln("Running coverage check...")
+	if err := cmdr.Run("go", "run", "github.com/vladopajic/go-test-coverage/v2@latest", "--config=./tests/testcoverage.yml"); err != nil {
+		stdPrintln("❌ Coverage thresholds not met")
+		stdPrintln("Please add tests to improve coverage before committing")
+		stdPrintln("Run 'make check-coverage' for detailed coverage report")
+		return errors.New("coverage thresholds not met")
 	}
 
-	fmt.Println("✅ Coverage thresholds met")
+	stdPrintln("✅ Coverage thresholds met")
+	return nil
 }
