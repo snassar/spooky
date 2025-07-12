@@ -16,6 +16,8 @@
 *.coverprofile
 profile.cov
 cover
+coverage*.html
+coverage_all.html
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
