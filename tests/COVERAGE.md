@@ -8,7 +8,7 @@
 - **Total**: 60% - Minimum acceptable coverage for the entire project
 
 ### Override Strategy
-- **Critical Core Files** (70-80%): `config.go`, `ssh.go`, `commands.go`
+- **Critical Core Files** (70-80%): `config.go`, `ssh.go`, `internal/cli/commands.go`
   - These contain the main business logic and should have high coverage
 - **CLI Entry Point** (30%): `main.go`
   - Mostly initialization code, lower coverage acceptable
@@ -70,13 +70,13 @@ git commit --no-verify -m "Emergency fix - bypassing coverage checks"
 go install github.com/vladopajic/go-test-coverage/v2@latest
 
 # Run tests and generate coverage profile
-go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...
 
 # Check coverage against thresholds
 go-test-coverage --config=./tests/testcoverage.yml
 
 # Generate HTML report
-go tool cover -html=./cover.out -o coverage.html
+go tool cover -html=./tests/coverage.out -o tests/reports/coverage.html
 ```
 
 ---
@@ -112,7 +112,7 @@ make check-coverage
 make coverage-html
 
 # Run coverage tool manually
-go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...
 go run github.com/vladopajic/go-test-coverage/v2@latest --config=./tests/testcoverage.yml
 ```
 
@@ -145,13 +145,13 @@ go run github.com/vladopajic/go-test-coverage/v2@latest --config=./tests/testcov
 go install github.com/vladopajic/go-test-coverage/v2@latest
 
 # Run tests and generate coverage profile
-go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...
 
 # Check coverage against thresholds
 go-test-coverage --config=./tests/testcoverage.yml
 
 # Generate HTML report
-go tool cover -html=./cover.out -o coverage.html
+go tool cover -html=./tests/coverage.out -o coverage.html
 ```
 ```
 
@@ -200,7 +200,7 @@ See [tests/COVERAGE.md](tests/COVERAGE.md) for details and rationale.
   `go install github.com/vladopajic/go-test-coverage/v2@latest`
 
 - **Profile not found:**  
-  Run `go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...` first.
+  Run `go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...` first.
 
 - **Threshold failures:**  
   Add or improve tests for uncovered code.
@@ -283,7 +283,8 @@ This project excludes certain files and directories from coverage calculations t
 The coverage metrics focus on:
 - Core SSH client functionality (`spooky/ssh.go`)
 - Configuration parsing (`spooky/config.go`)
-- Command-line interface (`commands.go`)
+- SSH key generation (`spooky/keygen.go`)
+- Command-line interface (`internal/cli/commands.go`)
 
 This ensures coverage reflects the quality of the actual application code.
 
@@ -316,7 +317,7 @@ These sections are excluded from coverage because:
 
 ```bash
 # Run coverage to see the impact
-go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...
 go run github.com/vladopajic/go-test-coverage/v2@latest --config=./tests/testcoverage.yml
 
 # Check that coverage is more accurate (focused on testable code)
@@ -435,7 +436,7 @@ Coverage thresholds are optimized for the spooky project structure:
 
 ##### Standard Code (Medium Thresholds)
 - **`ssh_keygen.go`**: 60% - SSH key generation utilities
-- **`commands.go`**: 55% - CLI commands with error handling
+- **`internal/cli/commands.go`**: 55% - CLI commands with error handling
 
 ##### Excluded Code
 - **`main.go`**: Entry point, tested via integration
@@ -505,21 +506,21 @@ Coverage changes are automatically posted to PRs:
 - **Total Coverage:** 62.3%
 
 📊 [View workflow run](https://github.com/owner/repo/actions/runs/123456789)
-📁 Coverage artifacts: `coverage-reports` (HTML report: `coverage.html`)
+�� Coverage artifacts: `coverage-reports` (HTML report: `coverage.html`)
 ```
 
 ### Local Diff Analysis
 ```bash
 # Generate current coverage breakdown
-go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...
 go run github.com/vladopajic/go-test-coverage/v2@latest \
   --config=./tests/testcoverage.yml \
-  --breakdown-file-name=coverage-breakdown.json
+  --breakdown-file-name=tests/coverage-breakdown.json
 
 # Compare with base (if available)
 go run github.com/vladopajic/go-test-coverage/v2@latest \
   --config=./tests/testcoverage.yml \
-  --diff-base-breakdown-file-name=base-coverage-breakdown.json
+  --diff-base-breakdown-file-name=tests/base-coverage-breakdown.json
 ```
 
 ## Task 6: Update README.md
@@ -543,16 +544,16 @@ For detailed coverage analysis, see [tests/COVERAGE.md](tests/COVERAGE.md).
 **Commands to test locally:**
 ```bash
 # Generate current coverage breakdown
-go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...
 go run github.com/vladopajic/go-test-coverage/v2@latest \
   --config=./tests/testcoverage.yml \
-  --breakdown-file-name=coverage-breakdown.json
+  --breakdown-file-name=tests/coverage-breakdown.json
 
 # Verify breakdown file was created
-ls -la coverage-breakdown.json
+ls -la tests/coverage-breakdown.json
 
 # Check breakdown file content
-cat coverage-breakdown.json
+cat tests/coverage-breakdown.json
 ```
 
 ## Expected outcomes:

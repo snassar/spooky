@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"spooky/internal/cli"
+
 	"github.com/spf13/cobra"
 )
 
@@ -19,10 +21,14 @@ func main() {
 - Support for parallel execution and error handling`,
 	}
 
+	// Initialize CLI commands
+	cli.InitCommands()
+
 	// Add subcommands
-	rootCmd.AddCommand(executeCmd)
-	rootCmd.AddCommand(validateCmd)
-	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(cli.ExecuteCmd)
+	rootCmd.AddCommand(cli.ValidateCmd)
+	rootCmd.AddCommand(cli.ListCmd)
+	rootCmd.AddCommand(cli.KeygenCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

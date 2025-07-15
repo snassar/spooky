@@ -17,7 +17,9 @@ func TestParseConfig_ValidFile(t *testing.T) {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
 	defer os.Remove(f.Name())
-	f.WriteString(content)
+	if _, err := f.WriteString(content); err != nil {
+		t.Fatalf("Failed to write test content: %v", err)
+	}
 	f.Close()
 
 	cfg, err := ParseConfig(f.Name())
@@ -44,7 +46,9 @@ func TestParseConfig_InvalidSyntax(t *testing.T) {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
 	defer os.Remove(f.Name())
-	f.WriteString(content)
+	if _, err := f.WriteString(content); err != nil {
+		t.Fatalf("Failed to write test content: %v", err)
+	}
 	f.Close()
 
 	_, err = ParseConfig(f.Name())

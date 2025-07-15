@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"fmt"
+	"os"
 	"sync"
 
 	"spooky/internal/config"
@@ -43,6 +44,14 @@ func ExecuteConfig(cfg *config.Config) error {
 
 // executeActionSequential executes an action sequentially on all target servers
 func executeActionSequential(action *config.Action, servers []*config.Server) error {
+	// Validate action before connecting
+	if action.Command != "" && action.Script != "" {
+		return fmt.Errorf("action %s: both command and script specified", action.Name)
+	}
+	if action.Command == "" && action.Script == "" {
+		return fmt.Errorf("action %s: neither command nor script specified", action.Name)
+	}
+
 	for _, server := range servers {
 		fmt.Printf("  🔗 Connecting to %s (%s@%s:%d)...\n", server.Name, server.User, server.Host, server.Port)
 
@@ -78,6 +87,21 @@ func executeActionSequential(action *config.Action, servers []*config.Server) er
 
 // executeActionParallel executes an action in parallel on all target servers
 func executeActionParallel(action *config.Action, servers []*config.Server) error {
+	// Validate action before connecting
+	if action.Command != "" && action.Script != "" {
+		return fmt.Errorf("action %s: both command and script specified", action.Name)
+	}
+	if action.Command == "" && action.Script == "" {
+		return fmt.Errorf("action %s: neither command nor script specified", action.Name)
+	}
+
+	// Validate script file exists before connecting (for parallel execution)
+	if action.Script != "" {
+		if _, err := os.Stat(action.Script); os.IsNotExist(err) {
+			return fmt.Errorf("failed to read script file %s: %w", action.Script, err)
+		}
+	}
+
 	var wg sync.WaitGroup
 	results := make(chan string, len(servers))
 	errors := make(chan error, len(servers))

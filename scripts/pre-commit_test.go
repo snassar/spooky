@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
-	"fmt"
+	"os"
 	"strings"
 	"testing"
 )
@@ -17,30 +17,33 @@ type MockCommander struct {
 func (m MockCommander) Output(name string, args ...string) ([]byte, error) {
 	return m.OutputFunc(name, args...)
 }
+
 func (m MockCommander) Run(name string, args ...string) error {
-	if m.RunFunc != nil {
-		return m.RunFunc(name, args...)
-	}
 	if m.RunLog != nil {
-		fmt.Fprintf(m.RunLog, "Run: %s %s\n", name, strings.Join(args, " "))
+		m.RunLog.WriteString(name + " " + strings.Join(args, " ") + "\n")
 	}
-	return nil
+	return m.RunFunc(name, args...)
 }
 
-// Helper to capture output from runPreCommitChecks
+// captureOutput captures stdout/stderr during function execution
 func captureOutput(fn func()) string {
-	var buf bytes.Buffer
-	stdPrintln = func(a ...interface{}) (int, error) {
-		return fmt.Fprintln(&buf, a...)
-	}
-	stdPrintf = func(format string, a ...interface{}) (int, error) {
-		return fmt.Fprintf(&buf, format, a...)
-	}
-	defer func() {
-		stdPrintln = fmt.Println
-		stdPrintf = fmt.Printf
-	}()
+	// Redirect stdout to a buffer
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// Run the function
 	fn()
+
+	// Restore stdout
+	w.Close()
+	os.Stdout = oldStdout
+
+	// Read the captured output
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		panic(err)
+	}
 	return buf.String()
 }
 
@@ -52,14 +55,14 @@ func TestGitRepositoryDetection(t *testing.T) {
 					return []byte(".git"), nil
 				}
 				if name == "git" && args[0] == "diff" {
-					return []byte("main.go\ncommands.go"), nil
+					return []byte("main.go"), nil
 				}
 				return nil, errors.New("unexpected command")
 			},
 			RunFunc: func(name string, args ...string) error { return nil },
 		}
 		output := captureOutput(func() {
-			runPreCommitChecks(mock)
+			_ = runPreCommitChecks(mock) // ignore error, output is captured for assertions
 		})
 		if !strings.Contains(output, "Running pre-commit coverage checks...") {
 			t.Errorf("Expected output to contain 'Running pre-commit coverage checks...', got %q", output)
@@ -76,7 +79,7 @@ func TestGitRepositoryDetection(t *testing.T) {
 			},
 		}
 		output := captureOutput(func() {
-			runPreCommitChecks(mock)
+			_ = runPreCommitChecks(mock) // ignore error, output is captured for assertions
 		})
 		if !strings.Contains(output, "❌ Not in a git repository") {
 			t.Errorf("Expected output to contain '❌ Not in a git repository', got %q", output)
@@ -98,7 +101,7 @@ func TestStagedFilesDetection(t *testing.T) {
 			},
 		}
 		output := captureOutput(func() {
-			runPreCommitChecks(mock)
+			_ = runPreCommitChecks(mock) // ignore error, output is captured for assertions
 		})
 		if !strings.Contains(output, "No Go files staged, skipping coverage check") {
 			t.Errorf("Expected output to contain 'No Go files staged, skipping coverage check', got %q", output)
@@ -112,16 +115,16 @@ func TestStagedFilesDetection(t *testing.T) {
 					return []byte(".git"), nil
 				}
 				if name == "git" && args[0] == "diff" {
-					return []byte("main.go\ncommands.go\nssh.go\nREADME.md"), nil
+					return []byte("main.go\ninternal/cli/commands.go\nssh.go\nREADME.md"), nil
 				}
 				return nil, errors.New("unexpected command")
 			},
 			RunFunc: func(name string, args ...string) error { return nil },
 		}
 		output := captureOutput(func() {
-			runPreCommitChecks(mock)
+			_ = runPreCommitChecks(mock) // ignore error, output is captured for assertions
 		})
-		for _, file := range []string{"main.go", "commands.go", "ssh.go"} {
+		for _, file := range []string{"main.go", "internal/cli/commands.go", "ssh.go"} {
 			if !strings.Contains(output, file) {
 				t.Errorf("Expected output to contain staged file %q", file)
 			}
@@ -148,7 +151,7 @@ func TestStagedFilesDetection(t *testing.T) {
 			RunFunc: func(name string, args ...string) error { return nil },
 		}
 		output := captureOutput(func() {
-			runPreCommitChecks(mock)
+			_ = runPreCommitChecks(mock) // ignore error, output is captured for assertions
 		})
 		for _, file := range []string{"main.go", "ssh.go"} {
 			if !strings.Contains(output, file) {
@@ -176,7 +179,7 @@ func TestStagedFilesDetection(t *testing.T) {
 			},
 		}
 		output := captureOutput(func() {
-			runPreCommitChecks(mock)
+			_ = runPreCommitChecks(mock) // ignore error, output is captured for assertions
 		})
 		if !strings.Contains(output, "❌ Failed to get staged files:") {
 			t.Errorf("Expected output to contain '❌ Failed to get staged files:', got %q", output)
@@ -199,7 +202,7 @@ func TestCoverageGeneration(t *testing.T) {
 			RunFunc: func(name string, args ...string) error { return nil },
 		}
 		output := captureOutput(func() {
-			runPreCommitChecks(mock)
+			_ = runPreCommitChecks(mock) // ignore error, output is captured for assertions
 		})
 		if !strings.Contains(output, "Generating coverage profile...") {
 			t.Errorf("Expected output to contain 'Generating coverage profile...', got %q", output)
@@ -228,7 +231,7 @@ func TestCoverageGeneration(t *testing.T) {
 			},
 		}
 		output := captureOutput(func() {
-			runPreCommitChecks(mock)
+			_ = runPreCommitChecks(mock) // ignore error, output is captured for assertions
 		})
 		if !strings.Contains(output, "❌ Test execution failed:") {
 			t.Errorf("Expected output to contain '❌ Test execution failed:', got %q", output)
@@ -251,7 +254,7 @@ func TestCoverageCheck(t *testing.T) {
 			RunFunc: func(name string, args ...string) error { return nil },
 		}
 		output := captureOutput(func() {
-			runPreCommitChecks(mock)
+			_ = runPreCommitChecks(mock) // ignore error, output is captured for assertions
 		})
 		if !strings.Contains(output, "✅ Coverage thresholds met") {
 			t.Errorf("Expected output to contain '✅ Coverage thresholds met', got %q", output)
@@ -270,17 +273,23 @@ func TestCoverageCheck(t *testing.T) {
 				return nil, errors.New("unexpected command")
 			},
 			RunFunc: func(name string, args ...string) error {
+				if name == "go" && args[0] == "test" {
+					return nil
+				}
 				if name == "go" && args[0] == "run" {
-					return errors.New("fail")
+					return errors.New("coverage thresholds not met")
 				}
 				return nil
 			},
 		}
 		output := captureOutput(func() {
-			runPreCommitChecks(mock)
+			_ = runPreCommitChecks(mock) // ignore error, output is captured for assertions
 		})
 		if !strings.Contains(output, "❌ Coverage thresholds not met") {
 			t.Errorf("Expected output to contain '❌ Coverage thresholds not met', got %q", output)
+		}
+		if !strings.Contains(output, "Please add tests to improve coverage before committing") {
+			t.Errorf("Expected output to contain help message, got %q", output)
 		}
 	})
 }

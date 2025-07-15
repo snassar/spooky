@@ -52,7 +52,7 @@ func WriteKeyFiles(privateKeyPEM []byte, publicKey []byte, password string) (str
 
 	// Write combined file with all information
 	combinedPath := fmt.Sprintf("%s/ed25519_keys.txt", outputDir)
-	combinedContent := fmt.Sprintf("=== ED25519 SSH Key Pair ===\n\n")
+	combinedContent := "=== ED25519 SSH Key Pair ===\n\n"
 	combinedContent += "Private Key:\n"
 	combinedContent += string(privateKeyPEM)
 	combinedContent += "\n\nPublic Key:\n"
