@@ -55,11 +55,5 @@ The pre-commit hook:
 You can also run the coverage check manually:
 
 ```bash
-go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./... && go run github.com/vladopajic/go-test-coverage/v2@latest --config=./tests/testcoverage.yml
+go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./... && go run github.com/vladopajic/go-test-coverage/v2@latest --config=./tests/testcoverage.yml
 ```
-
-### Requirements
-
-- Go 1.24 or later
-- The `go-test-coverage/v2` tool (installed automatically via `go run`)
-- Coverage configuration in `tests/testcoverage.yml` 

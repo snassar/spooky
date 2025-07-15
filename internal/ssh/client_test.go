@@ -1,95 +1,26 @@
 package ssh
 
 import (
-	"errors"
-	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"spooky/internal/config"
-
-	"golang.org/x/crypto/ssh"
 )
 
-// --- Mock interfaces for dependency injection ---
-type fileReader interface {
-	ReadFile(filename string) ([]byte, error)
-}
-
-type keyParser interface {
-	ParsePrivateKey(key []byte) (ssh.Signer, error)
-}
-
-type sshDialer interface {
-	Dial(network, addr string, config *ssh.ClientConfig) (*ssh.Client, error)
-}
-
-// --- Mock implementations ---
-type mockFileReader struct {
-	shouldFail bool
-	content    []byte
-}
-
-func (m *mockFileReader) ReadFile(filename string) ([]byte, error) {
-	if m.shouldFail {
-		return nil, errors.New("file read error")
-	}
-	return m.content, nil
-}
-
-type mockKeyParser struct {
-	shouldFail bool
-}
-
-func (m *mockKeyParser) ParsePrivateKey(key []byte) (ssh.Signer, error) {
-	if m.shouldFail {
-		return nil, errors.New("key parse error")
-	}
-	// Return a mock signer
-	return &mockSigner{}, nil
-}
-
-type mockSigner struct{}
-
-func (m *mockSigner) PublicKey() ssh.PublicKey { return nil }
-func (m *mockSigner) Sign(rand io.Reader, data []byte) (*ssh.Signature, error) {
-	return &ssh.Signature{}, nil
-}
-
-type mockSSHDialer struct {
-	shouldFail bool
-}
-
-func (m *mockSSHDialer) Dial(network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
-	if m.shouldFail {
-		return nil, errors.New("ssh dial error")
-	}
-	return &ssh.Client{}, nil
-}
-
-// --- Test helpers ---
-func createTestServer() *config.Server {
-	return &config.Server{
-		Name:     "testserver",
-		Host:     "localhost",
-		User:     "testuser",
-		Port:     22,
-		Password: "testpass",
-	}
-}
-
-// --- Tests for NewSSHClient ---
 func TestNewSSHClient_NoAuth(t *testing.T) {
 	server := &config.Server{
-		Name: "testserver",
+		Name: "test",
 		Host: "localhost",
 		User: "testuser",
-		// No password or key file
+		Port: 22,
 	}
 
 	_, err := NewSSHClient(server, 30)
 	if err == nil {
-		t.Error("expected error for no authentication method")
+		t.Error("expected error when no authentication method is provided")
 	}
 	if !strings.Contains(err.Error(), "no authentication method available") {
 		t.Errorf("expected authentication error, got: %v", err)
@@ -97,69 +28,161 @@ func TestNewSSHClient_NoAuth(t *testing.T) {
 }
 
 func TestNewSSHClient_PasswordAuth(t *testing.T) {
-	server := createTestServer()
-	server.Password = "testpass"
+	server := &config.Server{
+		Name:     "test",
+		Host:     "localhost",
+		User:     "testuser",
+		Port:     22,
+		Password: "testpass",
+	}
 
-	// This will fail due to real SSH connection, but we're testing the auth method setup
-	_, err := NewSSHClient(server, 1) // Short timeout
-	if err != nil {
-		// Expected to fail due to connection, but should not fail due to auth method setup
-		if strings.Contains(err.Error(), "no authentication method available") {
-			t.Error("password authentication method should be available")
-		}
-		// Other errors (like connection timeout) are expected in unit tests
+	_, err := NewSSHClient(server, 30)
+	// This will fail to connect, but should not fail due to authentication setup
+	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") {
+		t.Errorf("expected connection error, got: %v", err)
 	}
 }
 
 func TestNewSSHClient_KeyFileAuth(t *testing.T) {
-	server := createTestServer()
-	server.Password = "" // Clear password
-	server.KeyFile = "/path/to/key"
+	// Create a temporary key file
+	tempDir := t.TempDir()
+	keyFile := filepath.Join(tempDir, "test_key")
 
-	// This will fail due to real SSH connection, but we're testing the auth method setup
-	_, err := NewSSHClient(server, 1) // Short timeout
+	// Write a dummy key file (this will fail to parse, but tests the file reading logic)
+	err := os.WriteFile(keyFile, []byte("invalid key content"), 0600)
 	if err != nil {
-		// Expected to fail due to connection or file read, but should not fail due to auth method setup
-		if strings.Contains(err.Error(), "no authentication method available") {
-			t.Error("key file authentication method should be available")
-		}
-		// Other errors (like file not found or connection timeout) are expected in unit tests
+		t.Fatalf("failed to create test key file: %v", err)
+	}
+
+	server := &config.Server{
+		Name:    "test",
+		Host:    "localhost",
+		User:    "testuser",
+		Port:    22,
+		KeyFile: keyFile,
+	}
+
+	_, err = NewSSHClient(server, 30)
+	if err == nil {
+		t.Error("expected error when key file is invalid")
+	}
+	if !strings.Contains(err.Error(), "failed to parse private key") {
+		t.Errorf("expected key parsing error, got: %v", err)
 	}
 }
 
 func TestNewSSHClient_BothAuthMethods(t *testing.T) {
-	server := createTestServer()
-	server.Password = "testpass"
-	server.KeyFile = "/path/to/key"
+	// Create a temporary key file
+	tempDir := t.TempDir()
+	keyFile := filepath.Join(tempDir, "test_key")
 
-	// This will fail due to real SSH connection, but we're testing the auth method setup
-	_, err := NewSSHClient(server, 1) // Short timeout
+	// Write a dummy key file
+	err := os.WriteFile(keyFile, []byte("invalid key content"), 0600)
 	if err != nil {
-		// Expected to fail due to connection, but should not fail due to auth method setup
-		if strings.Contains(err.Error(), "no authentication method available") {
-			t.Error("both authentication methods should be available")
-		}
-		// Other errors (like connection timeout) are expected in unit tests
+		t.Fatalf("failed to create test key file: %v", err)
+	}
+
+	server := &config.Server{
+		Name:     "test",
+		Host:     "localhost",
+		User:     "testuser",
+		Port:     22,
+		Password: "testpass",
+		KeyFile:  keyFile,
+	}
+
+	_, err = NewSSHClient(server, 30)
+	// Should fail due to key parsing error
+	if err == nil {
+		t.Error("expected error when key file is invalid")
+	}
+	if !strings.Contains(err.Error(), "failed to parse private key") {
+		t.Errorf("expected key parsing error, got: %v", err)
 	}
 }
 
-// --- Tests for ExecuteCommand ---
-// Note: Testing ExecuteCommand with real SSH connections requires mocking
-// or integration tests. For unit tests, we focus on error conditions.
-
-// --- Tests for ExecuteScript ---
-func TestExecuteScript_FileReadError(t *testing.T) {
-	client := &SSHClient{
-		Client: &ssh.Client{},
-		Server: createTestServer(),
+func TestNewSSHClient_KeyFileNotFound(t *testing.T) {
+	server := &config.Server{
+		Name:    "test",
+		Host:    "localhost",
+		User:    "testuser",
+		Port:    22,
+		KeyFile: "/nonexistent/key/file",
 	}
 
-	// Test with non-existent file
+	_, err := NewSSHClient(server, 30)
+	if err == nil {
+		t.Error("expected error when key file does not exist")
+	}
+	if !strings.Contains(err.Error(), "failed to read key file") {
+		t.Errorf("expected file read error, got: %v", err)
+	}
+}
+
+func TestNewSSHClient_Timeout(t *testing.T) {
+	server := &config.Server{
+		Name:     "test",
+		Host:     "192.0.2.1", // RFC 5737 reserved for documentation/testing
+		User:     "testuser",
+		Port:     22,
+		Password: "testpass",
+	}
+
+	start := time.Now()
+	_, err := NewSSHClient(server, 1) // 1 second timeout
+	duration := time.Since(start)
+
+	if err == nil {
+		t.Error("expected error when connecting to unreachable host")
+	}
+
+	// Should timeout within reasonable time (not more than 3 seconds)
+	if duration > 3*time.Second {
+		t.Errorf("connection should have timed out faster, took: %v", duration)
+	}
+}
+
+func TestExecuteScript_FileReadError(t *testing.T) {
+	// Create a mock SSH client
+	client := &SSHClient{
+		Server: &config.Server{Name: "test"},
+	}
+
 	_, err := client.ExecuteScript("/nonexistent/script.sh")
 	if err == nil {
-		t.Error("expected error for non-existent script file")
+		t.Error("expected error when script file does not exist")
 	}
 	if !strings.Contains(err.Error(), "failed to read script file") {
 		t.Errorf("expected file read error, got: %v", err)
+	}
+}
+
+func TestSSHClient_Close(t *testing.T) {
+	// Test that Close doesn't panic when Client is nil
+	client := &SSHClient{
+		Server: &config.Server{Name: "test"},
+		Client: nil,
+	}
+
+	// Should not panic
+	err := client.Close()
+	if err != nil {
+		t.Errorf("Close should not return error when Client is nil, got: %v", err)
+	}
+}
+
+func TestSSHClient_ExecuteCommand_NoConnection(t *testing.T) {
+	// Test ExecuteCommand with no SSH connection
+	client := &SSHClient{
+		Server: &config.Server{Name: "test"},
+		Client: nil,
+	}
+
+	_, err := client.ExecuteCommand("echo test")
+	if err == nil {
+		t.Error("expected error when no SSH connection exists")
+	}
+	if !strings.Contains(err.Error(), "failed to create session") {
+		t.Errorf("expected session creation error, got: %v", err)
 	}
 }

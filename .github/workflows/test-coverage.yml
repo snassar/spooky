@@ -23,13 +23,13 @@ jobs:
       run: go mod download
       
     - name: Generate coverage profile
-      run: go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+      run: go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...
       
     - name: Run coverage check and generate breakdown
       run: |
         go run github.com/vladopajic/go-test-coverage/v2@latest \
           --config=./tests/testcoverage.yml \
-          --profile=./cover.out \
+          --profile=./tests/coverage.out \
           --breakdown-file-name=coverage-breakdown.json
         
     - name: Upload coverage artifacts
@@ -37,7 +37,7 @@ jobs:
       with:
         name: coverage-reports
         path: |
-          cover.out
+          tests/coverage.out
           coverage.html
           coverage-breakdown.json
         retention-days: 30
@@ -55,7 +55,7 @@ jobs:
         if [ -f "base-coverage/coverage-breakdown.json" ]; then
           go run github.com/vladopajic/go-test-coverage/v2@latest \
             --config=./tests/testcoverage.yml \
-            --profile=./cover.out \
+            --profile=./tests/coverage.out \
             --diff-base-breakdown-file-name=base-coverage/coverage-breakdown.json
         else
           echo "No base coverage found, skipping diff analysis"

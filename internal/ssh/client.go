@@ -60,11 +60,17 @@ func NewSSHClient(server *config.Server, timeout int) (*SSHClient, error) {
 
 // Close closes the SSH connection
 func (s *SSHClient) Close() error {
+	if s.Client == nil {
+		return nil
+	}
 	return s.Client.Close()
 }
 
 // ExecuteCommand executes a command on the remote server
 func (s *SSHClient) ExecuteCommand(command string) (string, error) {
+	if s.Client == nil {
+		return "", fmt.Errorf("failed to create session: no SSH connection exists (Client is nil)")
+	}
 	session, err := s.Client.NewSession()
 	if err != nil {
 		return "", fmt.Errorf("failed to create session: %w", err)

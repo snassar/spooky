@@ -217,16 +217,16 @@ go test -cover ./...
 
 ### Test Coverage Tool
 
-For detailed coverage analysis, install the go-test-coverage tool:
+For detailed coverage analysis, install the coverage tools:
 
 ```bash
-go install github.com/vladopajic/go-test-coverage/v2@latest
+make install-coverage-tools
 ```
 
 Then run:
 
 ```bash
-go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...
 ```
 
 Run the code coverage tool
@@ -270,7 +270,7 @@ Coverage reports are automatically generated in CI/CD and available as workflow 
 2. Click on a workflow run (e.g., "Test Coverage")
 3. Scroll down to **Artifacts**
 4. Download `coverage-reports` to get:
-   - `cover.out` - Raw coverage data
+   - `tests/coverage.out` - Raw coverage data
    - `coverage.html` - Interactive HTML report
 
 #### Viewing HTML Reports
@@ -362,7 +362,7 @@ make check-coverage
 make coverage-html
 
 # Run coverage tool manually
-go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...
 go run github.com/vladopajic/go-test-coverage/v2@latest --config=./tests/testcoverage.yml
 ```
 

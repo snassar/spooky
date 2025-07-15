@@ -33,7 +33,7 @@ go install github.com/vladopajic/go-test-coverage/v2@latest
 ```bash
 # Error: coverage profile not found
 # Generate profile first
-go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...
 ```
 
 #### Empty Profile
@@ -43,7 +43,7 @@ go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
 go test -v ./...
 
 # Check if coverage mode is correct
-go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
+go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...
 ```
 
 #### Profile Path Issues
@@ -52,7 +52,7 @@ go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...
 # Use absolute path
 go run github.com/vladopajic/go-test-coverage/v2@latest \
   --config=./tests/testcoverage.yml \
-  --profile=$(pwd)/cover.out
+  --profile=$(pwd)/tests/coverage.out
 ```
 
 ### Threshold Failures
@@ -61,7 +61,7 @@ go run github.com/vladopajic/go-test-coverage/v2@latest \
 ```bash
 # Error: file coverage below threshold
 # Check specific file coverage
-go tool cover -func=./cover.out | grep "filename.go"
+go tool cover -func=./tests/coverage.out | grep "filename.go"
 
 # Add tests for uncovered functions
 # Or add coverage-ignore comment if appropriate
@@ -71,7 +71,7 @@ go tool cover -func=./cover.out | grep "filename.go"
 ```bash
 # Error: package coverage below threshold
 # Check package coverage
-go tool cover -func=./cover.out
+go tool cover -func=./tests/coverage.out
 
 # Focus on high-priority functions
 # Add integration tests if unit tests are insufficient
@@ -81,7 +81,7 @@ go tool cover -func=./cover.out
 ```bash
 # Error: total coverage below threshold
 # Review overall coverage
-go tool cover -func=./cover.out
+go tool cover -func=./tests/coverage.out
 
 # Identify largest uncovered areas
 # Prioritize testing based on business impact
@@ -129,14 +129,14 @@ go run github.com/vladopajic/go-test-coverage/v2@latest \
 # Coverage generation is slow
 # Exclude unnecessary files
 # Use more specific package patterns
-go test ./spooky/... -coverprofile=./cover.out -covermode=atomic -coverpkg=./spooky/...
+go test ./spooky/... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./spooky/...
 ```
 
 #### Large Coverage Files
 ```bash
 # Coverage file is very large
 # Check what's being included
-go tool cover -func=./cover.out | wc -l
+go tool cover -func=./tests/coverage.out | wc -l
 
 # Review exclusions
 # Remove unnecessary packages from coverage
@@ -182,7 +182,7 @@ go run github.com/vladopajic/go-test-coverage/v2@latest \
 
 ### Common Solutions
 1. **Reinstall tools**: `go install github.com/vladopajic/go-test-coverage/v2@latest`
-2. **Regenerate profiles**: `go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...`
+2. **Regenerate profiles**: `go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...`
 3. **Check paths**: Use absolute paths for config and profile files
 4. **Validate config**: Check YAML syntax and regex patterns
 5. **Update exclusions**: Add appropriate exclusions for untestable code
@@ -193,7 +193,7 @@ go run github.com/vladopajic/go-test-coverage/v2@latest \
   `go install github.com/vladopajic/go-test-coverage/v2@latest`
 
 - **Profile not found:**  
-  Run `go test ./... -coverprofile=./cover.out -covermode=atomic -coverpkg=./...` first.
+  Run `go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...` first.
 
 - **Threshold failures:**  
   Add or improve tests for uncovered code.

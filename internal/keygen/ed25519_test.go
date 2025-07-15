@@ -23,7 +23,7 @@ func TestGenerateEd25519KeyPair(t *testing.T) {
 	// Verify PEM block structure
 	block, _ := pem.Decode(privateKeyPEM)
 	if block == nil {
-		t.Error("failed to decode private key PEM")
+		t.Fatal("failed to decode private key PEM")
 	}
 	if block.Type != "OPENSSH PRIVATE KEY" {
 		t.Errorf("expected PEM type 'OPENSSH PRIVATE KEY', got '%s'", block.Type)
@@ -130,7 +130,7 @@ func TestGenerateKeyPair_Ed25519Validation(t *testing.T) {
 	// Verify PEM block structure
 	block, _ := pem.Decode(keyPair.PrivateKey)
 	if block == nil {
-		t.Error("failed to decode private key PEM")
+		t.Fatal("failed to decode private key PEM")
 	}
 	if block.Type != "OPENSSH PRIVATE KEY" {
 		t.Errorf("expected PEM type 'OPENSSH PRIVATE KEY', got '%s'", block.Type)
