@@ -12,14 +12,22 @@ import (
 func ExecuteConfig(cfg *config.Config) error {
 	fmt.Printf("🚀 Starting execution of %d actions...\n", len(cfg.Actions))
 
+	// Initialize index cache for enterprise-scale performance
+	indexCache := &config.IndexCache{}
+
 	for _, action := range cfg.Actions {
 		fmt.Printf("\n⚡ Executing action: %s\n", action.Name)
 		if action.Description != "" {
 			fmt.Printf("📝 Description: %s\n", action.Description)
 		}
 
-		// Get target servers for this action
-		targetServers, err := config.GetServersForAction(&action, cfg)
+		// Get target servers for this action using optimized lookup
+		var targetServers []*config.Server
+		var err error
+
+		// Use enterprise-scale lookup for better performance
+		index := indexCache.GetIndex(cfg)
+		targetServers, err = config.GetServersForActionLarge(cfg, &action, index)
 		if err != nil {
 			return fmt.Errorf("failed to get servers for action %s: %w", action.Name, err)
 		}
