@@ -74,22 +74,22 @@ This project excludes certain files and directories from coverage calculations t
 - `^tests/helpers/` - Test helper utilities
 - `^examples/` - Example configurations and code
 - `main\.go$` - Main entry point (minimal logic)
-- `ssh_keygen\.go$` - SSH key generation utilities
+
 
 ### Rationale
 
 1. **Test Files**: Test code itself doesn't need coverage - we care about production code
 2. **Infrastructure**: Mock servers and test infrastructure are not production code
 3. **Examples**: Example files are for documentation, not production use
-4. **Utilities**: SSH key generation is a utility, not core functionality
-5. **Main**: Entry point typically has minimal logic
+4. **Main**: Entry point typically has minimal logic
+
 
 ### Coverage Focus
 
 The coverage metrics focus on:
 - Core SSH client functionality (`spooky/ssh.go`)
 - Configuration parsing (`spooky/config.go`)
-- SSH key generation (`spooky/keygen.go`)
+
 - Command-line interface (`internal/cli/commands.go`)
 
 This ensures coverage reflects the quality of the actual application code.
@@ -100,7 +100,7 @@ Some code sections are marked with `// coverage-ignore` comments for the followi
 
 ### CLI Entry Points
 - `main()` function - Entry point, tested via integration tests
-- `generateSSHKeys()` - CLI tool, tested via integration tests
+
 
 ### Error Handling
 - File system errors - Hard to reliably test in unit tests
@@ -228,7 +228,6 @@ Coverage thresholds are optimized for the spooky project structure:
 - **`spooky/config.go`**: 70% - Configuration parsing affects all operations
 
 ##### Standard Code (Medium Thresholds)
-- **`ssh_keygen.go`**: 60% - SSH key generation utilities
 - **`internal/cli/commands.go`**: 55% - CLI commands with error handling
 
 ##### Excluded Code
