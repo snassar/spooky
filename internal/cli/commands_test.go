@@ -26,13 +26,13 @@ func resetCommandState() {
 
 	// Reset command flags
 	ExecuteCmd.Flags().VisitAll(func(flag *pflag.Flag) {
-		flag.Value.Set(flag.DefValue)
+		_ = flag.Value.Set(flag.DefValue) // Ignore errors in test setup
 	})
 	ValidateCmd.Flags().VisitAll(func(flag *pflag.Flag) {
-		flag.Value.Set(flag.DefValue)
+		_ = flag.Value.Set(flag.DefValue) // Ignore errors in test setup
 	})
 	ListCmd.Flags().VisitAll(func(flag *pflag.Flag) {
-		flag.Value.Set(flag.DefValue)
+		_ = flag.Value.Set(flag.DefValue) // Ignore errors in test setup
 	})
 }
 
@@ -65,7 +65,7 @@ func TestExecuteCmd_InvalidConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	invalidConfig := filepath.Join(tempDir, "invalid.hcl")
 
-	err := os.WriteFile(invalidConfig, []byte("invalid hcl content"), 0644)
+	err := os.WriteFile(invalidConfig, []byte("invalid hcl content"), 0o600)
 	if err != nil {
 		t.Fatalf("failed to create invalid config file: %v", err)
 	}
@@ -97,7 +97,7 @@ action "test_action" {
 }
 `
 
-	err := os.WriteFile(validConfig, []byte(configContent), 0644)
+	err := os.WriteFile(validConfig, []byte(configContent), 0o600)
 	if err != nil {
 		t.Fatalf("failed to create valid config file: %v", err)
 	}
@@ -131,7 +131,7 @@ action "test_action" {
 }
 `
 
-	err := os.WriteFile(validConfig, []byte(configContent), 0644)
+	err := os.WriteFile(validConfig, []byte(configContent), 0o600)
 	if err != nil {
 		t.Fatalf("failed to create valid config file: %v", err)
 	}
@@ -164,7 +164,7 @@ action "test_action" {
 }
 `
 
-	err := os.WriteFile(validConfig, []byte(configContent), 0644)
+	err := os.WriteFile(validConfig, []byte(configContent), 0o600)
 	if err != nil {
 		t.Fatalf("failed to create valid config file: %v", err)
 	}
@@ -203,7 +203,7 @@ action "test_action" {
 }
 `
 
-	err := os.WriteFile(validConfig, []byte(configContent), 0644)
+	err := os.WriteFile(validConfig, []byte(configContent), 0o600)
 	if err != nil {
 		t.Fatalf("failed to create valid config file: %v", err)
 	}
@@ -236,7 +236,7 @@ action "test_action" {
 }
 `
 
-	err := os.WriteFile(validConfig, []byte(configContent), 0644)
+	err := os.WriteFile(validConfig, []byte(configContent), 0o600)
 	if err != nil {
 		t.Fatalf("failed to create valid config file: %v", err)
 	}
@@ -278,7 +278,7 @@ func TestValidateCmd_InvalidConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	invalidConfig := filepath.Join(tempDir, "invalid.hcl")
 
-	err := os.WriteFile(invalidConfig, []byte("invalid hcl content"), 0644)
+	err := os.WriteFile(invalidConfig, []byte("invalid hcl content"), 0o600)
 	if err != nil {
 		t.Fatalf("failed to create invalid config file: %v", err)
 	}
@@ -310,7 +310,7 @@ action "test_action" {
 }
 `
 
-	err := os.WriteFile(validConfig, []byte(configContent), 0644)
+	err := os.WriteFile(validConfig, []byte(configContent), 0o600)
 	if err != nil {
 		t.Fatalf("failed to create valid config file: %v", err)
 	}
@@ -342,7 +342,7 @@ action "test_action" {
 }
 `
 
-	err := os.WriteFile(validConfig, []byte(configContent), 0644)
+	err := os.WriteFile(validConfig, []byte(configContent), 0o600)
 	if err != nil {
 		t.Fatalf("failed to create valid config file: %v", err)
 	}
@@ -379,7 +379,7 @@ action "test_action" {
 }
 `
 
-	err := os.WriteFile(validConfig, []byte(configContent), 0644)
+	err := os.WriteFile(validConfig, []byte(configContent), 0o600)
 	if err != nil {
 		t.Fatalf("failed to create valid config file: %v", err)
 	}
@@ -420,7 +420,7 @@ func TestListCmd_InvalidConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	invalidConfig := filepath.Join(tempDir, "invalid.hcl")
 
-	err := os.WriteFile(invalidConfig, []byte("invalid hcl content"), 0644)
+	err := os.WriteFile(invalidConfig, []byte("invalid hcl content"), 0o600)
 	if err != nil {
 		t.Fatalf("failed to create invalid config file: %v", err)
 	}
@@ -452,7 +452,7 @@ action "test_action" {
 }
 `
 
-	err := os.WriteFile(validConfig, []byte(configContent), 0644)
+	err := os.WriteFile(validConfig, []byte(configContent), 0o600)
 	if err != nil {
 		t.Fatalf("failed to create valid config file: %v", err)
 	}
@@ -495,7 +495,7 @@ action "action2" {
 }
 `
 
-	err := os.WriteFile(validConfig, []byte(configContent), 0644)
+	err := os.WriteFile(validConfig, []byte(configContent), 0o600)
 	if err != nil {
 		t.Fatalf("failed to create valid config file: %v", err)
 	}
@@ -522,7 +522,7 @@ server "test" {
 }
 `
 
-	err := os.WriteFile(validConfig, []byte(configContent), 0644)
+	err := os.WriteFile(validConfig, []byte(configContent), 0o600)
 	if err != nil {
 		t.Fatalf("failed to create valid config file: %v", err)
 	}

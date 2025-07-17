@@ -214,6 +214,7 @@ func testPodmanAuthentication(t *testing.T, projectRoot string) {
 	}
 
 	// Execute the authentication test
+	//nolint:gosec // testConfigFile is controlled by test runner, not user input
 	cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
 	cmd.Args = append(cmd.Args, "--action", "test-authentication")
 
@@ -234,6 +235,7 @@ func testPodmanSystemInfo(t *testing.T, projectRoot string) {
 	}
 
 	// Execute the system info test
+	//nolint:gosec // testConfigFile is controlled by test runner, not user input
 	cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
 	cmd.Args = append(cmd.Args, "--action", "test-system-info")
 
@@ -254,6 +256,7 @@ func testPodmanFileOperations(t *testing.T, projectRoot string) {
 	}
 
 	// Execute the file operations test
+	//nolint:gosec // testConfigFile is controlled by test runner, not user input
 	cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
 	cmd.Args = append(cmd.Args, "--action", "test-file-operations")
 
@@ -274,6 +277,7 @@ func testPodmanSFTPOperations(t *testing.T, projectRoot string) {
 	}
 
 	// Execute the SFTP operations test
+	//nolint:gosec // testConfigFile is controlled by test runner, not user input
 	cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
 	cmd.Args = append(cmd.Args, "--action", "test-sftp-operations")
 
@@ -295,6 +299,7 @@ func testPodmanTagBasedTargeting(t *testing.T, projectRoot string) {
 
 	// Test production servers
 	t.Run("ProductionServers", func(t *testing.T) {
+		//nolint:gosec // testConfigFile is controlled by test runner, not user input
 		cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
 		cmd.Args = append(cmd.Args, "--action", "test-production-servers")
 
@@ -307,6 +312,7 @@ func testPodmanTagBasedTargeting(t *testing.T, projectRoot string) {
 
 	// Test staging servers
 	t.Run("StagingServers", func(t *testing.T) {
+		//nolint:gosec // testConfigFile is controlled by test runner, not user input
 		cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
 		cmd.Args = append(cmd.Args, "--action", "test-staging-servers")
 
@@ -327,6 +333,7 @@ func testPodmanConcurrentOperations(t *testing.T, projectRoot string) {
 	}
 
 	// Execute the concurrent operations test
+	//nolint:gosec // testConfigFile is controlled by test runner, not user input
 	cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
 	cmd.Args = append(cmd.Args, "--action", "test-concurrent-operations")
 
@@ -347,6 +354,7 @@ func testPodmanErrorHandling(t *testing.T, projectRoot string) {
 	}
 
 	// Execute the error handling test
+	//nolint:gosec // testConfigFile is controlled by test runner, not user input
 	cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
 	cmd.Args = append(cmd.Args, "--action", "test-error-handling")
 
@@ -367,6 +375,7 @@ func testPodmanNetworkConnectivity(t *testing.T, projectRoot string) {
 	}
 
 	// Execute the network connectivity test
+	//nolint:gosec // testConfigFile is controlled by test runner, not user input
 	cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
 	cmd.Args = append(cmd.Args, "--action", "test-network-connectivity")
 

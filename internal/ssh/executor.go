@@ -15,7 +15,8 @@ func ExecuteConfig(cfg *config.Config) error {
 	// Initialize index cache for enterprise-scale performance
 	indexCache := &config.IndexCache{}
 
-	for _, action := range cfg.Actions {
+	for i := range cfg.Actions {
+		action := &cfg.Actions[i]
 		fmt.Printf("\n⚡ Executing action: %s\n", action.Name)
 		if action.Description != "" {
 			fmt.Printf("📝 Description: %s\n", action.Description)
@@ -27,7 +28,7 @@ func ExecuteConfig(cfg *config.Config) error {
 
 		// Use enterprise-scale lookup for better performance
 		index := indexCache.GetIndex(cfg)
-		targetServers, err = config.GetServersForActionLarge(cfg, &action, index)
+		targetServers, err = config.GetServersForActionLarge(cfg, action, index)
 		if err != nil {
 			return fmt.Errorf("failed to get servers for action %s: %w", action.Name, err)
 		}
@@ -36,9 +37,9 @@ func ExecuteConfig(cfg *config.Config) error {
 
 		// Execute on each server
 		if action.Parallel {
-			err = executeActionParallel(&action, targetServers)
+			err = executeActionParallel(action, targetServers)
 		} else {
-			err = executeActionSequential(&action, targetServers)
+			err = executeActionSequential(action, targetServers)
 		}
 
 		if err != nil {
@@ -69,7 +70,6 @@ func executeActionSequential(action *config.Action, servers []*config.Server) er
 			fmt.Printf("  ❌ Failed to connect to %s: %v\n", server.Name, err)
 			continue
 		}
-		defer client.Close()
 
 		// Execute the action
 		var output string
@@ -77,6 +77,11 @@ func executeActionSequential(action *config.Action, servers []*config.Server) er
 			output, err = client.ExecuteCommand(action.Command)
 		} else if action.Script != "" {
 			output, err = client.ExecuteScript(action.Script)
+		}
+
+		// Close client after execution
+		if closeErr := client.Close(); closeErr != nil {
+			fmt.Printf("  ⚠️  Warning: failed to close connection to %s: %v\n", server.Name, closeErr)
 		}
 
 		if err != nil {
@@ -127,7 +132,13 @@ func executeActionParallel(action *config.Action, servers []*config.Server) erro
 				errors <- fmt.Errorf("failed to connect to %s: %w", s.Name, err)
 				return
 			}
-			defer client.Close()
+			// Close client when function returns
+			defer func() {
+				if closeErr := client.Close(); closeErr != nil {
+					// Log close error but don't fail the operation
+					fmt.Printf("  ⚠️  Warning: failed to close connection to %s: %v\n", s.Name, closeErr)
+				}
+			}()
 
 			// Execute the action
 			var output string

@@ -21,7 +21,7 @@ var ExecuteCmd = &cobra.Command{
 	Short: "Execute actions from HCL2 configuration file",
 	Long:  `Execute actions defined in an HCL2 configuration file on remote servers via SSH`,
 	Args:  cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		if len(args) > 0 {
 			configFile = args[0]
 		}
@@ -50,7 +50,7 @@ var ValidateCmd = &cobra.Command{
 	Short: "Validate HCL2 configuration file",
 	Long:  `Validate the syntax and structure of an HCL2 configuration file`,
 	Args:  cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		if len(args) > 0 {
 			configFile = args[0]
 		}
@@ -82,7 +82,7 @@ var ListCmd = &cobra.Command{
 	Short: "List servers and actions from configuration file",
 	Long:  `Display all servers and actions defined in an HCL2 configuration file`,
 	Args:  cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		if len(args) > 0 {
 			configFile = args[0]
 		}

@@ -9,10 +9,63 @@ import (
 	"spooky/internal/config"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
+
+// HostKeyCallbackType defines the type of host key verification to use
+type HostKeyCallbackType string
+
+const (
+	// InsecureHostKey allows connections without host key verification (for testing only)
+	InsecureHostKey HostKeyCallbackType = "insecure"
+	// KnownHostsHostKey uses known_hosts file for verification
+	KnownHostsHostKey HostKeyCallbackType = "known_hosts"
+	// AutoHostKey automatically accepts new host keys (less secure but more convenient)
+	AutoHostKey HostKeyCallbackType = "auto"
+)
+
+// getHostKeyCallback returns the appropriate host key callback based on the type
+func getHostKeyCallback(callbackType HostKeyCallbackType, knownHostsPath string) (ssh.HostKeyCallback, error) {
+	switch callbackType {
+	case InsecureHostKey:
+		// Note: This should only be used in testing environments
+		//nolint:gosec // InsecureIgnoreHostKey is intentional for testing mode
+		return ssh.InsecureIgnoreHostKey(), nil
+	case KnownHostsHostKey:
+		path := knownHostsPath
+		if path == "" {
+			path = "~/.ssh/known_hosts"
+		}
+		// Expand ~ to home directory
+		if strings.HasPrefix(path, "~") {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get home directory: %w", err)
+			}
+			path = strings.Replace(path, "~", homeDir, 1)
+		}
+		// Use golang.org/x/crypto/ssh/knownhosts for host key verification
+		hostKeyCallback, err := knownhosts.New(path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse known_hosts file at %s: %w", path, err)
+		}
+		return hostKeyCallback, nil
+	case AutoHostKey:
+		// Auto-accept new host keys (less secure but more convenient)
+		//nolint:gosec // InsecureIgnoreHostKey is intentional for auto-accept mode
+		return ssh.InsecureIgnoreHostKey(), nil
+	default:
+		return nil, fmt.Errorf("unsupported host key callback type: %s", callbackType)
+	}
+}
 
 // NewSSHClient creates a new SSH client connection
 func NewSSHClient(server *config.Server, timeout int) (*SSHClient, error) {
+	return NewSSHClientWithHostKeyCallback(server, timeout, InsecureHostKey, "")
+}
+
+// NewSSHClientWithHostKeyCallback creates a new SSH client with custom host key verification
+func NewSSHClientWithHostKeyCallback(server *config.Server, timeout int, hostKeyType HostKeyCallbackType, knownHostsPath string) (*SSHClient, error) {
 	var authMethods []ssh.AuthMethod
 
 	// Add password authentication if provided
@@ -38,11 +91,17 @@ func NewSSHClient(server *config.Server, timeout int) (*SSHClient, error) {
 		return nil, fmt.Errorf("no authentication method available for server %s", server.Name)
 	}
 
+	// Get host key callback
+	hostKeyCallback, err := getHostKeyCallback(hostKeyType, knownHostsPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create host key callback: %w", err)
+	}
+
 	// SSH client configuration
 	sshConfig := &ssh.ClientConfig{
 		User:            server.User,
 		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: hostKeyCallback,
 		Timeout:         time.Duration(timeout) * time.Second,
 	}
 
