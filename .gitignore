@@ -13,9 +13,8 @@
 
 # Code coverage profiles and other test artifacts
 *.out
-*.coverprofile
-profile.cov
-cover
+cover.out
+coverage.out
 coverage*.html
 coverage_all.html
 
@@ -47,5 +46,7 @@ generated_keys/
 #binaries
 spooky.exe
 spooky
-scripts/pre-commit
-scripts/pre-commit.exe
+build/*
+examples/configuration/large-scale-example-*.hcl
+examples/configuration/medium-scale-example-*.hcl
+examples/configuration/small-scale-example-*.hcl
