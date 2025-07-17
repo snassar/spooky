@@ -1,42 +1,33 @@
-# Spooky - SSH Automation Tool
+# Spooky
 
 [![Test Coverage](coverage.svg)](https://github.com/snassar/spooky)
+[![Go Version](https://img.shields.io/badge/go-1.24+-blue.svg)](https://golang.org)
+[![License](https://img.shields.io/badge/license-AGPL%203.0-green.svg)](LICENSE)
 
-Spooky is an automation tool written in Go that allows you to execute commands and scripts on multiple remote servers using HCL2 configuration files. It provides a declarative way to manage server operations with support for parallel execution and flexible server targeting. spooky uses SSH to communicate with other computers 
+> SSH automation tool written in Go that executes commands and scripts on multiple remote servers using HCL2 configuration files.
 
-When spooky grows up it wants to be Ansible.
+Spooky is a lightweight alternative to Ansible with declarative configuration and parallel execution capabilities. When spooky grows up it wants to be Ansible.
 
-**Notice**: This project is influenced heavily by agentic coding as part of the process of learning go.
+## ✨ Features
 
-## Features
+- 🚀 **Declarative Configuration** - Use HCL2 files to define servers and actions
+- 🔗 **SSH Connectivity** - Secure connections with password or key-based authentication  
+- ⚡ **Parallel Execution** - Run actions on multiple servers simultaneously
+- 🏷️ **Tag-based Targeting** - Target servers using tags for flexible grouping
+- 📝 **Script Support** - Execute both inline commands and external script files
+- ✅ **Validation** - Built-in configuration validation and syntax checking
 
-- 🚀 **Declarative Configuration**: Use HCL2 files to define servers and actions
-- 🔗 **SSH Connectivity**: Secure connections with password or key-based authentication
-- ⚡ **Parallel Execution**: Run actions on multiple servers simultaneously
-- 🏷️ **Tag-based Targeting**: Target servers using tags for flexible grouping
-- 📝 **Script Support**: Execute both inline commands and external script files
-- ✅ **Validation**: Built-in configuration validation and syntax checking
-- 🔍 **Listing**: View servers and actions defined in configuration files
+## 🚀 Quick Start
 
-## Installation
-
-### Prerequisites
-
-- Go 1.24 or later
-- target systems must be accessible via SSH
-
-### Build from Source
+### Install
 
 ```bash
 git clone https://github.com/snassar/spooky.git
 cd spooky
-go mod tidy
 go build -o spooky
 ```
 
-## Usage
-
-### Basic Commands
+### Basic Usage
 
 ```bash
 # Execute actions from configuration file
@@ -47,26 +38,16 @@ go build -o spooky
 
 # List servers and actions in configuration
 ./spooky list config.hcl
-
-# Execute with parallel processing
-./spooky execute -p config.hcl
-
-# Set custom timeout (in seconds)
-./spooky execute -t 60 config.hcl
 ```
 
-### Configuration File Format
-
-Spooky uses HCL2 configuration files to define servers and actions. Here's an example:
+### Example Configuration
 
 ```hcl
 # Define servers
 server "web-server-1" {
   host     = "192.168.1.10"
-  port     = 22
   user     = "admin"
   password = "your-password"
-  # key_file = "~/.ssh/id_rsa"  # Alternative to password
   tags = {
     environment = "production"
     role        = "web"
@@ -77,350 +58,69 @@ server "web-server-1" {
 action "check-status" {
   description = "Check system status"
   command     = "uptime && df -h"
-  servers     = ["web-server-1"]  # Target specific servers
-  # tags = ["production"]         # Or target by tags
-  parallel    = true              # Execute in parallel
-}
-```
-
-### Server Configuration
-
-Each server block defines a remote server:
-
-- `name`: Unique identifier for the server
-- `host`: Server IP address or hostname
-- `port`: SSH port (default: 22)
-- `user`: SSH username
-- `password`: SSH password (or use `key_file`)
-- `key_file`: Path to SSH private key file
-- `tags`: Key-value pairs for server categorization
-
-### Action Configuration
-
-Each action block defines an operation to perform:
-
-- `name`: Unique identifier for the action
-- `description`: Human-readable description
-- `command`: Inline command to execute
-- `script`: Path to script file to execute
-- `servers`: List of specific server names to target
-- `tags`: List of tags to match servers
-- `timeout`: Custom timeout for this action
-- `parallel`: Execute on servers in parallel
-
-### Server Targeting
-
-Actions can target servers in three ways:
-
-1. **Specific servers**: `servers = ["server1", "server2"]`
-2. **Tag-based**: `tags = ["production", "web"]`
-3. **All servers**: Omit both `servers` and `tags`
-
-## Examples
-
-### System Maintenance
-
-```hcl
-server "prod-web-1" {
-  host     = "10.0.1.10"
-  user     = "admin"
-  password = "secure-password"
-  tags = {
-    environment = "production"
-    role        = "web"
-  }
-}
-
-server "prod-web-2" {
-  host     = "10.0.1.11"
-  user     = "admin"
-  password = "secure-password"
-  tags = {
-    environment = "production"
-    role        = "web"
-  }
-}
-
-action "update-system" {
-  description = "Update system packages"
-  command     = "sudo apt update && sudo apt upgrade -y"
-  tags        = ["production"]
-  parallel    = true
-}
-
-action "restart-services" {
-  description = "Restart web services"
-  command     = "sudo systemctl restart nginx"
-  tags        = ["web"]
+  servers     = ["web-server-1"]
   parallel    = true
 }
 ```
 
-### Database Operations
+## 📖 Documentation
 
-```hcl
-server "db-master" {
-  host     = "10.0.2.10"
-  user     = "dbadmin"
-  key_file = "~/.ssh/db_key"
-  tags = {
-    environment = "production"
-    role        = "database"
-  }
-}
+- **[Detailed Documentation](docs/misc.md)** - Installation, configuration, testing, and more
+- **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
+- **[Test Environment](docs/test-environment.md)** - Setting up test environments
+- **[Tools](docs/tools.md)** - Development tools and utilities
+- **[Testing](docs/coverage.md)** - Testing guidelines and coverage requirements
+- **[Coverage](docs/coverage.md)** - Test coverage analysis and requirements
 
-action "backup-database" {
-  description = "Create database backup"
-  script      = "./scripts/backup.sh"
-  servers     = ["db-master"]
-}
-```
+## 🛠️ Development
 
-## Security Considerations
+### Prerequisites
 
-- Store sensitive information (passwords, keys) securely
-- Use SSH key authentication when possible
-- Limit SSH user permissions on target servers
-- Consider using environment variables for credentials
-- Regularly rotate passwords and keys
+- Go 1.24 or later
+- Target systems accessible via SSH
 
-## Error Handling
-
-Spooky provides detailed error reporting:
-
-- Connection failures are reported per server
-- Command execution errors include stderr output
-- Configuration validation errors prevent execution
-- Parallel execution continues even if some servers fail
-
-## Testing
-
-Spooky includes basic unit and integration tests to help ensure reliability.
-
-### Running Tests
-
-You can run tests directly using Go commands:
+### Testing
 
 ```bash
-# Run all tests (unit + integration)
+# Run all tests
 go test ./... -tags=integration
 
-# Run unit tests only (exclude integration tests)
-go test ./...
+# Run with coverage
+make check-coverage
 
-# Run integration tests only
-go test -tags=integration ./tests/integration/...
-
-# Run tests with coverage report
-go test -cover ./...
-```
-
-### Test Coverage Tool
-
-For detailed coverage analysis, install the coverage tools:
-
-```bash
-make install-coverage-tools
-```
-
-Then run:
-
-```bash
-go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...
-```
-
-Run the code coverage tool
-
-```bash
-go-test-coverage --config=./tests/testcoverage.yml
-```
-
-### Test Structure
-
-- **Unit Tests**: Co-located with source files (e.g., `config_test.go`)
-- **Integration Tests**: Located in `tests/integration/` using [gliderlabs/ssh](https://github.com/gliderlabs/ssh) for mock SSH servers
-- **Test Fixtures**: Sample configurations and scripts in `tests/fixtures/`
-- **Test Helpers**: Common utilities in `tests/helpers/`
-
-### Current Test Coverage
-
-The test suite currently covers:
-- Basic configuration parsing and validation
-- SSH connection and authentication
-- Simple command execution
-- Basic error handling
-
-**Note**: This is a work in progress. Additional test coverage for advanced features, edge cases, and parallel execution is planned.
-
-For detailed testing information, see [tests/README.md](tests/README.md).
-
-### Coverage Visualization
-
-#### Local Development
-Generate an HTML coverage report locally:
-```bash
+# Generate coverage report
 make coverage-html
 ```
-Then open `coverage.html` in your browser to view detailed coverage information.
 
-#### CI/CD
-Coverage reports are automatically generated in CI/CD and available as workflow artifacts:
+### Test Environment
 
-1. Go to the **Actions** tab in GitHub
-2. Click on a workflow run (e.g., "Test Coverage")
-3. Scroll down to **Artifacts**
-4. Download `coverage-reports` to get:
-   - `tests/coverage.out` - Raw coverage data
-   - `coverage.html` - Interactive HTML report
+```bash
+# Check requirements
+go run tools/spooky-test-env/main.go preflight
 
-#### Viewing HTML Reports
-The HTML coverage report provides:
-- File-by-file coverage breakdown
-- Line-by-line coverage highlighting
-- Overall project coverage statistics
-- Coverage trends and gaps
+# Start test environment
+go run tools/spooky-test-env/main.go start
+```
 
-Open `coverage.html` in any web browser to explore coverage details.
-
-## Contributing
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
 4. Add tests for new functionality
-5. Ensure all tests pass (see above for Go test commands)
+5. Ensure all tests pass
 6. Submit a pull request
 
-## License
+## 📄 License
 
-This project is licensed under the GNU Affero General Public License v3 - see the LICENSE file for details.
+This project is licensed under the GNU Affero General Public License v3 - see the [LICENSE](LICENSE) file for details.
 
-## Dependencies
+## 🔗 Links
 
-### Core Dependencies
-- [Cobra](https://github.com/spf13/cobra) - CLI framework for command-line interface
-- [golang.org/x/crypto/ssh](https://pkg.go.dev/golang.org/x/crypto/ssh) - SSH client implementation
-- [HCL2](https://github.com/hashicorp/hcl) - HashiCorp Configuration Language for config files
+- **[Issues](https://github.com/snassar/spooky/issues)** - Report bugs or request features
+- **[Discussions](https://github.com/snassar/spooky/discussions)** - Ask questions and share ideas
+- **[Releases](https://github.com/snassar/spooky/releases)** - Latest releases and changelog
 
-### Testing Dependencies
-- [gliderlabs/ssh](https://github.com/gliderlabs/ssh) - SSH server for integration testing
-- [github.com/pkg/sftp](https://github.com/pkg/sftp) - SFTP client for file transfer testing
+---
 
-### Indirect Dependencies
-- [golang.org/x/sys](https://pkg.go.dev/golang.org/x/sys) - System calls and OS-specific functionality
-- [golang.org/x/text](https://pkg.go.dev/golang.org/x/text) - Text processing utilities
-- [zclconf/go-cty](https://github.com/zclconf/go-cty) - Type system for HCL2
-- [apparentlymart/go-textseg](https://github.com/apparentlymart/go-textseg) - Text segmentation for HCL2
-- [kr/fs](https://github.com/kr/fs) - File system utilities for SFTP
-
-## Project Assumptions
-
-### Core Assumptions
-- SSH key authentication is preferred over passwords
-- We currently only support Ed25519 keys only
-- We currently do not support RSA keys
-- We currently do not support DSA keys
-- Windows compatibility is required
-- macOS compatibility is required
-- linux compatibility is required
-- Integration tests use https://github.com/gliderlabs/ssh
-- Unit tests must be co-located with source files
-- Integration tests must be located under `./tests/`
-- Example configuration files and snippets must be located under `./examples/`
-
-### Design Decisions
-- Use HCL2 for configuratio files
-- Do not use JSON for configuration files
-- Do not use YAML for configuration files
-- Parallel execution is optional per action
-- Server targeting via tags or explicit names
-- No persistent state or database required
-
-### Constraints
-- Make is supported
-- Must work without Make
-- Focus on basic functionality first
-
-## Test Coverage
-
-This project enforces test coverage to ensure code quality.
-
-### Coverage Requirements
-
-- **Total Coverage:** Minimum 60%
-- **Package Coverage:** Minimum 65%
-- **File Coverage:** Minimum 50%
-- **Critical Code:** Higher thresholds for SSH and configuration code
-
-### Running Coverage Checks Locally
-
-```bash
-# Run all tests and check coverage thresholds
-make check-coverage
-
-# Generate HTML coverage report
-make coverage-html
-
-# Run coverage tool manually
-go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...
-go run github.com/vladopajic/go-test-coverage/v2@latest --config=./tests/testcoverage.yml
-```
-
-### Pre-commit Hook Setup
-
-To automatically check coverage before each commit, install the pre-commit hook:
-
-```bash
-# Build and install the pre-commit hook
-make install-pre-commit-hook
-```
-
-This will:
-1. Build the Go-based pre-commit hook from `scripts/pre-commit.go`
-2. Install it as a Git hook in `.git/hooks/pre-commit`
-3. Automatically run coverage checks before each commit
-
-**Manual Setup:**
-```bash
-# Build the hook (cross-platform)
-make build-pre-commit-hook
-
-# Or build manually:
-# Unix/Linux/macOS: go build -o scripts/pre-commit scripts/pre-commit.go
-# Windows: go build -o scripts/pre-commit.exe scripts/pre-commit.go
-
-# Install the hook (cross-platform)
-make install-pre-commit-hook
-
-# Or install manually:
-# Unix/Linux/macOS: cp scripts/pre-commit .git/hooks/pre-commit
-# Windows: copy scripts\pre-commit.exe .git\hooks\pre-commit
-```
-
-**What the Hook Does:**
-- Runs tests with coverage profiling
-- Verifies coverage meets thresholds
-- Blocks commits if coverage is insufficient
-- Allows commits if coverage passes
-
-**Note:** The pre-commit hook is a pure Go solution with no external dependencies.
-
-### Viewing Coverage Reports
-
-- Open `coverage.html` in your browser for a detailed report.
-- Download coverage artifacts from GitHub Actions workflow runs.
-
-### CI/CD
-
-- Coverage is checked on every PR and push to main.
-- PRs that drop coverage below thresholds will fail.
-
-### Coverage Diff Tracking
-
-- Coverage changes are automatically tracked in pull requests
-- PR comments show coverage increases/decreases
-- Coverage reports are available as workflow artifacts
-- Decreases in coverage trigger warnings
-
-For detailed coverage analysis, see [tests/COVERAGE.md](tests/COVERAGE.md).
-# Test pre-commit hook 2
+**Notice**: This project is influenced heavily by agentic coding as part of the process of learning Go.
