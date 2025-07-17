@@ -1,4 +1,4 @@
-.PHONY: build clean test run validate list help check-coverage test-unit test-integration test-coverage install-coverage-tool install-pre-commit-hook build-pre-commit-hook
+.PHONY: build clean test run validate list help check-coverage test-unit test-integration test-coverage install-coverage-tool install-pre-commit-hook build-pre-commit-hook clean-config generate-config
 
 # Build the spooky binary
 build:
@@ -37,9 +37,9 @@ release: clean
 # Build pre-commit hook
 build-pre-commit-hook:
 ifeq ($(OS),Windows_NT)
-	go build -o build/pre-commit.exe scripts/pre-commit.go
+	go build -o build/pre-commit.exe tools/pre-commit/main.go
 else
-	go build -o build/pre-commit scripts/pre-commit.go
+	go build -o build/pre-commit tools/pre-commit/main.go
 endif
 
 # Install pre-commit hook (builds and copies to .git/hooks)
@@ -51,6 +51,25 @@ else
 endif
 	@echo "Pre-commit hook installed successfully"
 
+# Build test environment tool
+build-test-env:
+ifeq ($(OS),Windows_NT)
+	go build -o build/spooky-test-env.exe tools/spooky-test-env/main.go
+else
+	go build -o build/spooky-test-env tools/spooky-test-env/main.go
+endif
+	@echo "Test environment tool built successfully"
+
+# Install test environment tool
+install-test-env: build-test-env
+ifeq ($(OS),Windows_NT)
+	cp build/spooky-test-env.exe ~/spooky-test-env/spooky-test-env.exe
+else
+	cp build/spooky-test-env ~/spooky-test-env/spooky-test-env
+	chmod +x ~/spooky-test-env/spooky-test-env
+endif
+	@echo "Test environment tool installed successfully"
+
 # Run tests
 test: test-unit test-integration check-coverage 
 
@@ -61,6 +80,17 @@ test-unit:
 # Run integration tests only
 test-integration:
 	go test -v -tags=integration ./tests/integration/...
+
+# Run Podman-based integration tests
+test-integration-podman:
+	go test -v -podman ./tests/integration/podman_integration_test.go
+
+# Run basic Podman environment tests
+test-podman-basic:
+	go test -v -podman-basic ./tests/integration/podman_basic_test.go
+
+# Run all integration tests (legacy + Podman)
+test-integration-all: test-integration test-integration-podman
 
 # Run all tests with coverage
 test-coverage:
@@ -97,6 +127,21 @@ list: build
 # Show help
 help: build
 	./build/spooky --help
+
+# Clean up generated configuration files
+clean-config:
+	@echo "Cleaning up generated configuration files..."
+	@find examples/configuration/ -name "*-scale-example-*.hcl" -type f -delete
+	@echo "Generated configuration files cleaned up"
+
+# Generate configuration files for testing
+generate-config:
+	@echo "Generating configuration files for testing..."
+	@go run tools/generate-config/main.go
+	@echo "Configuration files generated successfully"
+
+# Generate and clean config files (clean first, then generate)
+config: clean-config generate-config
 
 # Default target
 all: deps build test 
