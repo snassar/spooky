@@ -77,6 +77,11 @@ test: test-unit test-integration check-coverage
 test-unit:
 	go test -v ./...
 
+# Run unit tests with coverage and go-test-coverage
+test-unit-coverage:
+	go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./...
+	go run github.com/vladopajic/go-test-coverage/v2@latest --config=./tests/testcoverage.yml
+
 # Run integration tests only
 test-integration:
 	go test -v -tags=integration ./tests/integration/...
