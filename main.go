@@ -28,7 +28,6 @@ func main() {
 	rootCmd.AddCommand(cli.ExecuteCmd)
 	rootCmd.AddCommand(cli.ValidateCmd)
 	rootCmd.AddCommand(cli.ListCmd)
-	rootCmd.AddCommand(cli.KeygenCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
