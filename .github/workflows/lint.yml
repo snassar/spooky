@@ -28,26 +28,35 @@ jobs:
         version: latest
         args: --timeout=5m
 
-    - name: Get changed Go files
+    - name: Get changed Go files and packages
       id: changed-files
       run: |
         # Get list of changed .go files
-        CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '\.go$' | tr '\n' ' ')
-        echo "Changed Go files: $CHANGED_FILES"
+        CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '\.go$')
+        echo "Changed Go files:"
+        echo "$CHANGED_FILES"
         
-        # If no Go files changed, set a dummy value
-        if [ -z "$CHANGED_FILES" ]; then
-          echo "No Go files changed"
-          echo "changed_files=" >> $GITHUB_OUTPUT
+        # Extract unique directories containing changed files
+        if [ -n "$CHANGED_FILES" ]; then
+          CHANGED_DIRS=$(echo "$CHANGED_FILES" | xargs -I {} dirname {} | sort -u | tr '\n' ' ')
+          echo "Changed directories: $CHANGED_DIRS"
+          echo "changed_dirs=$CHANGED_DIRS" >> $GITHUB_OUTPUT
         else
-          echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "No Go files changed"
+          echo "changed_dirs=" >> $GITHUB_OUTPUT
         fi
 
-    - name: Run golangci-lint on changed files
+    - name: Run golangci-lint on changed packages
       run: |
-        if [ -n "${{ steps.changed-files.outputs.changed_files }}" ]; then
-          echo "Running golangci-lint on changed files: ${{ steps.changed-files.outputs.changed_files }}"
-          golangci-lint run --timeout=5m ${{ steps.changed-files.outputs.changed_files }}
+        if [ -n "${{ steps.changed-files.outputs.changed_dirs }}" ]; then
+          echo "Running golangci-lint on changed packages: ${{ steps.changed-files.outputs.changed_dirs }}"
+          # Run golangci-lint on each changed directory
+          for dir in ${{ steps.changed-files.outputs.changed_dirs }}; do
+            if [ -d "$dir" ]; then
+              echo "Linting package: $dir"
+              golangci-lint run --timeout=5m "./$dir/..."
+            fi
+          done
         else
-          echo "No Go files to lint"
+          echo "No Go packages to lint"
         fi 
