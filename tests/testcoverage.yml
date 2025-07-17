@@ -2,4 +2,16 @@ threshold:
   file: 0      # Individual files must have at least 50% coverage
   package: 0   # Packages must have at least 65% coverage
   total: 0     # Overall project must have at least 60% coverage
-profile: ./tests/coverage.out 
+profile: ./tests/coverage.out
+exclude:
+  paths:
+    - _test\.go$
+    - ^tests/
+    - ^examples/
+    - main\.go$
+    - generated_keys/
+    - test_.*\.go$
+    - .*\.exe$
+    - .*\.dll$
+    - .*\.sample$
+    - .*\.sample\.[a-z]+$
