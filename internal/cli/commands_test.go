@@ -534,30 +534,6 @@ server "test" {
 	}
 }
 
-func TestKeygenCmd(t *testing.T) {
-	initCommandsOnce()
-	resetCommandState()
-	// Test keygen command
-	KeygenCmd.SetArgs([]string{})
-	err := KeygenCmd.Execute()
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	// Clean up after test
-	defer os.RemoveAll("generated_keys")
-
-	// Verify that at least one key directory was created
-	entries, err := os.ReadDir("generated_keys")
-	if err != nil {
-		t.Fatalf("failed to read generated_keys directory: %v", err)
-	}
-
-	if len(entries) == 0 {
-		t.Error("no key directories were created")
-	}
-}
-
 func TestInitCommands(t *testing.T) {
 	// Test that InitCommands doesn't panic
 	// This test ensures that InitCommands can be called multiple times safely

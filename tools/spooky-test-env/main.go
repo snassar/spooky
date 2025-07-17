@@ -215,20 +215,25 @@ func runStart() error {
 		fmt.Println("Network spooky-test already exists or creation failed (continuing)...")
 	}
 
-	// Start the containers
-	fmt.Println("Starting containers with podman-compose...")
-	if err := cmd.Run("podman-compose", "up", "-d"); err != nil {
-		return fmt.Errorf("failed to start containers: %w", err)
+	// Start the containers using podman run
+	fmt.Println("Starting containers with podman...")
+	containers := []string{"spooky-server1", "spooky-server2", "spooky-server3"}
+
+	for _, container := range containers {
+		fmt.Printf("Starting %s...\n", container)
+		// For now, use direct podman run commands instead of Quadlet
+		// TODO: Implement proper Quadlet integration
+		if err := startContainerDirectly(container); err != nil {
+			return fmt.Errorf("failed to start %s: %w", container, err)
+		}
 	}
 
 	// Wait a moment for containers to fully start
 	fmt.Println("Waiting for containers to start...")
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	// Get container IPs
 	fmt.Println("Getting container IPs...")
-	containers := []string{"spooky-server1", "spooky-server2", "spooky-server3"}
-
 	for _, container := range containers {
 		ip, err := getContainerIP(container)
 		if err != nil {
@@ -250,10 +255,15 @@ func runStop() error {
 		return fmt.Errorf("failed to change to test environment directory: %w", err)
 	}
 
-	// Stop the containers
-	fmt.Println("Stopping containers with podman-compose...")
-	if err := cmd.Run("podman-compose", "down"); err != nil {
-		return fmt.Errorf("failed to stop containers: %w", err)
+	// Stop the containers using podman
+	fmt.Println("Stopping containers with podman...")
+	containers := []string{"spooky-server1", "spooky-server2", "spooky-server3"}
+
+	for _, container := range containers {
+		fmt.Printf("Stopping %s...\n", container)
+		if err := cmd.Run("podman", "stop", container); err != nil {
+			fmt.Printf("Warning: failed to stop %s: %v\n", container, err)
+		}
 	}
 
 	fmt.Println("Test environment stopped!")
@@ -337,6 +347,57 @@ func getTestEnvDir() string {
 
 	// Navigate to the test environment directory in examples
 	return filepath.Join(currentDir, "examples", "test-environment")
+}
+
+func startContainerDirectly(containerName string) error {
+	// Define container configurations
+	containerConfigs := map[string]struct {
+		port     string
+		user     string
+		password string
+		command  string
+	}{
+		"spooky-server1": {
+			port:     "2221:22",
+			user:     "root",
+			password: "password",
+			command:  "bash -c \"echo 'nameserver 8.8.8.8' > /etc/resolv.conf && echo 'nameserver 1.1.1.1' >> /etc/resolv.conf && apt-get update && apt-get install -y openssh-server sudo && mkdir -p /var/run/sshd && echo 'root:password' | chpasswd && sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config && /usr/sbin/sshd -D\"",
+		},
+		"spooky-server2": {
+			port:     "2222:22",
+			user:     "admin",
+			password: "adminpass",
+			command:  "bash -c \"echo 'nameserver 8.8.8.8' > /etc/resolv.conf && echo 'nameserver 1.1.1.1' >> /etc/resolv.conf && apt-get update && apt-get install -y openssh-server sudo && mkdir -p /var/run/sshd && useradd -m -s /bin/bash admin && echo 'admin:adminpass' | chpasswd && mkdir -p /home/admin/.ssh && chown -R admin:admin /home/admin/.ssh && chmod 700 /home/admin/.ssh && sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config && /usr/sbin/sshd -D\"",
+		},
+		"spooky-server3": {
+			port:     "2223:22",
+			user:     "user",
+			password: "userpass",
+			command:  "bash -c \"echo 'nameserver 8.8.8.8' > /etc/resolv.conf && echo 'nameserver 1.1.1.1' >> /etc/resolv.conf && apt-get update && apt-get install -y openssh-server sudo openssh-sftp-server && mkdir -p /var/run/sshd && useradd -m -s /bin/bash user && echo 'user:userpass' | chpasswd && mkdir -p /home/user/.ssh && chown -R user:user /home/user/.ssh && chmod 700 /home/user/.ssh && mkdir -p /home/user/sftp && chown -R user:user /home/user/sftp && sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config && sed -i 's/#Subsystem sftp \\/usr\\/lib\\/openssh\\/sftp-server/Subsystem sftp internal-sftp/' /etc/ssh/sshd_config && echo 'Match User user' >> /etc/ssh/sshd_config && echo '  ChrootDirectory /home/user/sftp' >> /etc/ssh/sshd_config && echo '  ForceCommand internal-sftp' >> /etc/ssh/sshd_config && echo '  AllowTcpForwarding no' >> /etc/ssh/sshd_config && echo '  X11Forwarding no' >> /etc/ssh/sshd_config && /usr/sbin/sshd -D\"",
+		},
+	}
+
+	config, exists := containerConfigs[containerName]
+	if !exists {
+		return fmt.Errorf("unknown container: %s", containerName)
+	}
+
+	// Run the container with DNS configuration
+	args := []string{
+		"run", "-d",
+		"--name", containerName,
+		"--hostname", containerName,
+		"--network", "spooky-test",
+		"--ip", fmt.Sprintf("10.89.1.%s", strings.TrimPrefix(containerName, "spooky-server")),
+		"-p", config.port,
+		"-e", "DEBIAN_FRONTEND=noninteractive",
+		"--dns", "8.8.8.8",
+		"--dns", "8.8.4.4",
+		"debian:12-slim",
+		"bash", "-c", config.command,
+	}
+
+	return cmd.Run("podman", args...)
 }
 
 func getContainerIP(containerName string) (string, error) {

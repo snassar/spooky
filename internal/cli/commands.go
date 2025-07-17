@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"spooky/internal/config"
-	"spooky/internal/keygen"
 	"spooky/internal/ssh"
 )
 
@@ -116,14 +115,6 @@ var ListCmd = &cobra.Command{
 		}
 
 		return nil
-	},
-}
-
-var KeygenCmd = &cobra.Command{
-	Use:   "keygen",
-	Short: "Generate SSH key pairs",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return keygen.GenerateSSHKeys()
 	},
 }
 
