@@ -1,0 +1,53 @@
+name: Lint Changed Go Files
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  lint:
+    name: Lint Changed Go Files
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Required to get the full history for diff
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+
+    - name: Install golangci-lint
+      uses: golangci/golangci-lint-action@v4
+      with:
+        version: latest
+        args: --timeout=5m
+
+    - name: Get changed Go files
+      id: changed-files
+      run: |
+        # Get list of changed .go files
+        CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '\.go$' | tr '\n' ' ')
+        echo "Changed Go files: $CHANGED_FILES"
+        
+        # If no Go files changed, set a dummy value
+        if [ -z "$CHANGED_FILES" ]; then
+          echo "No Go files changed"
+          echo "changed_files=" >> $GITHUB_OUTPUT
+        else
+          echo "changed_files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Run golangci-lint on changed files
+      run: |
+        if [ -n "${{ steps.changed-files.outputs.changed_files }}" ]; then
+          echo "Running golangci-lint on changed files: ${{ steps.changed-files.outputs.changed_files }}"
+          golangci-lint run --timeout=5m ${{ steps.changed-files.outputs.changed_files }}
+        else
+          echo "No Go files to lint"
+        fi 
