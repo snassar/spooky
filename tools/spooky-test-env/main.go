@@ -59,7 +59,7 @@ var preflightCmd = &cobra.Command{
 	Use:   "preflight",
 	Short: "Check prerequisites for the test environment",
 	Long:  `Check that all required tools (podman, systemd) are available and working.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		return runPreflight(quietFlag)
 	},
 }
@@ -72,7 +72,7 @@ var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start the test environment",
 	Long:  `Start the Podman containers for the spooky test environment.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		return runStart()
 	},
 }
@@ -81,7 +81,7 @@ var stopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stop the test environment",
 	Long:  `Stop the Podman containers for the spooky test environment.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		return runStop()
 	},
 }
@@ -90,7 +90,7 @@ var cleanupCmd = &cobra.Command{
 	Use:   "cleanup",
 	Short: "Clean up test environment resources",
 	Long:  `Remove containers, networks, and other resources created by the test environment.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		return runCleanup()
 	},
 }
@@ -99,7 +99,7 @@ var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show test environment status",
 	Long:  `Show the current status of containers and networks in the test environment.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		return runStatus()
 	},
 }
@@ -196,9 +196,8 @@ func runPreflight(quiet bool) error {
 	// Return appropriate exit code
 	if allGood {
 		return nil
-	} else {
-		return fmt.Errorf("requirements not satisfied")
 	}
+	return fmt.Errorf("requirements not satisfied")
 }
 
 func runStart() error {

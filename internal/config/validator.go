@@ -77,7 +77,8 @@ func validateUniqueNames(config *Config) error {
 	}
 
 	actionNames := make(map[string]bool)
-	for _, action := range config.Actions {
+	for i := range config.Actions {
+		action := &config.Actions[i]
 		if actionNames[action.Name] {
 			return fmt.Errorf("duplicate action name: %s", action.Name)
 		}
@@ -94,11 +95,12 @@ func formatValidationErrors(err error) error {
 		for _, e := range validationErrors {
 			switch e.Tag() {
 			case "namerequired":
-				if e.Param() == "server" {
+				switch e.Param() {
+				case "server":
 					messages = append(messages, "server name cannot be empty")
-				} else if e.Param() == "action" {
+				case "action":
 					messages = append(messages, "action name cannot be empty")
-				} else {
+				default:
 					messages = append(messages, "name cannot be empty")
 				}
 			case "hostrequired":

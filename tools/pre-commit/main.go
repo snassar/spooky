@@ -26,12 +26,8 @@ func (RealCommander) Run(name string, args ...string) error {
 }
 
 // Allow test override
-var stdPrintln = func(args ...interface{}) (int, error) {
-	return fmt.Println(args...)
-}
-var stdPrintf = func(format string, args ...interface{}) (int, error) {
-	return fmt.Printf(format, args...)
-}
+var stdPrintln = fmt.Println
+var stdPrintf = fmt.Printf
 
 func main() {
 	if err := runPreCommitChecks(RealCommander{}); err != nil {

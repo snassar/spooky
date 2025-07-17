@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // Server represents a server configuration
@@ -48,7 +51,9 @@ func generateID() string {
 
 	// Generate 4 random alphanumeric characters
 	randomBytes := make([]byte, 2)
-	rand.Read(randomBytes)
+	if _, err := rand.Read(randomBytes); err != nil {
+		panic(fmt.Errorf("failed to generate random bytes: %w", err))
+	}
 	randomStr := hex.EncodeToString(randomBytes)[:4]
 
 	return fmt.Sprintf("%s+%s", timestamp, randomStr)
@@ -121,12 +126,13 @@ func generateServers(scale ScaleConfig) []Server {
 	for i := 1; i <= vmsPerType; i++ {
 		metadata := fmt.Sprintf("vm-fra00-db-%d-debian-debian12-database-production", i)
 		id := generateGitStyleID(metadata)
-		dbType := "postgresql"
-		if i%3 == 1 {
+		var dbType string
+		switch i % 3 {
+		case 1:
 			dbType = "postgresql"
-		} else if i%3 == 2 {
+		case 2:
 			dbType = "mysql"
-		} else {
+		default:
 			dbType = "mongodb"
 		}
 		tier := "production"
@@ -254,12 +260,13 @@ func generateServers(scale ScaleConfig) []Server {
 	for i := 1; i <= vmsPerType; i++ {
 		metadata := fmt.Sprintf("vm-ber0-db-%d-debian-debian12-database-production", i)
 		id := generateGitStyleID(metadata)
-		dbType := "postgresql"
-		if i%3 == 1 {
+		var dbType string
+		switch i % 3 {
+		case 1:
 			dbType = "postgresql"
-		} else if i%3 == 2 {
+		case 2:
 			dbType = "mysql"
-		} else {
+		default:
 			dbType = "mongodb"
 		}
 		tier := "production"
@@ -473,7 +480,7 @@ func generateActions() []Action {
 }
 
 // writeServer writes a server configuration to the file
-func writeServer(f *os.File, server Server) {
+func writeServer(f *os.File, server *Server) {
 	fmt.Fprintf(f, "server \"%s\" {\n", server.ID)
 	fmt.Fprintf(f, "  host     = \"%s\"\n", server.Host)
 	fmt.Fprintf(f, "  port     = %d\n", server.Port)
@@ -488,7 +495,7 @@ func writeServer(f *os.File, server Server) {
 }
 
 // writeAction writes an action configuration to the file
-func writeAction(f *os.File, action Action) {
+func writeAction(f *os.File, action *Action) {
 	fmt.Fprintf(f, "action \"%s\" {\n", action.Name)
 	fmt.Fprintf(f, "  description = \"%s\"\n", action.Description)
 	if action.Command != "" {
@@ -511,10 +518,13 @@ func writeAction(f *os.File, action Action) {
 // generateConfigFile generates a configuration file for a specific scale
 func generateConfigFile(scale ScaleConfig) error {
 	configID := generateID()
-	filename := filepath.Join("../examples/configuration", fmt.Sprintf("%s-scale-example-%s.hcl", scale.Name, configID))
+	configDir := "../examples/configuration"
+	filename := filepath.Join(configDir, fmt.Sprintf("%s-scale-example-%s.hcl", scale.Name, configID))
 
 	// Create output directory if it doesn't exist
-	os.MkdirAll(filepath.Dir(filename), 0755)
+	if err := os.MkdirAll(filepath.Dir(filename), 0o755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
 
 	file, err := os.Create(filename)
 	if err != nil {
@@ -523,7 +533,8 @@ func generateConfigFile(scale ScaleConfig) error {
 	defer file.Close()
 
 	// Write header
-	fmt.Fprintf(file, "# %s configuration for spooky SSH automation tool\n", strings.Title(scale.Name))
+	caser := cases.Title(language.English)
+	fmt.Fprintf(file, "# %s configuration for spooky SSH automation tool\n", caser.String(scale.Name))
 	fmt.Fprintf(file, "# %s\n", scale.Description)
 	fmt.Fprintf(file, "# Data centers: FRA00 (Frankfurt) and BER0 (Berlin)\n")
 	fmt.Fprintf(file, "# IP range: 10.0.0.0/8\n")
@@ -539,7 +550,7 @@ func generateConfigFile(scale ScaleConfig) error {
 	servers := generateServers(scale)
 	fmt.Printf("Writing %d servers to %s...\n", len(servers), filename)
 	for i, server := range servers {
-		writeServer(file, server)
+		writeServer(file, &server)
 		if i%1000 == 0 && i > 0 {
 			fmt.Printf("Written %d servers...\n", i)
 		}
@@ -552,8 +563,8 @@ func generateConfigFile(scale ScaleConfig) error {
 
 	// Generate and write all actions
 	actions := generateActions()
-	for _, action := range actions {
-		writeAction(file, action)
+	for i := range actions {
+		writeAction(file, &actions[i])
 	}
 
 	fmt.Printf("Generated configuration file: %s\n", filename)

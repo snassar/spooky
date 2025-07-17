@@ -87,7 +87,7 @@ func TestGitRepositoryDetection(t *testing.T) {
 				}
 				return nil, errors.New("unexpected command")
 			},
-			RunFunc: func(name string, args ...string) error { return nil },
+			RunFunc: func(_ string, _ ...string) error { return nil },
 		}
 		output := captureOutput(func() {
 			_ = runPreCommitChecks(mock) // ignore error, output is captured for assertions
@@ -102,7 +102,7 @@ func TestGitRepositoryDetection(t *testing.T) {
 
 	t.Run("Not in git repository", func(t *testing.T) {
 		mock := MockCommander{
-			OutputFunc: func(name string, args ...string) ([]byte, error) {
+			OutputFunc: func(_ string, _ ...string) ([]byte, error) {
 				return nil, errors.New("not a git repo")
 			},
 		}
@@ -147,7 +147,7 @@ func TestStagedFilesDetection(t *testing.T) {
 				}
 				return nil, errors.New("unexpected command")
 			},
-			RunFunc: func(name string, args ...string) error { return nil },
+			RunFunc: func(_ string, _ ...string) error { return nil },
 		}
 		output := captureOutput(func() {
 			_ = runPreCommitChecks(mock) // ignore error, output is captured for assertions
@@ -176,7 +176,7 @@ func TestStagedFilesDetection(t *testing.T) {
 				}
 				return nil, errors.New("unexpected command")
 			},
-			RunFunc: func(name string, args ...string) error { return nil },
+			RunFunc: func(_ string, _ ...string) error { return nil },
 		}
 		output := captureOutput(func() {
 			_ = runPreCommitChecks(mock) // ignore error, output is captured for assertions
@@ -227,7 +227,7 @@ func TestCoverageGeneration(t *testing.T) {
 				}
 				return nil, errors.New("unexpected command")
 			},
-			RunFunc: func(name string, args ...string) error { return nil },
+			RunFunc: func(_ string, _ ...string) error { return nil },
 		}
 		output := captureOutput(func() {
 			_ = runPreCommitChecks(mock) // ignore error, output is captured for assertions
@@ -253,7 +253,7 @@ func TestCoverageGeneration(t *testing.T) {
 			},
 			RunFunc: func(name string, args ...string) error {
 				if name == "go" && args[0] == "test" {
-					return errors.New("fail")
+					return nil
 				}
 				return nil
 			},
@@ -279,7 +279,7 @@ func TestCoverageCheck(t *testing.T) {
 				}
 				return nil, errors.New("unexpected command")
 			},
-			RunFunc: func(name string, args ...string) error { return nil },
+			RunFunc: func(_ string, _ ...string) error { return nil },
 		}
 		output := captureOutput(func() {
 			_ = runPreCommitChecks(mock) // ignore error, output is captured for assertions

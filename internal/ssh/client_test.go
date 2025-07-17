@@ -49,7 +49,7 @@ func TestNewSSHClient_KeyFileAuth(t *testing.T) {
 	keyFile := filepath.Join(tempDir, "test_key")
 
 	// Write a dummy key file (this will fail to parse, but tests the file reading logic)
-	err := os.WriteFile(keyFile, []byte("invalid key content"), 0600)
+	err := os.WriteFile(keyFile, []byte("invalid key content"), 0o600)
 	if err != nil {
 		t.Fatalf("failed to create test key file: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestNewSSHClient_BothAuthMethods(t *testing.T) {
 	keyFile := filepath.Join(tempDir, "test_key")
 
 	// Write a dummy key file
-	err := os.WriteFile(keyFile, []byte("invalid key content"), 0600)
+	err := os.WriteFile(keyFile, []byte("invalid key content"), 0o600)
 	if err != nil {
 		t.Fatalf("failed to create test key file: %v", err)
 	}
