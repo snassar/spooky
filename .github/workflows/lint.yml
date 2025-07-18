@@ -7,9 +7,38 @@ on:
     branches: [ main ]
 
 jobs:
+  check-changes:
+    name: Check for Go file changes
+    runs-on: ubuntu-latest
+    outputs:
+      has-go-changes: ${{ steps.check.outputs.has-go-changes }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Required to get the full history for diff
+
+    - name: Check for Go file changes
+      id: check
+      run: |
+        # Get list of changed .go files
+        CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '\.go$' || true)
+        
+        if [ -n "$CHANGED_FILES" ]; then
+          echo "Go files changed:"
+          echo "$CHANGED_FILES"
+          echo "has-go-changes=true" >> $GITHUB_OUTPUT
+        else
+          echo "No Go files changed, skipping lint job"
+          echo "has-go-changes=false" >> $GITHUB_OUTPUT
+        fi
+
   lint:
     name: Lint Changed Go Files
     runs-on: ubuntu-latest
+    needs: check-changes
+    if: needs.check-changes.outputs.has-go-changes == 'true'
     
     steps:
     - name: Checkout code
