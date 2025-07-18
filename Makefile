@@ -28,6 +28,17 @@ fmt:
 lint:
 	golangci-lint run
 
+# Lint code with fast mode (for development)
+lint-fast:
+	golangci-lint run --fast
+
+# Lint specific files or packages
+lint-fix:
+	golangci-lint run --fix
+
+# Lint and test in one command
+lint-test: lint test-unit
+
 # Create release binary
 release: clean
 	GOOS=linux GOARCH=amd64 go build -o build/spooky-linux-amd64
