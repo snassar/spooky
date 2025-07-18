@@ -85,6 +85,18 @@ func runPreCommitChecks(cmdr Commander) error {
 		}
 	}
 
+	// Run golangci-lint
+	if _, err := stdPrintln("Running golangci-lint..."); err != nil {
+		return fmt.Errorf("failed to print status: %w", err)
+	}
+	if err := cmdr.Run("golangci-lint", "run"); err != nil {
+		errorMsg := fmt.Sprintf("❌ Linting failed: %v", err)
+		if _, printErr := stdPrintln(errorMsg); printErr != nil {
+			return fmt.Errorf("failed to print error: %w", printErr)
+		}
+		return errors.New(errorMsg)
+	}
+
 	// Generate coverage profile
 	if _, err := stdPrintln("Generating coverage profile..."); err != nil {
 		return fmt.Errorf("failed to print status: %w", err)
@@ -114,7 +126,7 @@ func runPreCommitChecks(cmdr Commander) error {
 		return errors.New("coverage thresholds not met")
 	}
 
-	if _, err := stdPrintln("✅ Coverage thresholds met"); err != nil {
+	if _, err := stdPrintln("✅ Linting and coverage checks passed"); err != nil {
 		return fmt.Errorf("failed to print status: %w", err)
 	}
 	return nil
