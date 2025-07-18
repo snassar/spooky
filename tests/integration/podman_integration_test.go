@@ -136,7 +136,7 @@ func TestPodmanEnvironmentSetup(t *testing.T) {
 		// Use absolute path for config file
 		configPath := *testConfigFile
 		if configPath == "" {
-			configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+			configPath = filepath.Join(projectRoot, "examples", "test-environment", "test-config.hcl")
 		}
 		//nolint:gosec // configPath is controlled by test runner, not user input
 		cmd = exec.Command("go", "run", "main.go", "validate", configPath)
@@ -202,7 +202,7 @@ func testPodmanAuthentication(t *testing.T, projectRoot string) {
 	// Use absolute path for config file
 	configPath := *testConfigFile
 	if configPath == "" {
-		configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+		configPath = filepath.Join(projectRoot, "examples", "test-environment", "test-config.hcl")
 	}
 
 	// Test configuration validation first
@@ -248,7 +248,7 @@ func testPodmanSystemInfo(t *testing.T, projectRoot string) {
 	// Use absolute path for config file
 	configPath := *testConfigFile
 	if configPath == "" {
-		configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+		configPath = filepath.Join(projectRoot, "examples", "test-environment", "test-config.hcl")
 	}
 
 	// Execute the configuration (which includes system info commands)
@@ -273,7 +273,7 @@ func testPodmanFileOperations(t *testing.T, projectRoot string) {
 	// Use absolute path for config file
 	configPath := *testConfigFile
 	if configPath == "" {
-		configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+		configPath = filepath.Join(projectRoot, "examples", "test-environment", "test-config.hcl")
 	}
 
 	// Execute the configuration (which includes file operations)
@@ -298,7 +298,7 @@ func testPodmanSFTPOperations(t *testing.T, projectRoot string) {
 	// Use absolute path for config file
 	configPath := *testConfigFile
 	if configPath == "" {
-		configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+		configPath = filepath.Join(projectRoot, "examples", "test-environment", "test-config.hcl")
 	}
 
 	// Execute the configuration (which includes SFTP operations)
@@ -323,7 +323,7 @@ func testPodmanTagBasedTargeting(t *testing.T, projectRoot string) {
 	// Use absolute path for config file
 	configPath := *testConfigFile
 	if configPath == "" {
-		configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+		configPath = filepath.Join(projectRoot, "examples", "test-environment", "test-config.hcl")
 	}
 
 	// Execute the configuration (which includes tag-based targeting)
@@ -348,7 +348,7 @@ func testPodmanConcurrentOperations(t *testing.T, projectRoot string) {
 	// Use absolute path for config file
 	configPath := *testConfigFile
 	if configPath == "" {
-		configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+		configPath = filepath.Join(projectRoot, "examples", "test-environment", "test-config.hcl")
 	}
 
 	// Execute the configuration with parallel flag
@@ -373,7 +373,7 @@ func testPodmanErrorHandling(t *testing.T, projectRoot string) {
 	// Use absolute path for config file
 	configPath := *testConfigFile
 	if configPath == "" {
-		configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+		configPath = filepath.Join(projectRoot, "examples", "test-environment", "test-config.hcl")
 	}
 
 	// Test with invalid configuration file
@@ -410,7 +410,7 @@ func testPodmanNetworkConnectivity(t *testing.T, projectRoot string) {
 	// Use absolute path for config file
 	configPath := *testConfigFile
 	if configPath == "" {
-		configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+		configPath = filepath.Join(projectRoot, "examples", "test-environment", "test-config.hcl")
 	}
 
 	// Execute the configuration (which includes network connectivity tests)
