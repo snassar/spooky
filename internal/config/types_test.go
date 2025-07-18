@@ -67,15 +67,16 @@ func TestServer_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.server.Validate()
+			v := NewValidator()
+			err := v.ValidateServer(&tt.server)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Server.Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ValidateServer() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if tt.wantErr && err != nil {
 				// Check that the error message contains the server name
 				if !strings.Contains(err.Error(), tt.server.Name) {
-					t.Errorf("Server.Validate() error message should contain server name '%s', got: %s", tt.server.Name, err.Error())
+					t.Errorf("ValidateServer() error message should contain server name '%s', got: %s", tt.server.Name, err.Error())
 				}
 			}
 		})
@@ -179,15 +180,16 @@ func TestAction_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.action.Validate()
+			v := NewValidator()
+			err := v.ValidateAction(&tt.action)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("Action.Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ValidateAction() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if tt.wantErr && err != nil {
 				// Check that the error message contains the action name
 				if !strings.Contains(err.Error(), tt.action.Name) {
-					t.Errorf("Action.Validate() error message should contain action name '%s', got: %s", tt.action.Name, err.Error())
+					t.Errorf("ValidateAction() error message should contain action name '%s', got: %s", tt.action.Name, err.Error())
 				}
 			}
 		})
