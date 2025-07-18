@@ -1,0 +1,184 @@
+name: Integration Tests with Podman
+
+on:
+  workflow_dispatch:
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+        cache: true
+
+    - name: Install Podman
+      run: |
+        # Install Podman
+        sudo apt-get update
+        sudo apt-get install -y podman
+        
+        # Verify installation
+        podman --version
+
+    - name: Configure Podman for rootless operation
+      run: |
+        # Enable user namespaces
+        echo 'kernel.unprivileged_userns_clone=1' | sudo tee -a /etc/sysctl.conf
+        sudo sysctl -p
+        
+        # Configure subuid/subgid for the runner user
+        sudo usermod --add-subuids 100000-165535 $USER
+        sudo usermod --add-subgids 100000-165535 $USER
+        
+        # Create podman configuration directory
+        mkdir -p ~/.config/containers
+        
+        # Configure podman for rootless operation
+        cat > ~/.config/containers/containers.conf << EOF
+        [engine]
+        active_service = "podman"
+        
+        [engine.service_destinations]
+        [engine.service_destinations.podman]
+        uri = "unix:///run/user/\${UID}/podman/podman.sock"
+        
+        [engine.service_destinations.podman.connection_timeout_seconds]
+        uri = 20
+        
+        [engine.service_destinations.podman.connection_override]
+        uri = "unix:///run/user/\${UID}/podman/podman.sock"
+        EOF
+
+    - name: Generate SSH key pair
+      run: |
+        # Generate SSH key without passphrase
+        ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N "" -C "github-actions@spooky"
+        
+        # Set proper permissions
+        chmod 600 ~/.ssh/id_ed25519
+        chmod 644 ~/.ssh/id_ed25519.pub
+        
+        # Add to SSH agent
+        eval $(ssh-agent -s)
+        ssh-add ~/.ssh/id_ed25519
+        
+        # Display public key for debugging
+        echo "Generated SSH public key:"
+        cat ~/.ssh/id_ed25519.pub
+
+    - name: Create SSH-enabled Debian container
+      run: |
+        # Create a Dockerfile for SSH-enabled Debian
+        cat > Dockerfile.ssh << 'EOF'
+        FROM debian:12-slim
+        
+        # Install SSH server and required packages
+        RUN apt-get update && apt-get install -y \
+            openssh-server \
+            sudo \
+            curl \
+            wget \
+            vim \
+            && rm -rf /var/lib/apt/lists/*
+        
+        # Create SSH directory
+        RUN mkdir -p /var/run/sshd
+        
+        # Create test user
+        RUN useradd -m -s /bin/bash testuser && \
+            echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+        
+        # Create .ssh directory for testuser
+        RUN mkdir -p /home/testuser/.ssh && \
+            chown testuser:testuser /home/testuser/.ssh && \
+            chmod 700 /home/testuser/.ssh
+        
+        # Copy SSH public key
+        COPY id_ed25519.pub /home/testuser/.ssh/authorized_keys
+        RUN chown testuser:testuser /home/testuser/.ssh/authorized_keys && \
+            chmod 600 /home/testuser/.ssh/authorized_keys
+        
+        # Configure SSH
+        RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config && \
+            sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
+            sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config && \
+            sed -i 's/#AuthorizedKeysFile/AuthorizedKeysFile/' /etc/ssh/sshd_config
+        
+        # Expose SSH port
+        EXPOSE 22
+        
+        # Start SSH daemon
+        CMD ["/usr/sbin/sshd", "-D"]
+        EOF
+        
+        # Copy SSH public key to build context
+        cp ~/.ssh/id_ed25519.pub .
+        
+        # Build the SSH-enabled image
+        podman build -f Dockerfile.ssh -t spooky-test-ssh .
+        
+        # Verify image was created
+        podman images
+
+    - name: Start SSH container
+      run: |
+        # Start the SSH container
+        podman run -d \
+          --name spooky-test-server \
+          -p 2222:22 \
+          spooky-test-ssh
+        
+        # Wait for container to be ready
+        sleep 10
+        
+        # Verify container is running
+        podman ps
+        
+        # Get container IP
+        CONTAINER_IP=$(podman inspect spooky-test-server --format='{{.NetworkSettings.IPAddress}}')
+        echo "Container IP: $CONTAINER_IP"
+        
+        # Test SSH connection
+        echo "Testing SSH connection..."
+        timeout 30 bash -c 'until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2222 testuser@localhost "echo SSH connection successful"; do sleep 2; done'
+        
+        # Store container info for tests
+        echo "CONTAINER_IP=$CONTAINER_IP" >> $GITHUB_ENV
+        echo "SSH_PORT=2222" >> $GITHUB_ENV
+
+    - name: Run integration tests
+      run: |
+        # Set environment variables for tests
+        export SPOOKY_TEST_SSH_HOST=localhost
+        export SPOOKY_TEST_SSH_PORT=2222
+        export SPOOKY_TEST_SSH_USER=testuser
+        export SPOOKY_TEST_SSH_KEY=~/.ssh/id_ed25519
+        
+        # Run integration tests with podman flag
+        go test ./tests/integration -v -podman
+
+    - name: Cleanup containers
+      if: always()
+      run: |
+        # Stop and remove containers
+        podman stop spooky-test-server || true
+        podman rm spooky-test-server || true
+        
+        # Remove images
+        podman rmi spooky-test-ssh || true
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: |
+          test-results/
+          *.log
+        retention-days: 7 
