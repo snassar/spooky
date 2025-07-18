@@ -6,7 +6,7 @@ server "spooky-test-server" {
   host     = "localhost"
   port     = 2221
   user     = "testuser"
-  key_file = "examples/test-environment/ssh-keys/id_ed25519"
+  key_file = "ssh-keys/id_ed25519"
   tags = {
     environment = "testing"
     role        = "test-server"
