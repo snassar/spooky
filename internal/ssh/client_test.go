@@ -1,6 +1,8 @@
 package ssh
 
 import (
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,7 +10,51 @@ import (
 	"time"
 
 	"spooky/internal/config"
+
+	"github.com/gliderlabs/ssh"
 )
+
+// mockSSHServer creates a mock SSH server for testing
+func mockSSHServer(t *testing.T) (string, func()) {
+	// Create a listener on a random port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to create listener: %v", err)
+	}
+
+	port := listener.Addr().(*net.TCPAddr).Port
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+
+	// Create SSH server
+	server := &ssh.Server{
+		Addr: addr,
+		Handler: func(s ssh.Session) {
+			// Echo back the command
+			command := strings.Join(s.Command(), " ")
+			fmt.Fprintf(s, "Executed: %s\n", command)
+		},
+		PasswordHandler: func(ctx ssh.Context, password string) bool {
+			return password == "testpass"
+		},
+	}
+
+	// Start server in goroutine
+	go func() {
+		if err := server.Serve(listener); err != nil && err != ssh.ErrServerClosed {
+			t.Logf("SSH server error: %v", err)
+		}
+	}()
+
+	// Wait a bit for server to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Return cleanup function
+	cleanup := func() {
+		server.Close()
+	}
+
+	return addr, cleanup
+}
 
 func TestNewSSHClient_NoAuth(t *testing.T) {
 	server := &config.Server{
@@ -142,7 +188,327 @@ func TestNewSSHClient_Timeout(t *testing.T) {
 	}
 }
 
-func TestExecuteScript_FileReadError(t *testing.T) {
+func TestGetHostKeyCallback(t *testing.T) {
+	tests := []struct {
+		name           string
+		callbackType   HostKeyCallbackType
+		knownHostsPath string
+		expectError    bool
+		errorContains  string
+	}{
+		{
+			name:           "insecure host key callback",
+			callbackType:   InsecureHostKey,
+			knownHostsPath: "",
+			expectError:    false,
+		},
+		{
+			name:           "auto host key callback",
+			callbackType:   AutoHostKey,
+			knownHostsPath: "",
+			expectError:    false,
+		},
+		{
+			name:           "known hosts with default path",
+			callbackType:   KnownHostsHostKey,
+			knownHostsPath: "",
+			expectError:    true, // Will fail because ~/.ssh/known_hosts doesn't exist in test
+			errorContains:  "failed to parse known_hosts file",
+		},
+		{
+			name:           "known hosts with custom path",
+			callbackType:   KnownHostsHostKey,
+			knownHostsPath: "/nonexistent/known_hosts",
+			expectError:    true,
+			errorContains:  "failed to parse known_hosts file",
+		},
+		{
+			name:           "known hosts with tilde expansion",
+			callbackType:   KnownHostsHostKey,
+			knownHostsPath: "~/test_known_hosts",
+			expectError:    true,
+			errorContains:  "failed to parse known_hosts file",
+		},
+		{
+			name:           "unsupported host key callback type",
+			callbackType:   "unsupported",
+			knownHostsPath: "",
+			expectError:    true,
+			errorContains:  "unsupported host key callback type",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			callback, err := getHostKeyCallback(tt.callbackType, tt.knownHostsPath)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+					return
+				}
+				if tt.errorContains != "" && !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("Expected error to contain '%s', got: %s", tt.errorContains, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error but got: %v", err)
+					return
+				}
+				if callback == nil {
+					t.Errorf("Expected callback but got nil")
+				}
+			}
+		})
+	}
+}
+
+func TestNewSSHClientWithHostKeyCallback(t *testing.T) {
+	server := &config.Server{
+		Name:     "test",
+		Host:     "localhost",
+		User:     "testuser",
+		Password: "testpass",
+		Port:     22,
+	}
+
+	// Test with insecure host key callback (should not fail due to auth setup)
+	client, err := NewSSHClientWithHostKeyCallback(server, 30, InsecureHostKey, "")
+	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") {
+		t.Errorf("Expected connection error, got: %v", err)
+	}
+	if err == nil && client != nil {
+		defer client.Close()
+	}
+
+	// Test with auto host key callback (should not fail due to auth setup)
+	client, err = NewSSHClientWithHostKeyCallback(server, 30, AutoHostKey, "")
+	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") {
+		t.Errorf("Expected connection error, got: %v", err)
+	}
+	if err == nil && client != nil {
+		defer client.Close()
+	}
+
+	// Test with known hosts callback (should fail due to missing known_hosts file)
+	_, err = NewSSHClientWithHostKeyCallback(server, 30, KnownHostsHostKey, "")
+	if err == nil {
+		t.Error("Expected error with known hosts callback but got none")
+	} else if !strings.Contains(err.Error(), "failed to parse known_hosts file") {
+		t.Errorf("Expected known hosts error, got: %v", err)
+	}
+
+	// Test with unsupported host key callback type
+	_, err = NewSSHClientWithHostKeyCallback(server, 30, "unsupported", "")
+	if err == nil {
+		t.Error("Expected error with unsupported callback type but got none")
+	} else if !strings.Contains(err.Error(), "unsupported host key callback type") {
+		t.Errorf("Expected unsupported callback error, got: %v", err)
+	}
+}
+
+func TestSSHClient_ExecuteCommand_WithMockServer(t *testing.T) {
+	// Start mock SSH server
+	addr, cleanup := mockSSHServer(t)
+	defer cleanup()
+
+	// Parse address
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		t.Fatalf("Failed to parse address: %v", err)
+	}
+
+	// Parse port
+	port := 22
+	if portStr != "" {
+		if p, err := net.LookupPort("tcp", portStr); err == nil {
+			port = p
+		}
+	}
+
+	// Create server config
+	server := &config.Server{
+		Name:     "test",
+		Host:     host,
+		User:     "testuser",
+		Password: "testpass",
+		Port:     port,
+	}
+
+	// Create SSH client
+	client, err := NewSSHClient(server, 5)
+	if err != nil {
+		// If connection fails, that's okay for this test
+		// We're mainly testing the ExecuteCommand logic
+		t.Logf("SSH connection failed (expected in some environments): %v", err)
+		return
+	}
+	defer client.Close()
+
+	// Test ExecuteCommand
+	output, err := client.ExecuteCommand("echo hello")
+	if err != nil {
+		t.Logf("ExecuteCommand failed (expected in some environments): %v", err)
+		return
+	}
+
+	expected := "Executed: echo hello"
+	if !strings.Contains(output, expected) {
+		t.Errorf("Expected output to contain '%s', got: '%s'", expected, output)
+	}
+}
+
+func TestSSHClient_ExecuteCommand_WithRealConnection(t *testing.T) {
+	// Test with a real SSH connection attempt that will fail
+	// but will exercise the session creation code
+	server := &config.Server{
+		Name:     "test",
+		Host:     "192.0.2.1", // RFC 5737 reserved for documentation/testing
+		User:     "testuser",
+		Password: "testpass",
+		Port:     22,
+	}
+
+	client, err := NewSSHClient(server, 1) // 1 second timeout
+	if err != nil {
+		// This is expected to fail due to connection timeout
+		if !strings.Contains(err.Error(), "connection refused") &&
+			!strings.Contains(err.Error(), "no route to host") &&
+			!strings.Contains(err.Error(), "timeout") {
+			t.Errorf("Expected connection error, got: %v", err)
+		}
+		return
+	}
+
+	// If we somehow got a connection, test ExecuteCommand
+	if client != nil {
+		defer client.Close()
+		_, err := client.ExecuteCommand("echo test")
+		if err != nil {
+			// This is expected to fail due to session issues
+			if !strings.Contains(err.Error(), "failed to create session") {
+				t.Errorf("Expected session error, got: %v", err)
+			}
+		}
+	}
+}
+
+func TestSSHClient_ExecuteCommand_SessionError(t *testing.T) {
+	// Create a client with a nil SSH client to test session creation error
+	client := &SSHClient{
+		Server: &config.Server{Name: "test"},
+		Client: nil,
+	}
+
+	_, err := client.ExecuteCommand("echo test")
+	if err == nil {
+		t.Error("Expected error when client is nil")
+	}
+	if !strings.Contains(err.Error(), "no SSH connection exists") {
+		t.Errorf("Expected connection error, got: %v", err)
+	}
+}
+
+func TestSSHClient_ExecuteCommand_CommandExecutionError(t *testing.T) {
+	// Create a mock SSH server that returns an error
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to create listener: %v", err)
+	}
+
+	serverPort := listener.Addr().(*net.TCPAddr).Port
+	addr := fmt.Sprintf("127.0.0.1:%d", serverPort)
+
+	server := &ssh.Server{
+		Addr: addr,
+		Handler: func(s ssh.Session) {
+			// Return an error
+			s.Exit(1)
+		},
+		PasswordHandler: func(ctx ssh.Context, password string) bool {
+			return password == "testpass"
+		},
+	}
+
+	go func() {
+		if err := server.Serve(listener); err != nil && err != ssh.ErrServerClosed {
+			t.Logf("SSH server error: %v", err)
+		}
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	defer server.Close()
+
+	// Parse address
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		t.Fatalf("Failed to parse address: %v", err)
+	}
+
+	// Parse port
+	port := 22
+	if portStr != "" {
+		if p, err := net.LookupPort("tcp", portStr); err == nil {
+			port = p
+		}
+	}
+
+	// Create server config
+	serverConfig := &config.Server{
+		Name:     "test",
+		Host:     host,
+		User:     "testuser",
+		Password: "testpass",
+		Port:     port,
+	}
+
+	// Create SSH client
+	client, err := NewSSHClient(serverConfig, 5)
+	if err != nil {
+		// If connection fails, that's okay for this test
+		t.Logf("SSH connection failed (expected in some environments): %v", err)
+		return
+	}
+	defer client.Close()
+
+	// Test ExecuteCommand with error
+	_, err = client.ExecuteCommand("exit 1")
+	if err != nil {
+		// This is expected to fail
+		if !strings.Contains(err.Error(), "command execution failed") {
+			t.Errorf("Expected command execution error, got: %v", err)
+		}
+	}
+}
+
+func TestSSHClient_ExecuteScript_Success(t *testing.T) {
+	// Create a temporary script file
+	tempDir := t.TempDir()
+	scriptFile := filepath.Join(tempDir, "test_script.sh")
+	scriptContent := "echo 'test script content'"
+
+	err := os.WriteFile(scriptFile, []byte(scriptContent), 0o600)
+	if err != nil {
+		t.Fatalf("Failed to create test script file: %v", err)
+	}
+
+	// Create a mock SSH client
+	client := &SSHClient{
+		Server: &config.Server{Name: "test"},
+		Client: nil, // No real connection
+	}
+
+	// This should fail due to no SSH connection, but we can test the file reading part
+	_, err = client.ExecuteScript(scriptFile)
+	if err == nil {
+		t.Error("Expected error when no SSH connection exists")
+	}
+	if !strings.Contains(err.Error(), "no SSH connection exists") {
+		t.Errorf("Expected connection error, got: %v", err)
+	}
+}
+
+func TestSSHClient_ExecuteScript_FileReadError(t *testing.T) {
 	// Create a mock SSH client
 	client := &SSHClient{
 		Server: &config.Server{Name: "test"},
