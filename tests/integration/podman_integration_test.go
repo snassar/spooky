@@ -11,8 +11,13 @@ import (
 
 var (
 	runPodmanTests = flag.Bool("podman", false, "Run Podman-based integration tests")
-	testConfigFile = flag.String("config", "examples/test-environment/test-config.hcl", "Test configuration file")
+	testConfigFile = flag.String("config", "", "Test configuration file")
 )
+
+// isCIEnvironment checks if we're running in a CI environment
+func isCIEnvironment() bool {
+	return os.Getenv("CI") == "true" || os.Getenv("GITHUB_ACTIONS") == "true"
+}
 
 // TestPodmanIntegration runs integration tests against the Podman-based test environment
 func TestPodmanIntegration(t *testing.T) {
@@ -22,6 +27,11 @@ func TestPodmanIntegration(t *testing.T) {
 	// Skip if not specifically requested
 	if !*runPodmanTests {
 		t.Skip("Skipping Podman integration tests. Use -podman flag to run.")
+	}
+
+	// Skip if not in CI environment (these tests require a running SSH container)
+	if !isCIEnvironment() {
+		t.Skip("Skipping Podman integration tests - not in CI environment. These tests require a running SSH container.")
 	}
 
 	// Set up cleanup at the end of all tests
@@ -91,6 +101,11 @@ func TestPodmanEnvironmentSetup(t *testing.T) {
 		t.Skip("Skipping Podman integration tests. Use -podman flag to run.")
 	}
 
+	// Skip if not in CI environment (these tests require a running SSH container)
+	if !isCIEnvironment() {
+		t.Skip("Skipping Podman integration tests - not in CI environment. These tests require a running SSH container.")
+	}
+
 	// Get the absolute path to the project root
 	projectRoot, err := getProjectRoot()
 	if err != nil {
@@ -118,8 +133,13 @@ func TestPodmanEnvironmentSetup(t *testing.T) {
 
 		// Test configuration validation
 		t.Log("Testing configuration validation...")
-		//nolint:gosec // testConfigFile is controlled by test runner, not user input
-		cmd = exec.Command("go", "run", "main.go", "validate", *testConfigFile)
+		// Use absolute path for config file
+		configPath := *testConfigFile
+		if configPath == "" {
+			configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+		}
+		//nolint:gosec // configPath is controlled by test runner, not user input
+		cmd = exec.Command("go", "run", "main.go", "validate", configPath)
 		output, err = cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("Configuration validation failed: %v\nOutput: %s", err, string(output))
@@ -128,8 +148,8 @@ func TestPodmanEnvironmentSetup(t *testing.T) {
 
 		// Test listing servers and actions
 		t.Log("Testing list command...")
-		//nolint:gosec // testConfigFile is controlled by test runner, not user input
-		cmd = exec.Command("go", "run", "main.go", "list", *testConfigFile)
+		//nolint:gosec // configPath is controlled by test runner, not user input
+		cmd = exec.Command("go", "run", "main.go", "list", configPath)
 		output, err = cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("List command failed: %v\nOutput: %s", err, string(output))
@@ -179,10 +199,16 @@ func testPodmanAuthentication(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
+	// Use absolute path for config file
+	configPath := *testConfigFile
+	if configPath == "" {
+		configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+	}
+
 	// Test configuration validation first
 	t.Log("Validating configuration...")
-	//nolint:gosec // testConfigFile is controlled by test runner, not user input
-	cmd := exec.Command("go", "run", "main.go", "validate", *testConfigFile)
+	//nolint:gosec // configPath is controlled by test runner, not user input
+	cmd := exec.Command("go", "run", "main.go", "validate", configPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Configuration validation failed: %v\nOutput: %s", err, string(output))
@@ -191,8 +217,8 @@ func testPodmanAuthentication(t *testing.T, projectRoot string) {
 
 	// Test listing servers and actions
 	t.Log("Listing servers and actions...")
-	//nolint:gosec // testConfigFile is controlled by test runner, not user input
-	cmd = exec.Command("go", "run", "main.go", "list", *testConfigFile)
+	//nolint:gosec // configPath is controlled by test runner, not user input
+	cmd = exec.Command("go", "run", "main.go", "list", configPath)
 	output, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("List command failed: %v\nOutput: %s", err, string(output))
@@ -201,8 +227,8 @@ func testPodmanAuthentication(t *testing.T, projectRoot string) {
 
 	// Execute all actions in the configuration
 	t.Log("Executing all actions...")
-	//nolint:gosec // testConfigFile is controlled by test runner, not user input
-	cmd = exec.Command("go", "run", "main.go", "execute", *testConfigFile)
+	//nolint:gosec // configPath is controlled by test runner, not user input
+	cmd = exec.Command("go", "run", "main.go", "execute", configPath)
 	output, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Action execution failed: %v\nOutput: %s", err, string(output))
@@ -219,9 +245,15 @@ func testPodmanSystemInfo(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
+	// Use absolute path for config file
+	configPath := *testConfigFile
+	if configPath == "" {
+		configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+	}
+
 	// Execute the configuration (which includes system info commands)
-	//nolint:gosec // testConfigFile is controlled by test runner, not user input
-	cmd := exec.Command("go", "run", "main.go", "execute", *testConfigFile)
+	//nolint:gosec // configPath is controlled by test runner, not user input
+	cmd := exec.Command("go", "run", "main.go", "execute", configPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("System info test failed: %v\nOutput: %s", err, string(output))
@@ -238,9 +270,15 @@ func testPodmanFileOperations(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
+	// Use absolute path for config file
+	configPath := *testConfigFile
+	if configPath == "" {
+		configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+	}
+
 	// Execute the configuration (which includes file operations)
-	//nolint:gosec // testConfigFile is controlled by test runner, not user input
-	cmd := exec.Command("go", "run", "main.go", "execute", *testConfigFile)
+	//nolint:gosec // configPath is controlled by test runner, not user input
+	cmd := exec.Command("go", "run", "main.go", "execute", configPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("File operations test failed: %v\nOutput: %s", err, string(output))
@@ -257,9 +295,15 @@ func testPodmanSFTPOperations(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
+	// Use absolute path for config file
+	configPath := *testConfigFile
+	if configPath == "" {
+		configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+	}
+
 	// Execute the configuration (which includes SFTP operations)
-	//nolint:gosec // testConfigFile is controlled by test runner, not user input
-	cmd := exec.Command("go", "run", "main.go", "execute", *testConfigFile)
+	//nolint:gosec // configPath is controlled by test runner, not user input
+	cmd := exec.Command("go", "run", "main.go", "execute", configPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("SFTP operations test failed: %v\nOutput: %s", err, string(output))
@@ -276,9 +320,15 @@ func testPodmanTagBasedTargeting(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
+	// Use absolute path for config file
+	configPath := *testConfigFile
+	if configPath == "" {
+		configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+	}
+
 	// Execute the configuration (which includes tag-based targeting)
-	//nolint:gosec // testConfigFile is controlled by test runner, not user input
-	cmd := exec.Command("go", "run", "main.go", "execute", *testConfigFile)
+	//nolint:gosec // configPath is controlled by test runner, not user input
+	cmd := exec.Command("go", "run", "main.go", "execute", configPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Tag-based targeting test failed: %v\nOutput: %s", err, string(output))
@@ -295,9 +345,15 @@ func testPodmanConcurrentOperations(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
+	// Use absolute path for config file
+	configPath := *testConfigFile
+	if configPath == "" {
+		configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+	}
+
 	// Execute the configuration with parallel flag
-	//nolint:gosec // testConfigFile is controlled by test runner, not user input
-	cmd := exec.Command("go", "run", "main.go", "execute", *testConfigFile, "--parallel")
+	//nolint:gosec // configPath is controlled by test runner, not user input
+	cmd := exec.Command("go", "run", "main.go", "execute", configPath, "--parallel")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Concurrent operations test failed: %v\nOutput: %s", err, string(output))
@@ -314,6 +370,12 @@ func testPodmanErrorHandling(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
+	// Use absolute path for config file
+	configPath := *testConfigFile
+	if configPath == "" {
+		configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+	}
+
 	// Test with invalid configuration file
 	t.Run("InvalidConfig", func(t *testing.T) {
 		cmd := exec.Command("go", "run", "main.go", "validate", "nonexistent-config.hcl")
@@ -327,8 +389,8 @@ func testPodmanErrorHandling(t *testing.T, projectRoot string) {
 
 	// Test with valid configuration
 	t.Run("ValidConfig", func(t *testing.T) {
-		//nolint:gosec // testConfigFile is controlled by test runner, not user input
-		cmd := exec.Command("go", "run", "main.go", "validate", *testConfigFile)
+		//nolint:gosec // configPath is controlled by test runner, not user input
+		cmd := exec.Command("go", "run", "main.go", "validate", configPath)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("Valid config validation failed: %v\nOutput: %s", err, string(output))
@@ -345,9 +407,15 @@ func testPodmanNetworkConnectivity(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
+	// Use absolute path for config file
+	configPath := *testConfigFile
+	if configPath == "" {
+		configPath = filepath.Join(projectRoot, "examples/test-environment/test-config.hcl")
+	}
+
 	// Execute the configuration (which includes network connectivity tests)
-	//nolint:gosec // testConfigFile is controlled by test runner, not user input
-	cmd := exec.Command("go", "run", "main.go", "execute", *testConfigFile)
+	//nolint:gosec // configPath is controlled by test runner, not user input
+	cmd := exec.Command("go", "run", "main.go", "execute", configPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Network connectivity test failed: %v\nOutput: %s", err, string(output))
