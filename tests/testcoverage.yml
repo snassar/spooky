@@ -1,7 +1,7 @@
 threshold:
-  file: 50      # Individual files must have at least 50% coverage
-  package: 50   # Packages must have at least 65% coverage
-  total: 70     # Overall project must have at least 60% coverage
+  file: 60      # Individual files must have at least 50% coverage
+  package: 70   # Packages must have at least 65% coverage
+  total: 75     # Overall project must have at least 60% coverage
 profile: ./tests/coverage.out
 exclude:
   paths:

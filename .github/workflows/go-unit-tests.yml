@@ -83,10 +83,23 @@ jobs:
           threshold: true
         EOF
 
+    - name: Clean previous coverage files
+      run: |
+        echo "Cleaning any existing coverage files..."
+        rm -f ./tests/coverage.out ./tests/coverage-report.md
+
     - name: Run tests with coverage
       run: |
         echo "Running unit tests with coverage..."
         go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./... -v
+        
+        # Verify coverage file was generated
+        if [ ! -f ./tests/coverage.out ]; then
+          echo "ERROR: Coverage file was not generated!"
+          exit 1
+        fi
+        
+        echo "Coverage file generated: $(ls -la ./tests/coverage.out)"
 
     - name: Generate coverage report
       run: |
