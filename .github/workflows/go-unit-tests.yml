@@ -1,0 +1,126 @@
+name: Unit Tests with Coverage
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  check-changes:
+    name: Check for testable changes
+    runs-on: ubuntu-latest
+    outputs:
+      has-testable-changes: ${{ steps.check.outputs.has-testable-changes }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Required to get the full history for diff
+
+    - name: Check for testable file changes
+      id: check
+      run: |
+        # Get list of changed files that should trigger tests
+        CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} || true)
+        
+        # Check for Go files, test configs, or CI files
+        if echo "$CHANGED_FILES" | grep -E '\.(go|yml|yaml|json)$' > /dev/null; then
+          echo "Testable files changed:"
+          echo "$CHANGED_FILES" | grep -E '\.(go|yml|yaml|json)$' || true
+          echo "has-testable-changes=true" >> $GITHUB_OUTPUT
+        else
+          echo "No testable files changed, skipping test job"
+          echo "has-testable-changes=false" >> $GITHUB_OUTPUT
+        fi
+
+  test:
+    name: Run Unit Tests with Coverage
+    runs-on: ubuntu-latest
+    needs: check-changes
+    if: needs.check-changes.outputs.has-testable-changes == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+
+    - name: Install go-test-coverage
+      run: |
+        go install github.com/vladopajic/go-test-coverage/v2@latest
+
+    - name: Create CI-specific coverage config
+      run: |
+        cat > .github/testcoverage-ci.yml << 'EOF'
+        threshold:
+          file: 50      # Individual files must have at least 50% coverage
+          package: 50   # Packages must have at least 50% coverage
+          total: 70     # Overall project must have at least 70% coverage
+        profile: ./tests/coverage.out
+        exclude:
+          paths:
+            - _test\.go$
+            - ^tests/
+            - ^examples/
+            - main\.go$
+            - generated_keys/
+            - test_.*\.go$
+            - .*\.exe$
+            - .*\.dll$
+            - .*\.sample$
+            - .*\.sample\.[a-z]+$
+            - ^tools/
+            - ^\.github/
+        output:
+          format: markdown
+          path: ./tests/coverage-report.md
+        fail:
+          threshold: true
+        EOF
+
+    - name: Run tests with coverage
+      run: |
+        echo "Running unit tests with coverage..."
+        go test ./... -coverprofile=./tests/coverage.out -covermode=atomic -coverpkg=./... -v
+
+    - name: Generate coverage report
+      run: |
+        echo "Generating coverage report..."
+        go-test-coverage --config=.github/testcoverage-ci.yml
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: |
+          ./tests/coverage.out
+          ./tests/coverage-report.md
+        retention-days: 30
+
+    - name: Comment PR with coverage report
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          try {
+            const reportPath = './tests/coverage-report.md';
+            if (fs.existsSync(reportPath)) {
+              const report = fs.readFileSync(reportPath, 'utf8');
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 📊 Test Coverage Report\n\n${report}`
+              });
+            }
+          } catch (error) {
+            console.log('Could not post coverage report as comment:', error.message);
+          } 
