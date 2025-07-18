@@ -8,23 +8,23 @@ type Config struct {
 
 // Server represents a remote server configuration
 type Server struct {
-	Name     string            `hcl:"name,label" validate:"required,min=1"`
-	Host     string            `hcl:"host" validate:"required,min=1"`
+	Name     string            `hcl:"name,label" validate:"required"`
+	Host     string            `hcl:"host" validate:"required"`
 	Port     int               `hcl:"port,optional" validate:"omitempty,min=1,max=65535"`
-	User     string            `hcl:"user" validate:"required,min=1"`
-	Password string            `hcl:"password,optional" validate:"omitempty,min=1"`
-	KeyFile  string            `hcl:"key_file,optional" validate:"omitempty,min=1"`
-	Tags     map[string]string `hcl:"tags,optional" validate:"omitempty,dive,keys,min=1,endkeys,min=1"`
+	User     string            `hcl:"user" validate:"required"`
+	Password string            `hcl:"password,optional"`
+	KeyFile  string            `hcl:"key_file,optional"`
+	Tags     map[string]string `hcl:"tags,optional" validate:"omitempty,dive,keys,required,endkeys,required"`
 }
 
 // Action represents an action to be executed on servers
 type Action struct {
-	Name        string   `hcl:"name,label" validate:"required,min=1"`
-	Description string   `hcl:"description,optional" validate:"omitempty,min=1"`
-	Command     string   `hcl:"command,optional" validate:"omitempty,min=1"`
-	Script      string   `hcl:"script,optional" validate:"omitempty,min=1"`
-	Servers     []string `hcl:"servers,optional" validate:"omitempty,dive,min=1"`
-	Tags        []string `hcl:"tags,optional" validate:"omitempty,dive,min=1"`
+	Name        string   `hcl:"name,label" validate:"required"`
+	Description string   `hcl:"description,optional"`
+	Command     string   `hcl:"command,optional"`
+	Script      string   `hcl:"script,optional"`
+	Servers     []string `hcl:"servers,optional" validate:"omitempty,dive,required"`
+	Tags        []string `hcl:"tags,optional" validate:"omitempty,dive,required"`
 	Timeout     int      `hcl:"timeout,optional" validate:"omitempty,min=1,max=3600"`
 	Parallel    bool     `hcl:"parallel,optional"`
 }
