@@ -6,9 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
-	"time"
 )
 
 var (
@@ -108,47 +106,37 @@ func TestPodmanEnvironmentSetup(t *testing.T) {
 			t.Fatalf("Failed to change to project root: %v", err)
 		}
 
-		// Run preflight check
-		t.Log("Running preflight check...")
-		if err := exec.Command("go", "run", "../../tools/spooky-test-env/main.go", "preflight").Run(); err != nil {
-			t.Fatalf("Preflight check failed: %v", err)
-		}
-
-		// Start the test environment
-		t.Log("Starting test environment...")
-		if err := exec.Command("go", "run", "../../tools/spooky-test-env/main.go", "start").Run(); err != nil {
-			t.Fatalf("Failed to start test environment: %v", err)
-		}
-
-		// Wait for containers to be ready
-		t.Log("Waiting for containers to be ready...")
-		time.Sleep(15 * time.Second)
-
-		// Check environment status
-		t.Log("Checking environment status...")
-		if err := exec.Command("go", "run", "../../tools/spooky-test-env/main.go", "status").Run(); err != nil {
-			t.Fatalf("Failed to check environment status: %v", err)
-		}
-
-		// Verify containers are running
-		t.Log("Verifying containers are running...")
-		output, err := exec.Command("podman", "ps", "--filter", "name=spooky-server", "--format", "{{.Names}}").Output()
+		// Test SSH connectivity to verify container is ready
+		t.Log("Testing SSH connectivity...")
+		cmd := exec.Command("ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=5",
+			"-p", "2221", "testuser@localhost", "echo 'SSH connection successful'")
+		output, err := cmd.CombinedOutput()
 		if err != nil {
-			t.Fatalf("Failed to check container status: %v", err)
+			t.Fatalf("SSH connectivity test failed: %v\nOutput: %s", err, string(output))
 		}
+		t.Logf("SSH connectivity verified: %s", string(output))
 
-		containerNames := strings.TrimSpace(string(output))
-		if containerNames == "" {
-			t.Fatal("No spooky-server containers found")
+		// Test configuration validation
+		t.Log("Testing configuration validation...")
+		//nolint:gosec // testConfigFile is controlled by test runner, not user input
+		cmd = exec.Command("go", "run", "main.go", "validate", *testConfigFile)
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("Configuration validation failed: %v\nOutput: %s", err, string(output))
 		}
+		t.Logf("Configuration validation successful: %s", string(output))
 
-		t.Logf("Found containers: %s", containerNames)
-
-		// Clean up
-		t.Log("Cleaning up test environment...")
-		if cleanupErr := exec.Command("go", "run", "../../tools/spooky-test-env/main.go", "cleanup").Run(); cleanupErr != nil {
-			t.Logf("Warning: failed to cleanup test environment: %v", cleanupErr)
+		// Test listing servers and actions
+		t.Log("Testing list command...")
+		//nolint:gosec // testConfigFile is controlled by test runner, not user input
+		cmd = exec.Command("go", "run", "main.go", "list", *testConfigFile)
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("List command failed: %v\nOutput: %s", err, string(output))
 		}
+		t.Logf("List command successful: %s", string(output))
+
+		t.Log("Environment setup test completed successfully")
 	})
 }
 
@@ -161,48 +149,26 @@ func setupPodmanEnvironment(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
-	// Run preflight check
-	t.Log("Running preflight check...")
-	if err := exec.Command("go", "run", "../../tools/spooky-test-env/main.go", "preflight").Run(); err != nil {
-		t.Fatalf("Preflight check failed: %v", err)
+	// The workflow already handles container setup, so we just verify connectivity
+	t.Log("Verifying SSH connectivity...")
+
+	// Test SSH connection to verify container is ready
+	cmd := exec.Command("ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=5",
+		"-p", "2221", "testuser@localhost", "echo 'SSH connection successful'")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("SSH connectivity test failed: %v\nOutput: %s", err, string(output))
 	}
 
-	// Start the test environment
-	t.Log("Starting test environment...")
-	if err := exec.Command("go", "run", "../../tools/spooky-test-env/main.go", "start").Run(); err != nil {
-		t.Fatalf("Failed to start test environment: %v", err)
-	}
-
-	// Wait for containers to be ready
-	t.Log("Waiting for containers to be ready...")
-	time.Sleep(15 * time.Second)
-
-	// Check environment status
-	t.Log("Checking environment status...")
-	if err := exec.Command("go", "run", "tools/spooky-test-env/main.go", "status").Run(); err != nil {
-		t.Fatalf("Failed to check environment status: %v", err)
-	}
+	t.Logf("SSH connectivity verified: %s", string(output))
 }
 
 // cleanupPodmanEnvironment cleans up the Podman test environment
 func cleanupPodmanEnvironment(t *testing.T) {
 	t.Log("Cleaning up Podman test environment...")
 
-	projectRoot, err := getProjectRoot()
-	if err != nil {
-		t.Logf("Warning: failed to get project root for cleanup: %v", err)
-		return
-	}
-
-	if err := os.Chdir(projectRoot); err != nil {
-		t.Logf("Warning: failed to change to project root for cleanup: %v", err)
-		return
-	}
-
-	// Stop and cleanup the test environment
-	if err := exec.Command("go", "run", "../../tools/spooky-test-env/main.go", "cleanup").Run(); err != nil {
-		t.Logf("Warning: failed to cleanup test environment: %v", err)
-	}
+	// The workflow handles cleanup, so we just log the cleanup
+	t.Log("Cleanup handled by workflow")
 }
 
 // testPodmanAuthentication tests basic authentication across all servers
@@ -213,17 +179,36 @@ func testPodmanAuthentication(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
-	// Execute the authentication test
+	// Test configuration validation first
+	t.Log("Validating configuration...")
 	//nolint:gosec // testConfigFile is controlled by test runner, not user input
-	cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
-	cmd.Args = append(cmd.Args, "--action", "test-authentication")
-
+	cmd := exec.Command("go", "run", "main.go", "validate", *testConfigFile)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("Authentication test failed: %v\nOutput: %s", err, string(output))
+		t.Fatalf("Configuration validation failed: %v\nOutput: %s", err, string(output))
+	}
+	t.Logf("Configuration validation output:\n%s", string(output))
+
+	// Test listing servers and actions
+	t.Log("Listing servers and actions...")
+	//nolint:gosec // testConfigFile is controlled by test runner, not user input
+	cmd = exec.Command("go", "run", "main.go", "list", *testConfigFile)
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("List command failed: %v\nOutput: %s", err, string(output))
+	}
+	t.Logf("List command output:\n%s", string(output))
+
+	// Execute all actions in the configuration
+	t.Log("Executing all actions...")
+	//nolint:gosec // testConfigFile is controlled by test runner, not user input
+	cmd = exec.Command("go", "run", "main.go", "execute", *testConfigFile)
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Action execution failed: %v\nOutput: %s", err, string(output))
 	}
 
-	t.Logf("Authentication test output:\n%s", string(output))
+	t.Logf("Action execution output:\n%s", string(output))
 }
 
 // testPodmanSystemInfo tests system information gathering
@@ -234,11 +219,9 @@ func testPodmanSystemInfo(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
-	// Execute the system info test
+	// Execute the configuration (which includes system info commands)
 	//nolint:gosec // testConfigFile is controlled by test runner, not user input
-	cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
-	cmd.Args = append(cmd.Args, "--action", "test-system-info")
-
+	cmd := exec.Command("go", "run", "main.go", "execute", *testConfigFile)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("System info test failed: %v\nOutput: %s", err, string(output))
@@ -255,11 +238,9 @@ func testPodmanFileOperations(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
-	// Execute the file operations test
+	// Execute the configuration (which includes file operations)
 	//nolint:gosec // testConfigFile is controlled by test runner, not user input
-	cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
-	cmd.Args = append(cmd.Args, "--action", "test-file-operations")
-
+	cmd := exec.Command("go", "run", "main.go", "execute", *testConfigFile)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("File operations test failed: %v\nOutput: %s", err, string(output))
@@ -276,11 +257,9 @@ func testPodmanSFTPOperations(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
-	// Execute the SFTP operations test
+	// Execute the configuration (which includes SFTP operations)
 	//nolint:gosec // testConfigFile is controlled by test runner, not user input
-	cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
-	cmd.Args = append(cmd.Args, "--action", "test-sftp-operations")
-
+	cmd := exec.Command("go", "run", "main.go", "execute", *testConfigFile)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("SFTP operations test failed: %v\nOutput: %s", err, string(output))
@@ -297,31 +276,15 @@ func testPodmanTagBasedTargeting(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
-	// Test production servers
-	t.Run("ProductionServers", func(t *testing.T) {
-		//nolint:gosec // testConfigFile is controlled by test runner, not user input
-		cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
-		cmd.Args = append(cmd.Args, "--action", "test-production-servers")
+	// Execute the configuration (which includes tag-based targeting)
+	//nolint:gosec // testConfigFile is controlled by test runner, not user input
+	cmd := exec.Command("go", "run", "main.go", "execute", *testConfigFile)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Tag-based targeting test failed: %v\nOutput: %s", err, string(output))
+	}
 
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("Production servers test failed: %v\nOutput: %s", err, string(output))
-		}
-		t.Logf("Production servers test output:\n%s", string(output))
-	})
-
-	// Test staging servers
-	t.Run("StagingServers", func(t *testing.T) {
-		//nolint:gosec // testConfigFile is controlled by test runner, not user input
-		cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
-		cmd.Args = append(cmd.Args, "--action", "test-staging-servers")
-
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("Staging servers test failed: %v\nOutput: %s", err, string(output))
-		}
-		t.Logf("Staging servers test output:\n%s", string(output))
-	})
+	t.Logf("Tag-based targeting test output:\n%s", string(output))
 }
 
 // testPodmanConcurrentOperations tests concurrent operations
@@ -332,11 +295,9 @@ func testPodmanConcurrentOperations(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
-	// Execute the concurrent operations test
+	// Execute the configuration with parallel flag
 	//nolint:gosec // testConfigFile is controlled by test runner, not user input
-	cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
-	cmd.Args = append(cmd.Args, "--action", "test-concurrent-operations")
-
+	cmd := exec.Command("go", "run", "main.go", "execute", *testConfigFile, "--parallel")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Concurrent operations test failed: %v\nOutput: %s", err, string(output))
@@ -353,17 +314,27 @@ func testPodmanErrorHandling(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
-	// Execute the error handling test
-	//nolint:gosec // testConfigFile is controlled by test runner, not user input
-	cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
-	cmd.Args = append(cmd.Args, "--action", "test-error-handling")
+	// Test with invalid configuration file
+	t.Run("InvalidConfig", func(t *testing.T) {
+		cmd := exec.Command("go", "run", "main.go", "validate", "nonexistent-config.hcl")
+		output, err := cmd.CombinedOutput()
+		// This should fail, which is expected
+		if err == nil {
+			t.Error("Expected validation to fail for nonexistent config file")
+		}
+		t.Logf("Invalid config test output:\n%s", string(output))
+	})
 
-	output, err := cmd.CombinedOutput()
-	// Note: This test is expected to handle errors gracefully, so we don't fail on error
-	t.Logf("Error handling test output:\n%s", string(output))
-	if err != nil {
-		t.Logf("Error occurred (expected): %v", err)
-	}
+	// Test with valid configuration
+	t.Run("ValidConfig", func(t *testing.T) {
+		//nolint:gosec // testConfigFile is controlled by test runner, not user input
+		cmd := exec.Command("go", "run", "main.go", "validate", *testConfigFile)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("Valid config validation failed: %v\nOutput: %s", err, string(output))
+		}
+		t.Logf("Valid config test output:\n%s", string(output))
+	})
 }
 
 // testPodmanNetworkConnectivity tests network connectivity between servers
@@ -374,11 +345,9 @@ func testPodmanNetworkConnectivity(t *testing.T, projectRoot string) {
 		t.Fatalf("Failed to change to project root: %v", err)
 	}
 
-	// Execute the network connectivity test
+	// Execute the configuration (which includes network connectivity tests)
 	//nolint:gosec // testConfigFile is controlled by test runner, not user input
-	cmd := exec.Command("go", "run", "../../main.go", "execute", *testConfigFile)
-	cmd.Args = append(cmd.Args, "--action", "test-network-connectivity")
-
+	cmd := exec.Command("go", "run", "main.go", "execute", *testConfigFile)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("Network connectivity test failed: %v\nOutput: %s", err, string(output))

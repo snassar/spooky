@@ -2,6 +2,13 @@ name: Integration Tests with Podman
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'tests/integration/**'
+      - 'internal/**'
+      - 'main.go'
+      - '.github/workflows/integration-tests.yml'
 
 jobs:
   integration-tests:
@@ -108,7 +115,8 @@ jobs:
         RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config && \
             sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
             sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config && \
-            sed -i 's/#AuthorizedKeysFile/AuthorizedKeysFile/' /etc/ssh/sshd_config
+            sed -i 's/#AuthorizedKeysFile/AuthorizedKeysFile/' /etc/ssh/sshd_config && \
+            echo "StrictModes no" >> /etc/ssh/sshd_config
         
         # Expose SSH port
         EXPOSE 22
@@ -128,10 +136,10 @@ jobs:
 
     - name: Start SSH container
       run: |
-        # Start the SSH container
+        # Start the SSH container on port 2221 (matching test config)
         podman run -d \
           --name spooky-test-server \
-          -p 2222:22 \
+          -p 2221:22 \
           spooky-test-ssh
         
         # Wait for container to be ready
@@ -144,23 +152,115 @@ jobs:
         CONTAINER_IP=$(podman inspect spooky-test-server --format='{{.NetworkSettings.IPAddress}}')
         echo "Container IP: $CONTAINER_IP"
         
-        # Test SSH connection
+        # Test SSH connection on port 2221
         echo "Testing SSH connection..."
-        timeout 30 bash -c 'until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2222 testuser@localhost "echo SSH connection successful"; do sleep 2; done'
+        echo "SSH key contents (first few lines):"
+        head -5 ~/.ssh/id_ed25519.pub
+        
+        echo "Testing SSH connection with verbose output..."
+        ssh -v -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2221 testuser@localhost "echo 'SSH connection successful'" || {
+            echo "SSH connection failed, checking container logs..."
+            podman logs spooky-test-server
+            echo "Checking SSH daemon status in container..."
+            podman exec spooky-test-server ps aux | grep sshd
+            echo "Checking authorized_keys in container..."
+            podman exec spooky-test-server cat /home/testuser/.ssh/authorized_keys
+            exit 1
+        }
         
         # Store container info for tests
         echo "CONTAINER_IP=$CONTAINER_IP" >> $GITHUB_ENV
-        echo "SSH_PORT=2222" >> $GITHUB_ENV
+        echo "SSH_PORT=2221" >> $GITHUB_ENV
+
+    - name: Update test configuration
+      run: |
+        # Create updated test configuration with correct user and key path
+        cat > examples/test-environment/test-config.hcl << 'EOF'
+        # Test configuration for spooky SSH automation tool
+        # Points to the test environment SSH server
+
+        # Define test server
+        server "spooky-test-server" {
+          host     = "localhost"
+          port     = 2221
+          user     = "testuser"
+          key_file = "examples/test-environment/ssh-keys/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "test-server"
+          }
+        }
+
+        # Define test actions
+        action "check-status" {
+          description = "Check system status"
+          command     = "uptime && df -h"
+          servers     = ["spooky-test-server"]
+          parallel    = true
+        }
+
+        action "check-ssh-keys" {
+          description = "Check SSH key configuration"
+          command     = "ls -la ~/.ssh/ && echo 'SSH keys mounted successfully'"
+          servers     = ["spooky-test-server"]
+          parallel    = true
+        }
+
+        action "test-connection" {
+          description = "Test basic connectivity"
+          command     = "echo 'Connection test successful' && hostname && whoami"
+          servers     = ["spooky-test-server"]
+          parallel    = true
+        }
+        EOF
+
+    - name: Copy SSH key to test environment
+      run: |
+        # Create SSH keys directory in test environment
+        mkdir -p examples/test-environment/ssh-keys
+        
+        # Copy the private key to the test environment
+        cp ~/.ssh/id_ed25519 examples/test-environment/ssh-keys/
+        
+        # Set proper permissions
+        chmod 600 examples/test-environment/ssh-keys/id_ed25519
+
+    - name: Build spooky binary
+      run: |
+        # Create build directory
+        mkdir -p build
+        
+        # Build the spooky binary
+        go build -o build/spooky main.go
+        
+        # Verify binary was created
+        ls -la build/
 
     - name: Run integration tests
       run: |
         # Set environment variables for tests
         export SPOOKY_TEST_SSH_HOST=localhost
-        export SPOOKY_TEST_SSH_PORT=2222
+        export SPOOKY_TEST_SSH_PORT=2221
         export SPOOKY_TEST_SSH_USER=testuser
-        export SPOOKY_TEST_SSH_KEY=~/.ssh/id_ed25519
+        export SPOOKY_TEST_SSH_KEY=examples/test-environment/ssh-keys/id_ed25519
+        
+        # Show current directory and files
+        echo "Current directory: $(pwd)"
+        echo "Files in current directory:"
+        ls -la
+        
+        echo "Files in build directory:"
+        ls -la build/ || echo "Build directory not found"
+        
+        echo "Files in examples/test-environment:"
+        ls -la examples/test-environment/ || echo "Test environment directory not found"
+        
+        # Test SSH connectivity
+        echo "Testing SSH connectivity..."
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2221 testuser@localhost "echo 'SSH connection successful'"
         
         # Run integration tests with podman flag
+        echo "Running Go integration tests..."
         go test ./tests/integration -v -podman
 
     - name: Cleanup containers

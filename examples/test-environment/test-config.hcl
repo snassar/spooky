@@ -5,8 +5,8 @@
 server "spooky-test-server" {
   host     = "localhost"
   port     = 2221
-  user     = "root"
-  key_file = "ssh-keys/id_ed25519"
+  user     = "testuser"
+  key_file = "examples/test-environment/ssh-keys/id_ed25519"
   tags = {
     environment = "testing"
     role        = "test-server"
@@ -23,7 +23,7 @@ action "check-status" {
 
 action "check-ssh-keys" {
   description = "Check SSH key configuration"
-  command     = "ls -la /root/.ssh/ && echo 'SSH keys mounted successfully'"
+  command     = "ls -la ~/.ssh/ && echo 'SSH keys mounted successfully'"
   servers     = ["spooky-test-server"]
   parallel    = true
 }
