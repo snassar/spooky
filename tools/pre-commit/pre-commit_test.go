@@ -95,8 +95,8 @@ func TestGitRepositoryDetection(t *testing.T) {
 		if !strings.Contains(output, "Running pre-commit coverage checks...") {
 			t.Errorf("Expected output to contain 'Running pre-commit coverage checks...', got %q", output)
 		}
-		if !strings.Contains(output, "✅ Coverage thresholds met") {
-			t.Errorf("Expected output to contain '✅ Coverage thresholds met', got %q", output)
+		if !strings.Contains(output, "✅ Linting and coverage checks passed") {
+			t.Errorf("Expected output to contain '✅ Linting and coverage checks passed', got %q", output)
 		}
 	})
 
@@ -160,8 +160,8 @@ func TestStagedFilesDetection(t *testing.T) {
 		if !strings.Contains(output, "Staged Go files:") {
 			t.Errorf("Expected output to contain 'Staged Go files:', got %q", output)
 		}
-		if !strings.Contains(output, "✅ Coverage thresholds met") {
-			t.Errorf("Expected output to contain '✅ Coverage thresholds met', got %q", output)
+		if !strings.Contains(output, "✅ Linting and coverage checks passed") {
+			t.Errorf("Expected output to contain '✅ Linting and coverage checks passed', got %q", output)
 		}
 	})
 
@@ -189,8 +189,8 @@ func TestStagedFilesDetection(t *testing.T) {
 		if !strings.Contains(output, "Staged Go files:") {
 			t.Errorf("Expected output to contain 'Staged Go files:', got %q", output)
 		}
-		if !strings.Contains(output, "✅ Coverage thresholds met") {
-			t.Errorf("Expected output to contain '✅ Coverage thresholds met', got %q", output)
+		if !strings.Contains(output, "✅ Linting and coverage checks passed") {
+			t.Errorf("Expected output to contain '✅ Linting and coverage checks passed', got %q", output)
 		}
 	})
 
@@ -235,8 +235,8 @@ func TestCoverageGeneration(t *testing.T) {
 		if !strings.Contains(output, "Generating coverage profile...") {
 			t.Errorf("Expected output to contain 'Generating coverage profile...', got %q", output)
 		}
-		if !strings.Contains(output, "✅ Coverage thresholds met") {
-			t.Errorf("Expected output to contain '✅ Coverage thresholds met', got %q", output)
+		if !strings.Contains(output, "✅ Linting and coverage checks passed") {
+			t.Errorf("Expected output to contain '✅ Linting and coverage checks passed', got %q", output)
 		}
 	})
 
@@ -284,8 +284,8 @@ func TestCoverageCheck(t *testing.T) {
 		output := captureOutput(func() {
 			_ = runPreCommitChecks(mock) // ignore error, output is captured for assertions
 		})
-		if !strings.Contains(output, "✅ Coverage thresholds met") {
-			t.Errorf("Expected output to contain '✅ Coverage thresholds met', got %q", output)
+		if !strings.Contains(output, "✅ Linting and coverage checks passed") {
+			t.Errorf("Expected output to contain '✅ Linting and coverage checks passed', got %q", output)
 		}
 	})
 
