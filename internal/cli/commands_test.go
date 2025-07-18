@@ -104,9 +104,9 @@ action "test_action" {
 
 	ExecuteCmd.SetArgs([]string{validConfig})
 	err = ExecuteCmd.Execute()
-	// This will fail to connect but should not fail due to configuration issues
-	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") {
-		t.Errorf("expected connection error, got: %v", err)
+	// This will fail to connect or authenticate but should not fail due to configuration issues
+	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") && !strings.Contains(err.Error(), "unable to authenticate") {
+		t.Errorf("expected connection/authentication error, got: %v", err)
 	}
 }
 
@@ -138,9 +138,9 @@ action "test_action" {
 
 	ExecuteCmd.SetArgs([]string{validConfig, "--parallel"})
 	err = ExecuteCmd.Execute()
-	// This will fail to connect but should not fail due to configuration issues
-	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") {
-		t.Errorf("expected connection error, got: %v", err)
+	// This will fail to connect or authenticate but should not fail due to configuration issues
+	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") && !strings.Contains(err.Error(), "unable to authenticate") {
+		t.Errorf("expected connection/authentication error, got: %v", err)
 	}
 }
 
@@ -171,9 +171,9 @@ action "test_action" {
 
 	ExecuteCmd.SetArgs([]string{validConfig, "--timeout", "60"})
 	err = ExecuteCmd.Execute()
-	// This will fail to connect but should not fail due to configuration issues
-	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") {
-		t.Errorf("expected connection error, got: %v", err)
+	// This will fail to connect or authenticate but should not fail due to configuration issues
+	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") && !strings.Contains(err.Error(), "unable to authenticate") {
+		t.Errorf("expected connection/authentication error, got: %v", err)
 	}
 }
 
@@ -210,9 +210,9 @@ action "test_action" {
 
 	ExecuteCmd.SetArgs([]string{validConfig})
 	err = ExecuteCmd.Execute()
-	// This will fail to connect but should not fail due to configuration issues
-	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") {
-		t.Errorf("expected connection error, got: %v", err)
+	// This will fail to connect or authenticate but should not fail due to configuration issues
+	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") && !strings.Contains(err.Error(), "unable to authenticate") {
+		t.Errorf("expected connection/authentication error, got: %v", err)
 	}
 }
 

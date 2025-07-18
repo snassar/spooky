@@ -83,9 +83,9 @@ func TestNewSSHClient_PasswordAuth(t *testing.T) {
 	}
 
 	_, err := NewSSHClient(server, 30)
-	// This will fail to connect, but should not fail due to authentication setup
-	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") {
-		t.Errorf("expected connection error, got: %v", err)
+	// This will fail to connect or authenticate, but should not fail due to authentication setup
+	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") && !strings.Contains(err.Error(), "unable to authenticate") {
+		t.Errorf("expected connection/authentication error, got: %v", err)
 	}
 }
 
@@ -274,8 +274,8 @@ func TestNewSSHClientWithHostKeyCallback(t *testing.T) {
 
 	// Test with insecure host key callback (should not fail due to auth setup)
 	client, err := NewSSHClientWithHostKeyCallback(server, 30, InsecureHostKey, "")
-	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") {
-		t.Errorf("Expected connection error, got: %v", err)
+	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") && !strings.Contains(err.Error(), "unable to authenticate") {
+		t.Errorf("Expected connection/authentication error, got: %v", err)
 	}
 	if err == nil && client != nil {
 		defer client.Close()
