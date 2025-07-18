@@ -224,6 +224,9 @@ jobs:
         
         # Set proper permissions
         chmod 600 examples/test-environment/ssh-keys/id_ed25519
+        
+        # Verify the key is in the right place
+        ls -la examples/test-environment/ssh-keys/
 
     - name: Build spooky binary
       run: |
