@@ -253,7 +253,7 @@ func TestCoverageGeneration(t *testing.T) {
 			},
 			RunFunc: func(name string, args ...string) error {
 				if name == "go" && args[0] == "test" {
-					return nil
+					return errors.New("test execution failed")
 				}
 				return nil
 			},
