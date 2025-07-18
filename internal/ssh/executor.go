@@ -4,23 +4,32 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"spooky/internal/config"
+	"spooky/internal/logging"
 )
 
 // ExecuteConfig executes all actions in the configuration
 func ExecuteConfig(cfg *config.Config) error {
-	fmt.Printf("🚀 Starting execution of %d actions...\n", len(cfg.Actions))
+	logger := logging.GetLogger()
+
+	logger.Info("Starting configuration execution",
+		logging.Int("action_count", len(cfg.Actions)),
+		logging.Int("server_count", len(cfg.Servers)),
+	)
 
 	// Initialize index cache for enterprise-scale performance
 	indexCache := &config.IndexCache{}
 
 	for i := range cfg.Actions {
 		action := &cfg.Actions[i]
-		fmt.Printf("\n⚡ Executing action: %s\n", action.Name)
-		if action.Description != "" {
-			fmt.Printf("📝 Description: %s\n", action.Description)
-		}
+		startTime := time.Now()
+
+		logger.Info("Executing action",
+			logging.Action(action.Name),
+			logging.String("description", action.Description),
+		)
 
 		// Get target servers for this action using optimized lookup
 		var targetServers []*config.Server
@@ -30,10 +39,16 @@ func ExecuteConfig(cfg *config.Config) error {
 		index := indexCache.GetIndex(cfg)
 		targetServers, err = config.GetServersForActionLarge(cfg, action, index)
 		if err != nil {
+			logger.Error("Failed to get servers for action", err,
+				logging.Action(action.Name),
+			)
 			return fmt.Errorf("failed to get servers for action %s: %w", action.Name, err)
 		}
 
-		fmt.Printf("🌐 Target servers: %d\n", len(targetServers))
+		logger.Info("Action target servers determined",
+			logging.Action(action.Name),
+			logging.Int("target_server_count", len(targetServers)),
+		)
 
 		// Execute on each server
 		if action.Parallel {
@@ -43,31 +58,61 @@ func ExecuteConfig(cfg *config.Config) error {
 		}
 
 		if err != nil {
+			logger.Error("Failed to execute action", err,
+				logging.Action(action.Name),
+				logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+			)
 			return fmt.Errorf("failed to execute action %s: %w", action.Name, err)
 		}
+
+		logger.Info("Action completed successfully",
+			logging.Action(action.Name),
+			logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+		)
 	}
 
-	fmt.Println("\n✅ All actions completed successfully!")
+	logger.Info("All actions completed successfully",
+		logging.Int("total_actions", len(cfg.Actions)),
+	)
 	return nil
 }
 
 // executeActionSequential executes an action sequentially on all target servers
 func executeActionSequential(action *config.Action, servers []*config.Server) error {
+	logger := logging.GetLogger()
+
 	// Validate action before connecting
 	if action.Command != "" && action.Script != "" {
+		logger.Error("Action validation failed", fmt.Errorf("both command and script specified"),
+			logging.Action(action.Name),
+		)
 		return fmt.Errorf("action %s: both command and script specified", action.Name)
 	}
 	if action.Command == "" && action.Script == "" {
+		logger.Error("Action validation failed", fmt.Errorf("neither command nor script specified"),
+			logging.Action(action.Name),
+		)
 		return fmt.Errorf("action %s: neither command nor script specified", action.Name)
 	}
 
 	for _, server := range servers {
-		fmt.Printf("  🔗 Connecting to %s (%s@%s:%d)...\n", server.Name, server.User, server.Host, server.Port)
+		startTime := time.Now()
+
+		logger.Info("Connecting to server",
+			logging.Server(server.Name),
+			logging.Host(server.Host),
+			logging.Port(server.Port),
+			logging.String("user", server.User),
+		)
 
 		// Create SSH client
 		client, err := NewSSHClient(server, 30) // Default timeout
 		if err != nil {
-			fmt.Printf("  ❌ Failed to connect to %s: %v\n", server.Name, err)
+			logger.Error("Failed to connect to server", err,
+				logging.Server(server.Name),
+				logging.Host(server.Host),
+				logging.Port(server.Port),
+			)
 			continue
 		}
 
@@ -81,17 +126,34 @@ func executeActionSequential(action *config.Action, servers []*config.Server) er
 
 		// Close client after execution
 		if closeErr := client.Close(); closeErr != nil {
-			fmt.Printf("  ⚠️  Warning: failed to close connection to %s: %v\n", server.Name, closeErr)
+			logger.Warn("Failed to close SSH connection",
+				logging.Server(server.Name),
+				logging.Error(closeErr),
+			)
 		}
 
 		if err != nil {
-			fmt.Printf("  ❌ Failed to execute action on %s: %v\n", server.Name, err)
+			logger.Error("Failed to execute action on server", err,
+				logging.Server(server.Name),
+				logging.Action(action.Name),
+				logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+			)
 			continue
 		}
 
-		fmt.Printf("  ✅ Success on %s\n", server.Name)
+		logger.Info("Action executed successfully on server",
+			logging.Server(server.Name),
+			logging.Action(action.Name),
+			logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+			logging.String("output_length", fmt.Sprintf("%d chars", len(output))),
+		)
+
 		if output != "" {
-			fmt.Printf("  📄 Output:\n%s\n", indentOutput(output))
+			logger.Debug("Command output",
+				logging.Server(server.Name),
+				logging.Action(action.Name),
+				logging.String("output", output),
+			)
 		}
 	}
 
@@ -100,17 +162,29 @@ func executeActionSequential(action *config.Action, servers []*config.Server) er
 
 // executeActionParallel executes an action in parallel on all target servers
 func executeActionParallel(action *config.Action, servers []*config.Server) error {
+	logger := logging.GetLogger()
+
 	// Validate action before connecting
 	if action.Command != "" && action.Script != "" {
+		logger.Error("Action validation failed", fmt.Errorf("both command and script specified"),
+			logging.Action(action.Name),
+		)
 		return fmt.Errorf("action %s: both command and script specified", action.Name)
 	}
 	if action.Command == "" && action.Script == "" {
+		logger.Error("Action validation failed", fmt.Errorf("neither command nor script specified"),
+			logging.Action(action.Name),
+		)
 		return fmt.Errorf("action %s: neither command nor script specified", action.Name)
 	}
 
 	// Validate script file exists before connecting (for parallel execution)
 	if action.Script != "" {
 		if _, err := os.Stat(action.Script); os.IsNotExist(err) {
+			logger.Error("Script file not found", err,
+				logging.Action(action.Name),
+				logging.String("script_file", action.Script),
+			)
 			return fmt.Errorf("failed to read script file %s: %w", action.Script, err)
 		}
 	}
@@ -123,20 +197,33 @@ func executeActionParallel(action *config.Action, servers []*config.Server) erro
 		wg.Add(1)
 		go func(s *config.Server) {
 			defer wg.Done()
+			startTime := time.Now()
 
-			fmt.Printf("  🔗 Connecting to %s (%s@%s:%d)...\n", s.Name, s.User, s.Host, s.Port)
+			logger.Info("Connecting to server (parallel)",
+				logging.Server(s.Name),
+				logging.Host(s.Host),
+				logging.Port(s.Port),
+				logging.String("user", s.User),
+			)
 
 			// Create SSH client
 			client, err := NewSSHClient(s, 30) // Default timeout
 			if err != nil {
+				logger.Error("Failed to connect to server (parallel)", err,
+					logging.Server(s.Name),
+					logging.Host(s.Host),
+					logging.Port(s.Port),
+				)
 				errors <- fmt.Errorf("failed to connect to %s: %w", s.Name, err)
 				return
 			}
 			// Close client when function returns
 			defer func() {
 				if closeErr := client.Close(); closeErr != nil {
-					// Log close error but don't fail the operation
-					fmt.Printf("  ⚠️  Warning: failed to close connection to %s: %v\n", s.Name, closeErr)
+					logger.Warn("Failed to close SSH connection (parallel)",
+						logging.Server(s.Name),
+						logging.Error(closeErr),
+					)
 				}
 			}()
 
@@ -149,9 +236,21 @@ func executeActionParallel(action *config.Action, servers []*config.Server) erro
 			}
 
 			if err != nil {
+				logger.Error("Failed to execute action on server (parallel)", err,
+					logging.Server(s.Name),
+					logging.Action(action.Name),
+					logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+				)
 				errors <- fmt.Errorf("failed to execute action on %s: %w", s.Name, err)
 				return
 			}
+
+			logger.Info("Action executed successfully on server (parallel)",
+				logging.Server(s.Name),
+				logging.Action(action.Name),
+				logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+				logging.String("output_length", fmt.Sprintf("%d chars", len(output))),
+			)
 
 			results <- fmt.Sprintf("✅ Success on %s\n%s", s.Name, indentOutput(output))
 		}(server)
@@ -164,14 +263,16 @@ func executeActionParallel(action *config.Action, servers []*config.Server) erro
 
 	// Collect results
 	for result := range results {
-		fmt.Println(result)
+		logger.Info("Parallel execution result", logging.String("result", result))
 	}
 
 	// Check for errors
 	select {
 	case err := <-errors:
+		logger.Error("Parallel execution failed", err, logging.Action(action.Name))
 		return err
 	default:
+		logger.Info("Parallel execution completed successfully", logging.Action(action.Name))
 		return nil
 	}
 }

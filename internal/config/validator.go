@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"spooky/internal/logging"
+
 	"github.com/go-playground/validator/v10"
 )
 
@@ -167,13 +169,24 @@ func (v *Validator) validateConfigStruct(sl validator.StructLevel) {
 
 // validateConfig validates the entire configuration
 func (v *Validator) validateConfig(config *Config) error {
+	logger := logging.GetLogger()
+
 	// Set defaults before validation
 	SetDefaults(config)
 
 	// Perform validation
 	if err := v.validate.Struct(config); err != nil {
+		logger.Error("Configuration validation failed", err,
+			logging.Int("server_count", len(config.Servers)),
+			logging.Int("action_count", len(config.Actions)),
+		)
 		return v.formatValidationErrors(err)
 	}
+
+	logger.Info("Configuration validation successful",
+		logging.Int("server_count", len(config.Servers)),
+		logging.Int("action_count", len(config.Actions)),
+	)
 
 	return nil
 }
@@ -238,18 +251,46 @@ func (v *Validator) formatMinValidation(e validator.FieldError) string {
 	return fmt.Sprintf("%s must be at least %s characters long", e.Field(), e.Param())
 }
 
-// ValidateServer validates a single server
+// ValidateServer validates a single server configuration
 func (v *Validator) ValidateServer(server *Server) error {
+	logger := logging.GetLogger()
+
 	if err := v.validate.Struct(server); err != nil {
+		logger.Error("Server validation failed", err,
+			logging.Server(server.Name),
+			logging.Host(server.Host),
+			logging.Port(server.Port),
+		)
 		return v.formatValidationErrors(err)
 	}
+
+	logger.Info("Server validation successful",
+		logging.Server(server.Name),
+		logging.Host(server.Host),
+		logging.Port(server.Port),
+	)
+
 	return nil
 }
 
-// ValidateAction validates a single action
+// ValidateAction validates a single action configuration
 func (v *Validator) ValidateAction(action *Action) error {
+	logger := logging.GetLogger()
+
 	if err := v.validate.Struct(action); err != nil {
+		logger.Error("Action validation failed", err,
+			logging.Action(action.Name),
+			logging.String("description", action.Description),
+		)
 		return v.formatValidationErrors(err)
 	}
+
+	logger.Info("Action validation successful",
+		logging.Action(action.Name),
+		logging.String("description", action.Description),
+		logging.Bool("parallel", action.Parallel),
+		logging.Int("timeout", action.Timeout),
+	)
+
 	return nil
 }

@@ -5,11 +5,18 @@ import (
 	"os"
 
 	"spooky/internal/cli"
+	"spooky/internal/logging"
 
 	"github.com/spf13/cobra"
 )
 
 func main() {
+	logger := logging.GetLogger()
+
+	logger.Info("Starting spooky application",
+		logging.String("version", "1.0.0"), // TODO: Add version from build info
+	)
+
 	// coverage-ignore: main function is entry point, tested via integration tests
 	var rootCmd = &cobra.Command{
 		Use:   "spooky",
@@ -30,7 +37,10 @@ func main() {
 	rootCmd.AddCommand(cli.ListCmd)
 
 	if err := rootCmd.Execute(); err != nil {
+		logger.Error("Application execution failed", err)
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+
+	logger.Info("Application completed successfully")
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"spooky/internal/config"
+	"spooky/internal/logging"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
@@ -66,34 +67,68 @@ func NewSSHClient(server *config.Server, timeout int) (*SSHClient, error) {
 
 // NewSSHClientWithHostKeyCallback creates a new SSH client with custom host key verification
 func NewSSHClientWithHostKeyCallback(server *config.Server, timeout int, hostKeyType HostKeyCallbackType, knownHostsPath string) (*SSHClient, error) {
+	logger := logging.GetLogger()
+
+	logger.Info("Creating SSH client",
+		logging.Server(server.Name),
+		logging.Host(server.Host),
+		logging.Port(server.Port),
+		logging.String("user", server.User),
+		logging.Int("timeout_seconds", timeout),
+		logging.String("host_key_type", string(hostKeyType)),
+	)
+
 	var authMethods []ssh.AuthMethod
 
 	// Add password authentication if provided
 	if server.Password != "" {
+		logger.Debug("Adding password authentication",
+			logging.Server(server.Name),
+		)
 		authMethods = append(authMethods, ssh.Password(server.Password))
 	}
 
 	// Add key-based authentication if provided
 	if server.KeyFile != "" {
+		logger.Debug("Adding key-based authentication",
+			logging.Server(server.Name),
+			logging.String("key_file", server.KeyFile),
+		)
+
 		key, err := os.ReadFile(server.KeyFile)
 		if err != nil {
+			logger.Error("Failed to read SSH key file", err,
+				logging.Server(server.Name),
+				logging.String("key_file", server.KeyFile),
+			)
 			return nil, fmt.Errorf("failed to read key file %s: %w", server.KeyFile, err)
 		}
 
 		signer, err := ssh.ParsePrivateKey(key)
 		if err != nil {
+			logger.Error("Failed to parse SSH private key", err,
+				logging.Server(server.Name),
+				logging.String("key_file", server.KeyFile),
+			)
 			return nil, fmt.Errorf("failed to parse private key: %w", err)
 		}
 		authMethods = append(authMethods, ssh.PublicKeys(signer))
 	}
 
 	if len(authMethods) == 0 {
+		logger.Error("No authentication method available", fmt.Errorf("no auth methods"),
+			logging.Server(server.Name),
+		)
 		return nil, fmt.Errorf("no authentication method available for server %s", server.Name)
 	}
 
 	// Get host key callback
 	hostKeyCallback, err := getHostKeyCallback(hostKeyType, knownHostsPath)
 	if err != nil {
+		logger.Error("Failed to create host key callback", err,
+			logging.Server(server.Name),
+			logging.String("host_key_type", string(hostKeyType)),
+		)
 		return nil, fmt.Errorf("failed to create host key callback: %w", err)
 	}
 
@@ -106,10 +141,27 @@ func NewSSHClientWithHostKeyCallback(server *config.Server, timeout int, hostKey
 	}
 
 	// Connect to the server
+	startTime := time.Now()
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", server.Host, server.Port), sshConfig)
 	if err != nil {
+		logger.Error("Failed to establish SSH connection", err,
+			logging.Server(server.Name),
+			logging.Host(server.Host),
+			logging.Port(server.Port),
+			logging.String("user", server.User),
+			logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+		)
 		return nil, fmt.Errorf("failed to connect to %s@%s:%d: %w", server.User, server.Host, server.Port, err)
 	}
+
+	logger.Info("SSH connection established successfully",
+		logging.Server(server.Name),
+		logging.Host(server.Host),
+		logging.Port(server.Port),
+		logging.String("user", server.User),
+		logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+		logging.Int("auth_methods", len(authMethods)),
+	)
 
 	return &SSHClient{
 		Client: client,
@@ -127,11 +179,25 @@ func (s *SSHClient) Close() error {
 
 // ExecuteCommand executes a command on the remote server
 func (s *SSHClient) ExecuteCommand(command string) (string, error) {
+	logger := logging.GetLogger()
+
 	if s.Client == nil {
+		logger.Error("No SSH connection available", fmt.Errorf("client is nil"),
+			logging.Server(s.Server.Name),
+		)
 		return "", fmt.Errorf("failed to create session: no SSH connection exists (Client is nil)")
 	}
+
+	logger.Debug("Creating SSH session",
+		logging.Server(s.Server.Name),
+		logging.String("command_length", fmt.Sprintf("%d chars", len(command))),
+	)
+
 	session, err := s.Client.NewSession()
 	if err != nil {
+		logger.Error("Failed to create SSH session", err,
+			logging.Server(s.Server.Name),
+		)
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
 	defer session.Close()
@@ -142,21 +208,53 @@ func (s *SSHClient) ExecuteCommand(command string) (string, error) {
 	session.Stderr = &stderr
 
 	// Execute the command
+	startTime := time.Now()
 	err = session.Run(command)
 	if err != nil {
+		logger.Error("Command execution failed", err,
+			logging.Server(s.Server.Name),
+			logging.String("command_length", fmt.Sprintf("%d chars", len(command))),
+			logging.String("stderr", stderr.String()),
+			logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+		)
 		return "", fmt.Errorf("command execution failed: %s, stderr: %s", err, stderr.String())
 	}
 
-	return stdout.String(), nil
+	output := stdout.String()
+	logger.Debug("Command executed successfully",
+		logging.Server(s.Server.Name),
+		logging.String("command_length", fmt.Sprintf("%d chars", len(command))),
+		logging.String("output_length", fmt.Sprintf("%d chars", len(output))),
+		logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+	)
+
+	return output, nil
 }
 
 // ExecuteScript executes a script file on the remote server
 func (s *SSHClient) ExecuteScript(scriptPath string) (string, error) {
+	logger := logging.GetLogger()
+
+	logger.Info("Loading script file",
+		logging.Server(s.Server.Name),
+		logging.String("script_path", scriptPath),
+	)
+
 	// Read the script file
 	scriptContent, err := os.ReadFile(scriptPath)
 	if err != nil {
+		logger.Error("Failed to read script file", err,
+			logging.Server(s.Server.Name),
+			logging.String("script_path", scriptPath),
+		)
 		return "", fmt.Errorf("failed to read script file %s: %w", scriptPath, err)
 	}
+
+	logger.Debug("Script file loaded successfully",
+		logging.Server(s.Server.Name),
+		logging.String("script_path", scriptPath),
+		logging.String("script_size", fmt.Sprintf("%d bytes", len(scriptContent))),
+	)
 
 	// Execute the script content
 	return s.ExecuteCommand(string(scriptContent))

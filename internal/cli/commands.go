@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"spooky/internal/config"
+	"spooky/internal/logging"
 	"spooky/internal/ssh"
 )
 
@@ -22,6 +23,8 @@ var ExecuteCmd = &cobra.Command{
 	Long:  `Execute actions defined in an HCL2 configuration file on remote servers via SSH`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
+		logger := logging.GetLogger()
+
 		if len(args) > 0 {
 			configFile = args[0]
 		}
@@ -32,14 +35,24 @@ var ExecuteCmd = &cobra.Command{
 
 		// Validate config file exists
 		if _, err := os.Stat(configFile); os.IsNotExist(err) {
+			logger.Error("Config file not found", err, logging.String("config_file", configFile))
 			return fmt.Errorf("config file %s does not exist", configFile) // coverage-ignore: file system error, hard to test
 		}
 
 		// Parse and execute configuration
 		config, err := config.ParseConfig(configFile)
 		if err != nil {
+			logger.Error("Failed to parse configuration", err, logging.String("config_file", configFile))
 			return fmt.Errorf("failed to parse config: %w", err)
 		}
+
+		logger.Info("Starting configuration execution",
+			logging.String("config_file", configFile),
+			logging.Int("action_count", len(config.Actions)),
+			logging.Int("server_count", len(config.Servers)),
+			logging.Bool("parallel", parallel),
+			logging.Int("timeout", timeout),
+		)
 
 		return ssh.ExecuteConfig(config)
 	},
@@ -51,6 +64,8 @@ var ValidateCmd = &cobra.Command{
 	Long:  `Validate the syntax and structure of an HCL2 configuration file`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
+		logger := logging.GetLogger()
+
 		if len(args) > 0 {
 			configFile = args[0]
 		}
@@ -61,17 +76,22 @@ var ValidateCmd = &cobra.Command{
 
 		// Validate config file exists
 		if _, err := os.Stat(configFile); os.IsNotExist(err) {
+			logger.Error("Config file not found", err, logging.String("config_file", configFile))
 			return fmt.Errorf("config file %s does not exist", configFile)
 		}
 
 		// Parse configuration
 		config, err := config.ParseConfig(configFile)
 		if err != nil {
+			logger.Error("Configuration validation failed", err, logging.String("config_file", configFile))
 			return fmt.Errorf("validation failed: %w", err)
 		}
 
-		fmt.Printf("✅ Configuration file '%s' is valid\n", configFile)
-		fmt.Printf("📊 Found %d servers and %d actions\n", len(config.Servers), len(config.Actions))
+		logger.Info("Configuration file validated successfully",
+			logging.String("config_file", configFile),
+			logging.Int("server_count", len(config.Servers)),
+			logging.Int("action_count", len(config.Actions)),
+		)
 
 		return nil
 	},
@@ -83,6 +103,8 @@ var ListCmd = &cobra.Command{
 	Long:  `Display all servers and actions defined in an HCL2 configuration file`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
+		logger := logging.GetLogger()
+
 		if len(args) > 0 {
 			configFile = args[0]
 		}
@@ -93,25 +115,45 @@ var ListCmd = &cobra.Command{
 
 		// Validate config file exists
 		if _, err := os.Stat(configFile); os.IsNotExist(err) {
+			logger.Error("Config file not found", err, logging.String("config_file", configFile))
 			return fmt.Errorf("config file %s does not exist", configFile)
 		}
 
 		// Parse configuration
 		config, err := config.ParseConfig(configFile)
 		if err != nil {
+			logger.Error("Failed to parse configuration", err, logging.String("config_file", configFile))
 			return fmt.Errorf("failed to parse config: %w", err)
 		}
 
-		// Display servers
-		fmt.Println("🌐 Servers:")
+		// Log servers
+		logger.Info("Configuration servers listed",
+			logging.String("config_file", configFile),
+			logging.Int("server_count", len(config.Servers)),
+		)
+
 		for _, server := range config.Servers {
-			fmt.Printf("  - %s (%s@%s:%d)\n", server.Name, server.User, server.Host, server.Port)
+			logger.Info("Server details",
+				logging.Server(server.Name),
+				logging.Host(server.Host),
+				logging.Port(server.Port),
+				logging.String("user", server.User),
+			)
 		}
 
-		// Display actions
-		fmt.Println("\n⚡ Actions:")
+		// Log actions
+		logger.Info("Configuration actions listed",
+			logging.String("config_file", configFile),
+			logging.Int("action_count", len(config.Actions)),
+		)
+
 		for _, action := range config.Actions {
-			fmt.Printf("  - %s: %s\n", action.Name, action.Description)
+			logger.Info("Action details",
+				logging.Action(action.Name),
+				logging.String("description", action.Description),
+				logging.Bool("parallel", action.Parallel),
+				logging.Int("timeout", action.Timeout),
+			)
 		}
 
 		return nil

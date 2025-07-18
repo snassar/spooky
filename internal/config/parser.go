@@ -1,8 +1,11 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
+
+	"spooky/internal/logging"
 
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclparse"
@@ -34,20 +37,40 @@ func resolveActionPaths(configFile string, action *Action) {
 
 // ParseConfig parses an HCL2 configuration file
 func ParseConfig(filename string) (*Config, error) {
+	logger := logging.GetLogger()
+
+	logger.Info("Parsing configuration file",
+		logging.String("config_file", filename),
+	)
+
 	parser := hclparse.NewParser()
 
 	// Read the file
 	file, diags := parser.ParseHCLFile(filename)
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to parse HCL file: %s", diags.Error())
+		diagError := diags.Error()
+		logger.Error("Failed to parse HCL file", errors.New(diagError),
+			logging.String("config_file", filename),
+		)
+		return nil, errors.New("failed to parse HCL file: " + diagError)
 	}
 
 	// Decode the configuration
 	var config Config
 	diags = gohcl.DecodeBody(file.Body, nil, &config)
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to decode configuration: %s", diags.Error())
+		diagError := diags.Error()
+		logger.Error("Failed to decode configuration", errors.New(diagError),
+			logging.String("config_file", filename),
+		)
+		return nil, errors.New("failed to decode configuration: " + diagError)
 	}
+
+	logger.Debug("Configuration decoded successfully",
+		logging.String("config_file", filename),
+		logging.Int("server_count", len(config.Servers)),
+		logging.Int("action_count", len(config.Actions)),
+	)
 
 	// Resolve relative paths in server configurations
 	for i := range config.Servers {
@@ -59,13 +82,26 @@ func ParseConfig(filename string) (*Config, error) {
 		resolveActionPaths(filename, &config.Actions[i])
 	}
 
+	logger.Debug("Relative paths resolved",
+		logging.String("config_file", filename),
+	)
+
 	// Set default values
 	SetDefaults(&config)
 
 	// Validate configuration
 	if err := ValidateConfig(&config); err != nil {
+		logger.Error("Configuration validation failed", err,
+			logging.String("config_file", filename),
+		)
 		return nil, fmt.Errorf("configuration validation failed: %w", err)
 	}
+
+	logger.Info("Configuration parsed and validated successfully",
+		logging.String("config_file", filename),
+		logging.Int("server_count", len(config.Servers)),
+		logging.Int("action_count", len(config.Actions)),
+	)
 
 	return &config, nil
 }
