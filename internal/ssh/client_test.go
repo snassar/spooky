@@ -212,7 +212,8 @@ func TestGetHostKeyCallback(t *testing.T) {
 			name:           "known hosts with default path",
 			callbackType:   KnownHostsHostKey,
 			knownHostsPath: "",
-			expectError:    false, // May succeed if ~/.ssh/known_hosts exists
+			expectError:    true, // Will fail if ~/.ssh/known_hosts doesn't exist or is empty
+			errorContains:  "failed to parse known_hosts file",
 		},
 		{
 			name:           "known hosts with custom path",
