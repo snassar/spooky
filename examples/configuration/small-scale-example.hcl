@@ -588,7 +588,7 @@ action "check-nginx" {
 action "full-system-check" {
   description = "Comprehensive system check"
   command     = "uptime && df -h && free -h && systemctl --failed --no-pager"
-  servers     = ["machine-550e8400e29b41d4", "vm-550e8400e29b41da", "vm-550e8400e29b41e6"]
+  servers     = ["machine-fe8d67b1073acad1", "vm-e5994bec43a922bd", "vm-9a5601746ea4abd3"]
   parallel    = true
   timeout     = 300
 }
