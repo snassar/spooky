@@ -25,35 +25,17 @@ jobs:
         go test ./... -v -race -coverprofile=coverage.out
 
     - name: Check if coverage file exists
-      id: coverage-check
       if: always()
       run: |
         if [ -f "coverage.out" ]; then
           echo "Coverage file exists, size: $(wc -c < coverage.out) bytes"
-          echo "has-coverage=true" >> $GITHUB_OUTPUT
+          echo "Coverage report:"
+          go tool cover -func=coverage.out | tail -1
         else
           echo "No coverage file generated"
-          echo "has-coverage=false" >> $GITHUB_OUTPUT
         fi
 
-    - name: Upload coverage to Codecov
-      if: always() && steps.coverage-check.outputs.has-coverage == 'true'
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.out
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
-
-    - name: Build binary
+    - name: Verify build works
       run: |
-        mkdir -p build
-        go build -o build/spooky main.go
-        ls -la build/
-
-    - name: Upload binary artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: spooky-binary
-        path: build/spooky
-        retention-days: 1 
+        go build -o /tmp/spooky-test main.go
+        echo "Build verification successful" 
