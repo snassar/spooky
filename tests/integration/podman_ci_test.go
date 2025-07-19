@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,6 +30,15 @@ func TestPodmanCIIntegration(t *testing.T) {
 		t.Fatal("Missing required environment variables for SSH connection")
 	}
 
+	// Expand ~ in SSH key path if present
+	if strings.HasPrefix(sshKey, "~") {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			t.Fatalf("Failed to get home directory: %v", err)
+		}
+		sshKey = strings.Replace(sshKey, "~", homeDir, 1)
+	}
+
 	// Parse port number
 	sshPort, err := strconv.Atoi(sshPortStr)
 	if err != nil {
@@ -39,6 +49,12 @@ func TestPodmanCIIntegration(t *testing.T) {
 
 	// Test 1: Basic SSH connection
 	t.Run("SSH Connection", func(t *testing.T) {
+		// Debug: Check if SSH key file exists
+		if _, err := os.Stat(sshKey); os.IsNotExist(err) {
+			t.Fatalf("SSH key file does not exist: %s", sshKey)
+		}
+		t.Logf("SSH key file exists: %s", sshKey)
+
 		// Create a simple server config for testing
 		server := config.Server{
 			Name:     "test-server",
@@ -48,6 +64,8 @@ func TestPodmanCIIntegration(t *testing.T) {
 			KeyFile:  sshKey,
 			Password: "", // Use key authentication
 		}
+
+		t.Logf("Attempting SSH connection to %s@%s:%d with key %s", server.User, server.Host, server.Port, server.KeyFile)
 
 		// Test SSH client creation
 		client, err := ssh.NewSSHClient(&server, 30)
@@ -261,8 +279,8 @@ action "test-action" {
 			t.Fatalf("Failed to write config file: %v", err)
 		}
 
-		// Test validate command
-		cmd := exec.Command("go", "run", ".", "validate", configFile)
+		// Test validate command using built binary
+		cmd := exec.Command("./build/spooky", "validate", configFile)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("Validate command failed: %v\nOutput: %s", err, output)
@@ -270,8 +288,8 @@ action "test-action" {
 
 		t.Logf("Validate command passed: %s", output)
 
-		// Test list command
-		cmd = exec.Command("go", "run", ".", "list", configFile)
+		// Test list command using built binary
+		cmd = exec.Command("./build/spooky", "list", configFile)
 		output, err = cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("List command failed: %v\nOutput: %s", err, output)
