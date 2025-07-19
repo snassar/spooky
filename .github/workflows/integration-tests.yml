@@ -364,29 +364,18 @@ jobs:
         }
         EOF
 
-    - name: Download built binary from unit tests
-      if: github.event_name != 'workflow_dispatch'
-      uses: actions/download-artifact@v4
+    - name: Set up Go
+      uses: actions/setup-go@v4
       with:
-        name: spooky-binary
-        path: build/
-      
-    - name: Build binary locally (manual trigger)
-      if: github.event_name == 'workflow_dispatch'
+        go-version: '1.24'
+        cache: true
+
+    - name: Build binary
       run: |
         mkdir -p build
         go build -o build/spooky main.go
         chmod +x build/spooky
-      
-    - name: Verify binary exists
-      run: |
         ls -la build/
-        if [ ! -f "./build/spooky" ]; then
-          echo "Spooky binary not found, building locally..."
-          mkdir -p build
-          go build -o build/spooky main.go
-        fi
-        chmod +x build/spooky
 
     - name: Run integration tests
       run: |
