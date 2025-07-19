@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -20,15 +21,21 @@ func TestPodmanCIIntegration(t *testing.T) {
 
 	// Get environment variables
 	sshHost := os.Getenv("SPOOKY_TEST_SSH_HOST")
-	sshPort := os.Getenv("SPOOKY_TEST_SSH_PORT")
+	sshPortStr := os.Getenv("SPOOKY_TEST_SSH_PORT")
 	sshUser := os.Getenv("SPOOKY_TEST_SSH_USER")
 	sshKey := os.Getenv("SPOOKY_TEST_SSH_KEY")
 
-	if sshHost == "" || sshPort == "" || sshUser == "" || sshKey == "" {
+	if sshHost == "" || sshPortStr == "" || sshUser == "" || sshKey == "" {
 		t.Fatal("Missing required environment variables for SSH connection")
 	}
 
-	t.Logf("Testing SSH connection to %s@%s:%s using key %s", sshUser, sshHost, sshPort, sshKey)
+	// Parse port number
+	sshPort, err := strconv.Atoi(sshPortStr)
+	if err != nil {
+		t.Fatalf("Invalid SSH port number: %s", sshPortStr)
+	}
+
+	t.Logf("Testing SSH connection to %s@%s:%d using key %s", sshUser, sshHost, sshPort, sshKey)
 
 	// Test 1: Basic SSH connection
 	t.Run("SSH Connection", func(t *testing.T) {
@@ -36,7 +43,7 @@ func TestPodmanCIIntegration(t *testing.T) {
 		server := config.Server{
 			Name:     "test-server",
 			Host:     sshHost,
-			Port:     22, // Default SSH port
+			Port:     sshPort, // Use port from environment variable
 			User:     sshUser,
 			KeyFile:  sshKey,
 			Password: "", // Use key authentication
@@ -69,7 +76,7 @@ func TestPodmanCIIntegration(t *testing.T) {
 		configContent := fmt.Sprintf(`
 server "test-server" {
   host = "%s"
-  port = 22
+  port = %d
   user = "%s"
   key_file = "%s"
   host_key_type = "insecure"
@@ -82,7 +89,7 @@ action "test-action" {
   parallel = false
   timeout = 30
 }
-`, sshHost, sshUser, sshKey)
+`, sshHost, sshPort, sshUser, sshKey)
 
 		// Write config to temporary file
 		tmpDir := t.TempDir()
@@ -127,7 +134,7 @@ echo "Script execution test completed"
 		server := config.Server{
 			Name:     "test-server",
 			Host:     sshHost,
-			Port:     22,
+			Port:     sshPort,
 			User:     sshUser,
 			KeyFile:  sshKey,
 			Password: "",
@@ -160,7 +167,7 @@ echo "Script execution test completed"
 		configContent := fmt.Sprintf(`
 server "test-server" {
   host = "%s"
-  port = 22
+  port = %d
   user = "%s"
   key_file = "%s"
   host_key_type = "insecure"
@@ -173,7 +180,7 @@ action "parallel-test" {
   parallel = true
   timeout = 30
 }
-`, sshHost, sshUser, sshKey)
+`, sshHost, sshPort, sshUser, sshKey)
 
 		// Write config to temporary file
 		tmpDir := t.TempDir()
@@ -210,7 +217,7 @@ action "parallel-test" {
 		server := config.Server{
 			Name:     "test-server",
 			Host:     sshHost,
-			Port:     22,
+			Port:     sshPort,
 			User:     sshUser,
 			KeyFile:  sshKey,
 			Password: "",
@@ -240,7 +247,7 @@ action "parallel-test" {
 		configContent := fmt.Sprintf(`
 server "test-server" {
   host = "%s"
-  port = 22
+  port = %d
   user = "%s"
   key_file = "%s"
   host_key_type = "insecure"
@@ -251,7 +258,7 @@ action "test-action" {
   command = "echo 'test'"
   servers = ["test-server"]
 }
-`, sshHost, sshUser, sshKey)
+`, sshHost, sshPort, sshUser, sshKey)
 
 		if err := os.WriteFile(configFile, []byte(configContent), 0o600); err != nil {
 			t.Fatalf("Failed to write config file: %v", err)
