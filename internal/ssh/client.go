@@ -45,6 +45,10 @@ func getHostKeyCallback(callbackType HostKeyCallbackType, knownHostsPath string)
 			}
 			path = strings.Replace(path, "~", homeDir, 1)
 		}
+		// Check if the known_hosts file exists
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to parse known_hosts file at %s: file does not exist", path)
+		}
 		// Use golang.org/x/crypto/ssh/knownhosts for host key verification
 		hostKeyCallback, err := knownhosts.New(path)
 		if err != nil {
