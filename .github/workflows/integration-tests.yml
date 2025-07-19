@@ -7,7 +7,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  integration-tests:
+  run-integration-tests:
+    name: Run Integration Tests
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     
@@ -21,29 +22,22 @@ jobs:
         go-version: '1.24'
         cache: true
 
-    - name: Install Podman
+    - name: Enable user namespaces
       run: |
-        # Install Podman
-        sudo apt-get update
-        sudo apt-get install -y podman
-        
-        # Verify installation
-        podman --version
-
-    - name: Configure Podman for rootless operation
-      run: |
-        # Enable user namespaces
         echo 'kernel.unprivileged_userns_clone=1' | sudo tee -a /etc/sysctl.conf
         sudo sysctl -p
-        
-        # Configure subuid/subgid for the runner user
+
+    - name: Configure subuid/subgid for runner user
+      run: |
         sudo usermod --add-subuids 100000-165535 $USER
         sudo usermod --add-subgids 100000-165535 $USER
-        
-        # Create podman configuration directory
+
+    - name: Create Podman configuration directory
+      run: |
         mkdir -p ~/.config/containers
-        
-        # Configure podman for rootless operation
+
+    - name: Create Podman containers.conf
+      run: |
         cat > ~/.config/containers/containers.conf << EOF
         [engine]
         active_service = "podman"
@@ -59,26 +53,26 @@ jobs:
         uri = "unix:///run/user/\${UID}/podman/podman.sock"
         EOF
 
+    - name: Install Podman
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y podman
+
+    - name: Verify Podman installation
+      run: |
+        podman --version
+
     - name: Generate SSH key pair
       run: |
-        # Generate SSH key without passphrase
         ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N "" -C "github-actions@spooky"
-        
-        # Set proper permissions
+
+    - name: Set SSH key permissions
+      run: |
         chmod 600 ~/.ssh/id_ed25519
         chmod 644 ~/.ssh/id_ed25519.pub
-        
-        # Add to SSH agent
-        eval $(ssh-agent -s)
-        ssh-add ~/.ssh/id_ed25519
-        
-        # Display public key for debugging
-        echo "Generated SSH public key:"
-        cat ~/.ssh/id_ed25519.pub
 
-    - name: Create SSH-enabled Debian container
+    - name: Create Dockerfile for SSH container
       run: |
-        # Create a Dockerfile for SSH-enabled Debian
         cat > Dockerfile.ssh << 'EOF'
         FROM debian:12-slim
         
@@ -86,9 +80,6 @@ jobs:
         RUN apt-get update && apt-get install -y \
             openssh-server \
             sudo \
-            curl \
-            wget \
-            vim \
             && rm -rf /var/lib/apt/lists/*
         
         # Create SSH directory
@@ -121,199 +112,50 @@ jobs:
         # Start SSH daemon
         CMD ["/usr/sbin/sshd", "-D"]
         EOF
-        
-        # Copy SSH public key to build context
+
+    - name: Copy SSH public key to build context
+      run: |
         cp ~/.ssh/id_ed25519.pub .
-        
-        # Build the SSH-enabled image
+
+    - name: Build SSH container image
+      run: |
         podman build -f Dockerfile.ssh -t spooky-test-ssh .
-        
-        # Verify image was created
-        podman images
 
-    - name: Pre-flight environment check
+    - name: Start SSH containers
       run: |
-        echo "=== Pre-flight Environment Check ==="
+        # Start 7 SSH containers on different ports
+        for i in {1..7}; do
+          port=$((2220 + $i))
+          container_name="spooky-test-server-$i"
+          
+          echo "Starting container $i on port $port..."
+          podman run -d \
+            --name "$container_name" \
+            -p "$port:22" \
+            spooky-test-ssh
+        done
         
-        # Check Podman installation
-        echo "Podman version:"
-        podman --version
-        
-        # Check if ports are already in use
-        echo "Checking if required ports are available..."
-        if netstat -tlnp 2>/dev/null | grep -q ":2221"; then
-          echo "✗ Port 2221 is already in use:"
-          netstat -tlnp 2>/dev/null | grep ":2221"
-          echo "Stopping any existing containers..."
-          podman stop spooky-test-server 2>/dev/null || true
-          podman rm spooky-test-server 2>/dev/null || true
-          sleep 2
-        else
-          echo "✓ Port 2221 is available"
-        fi
-        
-        # Check SSH key exists
-        if [ ! -f ~/.ssh/id_ed25519 ]; then
-          echo "✗ SSH private key not found"
-          exit 1
-        else
-          echo "✓ SSH private key exists"
-        fi
-        
-        if [ ! -f ~/.ssh/id_ed25519.pub ]; then
-          echo "✗ SSH public key not found"
-          exit 1
-        else
-          echo "✓ SSH public key exists"
-        fi
-        
-        # Check SSH key permissions
-        if [ "$(stat -c %a ~/.ssh/id_ed25519)" != "600" ]; then
-          echo "✗ SSH private key has wrong permissions: $(stat -c %a ~/.ssh/id_ed25519)"
-          exit 1
-        else
-          echo "✓ SSH private key has correct permissions"
-        fi
-        
-        # Check available disk space
-        echo "Available disk space:"
-        df -h .
-        
-        # Check available memory
-        echo "Available memory:"
-        free -h
-        
-        echo "=== Pre-flight Check Complete ==="
-
-    - name: Start SSH container
-      run: |
-        # Start the SSH container on port 2221 (matching test config)
-        podman run -d \
-          --name spooky-test-server \
-          -p 2221:22 \
-          spooky-test-ssh
-        
-        echo "Container started, beginning health checks..."
-        
-        # Wait for container to be ready and check health
-        echo "Waiting for container to be ready..."
+        # Wait for all containers to be ready
+        echo "Waiting for all containers to be ready..."
         for i in {1..30}; do
-          if podman ps --filter name=spooky-test-server --format "{{.Status}}" | grep -q "Up"; then
-            echo "Container is running (attempt $i/30)"
+          running_count=$(podman ps --filter name=spooky-test-server --format "{{.Status}}" | grep -c "Up" || echo "0")
+          if [ "$running_count" -eq 7 ]; then
+            echo "All 7 containers are running (attempt $i/30)"
             break
           fi
-          echo "Waiting for container to start... (attempt $i/30)"
+          echo "Waiting for containers to start... ($running_count/7 running, attempt $i/30)"
           sleep 2
         done
-        
-        # Verify container is running
-        echo "=== Container Status ==="
-        podman ps --filter name=spooky-test-server
-        
-        # Check container health
-        echo "=== Container Health Check ==="
-        CONTAINER_HEALTH=$(podman inspect spooky-test-server --format='{{.State.Health.Status}}' 2>/dev/null || echo "no-health-check")
-        echo "Container health status: $CONTAINER_HEALTH"
-        
-        # Get container IP
-        CONTAINER_IP=$(podman inspect spooky-test-server --format='{{.NetworkSettings.IPAddress}}')
-        echo "Container IP: $CONTAINER_IP"
-        
-        # Check if SSH port is listening
-        echo "=== Port Availability Check ==="
-        if netstat -tlnp 2>/dev/null | grep -q ":2221"; then
-          echo "✓ Port 2221 is listening"
-        else
-          echo "✗ Port 2221 is not listening"
-          echo "Checking what's listening on port 2221:"
-          netstat -tlnp 2>/dev/null | grep ":2221" || echo "Nothing found"
-        fi
-        
-        # Check SSH daemon is running inside container
-        echo "=== SSH Daemon Check ==="
-        if podman exec spooky-test-server ps aux | grep -q "sshd"; then
-          echo "✓ SSH daemon is running inside container"
-        else
-          echo "✗ SSH daemon not found in container"
-          echo "Processes in container:"
-          podman exec spooky-test-server ps aux
-        fi
-        
-        # Check SSH configuration
-        echo "=== SSH Configuration Check ==="
-        echo "SSH config file contents:"
-        podman exec spooky-test-server cat /etc/ssh/sshd_config | grep -E "(Port|PermitRootLogin|PubkeyAuthentication|PasswordAuthentication|AuthorizedKeysFile)" || echo "Could not read SSH config"
-        
-        # Check authorized_keys
-        echo "=== SSH Key Check ==="
-        echo "Authorized keys in container:"
-        podman exec spooky-test-server cat /home/testuser/.ssh/authorized_keys || echo "Could not read authorized_keys"
-        
-        echo "Local SSH key (first few lines):"
-        head -5 ~/.ssh/id_ed25519.pub
-        
-        # Test SSH connection with retry logic
-        echo "=== SSH Connection Test ==="
-        SSH_SUCCESS=false
-        for attempt in {1..5}; do
-          echo "SSH connection attempt $attempt/5..."
-          if ssh -v -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes -p 2221 testuser@localhost "echo 'SSH connection successful - attempt $attempt'" 2>&1; then
-            echo "✓ SSH connection successful on attempt $attempt"
-            SSH_SUCCESS=true
-            break
-          else
-            echo "✗ SSH connection failed on attempt $attempt"
-            if [ $attempt -lt 5 ]; then
-              echo "Waiting 5 seconds before retry..."
-              sleep 5
-            fi
-          fi
-        done
-        
-        # If SSH failed, provide detailed diagnostics
-        if [ "$SSH_SUCCESS" = false ]; then
-          echo "=== SSH Connection Failed - Detailed Diagnostics ==="
-          echo "Container logs:"
-          podman logs spooky-test-server
-          
-          echo "SSH daemon status in container:"
-          podman exec spooky-test-server ps aux | grep sshd || echo "No SSH daemon found"
-          
-          echo "SSH daemon logs in container:"
-          podman exec spooky-test-server journalctl -u ssh 2>/dev/null || echo "No SSH service logs found"
-          
-          echo "Network connectivity test:"
-          podman exec spooky-test-server netstat -tlnp | grep :22 || echo "No SSH port found listening"
-          
-          echo "SSH key permissions in container:"
-          podman exec spooky-test-server ls -la /home/testuser/.ssh/ || echo "Could not check SSH directory"
-          
-          echo "Local SSH key permissions:"
-          ls -la ~/.ssh/id_ed25519*
-          
-          exit 1
-        fi
-        
-        # Additional connectivity tests
-        echo "=== Additional Connectivity Tests ==="
-        echo "Testing basic commands via SSH:"
-        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2221 testuser@localhost "whoami && hostname && pwd" || echo "Basic command test failed"
-        
-        # Store container info for tests
-        echo "CONTAINER_IP=$CONTAINER_IP" >> $GITHUB_ENV
-        echo "SSH_PORT=2221" >> $GITHUB_ENV
-        
-        echo "=== Container Setup Complete ==="
 
     - name: Update test configuration
       run: |
-        # Create updated test configuration with correct user and key path
+        # Create test configuration with all 7 servers
         cat > examples/test-environment/test-config.hcl << EOF
         # Test configuration for spooky SSH automation tool
-        # Points to the test environment SSH server
+        # Points to 7 test environment SSH servers
 
-        # Define test server
-        server "spooky-test-server" {
+        # Define test servers (7 containers)
+        server "spooky-test-server-1" {
           host     = "localhost"
           port     = 2221
           user     = "testuser"
@@ -321,54 +163,159 @@ jobs:
           tags = {
             environment = "testing"
             role        = "test-server"
+            group       = "primary"
           }
         }
 
-        # Define test actions
-        action "check-status" {
-          description = "Check system status"
-          command     = "uptime && df -h"
-          servers     = ["spooky-test-server"]
+        server "spooky-test-server-2" {
+          host     = "localhost"
+          port     = 2222
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "test-server"
+            group       = "primary"
+          }
+        }
+
+        server "spooky-test-server-3" {
+          host     = "localhost"
+          port     = 2223
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "test-server"
+            group       = "secondary"
+          }
+        }
+
+        server "spooky-test-server-4" {
+          host     = "localhost"
+          port     = 2224
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "test-server"
+            group       = "secondary"
+          }
+        }
+
+        server "spooky-test-server-5" {
+          host     = "localhost"
+          port     = 2225
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "test-server"
+            group       = "tertiary"
+          }
+        }
+
+        server "spooky-test-server-6" {
+          host     = "localhost"
+          port     = 2226
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "test-server"
+            group       = "tertiary"
+          }
+        }
+
+        server "spooky-test-server-7" {
+          host     = "localhost"
+          port     = 2227
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "test-server"
+            group       = "tertiary"
+          }
+        }
+
+        # Test actions for parallel execution
+        action "check-status-all" {
+          description = "Check system status on all servers"
+          command     = "uptime && df -h && echo 'Server: ' \$(hostname)"
+          servers     = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-server-3", "spooky-test-server-4", "spooky-test-server-5", "spooky-test-server-6", "spooky-test-server-7"]
           parallel    = true
         }
 
-        action "check-ssh-keys" {
-          description = "Check SSH key configuration"
-          command     = "ls -la ~/.ssh/ && echo 'SSH keys mounted successfully'"
-          servers     = ["spooky-test-server"]
+        action "check-ssh-keys-all" {
+          description = "Check SSH key configuration on all servers"
+          command     = "ls -la ~/.ssh/ && echo 'SSH keys mounted successfully on ' \$(hostname)"
+          servers     = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-server-3", "spooky-test-server-4", "spooky-test-server-5", "spooky-test-server-6", "spooky-test-server-7"]
           parallel    = true
         }
 
-        action "test-connection" {
-          description = "Test basic connectivity"
-          command     = "echo 'Connection test successful' && hostname && whoami"
-          servers     = ["spooky-test-server"]
+        action "test-connection-all" {
+          description = "Test basic connectivity on all servers"
+          command     = "echo 'Connection test successful on ' \$(hostname) && whoami && pwd"
+          servers     = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-server-3", "spooky-test-server-4", "spooky-test-server-5", "spooky-test-server-6", "spooky-test-server-7"]
+          parallel    = true
+        }
+
+        # Test actions for specific groups (error handling)
+        action "check-primary-group" {
+          description = "Check status on primary group servers"
+          command     = "echo 'Primary group check on ' \$(hostname) && uptime"
+          servers     = ["spooky-test-server-1", "spooky-test-server-2"]
+          parallel    = true
+        }
+
+        action "check-secondary-group" {
+          description = "Check status on secondary group servers"
+          command     = "echo 'Secondary group check on ' \$(hostname) && df -h"
+          servers     = ["spooky-test-server-3", "spooky-test-server-4"]
+          parallel    = true
+        }
+
+        action "check-tertiary-group" {
+          description = "Check status on tertiary group servers"
+          command     = "echo 'Tertiary group check on ' \$(hostname) && free -h"
+          servers     = ["spooky-test-server-5", "spooky-test-server-6", "spooky-test-server-7"]
+          parallel    = true
+        }
+
+        # Test action that will fail on some servers (error handling)
+        action "test-error-handling" {
+          description = "Test command that will fail on some servers"
+          command     = "ls /nonexistent/file && echo 'This should not appear' || echo 'Error handled correctly on ' \$(hostname)"
+          servers     = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-server-3", "spooky-test-server-4", "spooky-test-server-5", "spooky-test-server-6", "spooky-test-server-7"]
           parallel    = true
         }
         EOF
         
-        # Also create a simple test config for basic CLI testing
+        # Create a simple test config for basic CLI testing
         cat > examples/test-environment/simple-test.hcl << EOF
         # Simple test configuration for CLI testing
-        server "test-server" {
+        server "test-server-1" {
           host     = "localhost"
           port     = 2221
           user     = "testuser"
           key_file = "$HOME/.ssh/id_ed25519"
         }
 
+        server "test-server-2" {
+          host     = "localhost"
+          port     = 2222
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+        }
+
         action "test-action" {
-          description = "Simple test action"
-          command     = "echo 'test successful'"
-          servers     = ["test-server"]
+          description = "Simple test action on 2 servers"
+          command     = "echo 'test successful on ' \$(hostname)"
+          servers     = ["test-server-1", "test-server-2"]
+          parallel    = true
         }
         EOF
-
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.24'
-        cache: true
 
     - name: Build binary
       run: |
@@ -396,43 +343,74 @@ jobs:
         echo "Files in examples/test-environment:"
         ls -la examples/test-environment/ || echo "Test environment directory not found"
         
-        # Final pre-test SSH connectivity verification
-        echo "=== Pre-test SSH Verification ==="
-        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2221 testuser@localhost "echo 'SSH connection successful - pre-test'" || {
-          echo "SSH connection failed before tests - container may have become unhealthy"
-          echo "Container status:"
-          podman ps --filter name=spooky-test-server
-          echo "Container logs:"
-          podman logs spooky-test-server
-          exit 1
-        }
+        # Final pre-test SSH connectivity verification for all containers
+        echo "=== Pre-test SSH Verification for All Containers ==="
+        for i in {1..7}; do
+          port=$((2220 + $i))
+          container_name="spooky-test-server-$i"
+          
+          echo "Testing SSH connection to container $i on port $port..."
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p "$port" testuser@localhost "echo 'SSH connection successful - pre-test on container $i'" || {
+            echo "SSH connection failed to container $i before tests - container may have become unhealthy"
+            echo "Container status:"
+            podman ps --filter name="$container_name"
+            echo "Container logs:"
+            podman logs "$container_name"
+            exit 1
+          }
+          echo "✓ SSH connection to container $i successful"
+        done
         
         # Simple integration tests using shell commands
         echo "=== Running Simple Integration Tests ==="
         
-        # Test 1: Validate command
-        echo "Testing validate command..."
+        # Test 1: Validate command (simple config)
+        echo "Testing validate command with simple config..."
         ./build/spooky validate examples/test-environment/simple-test.hcl || {
-          echo "Validate command failed"
+          echo "Validate command failed with simple config"
           exit 1
         }
-        echo "✓ Validate command passed"
+        echo "✓ Validate command passed with simple config"
         
-        # Test 2: List command
-        echo "Testing list command..."
+        # Test 2: Validate command (full config)
+        echo "Testing validate command with full config..."
+        ./build/spooky validate examples/test-environment/test-config.hcl || {
+          echo "Validate command failed with full config"
+          exit 1
+        }
+        echo "✓ Validate command passed with full config"
+        
+        # Test 3: List command (simple config)
+        echo "Testing list command with simple config..."
         ./build/spooky list examples/test-environment/simple-test.hcl || {
-          echo "List command failed"
+          echo "List command failed with simple config"
           exit 1
         }
-        echo "✓ List command passed"
+        echo "✓ List command passed with simple config"
         
-        # Test 3: Execute command (basic test)
-        echo "Testing execute command..."
-        ./build/spooky execute examples/test-environment/simple-test.hcl || {
-          echo "Execute command failed"
+        # Test 4: List command (full config)
+        echo "Testing list command with full config..."
+        ./build/spooky list examples/test-environment/test-config.hcl || {
+          echo "List command failed with full config"
           exit 1
         }
-        echo "✓ Execute command passed"
+        echo "✓ List command passed with full config"
+        
+        # Test 5: Execute command (simple config - 2 servers)
+        echo "Testing execute command with simple config (2 servers)..."
+        ./build/spooky execute examples/test-environment/simple-test.hcl || {
+          echo "Execute command failed with simple config"
+          exit 1
+        }
+        echo "✓ Execute command passed with simple config"
+        
+        # Test 6: Execute command (full config - 7 servers, parallel execution)
+        echo "Testing execute command with full config (7 servers, parallel execution)..."
+        ./build/spooky execute examples/test-environment/test-config.hcl || {
+          echo "Execute command failed with full config"
+          exit 1
+        }
+        echo "✓ Execute command passed with full config"
         
         # Test 4: Test with invalid config
         echo "Testing invalid config handling..."
@@ -454,56 +432,37 @@ jobs:
         fi
         
         echo "=== All Integration Tests Passed ==="
-        
-        # Optional: Run Go integration tests if needed
-        # echo "Running Go integration tests..."
-        # go test ./tests/integration -v -podman
 
-    - name: Post-test container health check
+    - name: Stop containers
       if: always()
       run: |
-        echo "=== Post-test Container Health Check ==="
-        
-        # Check if container is still running
-        if podman ps --filter name=spooky-test-server --format "{{.Status}}" | grep -q "Up"; then
-          echo "✓ Container is still running after tests"
-          
-          # Verify SSH is still working
-          if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2221 testuser@localhost "echo 'SSH still working after tests'" 2>/dev/null; then
-            echo "✓ SSH is still functional after tests"
-          else
-            echo "✗ SSH connection failed after tests"
-            echo "Container logs after tests:"
-            podman logs spooky-test-server --tail=20
-          fi
-        else
-          echo "✗ Container is not running after tests"
-          echo "Container status:"
-          podman ps -a --filter name=spooky-test-server
-          echo "Container logs:"
-          podman logs spooky-test-server || echo "No logs available"
-        fi
-        
-        # Show container resource usage
-        echo "Container resource usage:"
-        podman stats spooky-test-server --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}" 2>/dev/null || echo "Could not get container stats"
+        echo "=== Stopping containers ==="
+        for i in {1..7}; do
+          container_name="spooky-test-server-$i"
+          echo "Stopping container $i..."
+          podman stop "$container_name" || true
+        done
 
-    - name: Cleanup containers
+    - name: Remove containers
       if: always()
       run: |
-        # Stop and remove containers
-        podman stop spooky-test-server || true
-        podman rm spooky-test-server || true
-        
-        # Remove images
+        echo "=== Removing containers ==="
+        for i in {1..7}; do
+          container_name="spooky-test-server-$i"
+          echo "Removing container $i..."
+          podman rm "$container_name" || true
+        done
+
+    - name: Remove container images
+      if: always()
+      run: |
+        echo "=== Removing container images ==="
         podman rmi spooky-test-ssh || true
 
-    - name: Upload test results
+    - name: Remove SSH keys
       if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-results
-        path: |
-          test-results/
-          *.log
-        retention-days: 7 
+      run: |
+        echo "=== Removing SSH keys ==="
+        rm -f ~/.ssh/id_ed25519 ~/.ssh/id_ed25519.pub || true
+
+ 
