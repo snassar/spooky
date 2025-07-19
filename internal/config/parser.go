@@ -18,7 +18,9 @@ func resolvePath(configFile, path string) string {
 	}
 
 	configDir := filepath.Dir(configFile)
-	return filepath.Join(configDir, path)
+	resolved := filepath.Join(configDir, path)
+	fmt.Printf("[DEBUG] resolvePath: configFile=%q, path=%q, configDir=%q, resolved=%q\n", configFile, path, configDir, resolved)
+	return resolved
 }
 
 // resolveServerPaths resolves relative paths in server configuration
