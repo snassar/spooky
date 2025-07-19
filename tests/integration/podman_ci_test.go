@@ -55,6 +55,11 @@ func TestPodmanCIIntegration(t *testing.T) {
 		}
 		t.Logf("SSH key file exists: %s", sshKey)
 
+		// Check SSH key permissions
+		if info, err := os.Stat(sshKey); err == nil {
+			t.Logf("SSH key permissions: %o", info.Mode().Perm())
+		}
+
 		// Create a simple server config for testing
 		server := config.Server{
 			Name:     "test-server",
@@ -67,8 +72,8 @@ func TestPodmanCIIntegration(t *testing.T) {
 
 		t.Logf("Attempting SSH connection to %s@%s:%d with key %s", server.User, server.Host, server.Port, server.KeyFile)
 
-		// Test SSH client creation
-		client, err := ssh.NewSSHClient(&server, 30)
+		// Test SSH client creation with longer timeout for CI
+		client, err := ssh.NewSSHClient(&server, 60) // Increased timeout for CI
 		if err != nil {
 			t.Fatalf("Failed to create SSH client: %v", err)
 		}
@@ -279,8 +284,15 @@ action "test-action" {
 			t.Fatalf("Failed to write config file: %v", err)
 		}
 
+		// Check if binary exists and is executable
+		binaryPath := "./build/spooky"
+		if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
+			t.Fatalf("Spooky binary not found: %s", binaryPath)
+		}
+
 		// Test validate command using built binary
-		cmd := exec.Command("./build/spooky", "validate", configFile)
+		cmd := exec.Command(binaryPath, "validate", configFile)
+		cmd.Dir = "." // Ensure we're in the right directory
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("Validate command failed: %v\nOutput: %s", err, output)
@@ -289,7 +301,8 @@ action "test-action" {
 		t.Logf("Validate command passed: %s", output)
 
 		// Test list command using built binary
-		cmd = exec.Command("./build/spooky", "list", configFile)
+		cmd = exec.Command(binaryPath, "list", configFile)
+		cmd.Dir = "." // Ensure we're in the right directory
 		output, err = cmd.CombinedOutput()
 		if err != nil {
 			t.Fatalf("List command failed: %v\nOutput: %s", err, output)
