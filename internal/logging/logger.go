@@ -31,11 +31,11 @@ func ensureLogDirectory(logFile string) error {
 	logDir := filepath.Dir(logFile)
 
 	// Create the directory and all parent directories
-	return os.MkdirAll(logDir, 0755)
+	return os.MkdirAll(logDir, 0o755)
 }
 
 // ConfigureLogger configures the global logger based on the provided settings
-func ConfigureLogger(level string, format string, output string, quiet bool, verbose bool) {
+func ConfigureLogger(level, format, output string, quiet, verbose bool) {
 	// Determine log level based on flags
 	var logLevel LogLevel
 	switch level {
@@ -86,8 +86,14 @@ func ConfigureLogger(level string, format string, output string, quiet bool, ver
 }
 
 func init() {
-	// Don't initialize logger here - it will be configured in main.go
-	// based on command line flags
+	// Initialize with a default logger for tests and other cases
+	// This will be overridden when ConfigureLogger is called
+	globalLogger = NewLogger(Config{
+		Level:     InfoLevel,
+		Format:    "json",
+		Output:    "stdout",
+		Timestamp: true,
+	})
 }
 
 // NewLogger creates a new logger with the given configuration

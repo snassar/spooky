@@ -5,6 +5,24 @@ build:
 	go mod tidy
 	go build -o build/spooky
 
+# Build the spooky binary with version information
+build-versioned:
+	go mod tidy
+	$(eval GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown"))
+	$(eval GIT_DIRTY := $(shell if [ -n "$$(git status --porcelain 2>/dev/null)" ]; then echo "-dirty"; fi))
+	$(eval BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S_UTC'))
+	$(eval VERSION := $(or $(VERSION),dev))
+	@echo "Building spooky version $(VERSION)-$(GIT_COMMIT)$(GIT_DIRTY)..."
+	go build \
+		-ldflags "-X main.version=$(VERSION) \
+		           -X main.commit=$(GIT_COMMIT)$(GIT_DIRTY) \
+		           -X main.buildTime=$(BUILD_TIME)" \
+		-o build/spooky \
+		main.go
+	@echo "Build complete: build/spooky"
+	@echo "Version: $(VERSION)-$(GIT_COMMIT)$(GIT_DIRTY)"
+	@echo "Build time: $(BUILD_TIME)"
+
 # Clean build artifacts
 clean:
 	rm -rf build/
@@ -41,9 +59,28 @@ lint-test: lint test-unit
 
 # Create release binary
 release: clean
-	GOOS=linux GOARCH=amd64 go build -o build/spooky-linux-amd64
-	GOOS=darwin GOARCH=amd64 go build -o build/spooky-darwin-amd64
-	GOOS=windows GOARCH=amd64 go build -o build/spooky-windows-amd64.exe
+	$(eval GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown"))
+	$(eval GIT_DIRTY := $(shell if [ -n "$$(git status --porcelain 2>/dev/null)" ]; then echo "-dirty"; fi))
+	$(eval BUILD_TIME := $(shell date -u '+%Y-%m-%d_%H:%M:%S_UTC'))
+	$(eval VERSION := $(or $(VERSION),dev))
+	@echo "Building release binaries version $(VERSION)-$(GIT_COMMIT)$(GIT_DIRTY)..."
+	GOOS=linux GOARCH=amd64 go build \
+		-ldflags "-X main.version=$(VERSION) \
+		           -X main.commit=$(GIT_COMMIT)$(GIT_DIRTY) \
+		           -X main.buildTime=$(BUILD_TIME)" \
+		-o build/spooky-linux-amd64
+	GOOS=darwin GOARCH=amd64 go build \
+		-ldflags "-X main.version=$(VERSION) \
+		           -X main.commit=$(GIT_COMMIT)$(GIT_DIRTY) \
+		           -X main.buildTime=$(BUILD_TIME)" \
+		-o build/spooky-darwin-amd64
+	GOOS=windows GOARCH=amd64 go build \
+		-ldflags "-X main.version=$(VERSION) \
+		           -X main.commit=$(GIT_COMMIT)$(GIT_DIRTY) \
+		           -X main.buildTime=$(BUILD_TIME)" \
+		-o build/spooky-windows-amd64.exe
+	@echo "Release binaries built successfully"
+	@echo "Version: $(VERSION)-$(GIT_COMMIT)$(GIT_DIRTY)"
 
 # Build pre-commit hook
 build-pre-commit-hook:

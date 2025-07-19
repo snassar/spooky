@@ -10,6 +10,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Version information - set at build time via ldflags
+var (
+	version = "dev"
+	commit  = "unknown"
+)
+
 func main() {
 	// coverage-ignore: main function is entry point, tested via integration tests
 	var rootCmd = &cobra.Command{
@@ -22,14 +28,14 @@ func main() {
 - Support for parallel execution and error handling
 - Collect and manage server facts
 - Use templates for dynamic configuration`,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		PersistentPreRun: func(_ *cobra.Command, _ []string) {
 			// Configure logger based on global flags
 			config := cli.GetGlobalConfig()
 			logging.ConfigureLogger(config.LogLevel, "json", config.LogFile, config.Quiet, config.Verbose)
 
 			logger := logging.GetLogger()
 			logger.Info("Starting spooky application",
-				logging.String("version", "1.0.0"), // TODO: Add version from build info
+				logging.String("version", fmt.Sprintf("%s-%s", version, commit)),
 			)
 		},
 	}
