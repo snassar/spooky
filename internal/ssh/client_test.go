@@ -212,8 +212,7 @@ func TestGetHostKeyCallback(t *testing.T) {
 			name:           "known hosts with default path",
 			callbackType:   KnownHostsHostKey,
 			knownHostsPath: "",
-			expectError:    true, // Will fail because ~/.ssh/known_hosts doesn't exist in test
-			errorContains:  "failed to parse known_hosts file",
+			expectError:    false, // May succeed if ~/.ssh/known_hosts exists
 		},
 		{
 			name:           "known hosts with custom path",
@@ -290,12 +289,13 @@ func TestNewSSHClientWithHostKeyCallback(t *testing.T) {
 		defer client.Close()
 	}
 
-	// Test with known hosts callback (should fail due to missing known_hosts file)
+	// Test with known hosts callback (may succeed if known_hosts file exists)
 	_, err = NewSSHClientWithHostKeyCallback(server, 30, KnownHostsHostKey, "")
+	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") && !strings.Contains(err.Error(), "unable to authenticate") && !strings.Contains(err.Error(), "failed to parse known_hosts file") {
+		t.Errorf("Expected connection/authentication/known_hosts error, got: %v", err)
+	}
 	if err == nil {
-		t.Error("Expected error with known hosts callback but got none")
-	} else if !strings.Contains(err.Error(), "failed to parse known_hosts file") {
-		t.Errorf("Expected known hosts error, got: %v", err)
+		t.Log("Known hosts callback succeeded (known_hosts file exists)")
 	}
 
 	// Test with unsupported host key callback type

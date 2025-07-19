@@ -160,8 +160,8 @@ func executeActionSequential(action *config.Action, servers []*config.Server) er
 	return nil
 }
 
-// executeActionParallel executes an action in parallel on all target servers
-func executeActionParallel(action *config.Action, servers []*config.Server) error {
+// validateActionForParallel validates an action for parallel execution
+func validateActionForParallel(action *config.Action) error {
 	logger := logging.GetLogger()
 
 	// Validate action before connecting
@@ -189,71 +189,87 @@ func executeActionParallel(action *config.Action, servers []*config.Server) erro
 		}
 	}
 
+	return nil
+}
+
+// executeActionOnServer executes an action on a single server in a goroutine
+func executeActionOnServer(action *config.Action, server *config.Server, results chan<- string, errors chan<- error, wg *sync.WaitGroup) {
+	defer wg.Done()
+	logger := logging.GetLogger()
+	startTime := time.Now()
+
+	logger.Info("Connecting to server (parallel)",
+		logging.Server(server.Name),
+		logging.Host(server.Host),
+		logging.Port(server.Port),
+		logging.String("user", server.User),
+	)
+
+	// Create SSH client
+	client, err := NewSSHClient(server, 30) // Default timeout
+	if err != nil {
+		logger.Error("Failed to connect to server (parallel)", err,
+			logging.Server(server.Name),
+			logging.Host(server.Host),
+			logging.Port(server.Port),
+		)
+		errors <- fmt.Errorf("failed to connect to %s: %w", server.Name, err)
+		return
+	}
+	// Close client when function returns
+	defer func() {
+		if closeErr := client.Close(); closeErr != nil {
+			logger.Warn("Failed to close SSH connection (parallel)",
+				logging.Server(server.Name),
+				logging.Error(closeErr),
+			)
+		}
+	}()
+
+	// Execute the action
+	var output string
+	if action.Command != "" {
+		output, err = client.ExecuteCommand(action.Command)
+	} else if action.Script != "" {
+		output, err = client.ExecuteScript(action.Script)
+	}
+
+	if err != nil {
+		logger.Error("Failed to execute action on server (parallel)", err,
+			logging.Server(server.Name),
+			logging.Action(action.Name),
+			logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+		)
+		errors <- fmt.Errorf("failed to execute action on %s: %w", server.Name, err)
+		return
+	}
+
+	logger.Info("Action executed successfully on server (parallel)",
+		logging.Server(server.Name),
+		logging.Action(action.Name),
+		logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+		logging.String("output_length", fmt.Sprintf("%d chars", len(output))),
+	)
+
+	results <- fmt.Sprintf("✅ Success on %s\n%s", server.Name, indentOutput(output))
+}
+
+// executeActionParallel executes an action in parallel on all target servers
+func executeActionParallel(action *config.Action, servers []*config.Server) error {
+	logger := logging.GetLogger()
+
+	// Validate action before connecting
+	if err := validateActionForParallel(action); err != nil {
+		return err
+	}
+
 	var wg sync.WaitGroup
 	results := make(chan string, len(servers))
 	errors := make(chan error, len(servers))
 
 	for _, server := range servers {
 		wg.Add(1)
-		go func(s *config.Server) {
-			defer wg.Done()
-			startTime := time.Now()
-
-			logger.Info("Connecting to server (parallel)",
-				logging.Server(s.Name),
-				logging.Host(s.Host),
-				logging.Port(s.Port),
-				logging.String("user", s.User),
-			)
-
-			// Create SSH client
-			client, err := NewSSHClient(s, 30) // Default timeout
-			if err != nil {
-				logger.Error("Failed to connect to server (parallel)", err,
-					logging.Server(s.Name),
-					logging.Host(s.Host),
-					logging.Port(s.Port),
-				)
-				errors <- fmt.Errorf("failed to connect to %s: %w", s.Name, err)
-				return
-			}
-			// Close client when function returns
-			defer func() {
-				if closeErr := client.Close(); closeErr != nil {
-					logger.Warn("Failed to close SSH connection (parallel)",
-						logging.Server(s.Name),
-						logging.Error(closeErr),
-					)
-				}
-			}()
-
-			// Execute the action
-			var output string
-			if action.Command != "" {
-				output, err = client.ExecuteCommand(action.Command)
-			} else if action.Script != "" {
-				output, err = client.ExecuteScript(action.Script)
-			}
-
-			if err != nil {
-				logger.Error("Failed to execute action on server (parallel)", err,
-					logging.Server(s.Name),
-					logging.Action(action.Name),
-					logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
-				)
-				errors <- fmt.Errorf("failed to execute action on %s: %w", s.Name, err)
-				return
-			}
-
-			logger.Info("Action executed successfully on server (parallel)",
-				logging.Server(s.Name),
-				logging.Action(action.Name),
-				logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
-				logging.String("output_length", fmt.Sprintf("%d chars", len(output))),
-			)
-
-			results <- fmt.Sprintf("✅ Success on %s\n%s", s.Name, indentOutput(output))
-		}(server)
+		go executeActionOnServer(action, server, results, errors, &wg)
 	}
 
 	// Wait for all goroutines to complete
@@ -287,11 +303,10 @@ func executeActionParallel(action *config.Action, servers []*config.Server) erro
 		if len(allErrors) == 1 {
 			logger.Error("Parallel execution failed", allErrors[0], logging.Action(action.Name))
 			return allErrors[0]
-		} else {
-			combinedError := fmt.Errorf("parallel execution failed on %d servers: %w", len(allErrors), allErrors[0])
-			logger.Error("Parallel execution failed", combinedError, logging.Action(action.Name))
-			return combinedError
 		}
+		combinedError := fmt.Errorf("parallel execution failed on %d servers: %w", len(allErrors), allErrors[0])
+		logger.Error("Parallel execution failed", combinedError, logging.Action(action.Name))
+		return combinedError
 	}
 
 	logger.Info("Parallel execution completed successfully", logging.Action(action.Name))
