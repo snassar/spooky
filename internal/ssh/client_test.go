@@ -212,7 +212,7 @@ func TestGetHostKeyCallback(t *testing.T) {
 			name:           "known hosts with default path",
 			callbackType:   KnownHostsHostKey,
 			knownHostsPath: "",
-			expectError:    false, // May succeed if ~/.ssh/known_hosts exists and is valid
+			expectError:    false, // Will be handled dynamically based on file existence
 		},
 		{
 			name:           "known hosts with custom path",
@@ -239,6 +239,42 @@ func TestGetHostKeyCallback(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Special handling for known_hosts_with_default_path test
+			if tt.name == "known hosts with default path" {
+				// Check if ~/.ssh/known_hosts exists
+				homeDir, err := os.UserHomeDir()
+				if err != nil {
+					t.Skipf("Cannot determine home directory: %v", err)
+				}
+				knownHostsPath := filepath.Join(homeDir, ".ssh", "known_hosts")
+				_, err = os.Stat(knownHostsPath)
+				fileExists := err == nil
+
+				callback, err := getHostKeyCallback(tt.callbackType, tt.knownHostsPath)
+
+				if fileExists {
+					// File exists, expect success
+					if err != nil {
+						t.Errorf("Expected no error but got: %v", err)
+						return
+					}
+					if callback == nil {
+						t.Errorf("Expected callback but got nil")
+					}
+				} else {
+					// File doesn't exist, expect error
+					if err == nil {
+						t.Errorf("Expected error but got none")
+						return
+					}
+					if !strings.Contains(err.Error(), "failed to parse known_hosts file") {
+						t.Errorf("Expected error to contain 'failed to parse known_hosts file', got: %s", err.Error())
+					}
+				}
+				return
+			}
+
+			// Standard test logic for other cases
 			callback, err := getHostKeyCallback(tt.callbackType, tt.knownHostsPath)
 
 			if tt.expectError {
