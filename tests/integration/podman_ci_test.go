@@ -79,7 +79,6 @@ server "test-server" {
   port = %d
   user = "%s"
   key_file = "%s"
-  host_key_type = "insecure"
 }
 
 action "test-action" {
@@ -170,7 +169,6 @@ server "test-server" {
   port = %d
   user = "%s"
   key_file = "%s"
-  host_key_type = "insecure"
 }
 
 action "parallel-test" {
@@ -250,7 +248,6 @@ server "test-server" {
   port = %d
   user = "%s"
   key_file = "%s"
-  host_key_type = "insecure"
 }
 
 action "test-action" {

@@ -3,7 +3,6 @@ server "test-server" {
   port = 2222
   user = "testuser"
   key_file = "~/.ssh/id_ed25519"
-  host_key_type = "insecure"
 }
 
 action "test-command" {
