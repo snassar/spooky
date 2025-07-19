@@ -266,13 +266,34 @@ func executeActionParallel(action *config.Action, servers []*config.Server) erro
 		logger.Info("Parallel execution result", logging.String("result", result))
 	}
 
-	// Check for errors
-	select {
-	case err := <-errors:
-		logger.Error("Parallel execution failed", err, logging.Action(action.Name))
-		return err
-	default:
-		logger.Info("Parallel execution completed successfully", logging.Action(action.Name))
-		return nil
+	// Collect all errors
+	var allErrors []error
+	for err := range errors {
+		allErrors = append(allErrors, err)
 	}
+
+	// Check for errors
+	if len(allErrors) > 0 {
+		// Log all errors for debugging
+		for i, err := range allErrors {
+			logger.Error("Parallel execution error", err,
+				logging.Action(action.Name),
+				logging.Int("error_index", i+1),
+				logging.Int("total_errors", len(allErrors)),
+			)
+		}
+
+		// Return the first error with context about total errors
+		if len(allErrors) == 1 {
+			logger.Error("Parallel execution failed", allErrors[0], logging.Action(action.Name))
+			return allErrors[0]
+		} else {
+			combinedError := fmt.Errorf("parallel execution failed on %d servers: %w", len(allErrors), allErrors[0])
+			logger.Error("Parallel execution failed", combinedError, logging.Action(action.Name))
+			return combinedError
+		}
+	}
+
+	logger.Info("Parallel execution completed successfully", logging.Action(action.Name))
+	return nil
 }
