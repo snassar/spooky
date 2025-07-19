@@ -312,13 +312,14 @@ func runFactsGather(_ *cobra.Command, args []string) error {
 	// Determine target hosts
 	var hosts []string
 
-	if len(args) > 0 {
+	switch {
+	case len(args) > 0:
 		// Use provided hosts argument
 		hosts = strings.Split(args[0], ",")
 		for i, host := range hosts {
 			hosts[i] = strings.TrimSpace(host)
 		}
-	} else if factsConfig != "" {
+	case factsConfig != "":
 		// Load hosts from spooky config file
 		logger.Info("Loading hosts from config file", logging.String("config", factsConfig))
 		config, err := config.ParseConfig(factsConfig)
@@ -337,11 +338,11 @@ func runFactsGather(_ *cobra.Command, args []string) error {
 		}
 
 		logger.Info("Loaded hosts from config", logging.Int("host_count", len(hosts)))
-	} else if factsInventory != "" {
+	case factsInventory != "":
 		// TODO: Load hosts from inventory file
 		logger.Info("Inventory file support not yet implemented", logging.String("inventory", factsInventory))
 		return fmt.Errorf("inventory file support not yet implemented")
-	} else {
+	default:
 		// Default to local host
 		hosts = []string{"local"}
 	}
