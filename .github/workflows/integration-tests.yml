@@ -414,6 +414,222 @@ jobs:
         }
         EOF
         
+        # Create working servers only config (7 working servers)
+        cat > examples/test-environment/working-servers.hcl << EOF
+        # Working servers only configuration for spooky SSH automation tool
+        # Points to 7 working SSH servers
+
+        # Define working test servers (7 containers)
+        server "spooky-test-server-1" {
+          host     = "localhost"
+          port     = 2221
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "test-server"
+            group       = "primary"
+          }
+        }
+
+        server "spooky-test-server-2" {
+          host     = "localhost"
+          port     = 2222
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "test-server"
+            group       = "primary"
+          }
+        }
+
+        server "spooky-test-server-3" {
+          host     = "localhost"
+          port     = 2223
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "test-server"
+            group       = "secondary"
+          }
+        }
+
+        server "spooky-test-server-4" {
+          host     = "localhost"
+          port     = 2224
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "test-server"
+            group       = "secondary"
+          }
+        }
+
+        server "spooky-test-server-5" {
+          host     = "localhost"
+          port     = 2225
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "test-server"
+            group       = "tertiary"
+          }
+        }
+
+        server "spooky-test-server-6" {
+          host     = "localhost"
+          port     = 2226
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "test-server"
+            group       = "tertiary"
+          }
+        }
+
+        server "spooky-test-server-7" {
+          host     = "localhost"
+          port     = 2227
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "test-server"
+            group       = "tertiary"
+          }
+        }
+
+        # Test actions for working servers only
+        action "check-status-all" {
+          description = "Check system status on all working servers"
+          command     = "uptime && df -h && echo 'Server: ' \$(hostname)"
+          servers     = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-server-3", "spooky-test-server-4", "spooky-test-server-5", "spooky-test-server-6", "spooky-test-server-7"]
+          parallel    = true
+        }
+
+        action "check-ssh-keys-all" {
+          description = "Check SSH key configuration on all working servers"
+          command     = "ls -la ~/.ssh/ && echo 'SSH keys mounted successfully on ' \$(hostname)"
+          servers     = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-server-3", "spooky-test-server-4", "spooky-test-server-5", "spooky-test-server-6", "spooky-test-server-7"]
+          parallel    = true
+        }
+
+        action "test-connection-all" {
+          description = "Test basic connectivity on all working servers"
+          command     = "echo 'Connection test successful on ' \$(hostname) && whoami && pwd"
+          servers     = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-server-3", "spooky-test-server-4", "spooky-test-server-5", "spooky-test-server-6", "spooky-test-server-7"]
+          parallel    = true
+        }
+        EOF
+        
+        # Create failure test config (only failure scenarios)
+        cat > examples/test-environment/failure-test.hcl << EOF
+        # Failure test configuration for spooky SSH automation tool
+        # Points to failure scenario SSH servers
+
+        # Failure scenario servers
+        server "spooky-test-no-ssh" {
+          host     = "localhost"
+          port     = 2228
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "failure-test"
+            group       = "failure"
+          }
+        }
+
+        server "spooky-test-ssh-no-key" {
+          host     = "localhost"
+          port     = 2229
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "failure-test"
+            group       = "failure"
+          }
+        }
+
+        # Test actions for connection failure scenarios
+        action "test-connection-failures" {
+          description = "Test connection failures (no SSH, no key)"
+          command     = "echo 'This should fail on failure-test servers' && hostname"
+          servers     = ["spooky-test-no-ssh", "spooky-test-ssh-no-key"]
+          parallel    = true
+        }
+        EOF
+        
+        # Create mixed test config (working + failure scenarios)
+        cat > examples/test-environment/mixed-test.hcl << EOF
+        # Mixed test configuration for spooky SSH automation tool
+        # Points to both working and failure scenario SSH servers
+
+        # Working servers
+        server "spooky-test-server-1" {
+          host     = "localhost"
+          port     = 2221
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "test-server"
+            group       = "primary"
+          }
+        }
+
+        server "spooky-test-server-2" {
+          host     = "localhost"
+          port     = 2222
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "test-server"
+            group       = "primary"
+          }
+        }
+
+        # Failure scenario servers
+        server "spooky-test-no-ssh" {
+          host     = "localhost"
+          port     = 2228
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "failure-test"
+            group       = "failure"
+          }
+        }
+
+        server "spooky-test-ssh-no-key" {
+          host     = "localhost"
+          port     = 2229
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "failure-test"
+            group       = "failure"
+          }
+        }
+
+        # Test actions for mixed success/failure scenarios
+        action "test-mixed-success-failure" {
+          description = "Test mixed success and failure scenarios"
+          command     = "echo 'Testing mixed scenarios on ' \$(hostname) && uptime"
+          servers     = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-no-ssh", "spooky-test-ssh-no-key"]
+          parallel    = true
+        }
+        EOF
+        
         # Create a simple test config for basic CLI testing
         cat > examples/test-environment/simple-test.hcl << EOF
         # Simple test configuration for CLI testing
@@ -545,13 +761,30 @@ jobs:
         }
         echo "✓ Execute command passed with simple config"
         
-        # Test 6: Execute command (full config - 7 servers, parallel execution)
-        echo "Testing execute command with full config (7 servers, parallel execution)..."
-        ./build/spooky execute examples/test-environment/test-config.hcl || {
-          echo "Execute command failed with full config"
+        # Test 6: Execute command (working servers only - 7 servers, parallel execution)
+        echo "Testing execute command with working servers only..."
+        ./build/spooky execute examples/test-environment/working-servers.hcl || {
+          echo "Execute command failed with working servers config"
           exit 1
         }
-        echo "✓ Execute command passed with full config"
+        echo "✓ Execute command passed with working servers config"
+        
+        # Test 7: Test failure scenarios (these should fail as expected)
+        echo "Testing failure scenarios (expected to fail)..."
+        if ./build/spooky execute examples/test-environment/failure-test.hcl 2>/dev/null; then
+          echo "✗ Failure scenario test should have failed but succeeded"
+          exit 1
+        else
+          echo "✓ Failure scenario test correctly failed as expected"
+        fi
+        
+        # Test 8: Test mixed success/failure scenarios (should succeed with partial failures)
+        echo "Testing mixed success/failure scenarios..."
+        ./build/spooky execute examples/test-environment/mixed-test.hcl || {
+          echo "Mixed success/failure test failed unexpectedly"
+          exit 1
+        }
+        echo "✓ Mixed success/failure test passed"
         
         # Test 4: Test with invalid config
         echo "Testing invalid config handling..."
