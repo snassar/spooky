@@ -175,7 +175,7 @@ jobs:
     - name: Update test configuration
       run: |
         # Create updated test configuration with correct user and key path
-        cat > examples/test-environment/test-config.hcl << 'EOF'
+        cat > examples/test-environment/test-config.hcl << EOF
         # Test configuration for spooky SSH automation tool
         # Points to the test environment SSH server
 
@@ -184,7 +184,7 @@ jobs:
           host     = "localhost"
           port     = 2221
           user     = "testuser"
-          key_file = "ssh-keys/id_ed25519"
+          key_file = "$HOME/.ssh/id_ed25519"
           tags = {
             environment = "testing"
             role        = "test-server"
@@ -214,20 +214,6 @@ jobs:
         }
         EOF
 
-    - name: Copy SSH key to test environment
-      run: |
-        # Create SSH keys directory in test environment
-        mkdir -p examples/test-environment/ssh-keys
-        
-        # Copy the private key to the test environment
-        cp ~/.ssh/id_ed25519 examples/test-environment/ssh-keys/
-        
-        # Set proper permissions
-        chmod 600 examples/test-environment/ssh-keys/id_ed25519
-        
-        # Verify the key is in the right place
-        ls -la examples/test-environment/ssh-keys/
-
     - name: Build spooky binary
       run: |
         # Create build directory
@@ -245,7 +231,7 @@ jobs:
         export SPOOKY_TEST_SSH_HOST=localhost
         export SPOOKY_TEST_SSH_PORT=2221
         export SPOOKY_TEST_SSH_USER=testuser
-        export SPOOKY_TEST_SSH_KEY=examples/test-environment/ssh-keys/id_ed25519
+        export SPOOKY_TEST_SSH_KEY=$HOME/.ssh/id_ed25519
         
         # Show current directory and files
         echo "Current directory: $(pwd)"

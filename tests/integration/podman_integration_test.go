@@ -138,6 +138,7 @@ func TestPodmanEnvironmentSetup(t *testing.T) {
 		if configPath == "" {
 			configPath = filepath.Join(projectRoot, "examples", "test-environment", "test-config.hcl")
 		}
+
 		//nolint:gosec // configPath is controlled by test runner, not user input
 		cmd = exec.Command("go", "run", "main.go", "validate", configPath)
 		output, err = cmd.CombinedOutput()
@@ -287,7 +288,7 @@ func testPodmanFileOperations(t *testing.T, projectRoot string) {
 	t.Logf("File operations test output:\n%s", string(output))
 }
 
-// testPodmanSFTPOperations tests SFTP-specific operations
+// testPodmanSFTPOperations tests SFTP operations
 func testPodmanSFTPOperations(t *testing.T, projectRoot string) {
 	t.Log("Testing SFTP operations...")
 
@@ -312,7 +313,7 @@ func testPodmanSFTPOperations(t *testing.T, projectRoot string) {
 	t.Logf("SFTP operations test output:\n%s", string(output))
 }
 
-// testPodmanTagBasedTargeting tests tag-based server targeting
+// testPodmanTagBasedTargeting tests tag-based targeting
 func testPodmanTagBasedTargeting(t *testing.T, projectRoot string) {
 	t.Log("Testing tag-based targeting...")
 
@@ -399,7 +400,7 @@ func testPodmanErrorHandling(t *testing.T, projectRoot string) {
 	})
 }
 
-// testPodmanNetworkConnectivity tests network connectivity between servers
+// testPodmanNetworkConnectivity tests network connectivity
 func testPodmanNetworkConnectivity(t *testing.T, projectRoot string) {
 	t.Log("Testing network connectivity...")
 
