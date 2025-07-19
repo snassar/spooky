@@ -24,16 +24,10 @@ jobs:
       run: |
         go test ./... -v -race -coverprofile=coverage.out
 
-    - name: Check if coverage file exists
-      if: always()
+    - name: Show coverage report
       run: |
-        if [ -f "coverage.out" ]; then
-          echo "Coverage file exists, size: $(wc -c < coverage.out) bytes"
-          echo "Coverage report:"
-          go tool cover -func=coverage.out | tail -1
-        else
-          echo "No coverage file generated"
-        fi
+        echo "Coverage report:"
+        go tool cover -func=coverage.out | tail -1
 
     - name: Verify build works
       run: |
