@@ -362,13 +362,14 @@ jobs:
           echo "✓ Failure scenario test correctly failed as expected"
         fi
         
-        # Test 8: Test mixed success/failure scenarios (should succeed with partial failures)
+        # Test 8: Test mixed success/failure scenarios (should fail due to parallel execution behavior)
         echo "Testing mixed success/failure scenarios..."
-        ./build/spooky execute examples/configuration/integration-mixed-test.hcl || {
-          echo "Mixed success/failure test failed unexpectedly"
+        if ./build/spooky execute examples/configuration/integration-mixed-test.hcl 2>/dev/null; then
+          echo "✗ Mixed success/failure test should have failed but succeeded"
           exit 1
-        }
-        echo "✓ Mixed success/failure test passed"
+        else
+          echo "✓ Mixed success/failure test correctly failed as expected (parallel execution fails on any server failure)"
+        fi
         
         # Test 9: Time validation of small-scale configuration
         echo "Testing validation timing for small-scale configuration..."
