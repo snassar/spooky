@@ -418,7 +418,7 @@ jobs:
         # Test 13: Time validation of large-scale configuration
         echo "Testing validation timing for large-scale configuration..."
         start_time=$(date +%s.%N)
-        ./build/spooky validate examples/configuration/large-scale-example-20250716+e685.hcl || {
+        ./build/spooky validate examples/configuration/large-scale-example.hcl || {
           echo "Large-scale validation failed"
           exit 1
         }
@@ -429,7 +429,7 @@ jobs:
         # Test 14: Time list command for large-scale configuration
         echo "Testing list timing for large-scale configuration..."
         start_time=$(date +%s.%N)
-        ./build/spooky list examples/configuration/large-scale-example-20250716+e685.hcl || {
+        ./build/spooky list examples/configuration/large-scale-example.hcl || {
           echo "Large-scale list failed"
           exit 1
         }
