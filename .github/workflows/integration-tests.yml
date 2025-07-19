@@ -121,29 +121,104 @@ jobs:
       run: |
         podman build -f Dockerfile.ssh -t spooky-test-ssh .
 
+    - name: Create Dockerfile for no-SSH container
+      run: |
+        cat > Dockerfile.no-ssh << 'EOF'
+        FROM debian:12-slim
+        
+        # Create test user
+        RUN useradd -m -s /bin/bash testuser
+        
+        # Just keep container running without SSH
+        CMD ["tail", "-f", "/dev/null"]
+        EOF
+
+    - name: Build no-SSH container image
+      run: |
+        podman build -f Dockerfile.no-ssh -t spooky-test-no-ssh .
+
+    - name: Create Dockerfile for SSH-no-key container
+      run: |
+        cat > Dockerfile.ssh-no-key << 'EOF'
+        FROM debian:12-slim
+        
+        # Install SSH server and required packages
+        RUN apt-get update && apt-get install -y \
+            openssh-server \
+            sudo \
+            && rm -rf /var/lib/apt/lists/*
+        
+        # Create SSH directory
+        RUN mkdir -p /var/run/sshd
+        
+        # Create test user
+        RUN useradd -m -s /bin/bash testuser && \
+            echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+        
+        # Create .ssh directory for testuser but DON'T add authorized_keys
+        RUN mkdir -p /home/testuser/.ssh && \
+            chown testuser:testuser /home/testuser/.ssh && \
+            chmod 700 /home/testuser/.ssh
+        
+        # Configure SSH
+        RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config && \
+            sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
+            sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config && \
+            sed -i 's/#AuthorizedKeysFile/AuthorizedKeysFile/' /etc/ssh/sshd_config && \
+            echo "StrictModes no" >> /etc/ssh/sshd_config
+        
+        # Expose SSH port
+        EXPOSE 22
+        
+        # Start SSH daemon
+        CMD ["/usr/sbin/sshd", "-D"]
+        EOF
+
+    - name: Build SSH-no-key container image
+      run: |
+        podman build -f Dockerfile.ssh-no-key -t spooky-test-ssh-no-key .
+
     - name: Start SSH containers
       run: |
-        # Start 7 SSH containers on different ports
+        # Start 7 working SSH containers on different ports
         for i in {1..7}; do
           port=$((2220 + $i))
           container_name="spooky-test-server-$i"
           
-          echo "Starting container $i on port $port..."
+          echo "Starting working SSH container $i on port $port..."
           podman run -d \
             --name "$container_name" \
             -p "$port:22" \
             spooky-test-ssh
         done
         
+        # Start container with no SSH running (port 2228)
+        echo "Starting container with no SSH on port 2228..."
+        podman run -d \
+          --name "spooky-test-no-ssh" \
+          -p "2228:22" \
+          spooky-test-no-ssh
+        
+        # Start container with SSH but no authorized key (port 2229)
+        echo "Starting container with SSH but no key on port 2229..."
+        podman run -d \
+          --name "spooky-test-ssh-no-key" \
+          -p "2229:22" \
+          spooky-test-ssh-no-key
+        
         # Wait for all containers to be ready
         echo "Waiting for all containers to be ready..."
         for i in {1..30}; do
-          running_count=$(podman ps --filter name=spooky-test-server --format "{{.Status}}" | grep -c "Up" || echo "0")
-          if [ "$running_count" -eq 7 ]; then
-            echo "All 7 containers are running (attempt $i/30)"
+          working_count=$(podman ps --filter name=spooky-test-server --format "{{.Status}}" | grep -c "Up" || echo "0")
+          no_ssh_count=$(podman ps --filter name=spooky-test-no-ssh --format "{{.Status}}" | grep -c "Up" || echo "0")
+          no_key_count=$(podman ps --filter name=spooky-test-ssh-no-key --format "{{.Status}}" | grep -c "Up" || echo "0")
+          total_running=$((working_count + no_ssh_count + no_key_count))
+          
+          if [ "$total_running" -eq 9 ]; then
+            echo "All 9 containers are running (attempt $i/30)"
             break
           fi
-          echo "Waiting for containers to start... ($running_count/7 running, attempt $i/30)"
+          echo "Waiting for containers to start... ($total_running/9 running, attempt $i/30)"
           sleep 2
         done
 
@@ -239,6 +314,31 @@ jobs:
           }
         }
 
+        # Failure scenario servers
+        server "spooky-test-no-ssh" {
+          host     = "localhost"
+          port     = 2228
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "failure-test"
+            group       = "failure"
+          }
+        }
+
+        server "spooky-test-ssh-no-key" {
+          host     = "localhost"
+          port     = 2229
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+          tags = {
+            environment = "testing"
+            role        = "failure-test"
+            group       = "failure"
+          }
+        }
+
         # Test actions for parallel execution
         action "check-status-all" {
           description = "Check system status on all servers"
@@ -288,6 +388,28 @@ jobs:
           description = "Test command that will fail on some servers"
           command     = "ls /nonexistent/file && echo 'This should not appear' || echo 'Error handled correctly on ' \$(hostname)"
           servers     = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-server-3", "spooky-test-server-4", "spooky-test-server-5", "spooky-test-server-6", "spooky-test-server-7"]
+          parallel    = true
+        }
+
+        # Test actions for connection failure scenarios
+        action "test-connection-failures" {
+          description = "Test connection failures (no SSH, no key)"
+          command     = "echo 'This should fail on failure-test servers' && hostname"
+          servers     = ["spooky-test-no-ssh", "spooky-test-ssh-no-key"]
+          parallel    = true
+        }
+
+        action "test-mixed-success-failure" {
+          description = "Test mixed success and failure scenarios"
+          command     = "echo 'Testing mixed scenarios on ' \$(hostname) && uptime"
+          servers     = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-no-ssh", "spooky-test-ssh-no-key"]
+          parallel    = true
+        }
+
+        action "test-all-servers-with-failures" {
+          description = "Test all servers including failure scenarios"
+          command     = "echo 'Testing on ' \$(hostname) && whoami"
+          servers     = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-server-3", "spooky-test-server-4", "spooky-test-server-5", "spooky-test-server-6", "spooky-test-server-7", "spooky-test-no-ssh", "spooky-test-ssh-no-key"]
           parallel    = true
         }
         EOF
@@ -343,8 +465,8 @@ jobs:
         echo "Files in examples/test-environment:"
         ls -la examples/test-environment/ || echo "Test environment directory not found"
         
-        # Final pre-test SSH connectivity verification for all containers
-        echo "=== Pre-test SSH Verification for All Containers ==="
+        # Final pre-test SSH connectivity verification for working containers
+        echo "=== Pre-test SSH Verification for Working Containers ==="
         for i in {1..7}; do
           port=$((2220 + $i))
           container_name="spooky-test-server-$i"
@@ -360,6 +482,25 @@ jobs:
           }
           echo "✓ SSH connection to container $i successful"
         done
+        
+        # Test failure scenarios (these should fail)
+        echo "=== Testing Failure Scenarios (Expected to Fail) ==="
+        
+        echo "Testing connection to no-SSH container (port 2228) - should fail..."
+        if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2228 testuser@localhost "echo 'This should not work'" 2>/dev/null; then
+          echo "✗ SSH connection to no-SSH container succeeded - this should have failed!"
+          exit 1
+        else
+          echo "✓ SSH connection to no-SSH container correctly failed"
+        fi
+        
+        echo "Testing connection to SSH-no-key container (port 2229) - should fail..."
+        if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2229 testuser@localhost "echo 'This should not work'" 2>/dev/null; then
+          echo "✗ SSH connection to SSH-no-key container succeeded - this should have failed!"
+          exit 1
+        else
+          echo "✓ SSH connection to SSH-no-key container correctly failed"
+        fi
         
         # Simple integration tests using shell commands
         echo "=== Running Simple Integration Tests ==="
@@ -442,6 +583,10 @@ jobs:
           echo "Stopping container $i..."
           podman stop "$container_name" || true
         done
+        
+        echo "Stopping failure test containers..."
+        podman stop spooky-test-no-ssh || true
+        podman stop spooky-test-ssh-no-key || true
 
     - name: Remove containers
       if: always()
@@ -452,12 +597,18 @@ jobs:
           echo "Removing container $i..."
           podman rm "$container_name" || true
         done
+        
+        echo "Removing failure test containers..."
+        podman rm spooky-test-no-ssh || true
+        podman rm spooky-test-ssh-no-key || true
 
     - name: Remove container images
       if: always()
       run: |
         echo "=== Removing container images ==="
         podman rmi spooky-test-ssh || true
+        podman rmi spooky-test-no-ssh || true
+        podman rmi spooky-test-ssh-no-key || true
 
     - name: Remove SSH keys
       if: always()
