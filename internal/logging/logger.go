@@ -2,6 +2,8 @@ package logging
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -19,14 +21,73 @@ var globalLogger Logger
 // contextKey for storing logger in context
 type contextKey struct{}
 
-func init() {
-	// Initialize with default configuration
+// ensureLogDirectory ensures the log directory exists
+func ensureLogDirectory(logFile string) error {
+	if logFile == "" || logFile == "stdout" || logFile == "stderr" {
+		return nil // No directory needed for stdout/stderr
+	}
+
+	// Get the directory from the log file path
+	logDir := filepath.Dir(logFile)
+
+	// Create the directory and all parent directories
+	return os.MkdirAll(logDir, 0755)
+}
+
+// ConfigureLogger configures the global logger based on the provided settings
+func ConfigureLogger(level string, format string, output string, quiet bool, verbose bool) {
+	// Determine log level based on flags
+	var logLevel LogLevel
+	switch level {
+	case "debug":
+		logLevel = DebugLevel
+	case "info":
+		logLevel = InfoLevel
+	case "warn":
+		logLevel = WarnLevel
+	case "error":
+		logLevel = ErrorLevel
+	default:
+		logLevel = InfoLevel
+	}
+
+	// Override level based on verbose/quiet flags
+	if quiet {
+		logLevel = ErrorLevel // Only show errors when quiet
+	} else if verbose {
+		logLevel = DebugLevel // Show debug when verbose
+	}
+
+	// Determine format
+	logFormat := "json"
+	if format == "text" {
+		logFormat = "text"
+	}
+
+	// Determine output
+	logOutput := "stdout"
+	if output != "" {
+		logOutput = output
+	}
+
+	// Ensure log directory exists
+	if err := ensureLogDirectory(logOutput); err != nil {
+		// If we can't create the log directory, fall back to stdout
+		logOutput = "stdout"
+	}
+
+	// Create and set the logger
 	globalLogger = NewLogger(Config{
-		Level:     InfoLevel,
-		Format:    "json",
-		Output:    "stdout",
+		Level:     logLevel,
+		Format:    logFormat,
+		Output:    logOutput,
 		Timestamp: true,
 	})
+}
+
+func init() {
+	// Don't initialize logger here - it will be configured in main.go
+	// based on command line flags
 }
 
 // NewLogger creates a new logger with the given configuration
