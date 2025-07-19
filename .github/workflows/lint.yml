@@ -1,9 +1,9 @@
-name: Lint Changed Go Files
+name: Lint
 
 on:
-  pull_request:
-    branches: [ main ]
   push:
+    branches: [ main ]
+  pull_request:
     branches: [ main ]
 
 jobs:
@@ -23,7 +23,13 @@ jobs:
       id: check
       run: |
         # Get list of changed .go files
-        CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '\.go$' || true)
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          # For PRs, compare with base branch
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep '\.go$' || true)
+        else
+          # For pushes, compare with previous commit
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '\.go$' || true)
+        fi
         
         if [ -n "$CHANGED_FILES" ]; then
           echo "Go files changed:"
@@ -43,25 +49,29 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0  # Required to get the full history for diff
 
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
         go-version: '1.24'
+        cache: true
 
     - name: Install golangci-lint
-      uses: golangci/golangci-lint-action@v4
-      with:
-        version: latest
-        args: --timeout=5m
+      run: |
+        go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
     - name: Get changed Go files and packages
       id: changed-files
       run: |
         # Get list of changed .go files
-        CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '\.go$')
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          # For PRs, compare with base branch
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep '\.go$')
+        else
+          # For pushes, compare with previous commit
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '\.go$')
+        fi
+        
         echo "Changed Go files:"
         echo "$CHANGED_FILES"
         
@@ -88,4 +98,34 @@ jobs:
           done
         else
           echo "No Go packages to lint"
+        fi
+
+    - name: Check code formatting
+      run: |
+        # Check formatting only for changed files
+        if [ -n "${{ steps.changed-files.outputs.changed_dirs }}" ]; then
+          UNFORMATTED_FILES=""
+          for dir in ${{ steps.changed-files.outputs.changed_dirs }}; do
+            if [ -d "$dir" ]; then
+              DIR_FILES=$(gofmt -s -l "$dir"/*.go 2>/dev/null || true)
+              if [ -n "$DIR_FILES" ]; then
+                UNFORMATTED_FILES="$UNFORMATTED_FILES $DIR_FILES"
+              fi
+            fi
+          done
+          
+          if [ -n "$UNFORMATTED_FILES" ]; then
+            echo "Code is not formatted. Please run 'gofmt -s -w .'"
+            echo "Unformatted files: $UNFORMATTED_FILES"
+            exit 1
+          fi
+        fi
+
+    - name: Check for unused dependencies
+      run: |
+        go mod tidy
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "go.mod or go.sum has uncommitted changes. Please run 'go mod tidy'"
+          git status
+          exit 1
         fi 

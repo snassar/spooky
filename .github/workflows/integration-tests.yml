@@ -1,18 +1,15 @@
-name: Integration Tests with Podman
+name: Integration Tests
 
 on:
+  workflow_run:
+    workflows: ["Unit Tests"]
+    types: [completed]
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - 'tests/integration/**'
-      - 'internal/**'
-      - 'main.go'
-      - '.github/workflows/integration-tests.yml'
 
 jobs:
   integration-tests:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     
     steps:
     - name: Checkout code
@@ -367,16 +364,29 @@ jobs:
         }
         EOF
 
-    - name: Build spooky binary
+    - name: Download built binary from unit tests
+      if: github.event_name != 'workflow_dispatch'
+      uses: actions/download-artifact@v4
+      with:
+        name: spooky-binary
+        path: build/
+      
+    - name: Build binary locally (manual trigger)
+      if: github.event_name == 'workflow_dispatch'
       run: |
-        # Create build directory
         mkdir -p build
-        
-        # Build the spooky binary
         go build -o build/spooky main.go
-        
-        # Verify binary was created
+        chmod +x build/spooky
+      
+    - name: Verify binary exists
+      run: |
         ls -la build/
+        if [ ! -f "./build/spooky" ]; then
+          echo "Spooky binary not found, building locally..."
+          mkdir -p build
+          go build -o build/spooky main.go
+        fi
+        chmod +x build/spooky
 
     - name: Run integration tests
       run: |
