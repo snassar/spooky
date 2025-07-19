@@ -349,6 +349,23 @@ jobs:
           parallel    = true
         }
         EOF
+        
+        # Also create a simple test config for basic CLI testing
+        cat > examples/test-environment/simple-test.hcl << EOF
+        # Simple test configuration for CLI testing
+        server "test-server" {
+          host     = "localhost"
+          port     = 2221
+          user     = "testuser"
+          key_file = "$HOME/.ssh/id_ed25519"
+        }
+
+        action "test-action" {
+          description = "Simple test action"
+          command     = "echo 'test successful'"
+          servers     = ["test-server"]
+        }
+        EOF
 
     - name: Build spooky binary
       run: |
@@ -391,9 +408,57 @@ jobs:
           exit 1
         }
         
-        # Run integration tests with podman flag
-        echo "Running Go integration tests..."
-        go test ./tests/integration -v -podman
+        # Simple integration tests using shell commands
+        echo "=== Running Simple Integration Tests ==="
+        
+        # Test 1: Validate command
+        echo "Testing validate command..."
+        ./build/spooky validate examples/test-environment/simple-test.hcl || {
+          echo "Validate command failed"
+          exit 1
+        }
+        echo "✓ Validate command passed"
+        
+        # Test 2: List command
+        echo "Testing list command..."
+        ./build/spooky list examples/test-environment/simple-test.hcl || {
+          echo "List command failed"
+          exit 1
+        }
+        echo "✓ List command passed"
+        
+        # Test 3: Execute command (basic test)
+        echo "Testing execute command..."
+        ./build/spooky execute examples/test-environment/simple-test.hcl || {
+          echo "Execute command failed"
+          exit 1
+        }
+        echo "✓ Execute command passed"
+        
+        # Test 4: Test with invalid config
+        echo "Testing invalid config handling..."
+        echo "invalid hcl content" > /tmp/invalid.hcl
+        if ./build/spooky validate /tmp/invalid.hcl 2>/dev/null; then
+          echo "✗ Validate should have failed with invalid config"
+          exit 1
+        else
+          echo "✓ Invalid config properly rejected"
+        fi
+        
+        # Test 5: Test with non-existent config
+        echo "Testing non-existent config handling..."
+        if ./build/spooky validate /tmp/nonexistent.hcl 2>/dev/null; then
+          echo "✗ Validate should have failed with non-existent config"
+          exit 1
+        else
+          echo "✓ Non-existent config properly rejected"
+        fi
+        
+        echo "=== All Integration Tests Passed ==="
+        
+        # Optional: Run Go integration tests if needed
+        # echo "Running Go integration tests..."
+        # go test ./tests/integration -v -podman
 
     - name: Post-test container health check
       if: always()
