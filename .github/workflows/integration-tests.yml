@@ -134,6 +134,60 @@ jobs:
         # Verify image was created
         podman images
 
+    - name: Pre-flight environment check
+      run: |
+        echo "=== Pre-flight Environment Check ==="
+        
+        # Check Podman installation
+        echo "Podman version:"
+        podman --version
+        
+        # Check if ports are already in use
+        echo "Checking if required ports are available..."
+        if netstat -tlnp 2>/dev/null | grep -q ":2221"; then
+          echo "✗ Port 2221 is already in use:"
+          netstat -tlnp 2>/dev/null | grep ":2221"
+          echo "Stopping any existing containers..."
+          podman stop spooky-test-server 2>/dev/null || true
+          podman rm spooky-test-server 2>/dev/null || true
+          sleep 2
+        else
+          echo "✓ Port 2221 is available"
+        fi
+        
+        # Check SSH key exists
+        if [ ! -f ~/.ssh/id_ed25519 ]; then
+          echo "✗ SSH private key not found"
+          exit 1
+        else
+          echo "✓ SSH private key exists"
+        fi
+        
+        if [ ! -f ~/.ssh/id_ed25519.pub ]; then
+          echo "✗ SSH public key not found"
+          exit 1
+        else
+          echo "✓ SSH public key exists"
+        fi
+        
+        # Check SSH key permissions
+        if [ "$(stat -c %a ~/.ssh/id_ed25519)" != "600" ]; then
+          echo "✗ SSH private key has wrong permissions: $(stat -c %a ~/.ssh/id_ed25519)"
+          exit 1
+        else
+          echo "✓ SSH private key has correct permissions"
+        fi
+        
+        # Check available disk space
+        echo "Available disk space:"
+        df -h .
+        
+        # Check available memory
+        echo "Available memory:"
+        free -h
+        
+        echo "=== Pre-flight Check Complete ==="
+
     - name: Start SSH container
       run: |
         # Start the SSH container on port 2221 (matching test config)
@@ -142,35 +196,117 @@ jobs:
           -p 2221:22 \
           spooky-test-ssh
         
-        # Wait for container to be ready
-        sleep 10
+        echo "Container started, beginning health checks..."
+        
+        # Wait for container to be ready and check health
+        echo "Waiting for container to be ready..."
+        for i in {1..30}; do
+          if podman ps --filter name=spooky-test-server --format "{{.Status}}" | grep -q "Up"; then
+            echo "Container is running (attempt $i/30)"
+            break
+          fi
+          echo "Waiting for container to start... (attempt $i/30)"
+          sleep 2
+        done
         
         # Verify container is running
-        podman ps
+        echo "=== Container Status ==="
+        podman ps --filter name=spooky-test-server
+        
+        # Check container health
+        echo "=== Container Health Check ==="
+        CONTAINER_HEALTH=$(podman inspect spooky-test-server --format='{{.State.Health.Status}}' 2>/dev/null || echo "no-health-check")
+        echo "Container health status: $CONTAINER_HEALTH"
         
         # Get container IP
         CONTAINER_IP=$(podman inspect spooky-test-server --format='{{.NetworkSettings.IPAddress}}')
         echo "Container IP: $CONTAINER_IP"
         
-        # Test SSH connection on port 2221
-        echo "Testing SSH connection..."
-        echo "SSH key contents (first few lines):"
+        # Check if SSH port is listening
+        echo "=== Port Availability Check ==="
+        if netstat -tlnp 2>/dev/null | grep -q ":2221"; then
+          echo "✓ Port 2221 is listening"
+        else
+          echo "✗ Port 2221 is not listening"
+          echo "Checking what's listening on port 2221:"
+          netstat -tlnp 2>/dev/null | grep ":2221" || echo "Nothing found"
+        fi
+        
+        # Check SSH daemon is running inside container
+        echo "=== SSH Daemon Check ==="
+        if podman exec spooky-test-server ps aux | grep -q "sshd"; then
+          echo "✓ SSH daemon is running inside container"
+        else
+          echo "✗ SSH daemon not found in container"
+          echo "Processes in container:"
+          podman exec spooky-test-server ps aux
+        fi
+        
+        # Check SSH configuration
+        echo "=== SSH Configuration Check ==="
+        echo "SSH config file contents:"
+        podman exec spooky-test-server cat /etc/ssh/sshd_config | grep -E "(Port|PermitRootLogin|PubkeyAuthentication|PasswordAuthentication|AuthorizedKeysFile)" || echo "Could not read SSH config"
+        
+        # Check authorized_keys
+        echo "=== SSH Key Check ==="
+        echo "Authorized keys in container:"
+        podman exec spooky-test-server cat /home/testuser/.ssh/authorized_keys || echo "Could not read authorized_keys"
+        
+        echo "Local SSH key (first few lines):"
         head -5 ~/.ssh/id_ed25519.pub
         
-        echo "Testing SSH connection with verbose output..."
-        ssh -v -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2221 testuser@localhost "echo 'SSH connection successful'" || {
-            echo "SSH connection failed, checking container logs..."
-            podman logs spooky-test-server
-            echo "Checking SSH daemon status in container..."
-            podman exec spooky-test-server ps aux | grep sshd
-            echo "Checking authorized_keys in container..."
-            podman exec spooky-test-server cat /home/testuser/.ssh/authorized_keys
-            exit 1
-        }
+        # Test SSH connection with retry logic
+        echo "=== SSH Connection Test ==="
+        SSH_SUCCESS=false
+        for attempt in {1..5}; do
+          echo "SSH connection attempt $attempt/5..."
+          if ssh -v -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes -p 2221 testuser@localhost "echo 'SSH connection successful - attempt $attempt'" 2>&1; then
+            echo "✓ SSH connection successful on attempt $attempt"
+            SSH_SUCCESS=true
+            break
+          else
+            echo "✗ SSH connection failed on attempt $attempt"
+            if [ $attempt -lt 5 ]; then
+              echo "Waiting 5 seconds before retry..."
+              sleep 5
+            fi
+          fi
+        done
+        
+        # If SSH failed, provide detailed diagnostics
+        if [ "$SSH_SUCCESS" = false ]; then
+          echo "=== SSH Connection Failed - Detailed Diagnostics ==="
+          echo "Container logs:"
+          podman logs spooky-test-server
+          
+          echo "SSH daemon status in container:"
+          podman exec spooky-test-server ps aux | grep sshd || echo "No SSH daemon found"
+          
+          echo "SSH daemon logs in container:"
+          podman exec spooky-test-server journalctl -u ssh 2>/dev/null || echo "No SSH service logs found"
+          
+          echo "Network connectivity test:"
+          podman exec spooky-test-server netstat -tlnp | grep :22 || echo "No SSH port found listening"
+          
+          echo "SSH key permissions in container:"
+          podman exec spooky-test-server ls -la /home/testuser/.ssh/ || echo "Could not check SSH directory"
+          
+          echo "Local SSH key permissions:"
+          ls -la ~/.ssh/id_ed25519*
+          
+          exit 1
+        fi
+        
+        # Additional connectivity tests
+        echo "=== Additional Connectivity Tests ==="
+        echo "Testing basic commands via SSH:"
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2221 testuser@localhost "whoami && hostname && pwd" || echo "Basic command test failed"
         
         # Store container info for tests
         echo "CONTAINER_IP=$CONTAINER_IP" >> $GITHUB_ENV
         echo "SSH_PORT=2221" >> $GITHUB_ENV
+        
+        echo "=== Container Setup Complete ==="
 
     - name: Update test configuration
       run: |
@@ -244,13 +380,49 @@ jobs:
         echo "Files in examples/test-environment:"
         ls -la examples/test-environment/ || echo "Test environment directory not found"
         
-        # Test SSH connectivity
-        echo "Testing SSH connectivity..."
-        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2221 testuser@localhost "echo 'SSH connection successful'"
+        # Final pre-test SSH connectivity verification
+        echo "=== Pre-test SSH Verification ==="
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2221 testuser@localhost "echo 'SSH connection successful - pre-test'" || {
+          echo "SSH connection failed before tests - container may have become unhealthy"
+          echo "Container status:"
+          podman ps --filter name=spooky-test-server
+          echo "Container logs:"
+          podman logs spooky-test-server
+          exit 1
+        }
         
         # Run integration tests with podman flag
         echo "Running Go integration tests..."
         go test ./tests/integration -v -podman
+
+    - name: Post-test container health check
+      if: always()
+      run: |
+        echo "=== Post-test Container Health Check ==="
+        
+        # Check if container is still running
+        if podman ps --filter name=spooky-test-server --format "{{.Status}}" | grep -q "Up"; then
+          echo "✓ Container is still running after tests"
+          
+          # Verify SSH is still working
+          if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p 2221 testuser@localhost "echo 'SSH still working after tests'" 2>/dev/null; then
+            echo "✓ SSH is still functional after tests"
+          else
+            echo "✗ SSH connection failed after tests"
+            echo "Container logs after tests:"
+            podman logs spooky-test-server --tail=20
+          fi
+        else
+          echo "✗ Container is not running after tests"
+          echo "Container status:"
+          podman ps -a --filter name=spooky-test-server
+          echo "Container logs:"
+          podman logs spooky-test-server || echo "No logs available"
+        fi
+        
+        # Show container resource usage
+        echo "Container resource usage:"
+        podman stats spooky-test-server --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}" 2>/dev/null || echo "Could not get container stats"
 
     - name: Cleanup containers
       if: always()
