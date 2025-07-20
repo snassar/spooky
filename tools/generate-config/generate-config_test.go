@@ -28,10 +28,10 @@ func TestGenerateGitStyleID_Deterministic(t *testing.T) {
 	}
 }
 
-func TestGenerateServers_Count(t *testing.T) {
+func TestGenerateMachines_Count(t *testing.T) {
 	scale := ScaleConfig{Name: "test", Hardware: 4, VMs: 8, Description: "test scale"}
-	servers := generateServers(scale)
-	if len(servers) == 0 {
-		t.Errorf("Expected some servers, got %d", len(servers))
+	machines := generateMachines(scale)
+	if len(machines) == 0 {
+		t.Errorf("Expected some machines, got %d", len(machines))
 	}
 }

@@ -427,7 +427,7 @@ func TestExportImportJSON(t *testing.T) {
 	}
 }
 
-func TestStorageInterface(t *testing.T) {
+func TestStorageInterface(_ *testing.T) {
 	// Test that both storage implementations satisfy the interface
 	var _ FactStorage = (*BadgerFactStorage)(nil)
 	var _ FactStorage = (*JSONFactStorage)(nil)

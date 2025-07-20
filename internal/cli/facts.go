@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"spooky/internal/config"
 	"spooky/internal/facts"
 	"spooky/internal/logging"
-	"spooky/internal/ssh"
 
 	"github.com/spf13/cobra"
 )
@@ -60,34 +58,6 @@ var (
 		RunE:  runFactsQuery,
 	}
 
-	// Legacy commands for backward compatibility
-	factsCollectCmd = &cobra.Command{
-		Use:    "collect [server]",
-		Short:  "Collect facts from a server (legacy)",
-		Long:   `Collect all available facts from the specified server or 'local' for the current machine.`,
-		Args:   cobra.ExactArgs(1),
-		RunE:   runFactsCollect,
-		Hidden: true, // Hide from help but keep for compatibility
-	}
-
-	factsGetCmd = &cobra.Command{
-		Use:    "get [server] [fact-key]",
-		Short:  "Get a specific fact (legacy)",
-		Long:   `Get a specific fact from the specified server.`,
-		Args:   cobra.ExactArgs(2),
-		RunE:   runFactsGet,
-		Hidden: true, // Hide from help but keep for compatibility
-	}
-
-	factsListCmd = &cobra.Command{
-		Use:    "list [server]",
-		Short:  "List all facts for a server (legacy)",
-		Long:   `List all available facts for the specified server.`,
-		Args:   cobra.MaximumNArgs(1),
-		RunE:   runFactsList,
-		Hidden: true, // Hide from help but keep for compatibility
-	}
-
 	factsCacheCmd = &cobra.Command{
 		Use:   "cache",
 		Short: "Manage fact cache",
@@ -109,7 +79,6 @@ var (
 	}
 
 	// Flags
-	factsOutputFormat string
 	factsSpecificKeys []string
 	factsInventory    string
 	factsConfig       string
@@ -140,10 +109,7 @@ func initFactsCommands() {
 	FactsCmd.AddCommand(factsValidateCmd)
 	FactsCmd.AddCommand(factsQueryCmd)
 
-	// Add legacy subcommands (hidden)
-	FactsCmd.AddCommand(factsCollectCmd)
-	FactsCmd.AddCommand(factsGetCmd)
-	FactsCmd.AddCommand(factsListCmd)
+	// Add cache subcommand
 	FactsCmd.AddCommand(factsCacheCmd)
 
 	// Add subcommands to cache
@@ -182,136 +148,6 @@ func initFactsCommands() {
 	factsQueryCmd.Flags().IntVar(&factsLimit, "limit", 0, "Limit number of results")
 	factsQueryCmd.Flags().BoolVar(&factsPretty, "pretty", false, "Pretty-print JSON output")
 
-	// Add flags for legacy commands
-	factsCollectCmd.Flags().StringVarP(&factsOutputFormat, "output", "o", "table", "Output format (table, json)")
-	factsCollectCmd.Flags().StringSliceVarP(&factsSpecificKeys, "keys", "k", nil, "Specific fact keys to collect")
-	factsListCmd.Flags().StringVarP(&factsOutputFormat, "output", "o", "table", "Output format (table, json)")
-}
-
-func runFactsCollect(_ *cobra.Command, args []string) error {
-	server := args[0]
-
-	// Create SSH client if needed
-	var sshClient *ssh.SSHClient
-	if server != "local" {
-		// TODO: Create SSH client from config
-		// For now, we'll just use nil and rely on local collection
-		_ = sshClient // Suppress unused variable warning
-	}
-
-	// Create fact manager
-	manager := facts.NewManager(sshClient)
-
-	var collection *facts.FactCollection
-	var err error
-
-	if len(factsSpecificKeys) > 0 {
-		// Collect specific facts
-		collection, err = manager.CollectSpecificFacts(server, factsSpecificKeys)
-	} else {
-		// Collect all facts
-		collection, err = manager.CollectAllFacts(server)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to collect facts: %w", err)
-	}
-
-	// Output the results
-	return outputFacts(collection, factsOutputFormat)
-}
-
-func runFactsGet(_ *cobra.Command, args []string) error {
-	server := args[0]
-	factKey := args[1]
-
-	// Create SSH client if needed
-	var sshClient *ssh.SSHClient
-	if server != "local" {
-		// TODO: Create SSH client from config
-		_ = sshClient // Suppress unused variable warning
-	}
-
-	// Create fact manager
-	manager := facts.NewManager(sshClient)
-
-	// Get the specific fact
-	fact, err := manager.GetFact(server, factKey)
-	if err != nil {
-		return fmt.Errorf("failed to get fact: %w", err)
-	}
-
-	// Output the fact
-	if factsOutputFormat == "json" {
-		jsonData, err := json.MarshalIndent(fact, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal fact to JSON: %w", err)
-		}
-		fmt.Println(string(jsonData))
-	} else {
-		fmt.Printf("Fact: %s\n", fact.Key)
-		fmt.Printf("Value: %v\n", fact.Value)
-		fmt.Printf("Source: %s\n", fact.Source)
-		fmt.Printf("Server: %s\n", fact.Server)
-		fmt.Printf("Timestamp: %s\n", fact.Timestamp.Format("2006-01-02 15:04:05"))
-		if fact.TTL > 0 {
-			fmt.Printf("TTL: %s\n", fact.TTL)
-		}
-	}
-
-	return nil
-}
-
-func runFactsList(_ *cobra.Command, args []string) error {
-
-	// Create storage and fact manager
-	storage, err := facts.NewFactStorage(facts.StorageOptions{
-		Type: facts.StorageTypeBadger, // Default to BadgerDB
-		Path: ".facts.db",             // Use local path for now
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create storage: %w", err)
-	}
-	defer storage.Close()
-
-	manager := facts.NewManagerWithStorage(nil, storage)
-
-	// If a specific machine is provided, show its facts
-	if len(args) > 0 {
-		machineName := args[0]
-		query := &facts.FactQuery{MachineName: machineName}
-		machineFacts, err := manager.QueryMachineFacts(query)
-		if err != nil {
-			return fmt.Errorf("failed to query facts: %w", err)
-		}
-
-		if len(machineFacts) == 0 {
-			return fmt.Errorf("no facts found for machine: %s", machineName)
-		}
-
-		// Display the first match
-		displayMachineFacts(machineFacts[0])
-		return nil
-	}
-
-	// Otherwise, list all facts
-	query := &facts.FactQuery{}
-	machineFacts, err := manager.QueryMachineFacts(query)
-	if err != nil {
-		return fmt.Errorf("failed to query facts: %w", err)
-	}
-
-	if len(machineFacts) == 0 {
-		fmt.Println("No facts found in database")
-		return nil
-	}
-
-	fmt.Printf("Found %d facts:\n\n", len(machineFacts))
-	for _, fact := range machineFacts {
-		displayMachineFacts(fact)
-	}
-
-	return nil
 }
 
 // displayMachineFacts displays facts for a single machine
@@ -427,10 +263,10 @@ func determineTargetHosts(args []string) ([]string, error) {
 			return nil, fmt.Errorf("failed to parse config file %s: %w", factsConfig, err)
 		}
 
-		// Extract server names from config
+		// Extract machine names from config
 		var hosts []string
-		for _, server := range config.Servers {
-			hosts = append(hosts, server.Name)
+		for _, machine := range config.Machines {
+			hosts = append(hosts, machine.Name)
 		}
 
 		if len(hosts) == 0 {
@@ -782,37 +618,4 @@ func parseQueryExpression(expression string) (*facts.FactQuery, error) {
 	}
 
 	return query, nil
-}
-
-func outputFacts(collection *facts.FactCollection, format string) error {
-	if format == "json" {
-		jsonData, err := json.MarshalIndent(collection, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal facts to JSON: %w", err)
-		}
-		fmt.Println(string(jsonData))
-	} else {
-		// Table format
-		fmt.Printf("Facts for server: %s\n", collection.Server)
-		fmt.Printf("Collected at: %s\n", collection.Timestamp.Format("2006-01-02 15:04:05"))
-		fmt.Println()
-		fmt.Printf("%-30s %-15s %-20s %s\n", "KEY", "SOURCE", "TTL", "VALUE")
-		fmt.Println(strings.Repeat("-", 80))
-
-		for key, fact := range collection.Facts {
-			ttlStr := "no expiry"
-			if fact.TTL > 0 {
-				ttlStr = fact.TTL.String()
-			}
-
-			valueStr := fmt.Sprintf("%v", fact.Value)
-			if len(valueStr) > 40 {
-				valueStr = valueStr[:37] + "..."
-			}
-
-			fmt.Printf("%-30s %-15s %-20s %s\n", key, fact.Source, ttlStr, valueStr)
-		}
-	}
-
-	return nil
 }

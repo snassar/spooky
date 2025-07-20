@@ -5,16 +5,16 @@ import (
 	"testing"
 )
 
-func TestServer_Validate(t *testing.T) {
+func TestMachine_Validate(t *testing.T) {
 	tests := []struct {
 		name    string
-		server  Server
+		machine Machine
 		wantErr bool
 	}{
 		{
-			name: "valid server with password",
-			server: Server{
-				Name:     "test-server",
+			name: "valid machine with password",
+			machine: Machine{
+				Name:     "test-machine",
 				Host:     "localhost",
 				User:     "testuser",
 				Password: "testpass",
@@ -22,9 +22,9 @@ func TestServer_Validate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "valid server with key file",
-			server: Server{
-				Name:    "test-server",
+			name: "valid machine with key file",
+			machine: Machine{
+				Name:    "test-machine",
 				Host:    "localhost",
 				User:    "testuser",
 				KeyFile: "/path/to/key",
@@ -32,9 +32,9 @@ func TestServer_Validate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "valid server with both password and key file",
-			server: Server{
-				Name:     "test-server",
+			name: "valid machine with both password and key file",
+			machine: Machine{
+				Name:     "test-machine",
 				Host:     "localhost",
 				User:     "testuser",
 				Password: "testpass",
@@ -43,9 +43,9 @@ func TestServer_Validate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "invalid server with no authentication",
-			server: Server{
-				Name: "test-server",
+			name: "invalid machine with no authentication",
+			machine: Machine{
+				Name: "test-machine",
 				Host: "localhost",
 				User: "testuser",
 				// No password or key file
@@ -53,9 +53,9 @@ func TestServer_Validate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "invalid server with empty password and key file",
-			server: Server{
-				Name:     "test-server",
+			name: "invalid machine with empty password and key file",
+			machine: Machine{
+				Name:     "test-machine",
 				Host:     "localhost",
 				User:     "testuser",
 				Password: "",
@@ -68,15 +68,15 @@ func TestServer_Validate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := NewValidator()
-			err := v.ValidateServer(&tt.server)
+			err := v.ValidateMachine(&tt.machine)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateServer() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ValidateMachine() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if tt.wantErr && err != nil {
-				// Check that the error message contains the server name
-				if !strings.Contains(err.Error(), tt.server.Name) {
-					t.Errorf("ValidateServer() error message should contain server name '%s', got: %s", tt.server.Name, err.Error())
+				// Check that the error message contains the machine name
+				if !strings.Contains(err.Error(), tt.machine.Name) {
+					t.Errorf("ValidateMachine() error message should contain machine name '%s', got: %s", tt.machine.Name, err.Error())
 				}
 			}
 		})
@@ -124,11 +124,11 @@ func TestAction_Validate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "valid action with servers and command",
+			name: "valid action with machines and command",
 			action: Action{
-				Name:    "test-action",
-				Command: "echo test",
-				Servers: []string{"server1", "server2"},
+				Name:     "test-action",
+				Command:  "echo test",
+				Machines: []string{"machine1", "machine2"},
 			},
 			wantErr: false,
 		},
@@ -199,9 +199,9 @@ func TestAction_Validate(t *testing.T) {
 func TestConfig_Structure(t *testing.T) {
 	// Test that Config struct can be created with valid data
 	config := Config{
-		Servers: []Server{
+		Machines: []Machine{
 			{
-				Name:     "test-server",
+				Name:     "test-machine",
 				Host:     "localhost",
 				User:     "testuser",
 				Password: "testpass",
@@ -215,16 +215,16 @@ func TestConfig_Structure(t *testing.T) {
 		},
 	}
 
-	if len(config.Servers) != 1 {
-		t.Errorf("Expected 1 server, got %d", len(config.Servers))
+	if len(config.Machines) != 1 {
+		t.Errorf("Expected 1 machine, got %d", len(config.Machines))
 	}
 
 	if len(config.Actions) != 1 {
 		t.Errorf("Expected 1 action, got %d", len(config.Actions))
 	}
 
-	if config.Servers[0].Name != "test-server" {
-		t.Errorf("Expected server name 'test-server', got '%s'", config.Servers[0].Name)
+	if config.Machines[0].Name != "test-machine" {
+		t.Errorf("Expected machine name 'test-machine', got '%s'", config.Machines[0].Name)
 	}
 
 	if config.Actions[0].Name != "test-action" {
@@ -232,29 +232,29 @@ func TestConfig_Structure(t *testing.T) {
 	}
 }
 
-func TestServer_DefaultValues(t *testing.T) {
-	server := Server{
-		Name: "test-server",
+func TestMachine_DefaultValues(t *testing.T) {
+	machine := Machine{
+		Name: "test-machine",
 		Host: "localhost",
 		User: "testuser",
 	}
 
 	// Test default values
-	if server.Port != 0 {
-		t.Errorf("Expected default port 0, got %d", server.Port)
+	if machine.Port != 0 {
+		t.Errorf("Expected default port 0, got %d", machine.Port)
 	}
 
-	if server.Password != "" {
-		t.Errorf("Expected default empty password, got '%s'", server.Password)
+	if machine.Password != "" {
+		t.Errorf("Expected default empty password, got '%s'", machine.Password)
 	}
 
-	if server.KeyFile != "" {
-		t.Errorf("Expected default empty key file, got '%s'", server.KeyFile)
+	if machine.KeyFile != "" {
+		t.Errorf("Expected default empty key file, got '%s'", machine.KeyFile)
 	}
 
 	// Tags map is nil by default in Go
-	if server.Tags != nil {
-		t.Errorf("Expected nil tags map by default, got %v", server.Tags)
+	if machine.Tags != nil {
+		t.Errorf("Expected nil tags map by default, got %v", machine.Tags)
 	}
 }
 
@@ -277,8 +277,8 @@ func TestAction_DefaultValues(t *testing.T) {
 	}
 
 	// Slices are nil by default in Go
-	if action.Servers != nil {
-		t.Errorf("Expected nil servers slice by default, got %v", action.Servers)
+	if action.Machines != nil {
+		t.Errorf("Expected nil machines slice by default, got %v", action.Machines)
 	}
 
 	if action.Tags != nil {

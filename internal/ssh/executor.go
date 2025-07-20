@@ -16,7 +16,7 @@ func ExecuteConfig(cfg *config.Config) error {
 
 	logger.Info("Starting configuration execution",
 		logging.Int("action_count", len(cfg.Actions)),
-		logging.Int("server_count", len(cfg.Servers)),
+		logging.Int("machine_count", len(cfg.Machines)),
 	)
 
 	// Initialize index cache for enterprise-scale performance
@@ -31,30 +31,30 @@ func ExecuteConfig(cfg *config.Config) error {
 			logging.String("description", action.Description),
 		)
 
-		// Get target servers for this action using optimized lookup
-		var targetServers []*config.Server
+		// Get target machines for this action using optimized lookup
+		var targetMachines []*config.Machine
 		var err error
 
 		// Use enterprise-scale lookup for better performance
 		index := indexCache.GetIndex(cfg)
-		targetServers, err = config.GetServersForActionLarge(cfg, action, index)
+		targetMachines, err = config.GetMachinesForActionLarge(cfg, action, index)
 		if err != nil {
-			logger.Error("Failed to get servers for action", err,
+			logger.Error("Failed to get machines for action", err,
 				logging.Action(action.Name),
 			)
-			return fmt.Errorf("failed to get servers for action %s: %w", action.Name, err)
+			return fmt.Errorf("failed to get machines for action %s: %w", action.Name, err)
 		}
 
-		logger.Info("Action target servers determined",
+		logger.Info("Action target machines determined",
 			logging.Action(action.Name),
-			logging.Int("target_server_count", len(targetServers)),
+			logging.Int("target_machine_count", len(targetMachines)),
 		)
 
-		// Execute on each server
+		// Execute on each machine
 		if action.Parallel {
-			err = executeActionParallel(action, targetServers)
+			err = executeActionParallel(action, targetMachines)
 		} else {
-			err = executeActionSequential(action, targetServers)
+			err = executeActionSequential(action, targetMachines)
 		}
 
 		if err != nil {
@@ -77,8 +77,8 @@ func ExecuteConfig(cfg *config.Config) error {
 	return nil
 }
 
-// executeActionSequential executes an action sequentially on all target servers
-func executeActionSequential(action *config.Action, servers []*config.Server) error {
+// executeActionSequential executes an action sequentially on all target machines
+func executeActionSequential(action *config.Action, machines []*config.Machine) error {
 	logger := logging.GetLogger()
 
 	// Validate action before connecting
@@ -95,23 +95,23 @@ func executeActionSequential(action *config.Action, servers []*config.Server) er
 		return fmt.Errorf("action %s: neither command nor script specified", action.Name)
 	}
 
-	for _, server := range servers {
+	for _, machine := range machines {
 		startTime := time.Now()
 
-		logger.Info("Connecting to server",
-			logging.Server(server.Name),
-			logging.Host(server.Host),
-			logging.Port(server.Port),
-			logging.String("user", server.User),
+		logger.Info("Connecting to machine",
+			logging.Server(machine.Name),
+			logging.Host(machine.Host),
+			logging.Port(machine.Port),
+			logging.String("user", machine.User),
 		)
 
 		// Create SSH client
-		client, err := NewSSHClient(server, 30) // Default timeout
+		client, err := NewSSHClient(machine, 30) // Default timeout
 		if err != nil {
-			logger.Error("Failed to connect to server", err,
-				logging.Server(server.Name),
-				logging.Host(server.Host),
-				logging.Port(server.Port),
+			logger.Error("Failed to connect to machine", err,
+				logging.Server(machine.Name),
+				logging.Host(machine.Host),
+				logging.Port(machine.Port),
 			)
 			continue
 		}
@@ -127,22 +127,22 @@ func executeActionSequential(action *config.Action, servers []*config.Server) er
 		// Close client after execution
 		if closeErr := client.Close(); closeErr != nil {
 			logger.Warn("Failed to close SSH connection",
-				logging.Server(server.Name),
+				logging.Server(machine.Name),
 				logging.Error(closeErr),
 			)
 		}
 
 		if err != nil {
-			logger.Error("Failed to execute action on server", err,
-				logging.Server(server.Name),
+			logger.Error("Failed to execute action on machine", err,
+				logging.Server(machine.Name),
 				logging.Action(action.Name),
 				logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
 			)
 			continue
 		}
 
-		logger.Info("Action executed successfully on server",
-			logging.Server(server.Name),
+		logger.Info("Action executed successfully on machine",
+			logging.Server(machine.Name),
 			logging.Action(action.Name),
 			logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
 			logging.String("output_length", fmt.Sprintf("%d chars", len(output))),
@@ -150,7 +150,7 @@ func executeActionSequential(action *config.Action, servers []*config.Server) er
 
 		if output != "" {
 			logger.Debug("Command output",
-				logging.Server(server.Name),
+				logging.Server(machine.Name),
 				logging.Action(action.Name),
 				logging.String("output", output),
 			)
@@ -192,35 +192,35 @@ func validateActionForParallel(action *config.Action) error {
 	return nil
 }
 
-// executeActionOnServer executes an action on a single server in a goroutine
-func executeActionOnServer(action *config.Action, server *config.Server, results chan<- string, errors chan<- error, wg *sync.WaitGroup) {
+// executeActionOnMachine executes an action on a single machine in a goroutine
+func executeActionOnMachine(action *config.Action, machine *config.Machine, results chan<- string, errors chan<- error, wg *sync.WaitGroup) {
 	defer wg.Done()
 	logger := logging.GetLogger()
 	startTime := time.Now()
 
-	logger.Info("Connecting to server (parallel)",
-		logging.Server(server.Name),
-		logging.Host(server.Host),
-		logging.Port(server.Port),
-		logging.String("user", server.User),
+	logger.Info("Connecting to machine (parallel)",
+		logging.Server(machine.Name),
+		logging.Host(machine.Host),
+		logging.Port(machine.Port),
+		logging.String("user", machine.User),
 	)
 
 	// Create SSH client
-	client, err := NewSSHClient(server, 30) // Default timeout
+	client, err := NewSSHClient(machine, 30) // Default timeout
 	if err != nil {
-		logger.Error("Failed to connect to server (parallel)", err,
-			logging.Server(server.Name),
-			logging.Host(server.Host),
-			logging.Port(server.Port),
+		logger.Error("Failed to connect to machine (parallel)", err,
+			logging.Server(machine.Name),
+			logging.Host(machine.Host),
+			logging.Port(machine.Port),
 		)
-		errors <- fmt.Errorf("failed to connect to %s: %w", server.Name, err)
+		errors <- fmt.Errorf("failed to connect to %s: %w", machine.Name, err)
 		return
 	}
 	// Close client when function returns
 	defer func() {
 		if closeErr := client.Close(); closeErr != nil {
 			logger.Warn("Failed to close SSH connection (parallel)",
-				logging.Server(server.Name),
+				logging.Server(machine.Name),
 				logging.Error(closeErr),
 			)
 		}
@@ -235,27 +235,27 @@ func executeActionOnServer(action *config.Action, server *config.Server, results
 	}
 
 	if err != nil {
-		logger.Error("Failed to execute action on server (parallel)", err,
-			logging.Server(server.Name),
+		logger.Error("Failed to execute action on machine (parallel)", err,
+			logging.Server(machine.Name),
 			logging.Action(action.Name),
 			logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
 		)
-		errors <- fmt.Errorf("failed to execute action on %s: %w", server.Name, err)
+		errors <- fmt.Errorf("failed to execute action on %s: %w", machine.Name, err)
 		return
 	}
 
-	logger.Info("Action executed successfully on server (parallel)",
-		logging.Server(server.Name),
+	logger.Info("Action executed successfully on machine (parallel)",
+		logging.Server(machine.Name),
 		logging.Action(action.Name),
 		logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
 		logging.String("output_length", fmt.Sprintf("%d chars", len(output))),
 	)
 
-	results <- fmt.Sprintf("✅ Success on %s\n%s", server.Name, indentOutput(output))
+	results <- fmt.Sprintf("✅ Success on %s\n%s", machine.Name, indentOutput(output))
 }
 
-// executeActionParallel executes an action in parallel on all target servers
-func executeActionParallel(action *config.Action, servers []*config.Server) error {
+// executeActionParallel executes an action in parallel on all target machines
+func executeActionParallel(action *config.Action, machines []*config.Machine) error {
 	logger := logging.GetLogger()
 
 	// Validate action before connecting
@@ -264,12 +264,12 @@ func executeActionParallel(action *config.Action, servers []*config.Server) erro
 	}
 
 	var wg sync.WaitGroup
-	results := make(chan string, len(servers))
-	errors := make(chan error, len(servers))
+	results := make(chan string, len(machines))
+	errors := make(chan error, len(machines))
 
-	for _, server := range servers {
+	for _, machine := range machines {
 		wg.Add(1)
-		go executeActionOnServer(action, server, results, errors, &wg)
+		go executeActionOnMachine(action, machine, results, errors, &wg)
 	}
 
 	// Wait for all goroutines to complete

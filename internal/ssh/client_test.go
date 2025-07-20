@@ -57,14 +57,14 @@ func mockSSHServer(t *testing.T) (serverAddr string, cleanup func()) {
 }
 
 func TestNewSSHClient_NoAuth(t *testing.T) {
-	server := &config.Server{
+	machine := &config.Machine{
 		Name: "test",
 		Host: "localhost",
 		User: "testuser",
 		Port: 22,
 	}
 
-	_, err := NewSSHClient(server, 30)
+	_, err := NewSSHClient(machine, 30)
 	if err == nil {
 		t.Error("expected error when no authentication method is provided")
 	}
@@ -74,7 +74,7 @@ func TestNewSSHClient_NoAuth(t *testing.T) {
 }
 
 func TestNewSSHClient_PasswordAuth(t *testing.T) {
-	server := &config.Server{
+	machine := &config.Machine{
 		Name:     "test",
 		Host:     "localhost",
 		User:     "testuser",
@@ -82,7 +82,7 @@ func TestNewSSHClient_PasswordAuth(t *testing.T) {
 		Password: "testpass",
 	}
 
-	_, err := NewSSHClient(server, 30)
+	_, err := NewSSHClient(machine, 30)
 	// This will fail to connect or authenticate, but should not fail due to authentication setup
 	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") && !strings.Contains(err.Error(), "unable to authenticate") {
 		t.Errorf("expected connection/authentication error, got: %v", err)
@@ -100,7 +100,7 @@ func TestNewSSHClient_KeyFileAuth(t *testing.T) {
 		t.Fatalf("failed to create test key file: %v", err)
 	}
 
-	server := &config.Server{
+	machine := &config.Machine{
 		Name:    "test",
 		Host:    "localhost",
 		User:    "testuser",
@@ -108,7 +108,7 @@ func TestNewSSHClient_KeyFileAuth(t *testing.T) {
 		KeyFile: keyFile,
 	}
 
-	_, err = NewSSHClient(server, 30)
+	_, err = NewSSHClient(machine, 30)
 	if err == nil {
 		t.Error("expected error when key file is invalid")
 	}
@@ -128,7 +128,7 @@ func TestNewSSHClient_BothAuthMethods(t *testing.T) {
 		t.Fatalf("failed to create test key file: %v", err)
 	}
 
-	server := &config.Server{
+	machine := &config.Machine{
 		Name:     "test",
 		Host:     "localhost",
 		User:     "testuser",
@@ -137,7 +137,7 @@ func TestNewSSHClient_BothAuthMethods(t *testing.T) {
 		KeyFile:  keyFile,
 	}
 
-	_, err = NewSSHClient(server, 30)
+	_, err = NewSSHClient(machine, 30)
 	// Should fail due to key parsing error
 	if err == nil {
 		t.Error("expected error when key file is invalid")
@@ -148,7 +148,7 @@ func TestNewSSHClient_BothAuthMethods(t *testing.T) {
 }
 
 func TestNewSSHClient_KeyFileNotFound(t *testing.T) {
-	server := &config.Server{
+	machine := &config.Machine{
 		Name:    "test",
 		Host:    "localhost",
 		User:    "testuser",
@@ -156,7 +156,7 @@ func TestNewSSHClient_KeyFileNotFound(t *testing.T) {
 		KeyFile: "/nonexistent/key/file",
 	}
 
-	_, err := NewSSHClient(server, 30)
+	_, err := NewSSHClient(machine, 30)
 	if err == nil {
 		t.Error("expected error when key file does not exist")
 	}
@@ -166,7 +166,7 @@ func TestNewSSHClient_KeyFileNotFound(t *testing.T) {
 }
 
 func TestNewSSHClient_Timeout(t *testing.T) {
-	server := &config.Server{
+	machine := &config.Machine{
 		Name:     "test",
 		Host:     "192.0.2.1", // RFC 5737 reserved for documentation/testing
 		User:     "testuser",
@@ -175,7 +175,7 @@ func TestNewSSHClient_Timeout(t *testing.T) {
 	}
 
 	start := time.Now()
-	_, err := NewSSHClient(server, 1) // 1 second timeout
+	_, err := NewSSHClient(machine, 1) // 1 second timeout
 	duration := time.Since(start)
 
 	if err == nil {
@@ -299,7 +299,7 @@ func TestGetHostKeyCallback(t *testing.T) {
 }
 
 func TestNewSSHClientWithHostKeyCallback(t *testing.T) {
-	server := &config.Server{
+	machine := &config.Machine{
 		Name:     "test",
 		Host:     "localhost",
 		User:     "testuser",
@@ -308,7 +308,7 @@ func TestNewSSHClientWithHostKeyCallback(t *testing.T) {
 	}
 
 	// Test with insecure host key callback (should not fail due to auth setup)
-	client, err := NewSSHClientWithHostKeyCallback(server, 30, InsecureHostKey, "")
+	client, err := NewSSHClientWithHostKeyCallback(machine, 30, InsecureHostKey, "")
 	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") && !strings.Contains(err.Error(), "unable to authenticate") {
 		t.Errorf("Expected connection/authentication error, got: %v", err)
 	}
@@ -317,7 +317,7 @@ func TestNewSSHClientWithHostKeyCallback(t *testing.T) {
 	}
 
 	// Test with auto host key callback (should not fail due to auth setup)
-	client, err = NewSSHClientWithHostKeyCallback(server, 30, AutoHostKey, "")
+	client, err = NewSSHClientWithHostKeyCallback(machine, 30, AutoHostKey, "")
 	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") && !strings.Contains(err.Error(), "unable to authenticate") {
 		t.Errorf("Expected connection/authentication error, got: %v", err)
 	}
@@ -326,7 +326,7 @@ func TestNewSSHClientWithHostKeyCallback(t *testing.T) {
 	}
 
 	// Test with known hosts callback (may succeed if known_hosts file exists)
-	_, err = NewSSHClientWithHostKeyCallback(server, 30, KnownHostsHostKey, "")
+	_, err = NewSSHClientWithHostKeyCallback(machine, 30, KnownHostsHostKey, "")
 	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") && !strings.Contains(err.Error(), "unable to authenticate") && !strings.Contains(err.Error(), "failed to parse known_hosts file") {
 		t.Errorf("Expected connection/authentication/known_hosts error, got: %v", err)
 	}
@@ -335,7 +335,7 @@ func TestNewSSHClientWithHostKeyCallback(t *testing.T) {
 	}
 
 	// Test with unsupported host key callback type
-	_, err = NewSSHClientWithHostKeyCallback(server, 30, "unsupported", "")
+	_, err = NewSSHClientWithHostKeyCallback(machine, 30, "unsupported", "")
 	if err == nil {
 		t.Error("Expected error with unsupported callback type but got none")
 	} else if !strings.Contains(err.Error(), "unsupported host key callback type") {
@@ -362,8 +362,8 @@ func TestSSHClient_ExecuteCommand_WithMockServer(t *testing.T) {
 		}
 	}
 
-	// Create server config
-	server := &config.Server{
+	// Create machine config
+	machine := &config.Machine{
 		Name:     "test",
 		Host:     host,
 		User:     "testuser",
@@ -372,7 +372,7 @@ func TestSSHClient_ExecuteCommand_WithMockServer(t *testing.T) {
 	}
 
 	// Create SSH client
-	client, err := NewSSHClient(server, 5)
+	client, err := NewSSHClient(machine, 5)
 	if err != nil {
 		// If connection fails, that's okay for this test
 		// We're mainly testing the ExecuteCommand logic
@@ -397,7 +397,7 @@ func TestSSHClient_ExecuteCommand_WithMockServer(t *testing.T) {
 func TestSSHClient_ExecuteCommand_WithRealConnection(t *testing.T) {
 	// Test with a real SSH connection attempt that will fail
 	// but will exercise the session creation code
-	server := &config.Server{
+	machine := &config.Machine{
 		Name:     "test",
 		Host:     "192.0.2.1", // RFC 5737 reserved for documentation/testing
 		User:     "testuser",
@@ -405,7 +405,7 @@ func TestSSHClient_ExecuteCommand_WithRealConnection(t *testing.T) {
 		Port:     22,
 	}
 
-	client, err := NewSSHClient(server, 1) // 1 second timeout
+	client, err := NewSSHClient(machine, 1) // 1 second timeout
 	if err != nil {
 		// This is expected to fail due to connection timeout
 		if !strings.Contains(err.Error(), "connection refused") &&
@@ -432,8 +432,8 @@ func TestSSHClient_ExecuteCommand_WithRealConnection(t *testing.T) {
 func TestSSHClient_ExecuteCommand_SessionError(t *testing.T) {
 	// Create a client with a nil SSH client to test session creation error
 	client := &SSHClient{
-		Server: &config.Server{Name: "test"},
-		Client: nil,
+		config: &config.Machine{Name: "test"},
+		client: nil,
 	}
 
 	_, err := client.ExecuteCommand("echo test")
@@ -489,8 +489,8 @@ func TestSSHClient_ExecuteCommand_CommandExecutionError(t *testing.T) {
 		}
 	}
 
-	// Create server config
-	serverConfig := &config.Server{
+	// Create machine config
+	machineConfig := &config.Machine{
 		Name:     "test",
 		Host:     host,
 		User:     "testuser",
@@ -499,7 +499,7 @@ func TestSSHClient_ExecuteCommand_CommandExecutionError(t *testing.T) {
 	}
 
 	// Create SSH client
-	client, err := NewSSHClient(serverConfig, 5)
+	client, err := NewSSHClient(machineConfig, 5)
 	if err != nil {
 		// If connection fails, that's okay for this test
 		t.Logf("SSH connection failed (expected in some environments): %v", err)
@@ -530,8 +530,8 @@ func TestSSHClient_ExecuteScript_Success(t *testing.T) {
 
 	// Create a mock SSH client
 	client := &SSHClient{
-		Server: &config.Server{Name: "test"},
-		Client: nil, // No real connection
+		config: &config.Machine{Name: "test"},
+		client: nil, // No real connection
 	}
 
 	// This should fail due to no SSH connection, but we can test the file reading part
@@ -547,7 +547,7 @@ func TestSSHClient_ExecuteScript_Success(t *testing.T) {
 func TestSSHClient_ExecuteScript_FileReadError(t *testing.T) {
 	// Create a mock SSH client
 	client := &SSHClient{
-		Server: &config.Server{Name: "test"},
+		config: &config.Machine{Name: "test"},
 	}
 
 	_, err := client.ExecuteScript("/nonexistent/script.sh")
@@ -560,10 +560,10 @@ func TestSSHClient_ExecuteScript_FileReadError(t *testing.T) {
 }
 
 func TestSSHClient_Close(t *testing.T) {
-	// Test that Close doesn't panic when Client is nil
+	// Test that Close doesn't panic when client is nil
 	client := &SSHClient{
-		Server: &config.Server{Name: "test"},
-		Client: nil,
+		config: &config.Machine{Name: "test"},
+		client: nil,
 	}
 
 	// Should not panic
@@ -576,8 +576,8 @@ func TestSSHClient_Close(t *testing.T) {
 func TestSSHClient_ExecuteCommand_NoConnection(t *testing.T) {
 	// Test ExecuteCommand with no SSH connection
 	client := &SSHClient{
-		Server: &config.Server{Name: "test"},
-		Client: nil,
+		config: &config.Machine{Name: "test"},
+		client: nil,
 	}
 
 	_, err := client.ExecuteCommand("echo test")

@@ -49,9 +49,10 @@ func (t *TestCLICommand) GetError() string {
 }
 
 // setupTestEnvironment creates a temporary test environment
-func setupTestEnvironment(t *testing.T) (string, func()) {
+func setupTestEnvironment(t *testing.T) (tempDir string, cleanup func()) {
 	// Create temporary directory
-	tempDir, err := os.MkdirTemp("", "spooky-facts-test-*")
+	var err error
+	tempDir, err = os.MkdirTemp("", "spooky-facts-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -64,96 +65,13 @@ func setupTestEnvironment(t *testing.T) (string, func()) {
 	os.Setenv("SPOOKY_FACTS_FORMAT", "badgerdb")
 
 	// Cleanup function
-	cleanup := func() {
+	cleanup = func() {
 		os.RemoveAll(tempDir)
 		os.Setenv("SPOOKY_FACTS_PATH", originalPath)
 		os.Setenv("SPOOKY_FACTS_FORMAT", originalFormat)
 	}
 
 	return tempDir, cleanup
-}
-
-func TestFactsCollectCommand(t *testing.T) {
-	_, cleanup := setupTestEnvironment(t)
-	defer cleanup()
-
-	// Create a test command
-	cmd := &cobra.Command{
-		Use:   "facts collect",
-		Short: "Collect facts from a server",
-		RunE:  runFactsCollect,
-	}
-
-	testCmd := NewTestCLICommand(cmd)
-
-	// Test collecting all facts from local machine
-	err := testCmd.Execute("local")
-	if err != nil {
-		t.Fatalf("Failed to execute facts collect command: %v", err)
-	}
-
-	// Since the command uses fmt.Println directly, we can't capture output easily
-	// Instead, we verify that the command executed successfully without errors
-	t.Log("Facts collect command executed successfully")
-}
-
-func TestFactsGetCommand(t *testing.T) {
-	_, cleanup := setupTestEnvironment(t)
-	defer cleanup()
-
-	// Create a test command
-	cmd := &cobra.Command{
-		Use:   "facts get",
-		Short: "Get a specific fact",
-		RunE:  runFactsGet,
-	}
-
-	testCmd := NewTestCLICommand(cmd)
-
-	// Test getting a specific fact
-	err := testCmd.Execute("local", "hostname")
-	if err != nil {
-		t.Fatalf("Failed to execute facts get command: %v", err)
-	}
-
-	// Since the command uses fmt.Println directly, we can't capture output easily
-	// Instead, we verify that the command executed successfully without errors
-	t.Log("Facts get command executed successfully")
-}
-
-func TestFactsListCommand(t *testing.T) {
-	_, cleanup := setupTestEnvironment(t)
-	defer cleanup()
-
-	// First, collect some facts to have data to list
-	collectCmd := &cobra.Command{
-		Use:   "facts collect",
-		Short: "Collect facts from a server",
-		RunE:  runFactsCollect,
-	}
-
-	collectTestCmd := NewTestCLICommand(collectCmd)
-	err := collectTestCmd.Execute("local")
-	if err != nil {
-		t.Fatalf("Failed to collect facts: %v", err)
-	}
-
-	// Now test listing facts
-	listCmd := &cobra.Command{
-		Use:   "facts list",
-		Short: "List stored facts",
-		RunE:  runFactsList,
-	}
-
-	listTestCmd := NewTestCLICommand(listCmd)
-	err = listTestCmd.Execute()
-	if err != nil {
-		t.Fatalf("Failed to execute facts list command: %v", err)
-	}
-
-	// Since the command uses fmt.Println directly, we can't capture output easily
-	// Instead, we verify that the command executed successfully without errors
-	t.Log("Facts list command executed successfully")
 }
 
 func TestFactsGatherCommand(t *testing.T) {
@@ -184,17 +102,17 @@ func TestFactsQueryCommand(t *testing.T) {
 	_, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 
-	// First, collect some facts to have data to query
-	collectCmd := &cobra.Command{
-		Use:   "facts collect",
-		Short: "Collect facts from a server",
-		RunE:  runFactsCollect,
+	// First, gather some facts to have data to query
+	gatherCmd := &cobra.Command{
+		Use:   "facts gather",
+		Short: "Gather facts from servers",
+		RunE:  runFactsGather,
 	}
 
-	collectTestCmd := NewTestCLICommand(collectCmd)
-	err := collectTestCmd.Execute("local")
+	gatherTestCmd := NewTestCLICommand(gatherCmd)
+	err := gatherTestCmd.Execute("local")
 	if err != nil {
-		t.Fatalf("Failed to collect facts: %v", err)
+		t.Fatalf("Failed to gather facts: %v", err)
 	}
 
 	// Now test querying facts
@@ -221,17 +139,17 @@ func TestFactsExportCommand(t *testing.T) {
 	tempDir, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 
-	// First, collect some facts to have data to export
-	collectCmd := &cobra.Command{
-		Use:   "facts collect",
-		Short: "Collect facts from a server",
-		RunE:  runFactsCollect,
+	// First, gather some facts to have data to export
+	gatherCmd := &cobra.Command{
+		Use:   "facts gather",
+		Short: "Gather facts from servers",
+		RunE:  runFactsGather,
 	}
 
-	collectTestCmd := NewTestCLICommand(collectCmd)
-	err := collectTestCmd.Execute("local")
+	gatherTestCmd := NewTestCLICommand(gatherCmd)
+	err := gatherTestCmd.Execute("local")
 	if err != nil {
-		t.Fatalf("Failed to collect facts: %v", err)
+		t.Fatalf("Failed to gather facts: %v", err)
 	}
 
 	// Create export file path
@@ -314,7 +232,7 @@ func TestFactsImportCommand(t *testing.T) {
 		t.Fatalf("Failed to marshal test facts: %v", err)
 	}
 
-	err = os.WriteFile(importFile, importData, 0644)
+	err = os.WriteFile(importFile, importData, 0o600)
 	if err != nil {
 		t.Fatalf("Failed to write import file: %v", err)
 	}
@@ -514,21 +432,4 @@ func TestParseQueryExpression(t *testing.T) {
 			}
 		})
 	}
-}
-
-// Helper function to check if a string contains a substring
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr ||
-		(len(s) > len(substr) && (s[:len(substr)] == substr ||
-			s[len(s)-len(substr):] == substr ||
-			containsSubstring(s, substr))))
-}
-
-func containsSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

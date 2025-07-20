@@ -47,7 +47,7 @@ func (v *Validator) registerCustomValidations() {
 	}
 
 	// Register struct-level validations for cross-field validation
-	v.validate.RegisterStructValidation(v.validateServerStruct, Server{})
+	v.validate.RegisterStructValidation(v.validateMachineStruct, Machine{})
 	v.validate.RegisterStructValidation(v.validateActionStruct, Action{})
 	v.validate.RegisterStructValidation(v.validateConfigStruct, Config{})
 }
@@ -94,20 +94,20 @@ func (v *Validator) validateScriptFile(fl validator.FieldLevel) bool {
 	return true
 }
 
-// validateServerStruct performs struct-level validation for Server
-func (v *Validator) validateServerStruct(sl validator.StructLevel) {
-	server := sl.Current().Interface().(Server)
+// validateMachineStruct performs struct-level validation for Machine
+func (v *Validator) validateMachineStruct(sl validator.StructLevel) {
+	machine := sl.Current().Interface().(Machine)
 
 	// Validate authentication requirements (either password or key_file must be provided)
-	if server.Password == "" && server.KeyFile == "" {
-		sl.ReportError(server.Password, "Password", "password", "server_auth", server.Name)
+	if machine.Password == "" && machine.KeyFile == "" {
+		sl.ReportError(machine.Password, "Password", "password", "machine_auth", machine.Name)
 	}
 
 	// Note: File validation is disabled for testing purposes
 	// In production, uncomment the following code to validate SSH key files:
-	// if server.KeyFile != "" {
-	// 	if !v.validateSSHKeyFileExists(server.KeyFile) {
-	// 		sl.ReportError(server.KeyFile, "KeyFile", "key_file", "sshkeyfile", server.Name)
+	// if machine.KeyFile != "" {
+	// 	if !v.validateSSHKeyFileExists(machine.KeyFile) {
+	// 		sl.ReportError(machine.KeyFile, "KeyFile", "key_file", "sshkeyfile", machine.Name)
 	// 	}
 	// }
 }
@@ -137,13 +137,13 @@ func (v *Validator) validateActionStruct(sl validator.StructLevel) {
 func (v *Validator) validateConfigStruct(sl validator.StructLevel) {
 	config := sl.Current().Interface().(Config)
 
-	// Validate unique server names
-	serverNames := make(map[string]bool)
-	for _, server := range config.Servers {
-		if serverNames[server.Name] {
-			sl.ReportError(server.Name, "Name", "name", "unique_server", server.Name)
+	// Validate unique machine names
+	machineNames := make(map[string]bool)
+	for _, machine := range config.Machines {
+		if machineNames[machine.Name] {
+			sl.ReportError(machine.Name, "Name", "name", "unique_machine", machine.Name)
 		}
-		serverNames[server.Name] = true
+		machineNames[machine.Name] = true
 	}
 
 	// Validate unique action names
@@ -156,12 +156,12 @@ func (v *Validator) validateConfigStruct(sl validator.StructLevel) {
 		actionNames[action.Name] = true
 	}
 
-	// Validate server references in actions
+	// Validate machine references in actions
 	for i := range config.Actions {
 		action := &config.Actions[i]
-		for _, serverRef := range action.Servers {
-			if !serverNames[serverRef] {
-				sl.ReportError(serverRef, "Servers", "servers", "valid_servers", action.Name)
+		for _, machineRef := range action.Machines {
+			if !machineNames[machineRef] {
+				sl.ReportError(machineRef, "Machines", "machines", "valid_machines", action.Name)
 			}
 		}
 	}
@@ -177,14 +177,14 @@ func (v *Validator) validateConfig(config *Config) error {
 	// Perform validation
 	if err := v.validate.Struct(config); err != nil {
 		logger.Error("Configuration validation failed", err,
-			logging.Int("server_count", len(config.Servers)),
+			logging.Int("machine_count", len(config.Machines)),
 			logging.Int("action_count", len(config.Actions)),
 		)
 		return v.formatValidationErrors(err)
 	}
 
 	logger.Info("Configuration validation successful",
-		logging.Int("server_count", len(config.Servers)),
+		logging.Int("machine_count", len(config.Machines)),
 		logging.Int("action_count", len(config.Actions)),
 	)
 
@@ -217,17 +217,17 @@ func (v *Validator) formatValidationError(e validator.FieldError) string {
 
 	// Use map for other validation tags
 	errorMessages := map[string]string{
-		"required":      fmt.Sprintf("%s is required", e.Field()),
-		"max":           fmt.Sprintf("%s must be at most %s", e.Field(), e.Param()),
-		"server_auth":   fmt.Sprintf("either password or key_file must be specified for server %s", e.Param()),
-		"action_exec":   fmt.Sprintf("either command or script must be specified for action %s (but not both)", e.Param()),
-		"unique_server": fmt.Sprintf("duplicate server name: %s", e.Param()),
-		"unique_action": fmt.Sprintf("duplicate action name: %s", e.Param()),
-		"valid_port":    fmt.Sprintf("port must be between 1 and 65535 for server %s", e.Param()),
-		"valid_timeout": fmt.Sprintf("timeout must be between 1 and 3600 seconds for action %s", e.Param()),
-		"valid_servers": fmt.Sprintf("server reference '%s' in action '%s' does not exist", e.Value(), e.Param()),
-		"sshkeyfile":    fmt.Sprintf("SSH key file '%s' does not exist or is not readable for server %s", e.Value(), e.Param()),
-		"scriptfile":    fmt.Sprintf("script file '%s' does not exist or is not executable for action %s", e.Value(), e.Param()),
+		"required":       fmt.Sprintf("%s is required", e.Field()),
+		"max":            fmt.Sprintf("%s must be at most %s", e.Field(), e.Param()),
+		"machine_auth":   fmt.Sprintf("either password or key_file must be specified for machine %s", e.Param()),
+		"action_exec":    fmt.Sprintf("either command or script must be specified for action %s (but not both)", e.Param()),
+		"unique_machine": fmt.Sprintf("duplicate machine name: %s", e.Param()),
+		"unique_action":  fmt.Sprintf("duplicate action name: %s", e.Param()),
+		"valid_port":     fmt.Sprintf("port must be between 1 and 65535 for machine %s", e.Param()),
+		"valid_timeout":  fmt.Sprintf("timeout must be between 1 and 3600 seconds for action %s", e.Param()),
+		"valid_machines": fmt.Sprintf("machine reference '%s' in action '%s' does not exist", e.Value(), e.Param()),
+		"sshkeyfile":     fmt.Sprintf("SSH key file '%s' does not exist or is not readable for machine %s", e.Value(), e.Param()),
+		"scriptfile":     fmt.Sprintf("script file '%s' does not exist or is not executable for action %s", e.Value(), e.Param()),
 	}
 
 	if message, exists := errorMessages[e.Tag()]; exists {
@@ -239,8 +239,8 @@ func (v *Validator) formatValidationError(e validator.FieldError) string {
 
 // formatMinValidation handles the complex min validation logic
 func (v *Validator) formatMinValidation(e validator.FieldError) string {
-	if e.Field() == "Servers" {
-		return "at least one server must be defined"
+	if e.Field() == "Machines" {
+		return "at least one machine must be defined"
 	}
 
 	// Handle numeric fields differently
@@ -248,26 +248,23 @@ func (v *Validator) formatMinValidation(e validator.FieldError) string {
 		return fmt.Sprintf("%s must be at least %s", e.Field(), e.Param())
 	}
 
-	return fmt.Sprintf("%s must be at least %s characters long", e.Field(), e.Param())
+	return fmt.Sprintf("%s must be at least %s", e.Field(), e.Param())
 }
 
-// ValidateServer validates a single server configuration
-func (v *Validator) ValidateServer(server *Server) error {
+// ValidateMachine validates a single machine configuration
+func (v *Validator) ValidateMachine(machine *Machine) error {
 	logger := logging.GetLogger()
 
-	if err := v.validate.Struct(server); err != nil {
-		logger.Error("Server validation failed", err,
-			logging.Server(server.Name),
-			logging.Host(server.Host),
-			logging.Port(server.Port),
+	// Perform validation
+	if err := v.validate.Struct(machine); err != nil {
+		logger.Error("Machine validation failed", err,
+			logging.String("machine_name", machine.Name),
 		)
 		return v.formatValidationErrors(err)
 	}
 
-	logger.Info("Server validation successful",
-		logging.Server(server.Name),
-		logging.Host(server.Host),
-		logging.Port(server.Port),
+	logger.Info("Machine validation successful",
+		logging.String("machine_name", machine.Name),
 	)
 
 	return nil

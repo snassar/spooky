@@ -212,94 +212,199 @@ func (c *SSHCollector) collectEnvironmentFacts(collection *FactCollection) error
 
 // collectSpecificFact collects a specific fact based on the key
 func (c *SSHCollector) collectSpecificFact(collection *FactCollection, key string) error {
-	switch key {
-	case FactMachineID:
-		if machineID, err := c.executeCommand("cat /etc/machine-id"); err == nil {
-			c.createFact(collection, FactMachineID, strings.TrimSpace(machineID))
-		}
-	case FactHostname:
-		if hostname, err := c.executeCommand("hostname"); err == nil {
-			c.createFact(collection, FactHostname, strings.TrimSpace(hostname))
-		}
-	case FactFQDN:
-		if fqdn, err := c.executeCommand("hostname -f"); err == nil {
-			c.createFact(collection, FactFQDN, strings.TrimSpace(fqdn))
-		}
-	case FactOSName, FactOSVersion, FactOSDistro:
-		if osRelease, err := c.executeCommand("cat /etc/os-release"); err == nil {
-			osInfo := c.parseOSRelease(osRelease)
-			if key == FactOSName {
-				c.createFact(collection, FactOSName, osInfo.Name)
-			} else if key == FactOSVersion {
-				c.createFact(collection, FactOSVersion, osInfo.Version)
-			} else if key == FactOSDistro {
-				c.createFact(collection, FactOSDistro, osInfo.Distribution)
-			}
-		}
-	case FactOSArch:
-		if arch, err := c.executeCommand("uname -m"); err == nil {
-			c.createFact(collection, FactOSArch, strings.TrimSpace(arch))
-		}
-	case FactOSKernel:
-		if kernel, err := c.executeCommand("uname -r"); err == nil {
-			c.createFact(collection, FactOSKernel, strings.TrimSpace(kernel))
-		}
-	case FactCPUCores:
-		if cores, err := c.executeCommand("nproc"); err == nil {
-			if coreCount, err := strconv.Atoi(strings.TrimSpace(cores)); err == nil {
-				c.createFactWithValue(collection, FactCPUCores, coreCount)
-			}
-		}
-	case FactCPUModel:
-		if model, err := c.executeCommand("cat /proc/cpuinfo | grep 'model name' | head -1 | cut -d: -f2"); err == nil {
-			c.createFact(collection, FactCPUModel, strings.TrimSpace(model))
-		}
-	case FactMemoryTotal, FactMemoryUsed, FactMemoryAvail:
-		if memInfo, err := c.executeCommand("cat /proc/meminfo"); err == nil {
-			memory := c.parseMemInfo(memInfo)
-			if key == FactMemoryTotal {
-				c.createFactWithValue(collection, FactMemoryTotal, memory.Total)
-			} else if key == FactMemoryUsed {
-				c.createFactWithValue(collection, FactMemoryUsed, memory.Used)
-			} else if key == FactMemoryAvail {
-				c.createFactWithValue(collection, FactMemoryAvail, memory.Available)
-			}
-		}
-	case FactDiskTotal, FactDiskUsed, FactDiskAvail:
-		if dfOutput, err := c.executeCommand("df -B1 /"); err == nil {
-			disk := c.parseDiskInfo(dfOutput)
-			if key == FactDiskTotal {
-				c.createFactWithValue(collection, FactDiskTotal, disk.Total)
-			} else if key == FactDiskUsed {
-				c.createFactWithValue(collection, FactDiskUsed, disk.Used)
-			} else if key == FactDiskAvail {
-				c.createFactWithValue(collection, FactDiskAvail, disk.Available)
-			}
-		}
-	case FactNetworkIPs:
-		if ipOutput, err := c.executeCommand("ip -json addr show"); err == nil {
-			ips := c.parseIPAddresses(ipOutput)
-			c.createFactWithValue(collection, FactNetworkIPs, ips)
-		}
-	case FactNetworkMACs:
-		if macOutput, err := c.executeCommand("ip -json link show"); err == nil {
-			macs := c.parseMACAddresses(macOutput)
-			c.createFactWithValue(collection, FactNetworkMACs, macs)
-		}
-	case FactDNS:
-		if resolvConf, err := c.executeCommand("cat /etc/resolv.conf"); err == nil {
-			dns := c.parseDNSConfig(resolvConf)
-			c.createFactWithValue(collection, FactDNS, dns)
-		}
-	case FactEnvironment:
-		if envOutput, err := c.executeCommand("env"); err == nil {
-			env := c.parseEnvironment(envOutput)
-			c.createFactWithValue(collection, FactEnvironment, env)
-		}
-	default:
+	collector, exists := c.getFactCollector(key)
+	if !exists {
 		return fmt.Errorf("unknown fact key: %s", key)
 	}
 
+	return collector(collection)
+}
+
+// factCollector is a function type that collects a specific fact
+type factCollector func(*FactCollection) error
+
+// getFactCollector returns the appropriate fact collector for the given key
+func (c *SSHCollector) getFactCollector(key string) (factCollector, bool) {
+	collectors := map[string]factCollector{
+		FactMachineID:   c.collectMachineID,
+		FactHostname:    c.collectHostname,
+		FactFQDN:        c.collectFQDN,
+		FactOSName:      c.collectOSName,
+		FactOSVersion:   c.collectOSVersion,
+		FactOSDistro:    c.collectOSDistro,
+		FactOSArch:      c.collectOSArch,
+		FactOSKernel:    c.collectOSKernel,
+		FactCPUCores:    c.collectCPUCores,
+		FactCPUModel:    c.collectCPUModel,
+		FactMemoryTotal: c.collectMemoryTotal,
+		FactMemoryUsed:  c.collectMemoryUsed,
+		FactMemoryAvail: c.collectMemoryAvail,
+		FactDiskTotal:   c.collectDiskTotal,
+		FactDiskUsed:    c.collectDiskUsed,
+		FactDiskAvail:   c.collectDiskAvail,
+		FactNetworkIPs:  c.collectNetworkIPs,
+		FactNetworkMACs: c.collectNetworkMACs,
+		FactDNS:         c.collectDNS,
+		FactEnvironment: c.collectEnvironment,
+	}
+
+	collector, exists := collectors[key]
+	return collector, exists
+}
+
+// Individual fact collector methods
+func (c *SSHCollector) collectMachineID(collection *FactCollection) error {
+	if machineID, err := c.executeCommand("cat /etc/machine-id"); err == nil {
+		c.createFact(collection, FactMachineID, strings.TrimSpace(machineID))
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectHostname(collection *FactCollection) error {
+	if hostname, err := c.executeCommand("hostname"); err == nil {
+		c.createFact(collection, FactHostname, strings.TrimSpace(hostname))
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectFQDN(collection *FactCollection) error {
+	if fqdn, err := c.executeCommand("hostname -f"); err == nil {
+		c.createFact(collection, FactFQDN, strings.TrimSpace(fqdn))
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectOSName(collection *FactCollection) error {
+	if osRelease, err := c.executeCommand("cat /etc/os-release"); err == nil {
+		osInfo := c.parseOSRelease(osRelease)
+		c.createFact(collection, FactOSName, osInfo.Name)
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectOSVersion(collection *FactCollection) error {
+	if osRelease, err := c.executeCommand("cat /etc/os-release"); err == nil {
+		osInfo := c.parseOSRelease(osRelease)
+		c.createFact(collection, FactOSVersion, osInfo.Version)
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectOSDistro(collection *FactCollection) error {
+	if osRelease, err := c.executeCommand("cat /etc/os-release"); err == nil {
+		osInfo := c.parseOSRelease(osRelease)
+		c.createFact(collection, FactOSDistro, osInfo.Distribution)
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectOSArch(collection *FactCollection) error {
+	if arch, err := c.executeCommand("uname -m"); err == nil {
+		c.createFact(collection, FactOSArch, strings.TrimSpace(arch))
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectOSKernel(collection *FactCollection) error {
+	if kernel, err := c.executeCommand("uname -r"); err == nil {
+		c.createFact(collection, FactOSKernel, strings.TrimSpace(kernel))
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectCPUCores(collection *FactCollection) error {
+	if cores, err := c.executeCommand("nproc"); err == nil {
+		if coreCount, err := strconv.Atoi(strings.TrimSpace(cores)); err == nil {
+			c.createFactWithValue(collection, FactCPUCores, coreCount)
+		}
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectCPUModel(collection *FactCollection) error {
+	if model, err := c.executeCommand("cat /proc/cpuinfo | grep 'model name' | head -1 | cut -d: -f2"); err == nil {
+		c.createFact(collection, FactCPUModel, strings.TrimSpace(model))
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectMemoryTotal(collection *FactCollection) error {
+	if memInfo, err := c.executeCommand("cat /proc/meminfo"); err == nil {
+		memory := c.parseMemInfo(memInfo)
+		c.createFactWithValue(collection, FactMemoryTotal, memory.Total)
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectMemoryUsed(collection *FactCollection) error {
+	if memInfo, err := c.executeCommand("cat /proc/meminfo"); err == nil {
+		memory := c.parseMemInfo(memInfo)
+		c.createFactWithValue(collection, FactMemoryUsed, memory.Used)
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectMemoryAvail(collection *FactCollection) error {
+	if memInfo, err := c.executeCommand("cat /proc/meminfo"); err == nil {
+		memory := c.parseMemInfo(memInfo)
+		c.createFactWithValue(collection, FactMemoryAvail, memory.Available)
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectDiskTotal(collection *FactCollection) error {
+	if dfOutput, err := c.executeCommand("df -B1 /"); err == nil {
+		disk := c.parseDiskInfo(dfOutput)
+		c.createFactWithValue(collection, FactDiskTotal, disk.Total)
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectDiskUsed(collection *FactCollection) error {
+	if dfOutput, err := c.executeCommand("df -B1 /"); err == nil {
+		disk := c.parseDiskInfo(dfOutput)
+		c.createFactWithValue(collection, FactDiskUsed, disk.Used)
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectDiskAvail(collection *FactCollection) error {
+	if dfOutput, err := c.executeCommand("df -B1 /"); err == nil {
+		disk := c.parseDiskInfo(dfOutput)
+		c.createFactWithValue(collection, FactDiskAvail, disk.Available)
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectNetworkIPs(collection *FactCollection) error {
+	if ipOutput, err := c.executeCommand("ip -json addr show"); err == nil {
+		ips := c.parseIPAddresses(ipOutput)
+		c.createFactWithValue(collection, FactNetworkIPs, ips)
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectNetworkMACs(collection *FactCollection) error {
+	if macOutput, err := c.executeCommand("ip -json link show"); err == nil {
+		macs := c.parseMACAddresses(macOutput)
+		c.createFactWithValue(collection, FactNetworkMACs, macs)
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectDNS(collection *FactCollection) error {
+	if resolvConf, err := c.executeCommand("cat /etc/resolv.conf"); err == nil {
+		dns := c.parseDNSConfig(resolvConf)
+		c.createFactWithValue(collection, FactDNS, dns)
+	}
+	return nil
+}
+
+func (c *SSHCollector) collectEnvironment(collection *FactCollection) error {
+	if envOutput, err := c.executeCommand("env"); err == nil {
+		env := c.parseEnvironment(envOutput)
+		c.createFactWithValue(collection, FactEnvironment, env)
+	}
 	return nil
 }
 
@@ -332,11 +437,13 @@ func (c *SSHCollector) parseOSRelease(osRelease string) OSInfo {
 		// Remove quotes from values
 		line = strings.Trim(line, `"'`)
 
-		if strings.HasPrefix(line, "NAME=") {
+		// Extract the prefix for switch statement
+		switch {
+		case strings.HasPrefix(line, "NAME="):
 			osInfo.Name = strings.Trim(strings.TrimPrefix(line, "NAME="), `"'`)
-		} else if strings.HasPrefix(line, "VERSION=") {
+		case strings.HasPrefix(line, "VERSION="):
 			osInfo.Version = strings.Trim(strings.TrimPrefix(line, "VERSION="), `"'`)
-		} else if strings.HasPrefix(line, "ID=") {
+		case strings.HasPrefix(line, "ID="):
 			osInfo.Distribution = strings.Trim(strings.TrimPrefix(line, "ID="), `"'`)
 		}
 	}

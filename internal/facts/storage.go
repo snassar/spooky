@@ -128,69 +128,119 @@ func ConvertFactCollectionToMachineFacts(machineID string, collection *FactColle
 
 	// Extract facts and convert to storage format
 	for key, fact := range collection.Facts {
-		switch key {
-		case "hostname":
-			if str, ok := fact.Value.(string); ok {
-				facts.Hostname = str
-			}
-		case "machine_id":
-			if str, ok := fact.Value.(string); ok {
-				facts.SystemID = str
-			}
-		case "os.name":
-			if str, ok := fact.Value.(string); ok {
-				facts.OS = str
-			}
-		case "os.version":
-			if str, ok := fact.Value.(string); ok {
-				facts.OSVersion = str
-			}
-		case "cpu.cores":
-			if cores, ok := fact.Value.(int); ok {
-				facts.CPU.Cores = cores
-			}
-		case "cpu.model":
-			if str, ok := fact.Value.(string); ok {
-				facts.CPU.Model = str
-			}
-		case "cpu.arch":
-			if str, ok := fact.Value.(string); ok {
-				facts.CPU.Arch = str
-			}
-		case "cpu.frequency":
-			if str, ok := fact.Value.(string); ok {
-				facts.CPU.Frequency = str
-			}
-		case "memory.total":
-			if total, ok := fact.Value.(uint64); ok {
-				facts.Memory.Total = total
-			}
-		case "memory.used":
-			if used, ok := fact.Value.(uint64); ok {
-				facts.Memory.Used = used
-			}
-		case "memory.available":
-			if avail, ok := fact.Value.(uint64); ok {
-				facts.Memory.Available = avail
-			}
-		case "network.ips":
-			if ips, ok := fact.Value.([]string); ok && len(ips) > 0 {
-				facts.IPAddresses = ips
-				// Set primary IP to first non-loopback address, or first address if all are loopback
-				for _, ip := range ips {
-					if !strings.HasPrefix(ip, "127.") && !strings.HasPrefix(ip, "::1") {
-						facts.PrimaryIP = ip
-						break
-					}
-				}
-				if facts.PrimaryIP == "" && len(ips) > 0 {
-					facts.PrimaryIP = ips[0]
-				}
-			}
+		if converter, exists := getFactConverter(key); exists {
+			converter(facts, fact.Value)
 		}
 	}
 
 	return facts
+}
+
+// factConverter is a function type that converts a fact value to the appropriate field in MachineFacts
+type factConverter func(*MachineFacts, interface{})
+
+// getFactConverter returns the appropriate fact converter for the given key
+func getFactConverter(key string) (factConverter, bool) {
+	converters := map[string]factConverter{
+		"hostname":         convertHostname,
+		"machine_id":       convertMachineID,
+		"os.name":          convertOSName,
+		"os.version":       convertOSVersion,
+		"cpu.cores":        convertCPUCores,
+		"cpu.model":        convertCPUModel,
+		"cpu.arch":         convertCPUArch,
+		"cpu.frequency":    convertCPUFrequency,
+		"memory.total":     convertMemoryTotal,
+		"memory.used":      convertMemoryUsed,
+		"memory.available": convertMemoryAvailable,
+		"network.ips":      convertNetworkIPs,
+	}
+
+	converter, exists := converters[key]
+	return converter, exists
+}
+
+// Individual fact converter functions
+func convertHostname(facts *MachineFacts, value interface{}) {
+	if str, ok := value.(string); ok {
+		facts.Hostname = str
+	}
+}
+
+func convertMachineID(facts *MachineFacts, value interface{}) {
+	if str, ok := value.(string); ok {
+		facts.SystemID = str
+	}
+}
+
+func convertOSName(facts *MachineFacts, value interface{}) {
+	if str, ok := value.(string); ok {
+		facts.OS = str
+	}
+}
+
+func convertOSVersion(facts *MachineFacts, value interface{}) {
+	if str, ok := value.(string); ok {
+		facts.OSVersion = str
+	}
+}
+
+func convertCPUCores(facts *MachineFacts, value interface{}) {
+	if cores, ok := value.(int); ok {
+		facts.CPU.Cores = cores
+	}
+}
+
+func convertCPUModel(facts *MachineFacts, value interface{}) {
+	if str, ok := value.(string); ok {
+		facts.CPU.Model = str
+	}
+}
+
+func convertCPUArch(facts *MachineFacts, value interface{}) {
+	if str, ok := value.(string); ok {
+		facts.CPU.Arch = str
+	}
+}
+
+func convertCPUFrequency(facts *MachineFacts, value interface{}) {
+	if str, ok := value.(string); ok {
+		facts.CPU.Frequency = str
+	}
+}
+
+func convertMemoryTotal(facts *MachineFacts, value interface{}) {
+	if total, ok := value.(uint64); ok {
+		facts.Memory.Total = total
+	}
+}
+
+func convertMemoryUsed(facts *MachineFacts, value interface{}) {
+	if used, ok := value.(uint64); ok {
+		facts.Memory.Used = used
+	}
+}
+
+func convertMemoryAvailable(facts *MachineFacts, value interface{}) {
+	if avail, ok := value.(uint64); ok {
+		facts.Memory.Available = avail
+	}
+}
+
+func convertNetworkIPs(facts *MachineFacts, value interface{}) {
+	if ips, ok := value.([]string); ok && len(ips) > 0 {
+		facts.IPAddresses = ips
+		// Set primary IP to first non-loopback address, or first address if all are loopback
+		for _, ip := range ips {
+			if !strings.HasPrefix(ip, "127.") && !strings.HasPrefix(ip, "::1") {
+				facts.PrimaryIP = ip
+				break
+			}
+		}
+		if facts.PrimaryIP == "" && len(ips) > 0 {
+			facts.PrimaryIP = ips[0]
+		}
+	}
 }
 
 // matchesQuery checks if facts match the query criteria

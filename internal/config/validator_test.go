@@ -15,19 +15,19 @@ func TestNewValidator(t *testing.T) {
 	}
 }
 
-func TestValidator_ValidateServer(t *testing.T) {
+func TestValidator_ValidateMachine(t *testing.T) {
 	v := NewValidator()
 
 	tests := []struct {
 		name    string
-		server  Server
+		machine Machine
 		wantErr bool
 		errMsg  string
 	}{
 		{
-			name: "valid server with password",
-			server: Server{
-				Name:     "test-server",
+			name: "valid machine with password",
+			machine: Machine{
+				Name:     "test-machine",
 				Host:     "localhost",
 				User:     "testuser",
 				Password: "testpass",
@@ -35,9 +35,9 @@ func TestValidator_ValidateServer(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "valid server with key file",
-			server: Server{
-				Name:    "test-server",
+			name: "valid machine with key file",
+			machine: Machine{
+				Name:    "test-machine",
 				Host:    "localhost",
 				User:    "testuser",
 				KeyFile: "/path/to/key",
@@ -45,9 +45,9 @@ func TestValidator_ValidateServer(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "valid server with both password and key file",
-			server: Server{
-				Name:     "test-server",
+			name: "valid machine with both password and key file",
+			machine: Machine{
+				Name:     "test-machine",
 				Host:     "localhost",
 				User:     "testuser",
 				Password: "testpass",
@@ -56,18 +56,18 @@ func TestValidator_ValidateServer(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "invalid server with no authentication",
-			server: Server{
-				Name: "test-server",
+			name: "invalid machine with no authentication",
+			machine: Machine{
+				Name: "test-machine",
 				Host: "localhost",
 				User: "testuser",
 			},
 			wantErr: true,
-			errMsg:  "either password or key_file must be specified for server test-server",
+			errMsg:  "either password or key_file must be specified for machine test-machine",
 		},
 		{
-			name: "invalid server with empty name",
-			server: Server{
+			name: "invalid machine with empty name",
+			machine: Machine{
 				Name:     "",
 				Host:     "localhost",
 				User:     "testuser",
@@ -77,9 +77,9 @@ func TestValidator_ValidateServer(t *testing.T) {
 			errMsg:  "Name is required",
 		},
 		{
-			name: "invalid server with empty host",
-			server: Server{
-				Name:     "test-server",
+			name: "invalid machine with empty host",
+			machine: Machine{
+				Name:     "test-machine",
 				Host:     "",
 				User:     "testuser",
 				Password: "testpass",
@@ -88,9 +88,9 @@ func TestValidator_ValidateServer(t *testing.T) {
 			errMsg:  "Host is required",
 		},
 		{
-			name: "invalid server with empty user",
-			server: Server{
-				Name:     "test-server",
+			name: "invalid machine with empty user",
+			machine: Machine{
+				Name:     "test-machine",
 				Host:     "localhost",
 				User:     "",
 				Password: "testpass",
@@ -100,9 +100,9 @@ func TestValidator_ValidateServer(t *testing.T) {
 		},
 
 		{
-			name: "valid server with valid port",
-			server: Server{
-				Name:     "test-server",
+			name: "valid machine with valid port",
+			machine: Machine{
+				Name:     "test-machine",
 				Host:     "localhost",
 				User:     "testuser",
 				Password: "testpass",
@@ -114,14 +114,14 @@ func TestValidator_ValidateServer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := v.ValidateServer(&tt.server)
+			err := v.ValidateMachine(&tt.machine)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateServer() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ValidateMachine() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if tt.wantErr && err != nil {
 				if tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
-					t.Errorf("ValidateServer() error message = %v, want to contain %v", err.Error(), tt.errMsg)
+					t.Errorf("ValidateMachine() error message = %v, want to contain %v", err.Error(), tt.errMsg)
 				}
 			}
 		})
@@ -220,9 +220,9 @@ func TestValidator_ValidateConfig(t *testing.T) {
 		{
 			name: "valid config",
 			config: Config{
-				Servers: []Server{
+				Machines: []Machine{
 					{
-						Name:     "server1",
+						Name:     "machine1",
 						Host:     "localhost",
 						User:     "testuser",
 						Password: "testpass",
@@ -238,9 +238,9 @@ func TestValidator_ValidateConfig(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "invalid config with no servers",
+			name: "invalid config with no machines",
 			config: Config{
-				Servers: []Server{},
+				Machines: []Machine{},
 				Actions: []Action{
 					{
 						Name:    "action1",
@@ -249,20 +249,20 @@ func TestValidator_ValidateConfig(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsg:  "at least one server must be defined",
+			errMsg:  "at least one machine must be defined",
 		},
 		{
-			name: "invalid config with duplicate server names",
+			name: "invalid config with duplicate machine names",
 			config: Config{
-				Servers: []Server{
+				Machines: []Machine{
 					{
-						Name:     "server1",
+						Name:     "machine1",
 						Host:     "localhost",
 						User:     "testuser",
 						Password: "testpass",
 					},
 					{
-						Name:     "server1",
+						Name:     "machine1",
 						Host:     "localhost2",
 						User:     "testuser2",
 						Password: "testpass2",
@@ -276,14 +276,14 @@ func TestValidator_ValidateConfig(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsg:  "duplicate server name: server1",
+			errMsg:  "duplicate machine name: machine1",
 		},
 		{
 			name: "invalid config with duplicate action names",
 			config: Config{
-				Servers: []Server{
+				Machines: []Machine{
 					{
-						Name:     "server1",
+						Name:     "machine1",
 						Host:     "localhost",
 						User:     "testuser",
 						Password: "testpass",
@@ -304,11 +304,11 @@ func TestValidator_ValidateConfig(t *testing.T) {
 			errMsg:  "duplicate action name: action1",
 		},
 		{
-			name: "invalid config with invalid server reference",
+			name: "invalid config with invalid machine reference",
 			config: Config{
-				Servers: []Server{
+				Machines: []Machine{
 					{
-						Name:     "server1",
+						Name:     "machine1",
 						Host:     "localhost",
 						User:     "testuser",
 						Password: "testpass",
@@ -316,27 +316,27 @@ func TestValidator_ValidateConfig(t *testing.T) {
 				},
 				Actions: []Action{
 					{
-						Name:    "action1",
-						Command: "echo test",
-						Servers: []string{"server1", "nonexistent"},
+						Name:     "action1",
+						Command:  "echo test",
+						Machines: []string{"machine1", "nonexistent"},
 					},
 				},
 			},
 			wantErr: true,
-			errMsg:  "server reference 'nonexistent' in action 'action1' does not exist",
+			errMsg:  "machine reference 'nonexistent' in action 'action1' does not exist",
 		},
 		{
-			name: "valid config with valid server references",
+			name: "valid config with valid machine references",
 			config: Config{
-				Servers: []Server{
+				Machines: []Machine{
 					{
-						Name:     "server1",
+						Name:     "machine1",
 						Host:     "localhost",
 						User:     "testuser",
 						Password: "testpass",
 					},
 					{
-						Name:     "server2",
+						Name:     "machine2",
 						Host:     "localhost2",
 						User:     "testuser2",
 						Password: "testpass2",
@@ -344,9 +344,9 @@ func TestValidator_ValidateConfig(t *testing.T) {
 				},
 				Actions: []Action{
 					{
-						Name:    "action1",
-						Command: "echo test",
-						Servers: []string{"server1", "server2"},
+						Name:     "action1",
+						Command:  "echo test",
+						Machines: []string{"machine1", "machine2"},
 					},
 				},
 			},
@@ -373,18 +373,18 @@ func TestValidator_ValidateConfig(t *testing.T) {
 func TestValidator_StructLevelValidation(t *testing.T) {
 	v := NewValidator()
 
-	// Test server struct-level validation
-	t.Run("Server struct-level validation", func(t *testing.T) {
+	// Test machine struct-level validation
+	t.Run("Machine struct-level validation", func(t *testing.T) {
 		// Test authentication validation
-		server := Server{
-			Name: "test-server",
+		machine := Machine{
+			Name: "test-machine",
 			Host: "localhost",
 			User: "testuser",
 			// No password or key file
 		}
-		err := v.ValidateServer(&server)
+		err := v.ValidateMachine(&machine)
 		if err == nil {
-			t.Error("Expected error for server without authentication")
+			t.Error("Expected error for machine without authentication")
 		}
 		if !strings.Contains(err.Error(), "either password or key_file must be specified") {
 			t.Errorf("Expected authentication error, got: %v", err)

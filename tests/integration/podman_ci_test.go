@@ -60,9 +60,9 @@ func TestPodmanCIIntegration(t *testing.T) {
 			t.Logf("SSH key permissions: %o", info.Mode().Perm())
 		}
 
-		// Create a simple server config for testing
-		server := config.Server{
-			Name:     "test-server",
+		// Create a simple machine config for testing
+		machine := config.Machine{
+			Name:     "test-machine",
 			Host:     sshHost,
 			Port:     sshPort, // Use port from environment variable
 			User:     sshUser,
@@ -70,10 +70,10 @@ func TestPodmanCIIntegration(t *testing.T) {
 			Password: "", // Use key authentication
 		}
 
-		t.Logf("Attempting SSH connection to %s@%s:%d with key %s", server.User, server.Host, server.Port, server.KeyFile)
+		t.Logf("Attempting SSH connection to %s@%s:%d with key %s", machine.User, machine.Host, machine.Port, machine.KeyFile)
 
 		// Test SSH client creation with longer timeout for CI
-		client, err := ssh.NewSSHClient(&server, 60) // Increased timeout for CI
+		client, err := ssh.NewSSHClient(&machine, 60) // Increased timeout for CI
 		if err != nil {
 			t.Fatalf("Failed to create SSH client: %v", err)
 		}
@@ -152,9 +152,9 @@ echo "Script execution test completed"
 			t.Fatalf("Failed to write script file: %v", err)
 		}
 
-		// Create server config
-		server := config.Server{
-			Name:     "test-server",
+		// Create machine config
+		machine := config.Machine{
+			Name:     "test-machine",
 			Host:     sshHost,
 			Port:     sshPort,
 			User:     sshUser,
@@ -163,7 +163,7 @@ echo "Script execution test completed"
 		}
 
 		// Create SSH client
-		client, err := ssh.NewSSHClient(&server, 30)
+		client, err := ssh.NewSSHClient(&machine, 30)
 		if err != nil {
 			t.Fatalf("Failed to create SSH client: %v", err)
 		}
@@ -234,9 +234,9 @@ action "parallel-test" {
 
 	// Test 5: Error handling
 	t.Run("Error Handling", func(t *testing.T) {
-		// Create server config
-		server := config.Server{
-			Name:     "test-server",
+		// Create machine config
+		machine := config.Machine{
+			Name:     "test-machine",
 			Host:     sshHost,
 			Port:     sshPort,
 			User:     sshUser,
@@ -245,7 +245,7 @@ action "parallel-test" {
 		}
 
 		// Create SSH client
-		client, err := ssh.NewSSHClient(&server, 30)
+		client, err := ssh.NewSSHClient(&machine, 30)
 		if err != nil {
 			t.Fatalf("Failed to create SSH client: %v", err)
 		}
