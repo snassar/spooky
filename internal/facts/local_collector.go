@@ -23,40 +23,34 @@ func NewLocalCollector() *LocalCollector {
 	return &LocalCollector{}
 }
 
+// Helper function to create a fact
+func (c *LocalCollector) createFact(collection *FactCollection, key, value string) {
+	collection.Facts[key] = &Fact{
+		Key:       key,
+		Value:     value,
+		Source:    string(SourceLocal),
+		Server:    collection.Server,
+		Timestamp: collection.Timestamp,
+		TTL:       DefaultTTL,
+	}
+}
+
+// Helper function to create a fact with any value type
+func (c *LocalCollector) createFactWithValue(collection *FactCollection, key string, value interface{}) {
+	collection.Facts[key] = &Fact{
+		Key:       key,
+		Value:     value,
+		Source:    string(SourceLocal),
+		Server:    collection.Server,
+		Timestamp: collection.Timestamp,
+		TTL:       DefaultTTL,
+	}
+}
+
 // Collect gathers all available facts from the local machine
 func (c *LocalCollector) Collect(server string) (*FactCollection, error) {
-	collection := &FactCollection{
-		Server:    server,
-		Timestamp: time.Now(),
-		Facts:     make(map[string]*Fact),
-	}
-
-	// Collect system facts
-	if err := c.collectSystemFacts(collection); err != nil {
-		return nil, fmt.Errorf("failed to collect system facts: %w", err)
-	}
-
-	// Collect OS facts
-	if err := c.collectOSFacts(collection); err != nil {
-		return nil, fmt.Errorf("failed to collect OS facts: %w", err)
-	}
-
-	// Collect hardware facts
-	if err := c.collectHardwareFacts(collection); err != nil {
-		return nil, fmt.Errorf("failed to collect hardware facts: %w", err)
-	}
-
-	// Collect network facts
-	if err := c.collectNetworkFacts(collection); err != nil {
-		return nil, fmt.Errorf("failed to collect network facts: %w", err)
-	}
-
-	// Collect environment facts
-	if err := c.collectEnvironmentFacts(collection); err != nil {
-		return nil, fmt.Errorf("failed to collect environment facts: %w", err)
-	}
-
-	return collection, nil
+	base := NewBaseCollector()
+	return base.CollectAll(server, c)
 }
 
 // CollectSpecific collects only the specified facts
@@ -99,38 +93,17 @@ func (c *LocalCollector) GetFact(server, key string) (*Fact, error) {
 func (c *LocalCollector) collectSystemFacts(collection *FactCollection) error {
 	// Machine ID
 	if machineID, err := c.readFile("/etc/machine-id"); err == nil {
-		collection.Facts[FactMachineID] = &Fact{
-			Key:       FactMachineID,
-			Value:     strings.TrimSpace(machineID),
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFact(collection, FactMachineID, strings.TrimSpace(machineID))
 	}
 
 	// Hostname
 	if hostname, err := os.Hostname(); err == nil {
-		collection.Facts[FactHostname] = &Fact{
-			Key:       FactHostname,
-			Value:     hostname,
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFact(collection, FactHostname, hostname)
 	}
 
 	// FQDN
 	if fqdn, err := c.executeCommand("hostname", "-f"); err == nil {
-		collection.Facts[FactFQDN] = &Fact{
-			Key:       FactFQDN,
-			Value:     strings.TrimSpace(fqdn),
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFact(collection, FactFQDN, strings.TrimSpace(fqdn))
 	}
 
 	return nil
@@ -140,52 +113,17 @@ func (c *LocalCollector) collectSystemFacts(collection *FactCollection) error {
 func (c *LocalCollector) collectOSFacts(collection *FactCollection) error {
 	// Get host info using gopsutil
 	if hostInfo, err := host.Info(); err == nil {
-		collection.Facts[FactOSName] = &Fact{
-			Key:       FactOSName,
-			Value:     hostInfo.OS,
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFact(collection, FactOSName, hostInfo.OS)
 
-		collection.Facts[FactOSVersion] = &Fact{
-			Key:       FactOSVersion,
-			Value:     hostInfo.PlatformVersion,
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFact(collection, FactOSVersion, hostInfo.PlatformVersion)
 
-		collection.Facts[FactOSDistro] = &Fact{
-			Key:       FactOSDistro,
-			Value:     hostInfo.Platform,
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFact(collection, FactOSDistro, hostInfo.Platform)
 
-		collection.Facts[FactOSKernel] = &Fact{
-			Key:       FactOSKernel,
-			Value:     hostInfo.KernelVersion,
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFact(collection, FactOSKernel, hostInfo.KernelVersion)
 	}
 
 	// Architecture
-	collection.Facts[FactOSArch] = &Fact{
-		Key:       FactOSArch,
-		Value:     runtime.GOARCH,
-		Source:    string(SourceLocal),
-		Server:    collection.Server,
-		Timestamp: collection.Timestamp,
-		TTL:       DefaultTTL,
-	}
+	c.createFact(collection, FactOSArch, runtime.GOARCH)
 
 	return nil
 }
@@ -194,92 +132,29 @@ func (c *LocalCollector) collectOSFacts(collection *FactCollection) error {
 func (c *LocalCollector) collectHardwareFacts(collection *FactCollection) error {
 	// CPU information
 	if cpuInfo, err := cpu.Info(); err == nil && len(cpuInfo) > 0 {
-		collection.Facts[FactCPUCores] = &Fact{
-			Key:       FactCPUCores,
-			Value:     int(cpuInfo[0].Cores),
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFactWithValue(collection, FactCPUCores, int(cpuInfo[0].Cores))
 
-		collection.Facts[FactCPUModel] = &Fact{
-			Key:       FactCPUModel,
-			Value:     cpuInfo[0].ModelName,
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFact(collection, FactCPUModel, cpuInfo[0].ModelName)
 
-		collection.Facts[FactCPUArch] = &Fact{
-			Key:       FactCPUArch,
-			Value:     runtime.GOARCH,
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFact(collection, FactCPUArch, runtime.GOARCH)
 	}
 
 	// Memory information
 	if memInfo, err := mem.VirtualMemory(); err == nil {
-		collection.Facts[FactMemoryTotal] = &Fact{
-			Key:       FactMemoryTotal,
-			Value:     memInfo.Total,
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFactWithValue(collection, FactMemoryTotal, memInfo.Total)
 
-		collection.Facts[FactMemoryUsed] = &Fact{
-			Key:       FactMemoryUsed,
-			Value:     memInfo.Used,
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFactWithValue(collection, FactMemoryUsed, memInfo.Used)
 
-		collection.Facts[FactMemoryAvail] = &Fact{
-			Key:       FactMemoryAvail,
-			Value:     memInfo.Available,
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFactWithValue(collection, FactMemoryAvail, memInfo.Available)
 	}
 
 	// Disk information
 	if diskInfo, err := disk.Usage("/"); err == nil {
-		collection.Facts[FactDiskTotal] = &Fact{
-			Key:       FactDiskTotal,
-			Value:     diskInfo.Total,
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFactWithValue(collection, FactDiskTotal, diskInfo.Total)
 
-		collection.Facts[FactDiskUsed] = &Fact{
-			Key:       FactDiskUsed,
-			Value:     diskInfo.Used,
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFactWithValue(collection, FactDiskUsed, diskInfo.Used)
 
-		collection.Facts[FactDiskAvail] = &Fact{
-			Key:       FactDiskAvail,
-			Value:     diskInfo.Free,
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFactWithValue(collection, FactDiskAvail, diskInfo.Free)
 	}
 
 	return nil
@@ -301,36 +176,15 @@ func (c *LocalCollector) collectNetworkFacts(collection *FactCollection) error {
 			}
 		}
 
-		collection.Facts[FactNetworkIPs] = &Fact{
-			Key:       FactNetworkIPs,
-			Value:     ips,
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFactWithValue(collection, FactNetworkIPs, ips)
 
-		collection.Facts[FactNetworkMACs] = &Fact{
-			Key:       FactNetworkMACs,
-			Value:     macs,
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFactWithValue(collection, FactNetworkMACs, macs)
 	}
 
 	// DNS configuration
 	if resolvConf, err := c.readFile("/etc/resolv.conf"); err == nil {
 		dns := c.parseDNSConfig(resolvConf)
-		collection.Facts[FactDNS] = &Fact{
-			Key:       FactDNS,
-			Value:     dns,
-			Source:    string(SourceLocal),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFactWithValue(collection, FactDNS, dns)
 	}
 
 	return nil
@@ -345,14 +199,7 @@ func (c *LocalCollector) collectEnvironmentFacts(collection *FactCollection) err
 		}
 	}
 
-	collection.Facts[FactEnvironment] = &Fact{
-		Key:       FactEnvironment,
-		Value:     env,
-		Source:    string(SourceLocal),
-		Server:    collection.Server,
-		Timestamp: collection.Timestamp,
-		TTL:       DefaultTTL,
-	}
+	c.createFactWithValue(collection, FactEnvironment, env)
 
 	return nil
 }
