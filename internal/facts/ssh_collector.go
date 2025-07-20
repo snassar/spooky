@@ -23,38 +23,8 @@ func NewSSHCollector(sshClient *ssh.SSHClient) *SSHCollector {
 
 // Collect gathers all available facts from a remote server
 func (c *SSHCollector) Collect(server string) (*FactCollection, error) {
-	collection := &FactCollection{
-		Server:    server,
-		Timestamp: time.Now(),
-		Facts:     make(map[string]*Fact),
-	}
-
-	// Collect system facts
-	if err := c.collectSystemFacts(collection); err != nil {
-		return nil, fmt.Errorf("failed to collect system facts: %w", err)
-	}
-
-	// Collect OS facts
-	if err := c.collectOSFacts(collection); err != nil {
-		return nil, fmt.Errorf("failed to collect OS facts: %w", err)
-	}
-
-	// Collect hardware facts
-	if err := c.collectHardwareFacts(collection); err != nil {
-		return nil, fmt.Errorf("failed to collect hardware facts: %w", err)
-	}
-
-	// Collect network facts
-	if err := c.collectNetworkFacts(collection); err != nil {
-		return nil, fmt.Errorf("failed to collect network facts: %w", err)
-	}
-
-	// Collect environment facts
-	if err := c.collectEnvironmentFacts(collection); err != nil {
-		return nil, fmt.Errorf("failed to collect environment facts: %w", err)
-	}
-
-	return collection, nil
+	base := NewBaseCollector()
+	return base.CollectAll(server, c)
 }
 
 // CollectSpecific collects only the specified facts
@@ -93,42 +63,45 @@ func (c *SSHCollector) GetFact(server, key string) (*Fact, error) {
 	return nil, fmt.Errorf("fact %s not found for server %s", key, server)
 }
 
+// Helper function to create a fact
+func (c *SSHCollector) createFact(collection *FactCollection, key, value string) {
+	collection.Facts[key] = &Fact{
+		Key:       key,
+		Value:     value,
+		Source:    string(SourceSSH),
+		Server:    collection.Server,
+		Timestamp: collection.Timestamp,
+		TTL:       DefaultTTL,
+	}
+}
+
+// Helper function to create a fact with any value type
+func (c *SSHCollector) createFactWithValue(collection *FactCollection, key string, value interface{}) {
+	collection.Facts[key] = &Fact{
+		Key:       key,
+		Value:     value,
+		Source:    string(SourceSSH),
+		Server:    collection.Server,
+		Timestamp: collection.Timestamp,
+		TTL:       DefaultTTL,
+	}
+}
+
 // collectSystemFacts collects basic system identification facts
 func (c *SSHCollector) collectSystemFacts(collection *FactCollection) error {
 	// Machine ID
 	if machineID, err := c.executeCommand("cat /etc/machine-id"); err == nil {
-		collection.Facts[FactMachineID] = &Fact{
-			Key:       FactMachineID,
-			Value:     strings.TrimSpace(machineID),
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFact(collection, FactMachineID, strings.TrimSpace(machineID))
 	}
 
 	// Hostname
 	if hostname, err := c.executeCommand("hostname"); err == nil {
-		collection.Facts[FactHostname] = &Fact{
-			Key:       FactHostname,
-			Value:     strings.TrimSpace(hostname),
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFact(collection, FactHostname, strings.TrimSpace(hostname))
 	}
 
 	// FQDN
 	if fqdn, err := c.executeCommand("hostname -f"); err == nil {
-		collection.Facts[FactFQDN] = &Fact{
-			Key:       FactFQDN,
-			Value:     strings.TrimSpace(fqdn),
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFact(collection, FactFQDN, strings.TrimSpace(fqdn))
 	}
 
 	return nil
@@ -140,56 +113,19 @@ func (c *SSHCollector) collectOSFacts(collection *FactCollection) error {
 	if osRelease, err := c.executeCommand("cat /etc/os-release"); err == nil {
 		osInfo := c.parseOSRelease(osRelease)
 
-		collection.Facts[FactOSName] = &Fact{
-			Key:       FactOSName,
-			Value:     osInfo.Name,
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
-
-		collection.Facts[FactOSVersion] = &Fact{
-			Key:       FactOSVersion,
-			Value:     osInfo.Version,
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
-
-		collection.Facts[FactOSDistro] = &Fact{
-			Key:       FactOSDistro,
-			Value:     osInfo.Distribution,
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFact(collection, FactOSName, osInfo.Name)
+		c.createFact(collection, FactOSVersion, osInfo.Version)
+		c.createFact(collection, FactOSDistro, osInfo.Distribution)
 	}
 
 	// Architecture
 	if arch, err := c.executeCommand("uname -m"); err == nil {
-		collection.Facts[FactOSArch] = &Fact{
-			Key:       FactOSArch,
-			Value:     strings.TrimSpace(arch),
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFact(collection, FactOSArch, strings.TrimSpace(arch))
 	}
 
 	// Kernel version
 	if kernel, err := c.executeCommand("uname -r"); err == nil {
-		collection.Facts[FactOSKernel] = &Fact{
-			Key:       FactOSKernel,
-			Value:     strings.TrimSpace(kernel),
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFact(collection, FactOSKernel, strings.TrimSpace(kernel))
 	}
 
 	return nil
@@ -200,91 +136,31 @@ func (c *SSHCollector) collectHardwareFacts(collection *FactCollection) error {
 	// CPU cores
 	if cores, err := c.executeCommand("nproc"); err == nil {
 		if coreCount, err := strconv.Atoi(strings.TrimSpace(cores)); err == nil {
-			collection.Facts[FactCPUCores] = &Fact{
-				Key:       FactCPUCores,
-				Value:     coreCount,
-				Source:    string(SourceSSH),
-				Server:    collection.Server,
-				Timestamp: collection.Timestamp,
-				TTL:       DefaultTTL,
-			}
+			c.createFactWithValue(collection, FactCPUCores, coreCount)
 		}
 	}
 
 	// CPU model
 	if model, err := c.executeCommand("cat /proc/cpuinfo | grep 'model name' | head -1 | cut -d: -f2"); err == nil {
-		collection.Facts[FactCPUModel] = &Fact{
-			Key:       FactCPUModel,
-			Value:     strings.TrimSpace(model),
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFact(collection, FactCPUModel, strings.TrimSpace(model))
 	}
 
 	// Memory information
 	if memInfo, err := c.executeCommand("cat /proc/meminfo"); err == nil {
 		memory := c.parseMemInfo(memInfo)
 
-		collection.Facts[FactMemoryTotal] = &Fact{
-			Key:       FactMemoryTotal,
-			Value:     memory.Total,
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
-
-		collection.Facts[FactMemoryUsed] = &Fact{
-			Key:       FactMemoryUsed,
-			Value:     memory.Used,
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
-
-		collection.Facts[FactMemoryAvail] = &Fact{
-			Key:       FactMemoryAvail,
-			Value:     memory.Available,
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFactWithValue(collection, FactMemoryTotal, memory.Total)
+		c.createFactWithValue(collection, FactMemoryUsed, memory.Used)
+		c.createFactWithValue(collection, FactMemoryAvail, memory.Available)
 	}
 
 	// Disk information
 	if dfOutput, err := c.executeCommand("df -B1 /"); err == nil {
 		disk := c.parseDiskInfo(dfOutput)
 
-		collection.Facts[FactDiskTotal] = &Fact{
-			Key:       FactDiskTotal,
-			Value:     disk.Total,
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
-
-		collection.Facts[FactDiskUsed] = &Fact{
-			Key:       FactDiskUsed,
-			Value:     disk.Used,
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
-
-		collection.Facts[FactDiskAvail] = &Fact{
-			Key:       FactDiskAvail,
-			Value:     disk.Available,
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFactWithValue(collection, FactDiskTotal, disk.Total)
+		c.createFactWithValue(collection, FactDiskUsed, disk.Used)
+		c.createFactWithValue(collection, FactDiskAvail, disk.Available)
 	}
 
 	return nil
@@ -295,40 +171,19 @@ func (c *SSHCollector) collectNetworkFacts(collection *FactCollection) error {
 	// IP addresses
 	if ipOutput, err := c.executeCommand("ip -json addr show"); err == nil {
 		ips := c.parseIPAddresses(ipOutput)
-		collection.Facts[FactNetworkIPs] = &Fact{
-			Key:       FactNetworkIPs,
-			Value:     ips,
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFactWithValue(collection, FactNetworkIPs, ips)
 	}
 
 	// MAC addresses
 	if macOutput, err := c.executeCommand("ip -json link show"); err == nil {
 		macs := c.parseMACAddresses(macOutput)
-		collection.Facts[FactNetworkMACs] = &Fact{
-			Key:       FactNetworkMACs,
-			Value:     macs,
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFactWithValue(collection, FactNetworkMACs, macs)
 	}
 
 	// DNS configuration
 	if resolvConf, err := c.executeCommand("cat /etc/resolv.conf"); err == nil {
 		dns := c.parseDNSConfig(resolvConf)
-		collection.Facts[FactDNS] = &Fact{
-			Key:       FactDNS,
-			Value:     dns,
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFactWithValue(collection, FactDNS, dns)
 	}
 
 	return nil
@@ -338,14 +193,7 @@ func (c *SSHCollector) collectNetworkFacts(collection *FactCollection) error {
 func (c *SSHCollector) collectEnvironmentFacts(collection *FactCollection) error {
 	if envOutput, err := c.executeCommand("env"); err == nil {
 		env := c.parseEnvironment(envOutput)
-		collection.Facts[FactEnvironment] = &Fact{
-			Key:       FactEnvironment,
-			Value:     env,
-			Source:    string(SourceSSH),
-			Server:    collection.Server,
-			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
-		}
+		c.createFactWithValue(collection, FactEnvironment, env)
 	}
 
 	return nil
