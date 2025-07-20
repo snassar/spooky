@@ -11,19 +11,9 @@ import (
 	"spooky/internal/config"
 	"spooky/internal/facts"
 	"spooky/internal/logging"
-	"spooky/internal/ssh"
 )
 
 var (
-	parallel int // coverage-ignore: global variable declaration
-	timeout  int // coverage-ignore: global variable declaration
-
-	// Execute command flags
-	hosts    string
-	retry    int
-	tags     string
-	skipTags string
-
 	// Validate command flags
 	schema string
 	strict bool
@@ -34,46 +24,6 @@ var (
 	sort    string
 	reverse bool
 )
-
-var ExecuteCmd = &cobra.Command{
-	Use:   "execute <source>",
-	Short: "Execute configuration files or remote sources",
-	Long:  `Execute actions defined in configuration files or remote sources on remote servers via SSH`,
-	Args:  cobra.ExactArgs(1),
-	RunE: func(_ *cobra.Command, args []string) error {
-		logger := logging.GetLogger()
-		source := args[0]
-
-		// TODO: Support remote sources (Git, S3, HTTP)
-		// For now, only support local files
-		if !isLocalFile(source) {
-			return fmt.Errorf("remote sources not yet supported: %s", source)
-		}
-
-		// Validate config file exists
-		if _, err := os.Stat(source); os.IsNotExist(err) {
-			logger.Error("Config file not found", err, logging.String("config_file", source))
-			return fmt.Errorf("config file %s does not exist", source) // coverage-ignore: file system error, hard to test
-		}
-
-		// Parse and execute configuration
-		config, err := config.ParseConfig(source)
-		if err != nil {
-			logger.Error("Failed to parse configuration", err, logging.String("config_file", source))
-			return fmt.Errorf("failed to parse config: %w", err)
-		}
-
-		logger.Info("Starting configuration execution",
-			logging.String("config_file", source),
-			logging.Int("action_count", len(config.Actions)),
-			logging.Int("machine_count", len(config.Machines)),
-			logging.Int("parallel", parallel),
-			logging.Int("timeout", timeout),
-		)
-
-		return ssh.ExecuteConfig(config)
-	},
-}
 
 var ValidateCmd = &cobra.Command{
 	Use:   "validate <source>",
@@ -115,11 +65,17 @@ var ValidateCmd = &cobra.Command{
 
 var ListCmd = &cobra.Command{
 	Use:   "list <resource|config-file>",
-	Short: "List resources, facts, or configurations",
-	Long:  `Display resources, facts, or configurations based on the specified resource type or from a configuration file`,
-	Args:  cobra.ExactArgs(1),
+	Short: "List resources or configurations",
+	Long:  `Display resources or configurations based on the specified resource type or from a configuration file. Use 'spooky facts list' for facts.`,
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
 		logger := logging.GetLogger()
+
+		// If no arguments provided, show help
+		if len(args) == 0 {
+			return fmt.Errorf("resource type or config file is required. Use 'spooky list <resource|config-file>' or 'spooky facts list' for facts")
+		}
+
 		resource := args[0]
 
 		// Check if it's a config file path
@@ -131,8 +87,6 @@ var ListCmd = &cobra.Command{
 		switch resource {
 		case "machines":
 			return listMachines(logger)
-		case "facts":
-			return listFacts(logger)
 		case "templates":
 			return listTemplates(logger)
 		case "configs":
@@ -140,20 +94,17 @@ var ListCmd = &cobra.Command{
 		case "actions":
 			return listActions(logger)
 		default:
-			return fmt.Errorf("unknown resource type: %s. Supported types: machines, facts, templates, configs, actions", resource)
+			return fmt.Errorf("unknown resource type: %s. Supported types: machines, templates, configs, actions. Use 'spooky facts list' for facts", resource)
 		}
 	},
 }
 
 // InitCommands initializes all CLI commands and their flags
 func InitCommands() {
-	// Execute command flags
-	ExecuteCmd.Flags().StringVar(&hosts, "hosts", "", "Comma-separated list of target hosts")
-	ExecuteCmd.Flags().IntVar(&parallel, "parallel", 5, "Number of parallel executions")
-	ExecuteCmd.Flags().IntVar(&timeout, "timeout", 30, "Execution timeout per host in seconds")
-	ExecuteCmd.Flags().IntVar(&retry, "retry", 3, "Number of retry attempts")
-	ExecuteCmd.Flags().StringVar(&tags, "tags", "", "Comma-separated list of tags to execute")
-	ExecuteCmd.Flags().StringVar(&skipTags, "skip-tags", "", "Comma-separated list of tags to skip")
+	// Check if flags are already initialized to prevent redefinition
+	if ValidateCmd.Flags().Lookup("schema") != nil {
+		return // Already initialized
+	}
 
 	// Validate command flags
 	ValidateCmd.Flags().StringVar(&schema, "schema", "", "Path to schema file for validation")

@@ -47,10 +47,12 @@ func main() {
 	cli.InitCommands()
 
 	// Add subcommands
-	rootCmd.AddCommand(cli.ExecuteCmd)
 	rootCmd.AddCommand(cli.ValidateCmd)
 	rootCmd.AddCommand(cli.ListCmd)
 	rootCmd.AddCommand(cli.FactsCmd)
+	rootCmd.AddCommand(cli.TemplatesCmd)
+	rootCmd.AddCommand(cli.MachinesCmd)
+	rootCmd.AddCommand(cli.ConfigCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		// Configure logger for error output if not already configured
