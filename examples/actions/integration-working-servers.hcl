@@ -1,8 +1,8 @@
-# Working servers only configuration for spooky SSH automation tool
-# Points to 7 working SSH servers for integration testing
+# Working machines only configuration for spooky SSH automation tool
+# Points to 7 working SSH machines for integration testing
 
-# Define working test servers (7 containers)
-server "spooky-test-server-1" {
+# Define working test machines (7 containers)
+machine "spooky-test-server-1" {
   host     = "localhost"
   port     = 2221
   user     = "testuser"
@@ -14,7 +14,7 @@ server "spooky-test-server-1" {
   }
 }
 
-server "spooky-test-server-2" {
+machine "spooky-test-server-2" {
   host     = "localhost"
   port     = 2222
   user     = "testuser"
@@ -26,7 +26,7 @@ server "spooky-test-server-2" {
   }
 }
 
-server "spooky-test-server-3" {
+machine "spooky-test-server-3" {
   host     = "localhost"
   port     = 2223
   user     = "testuser"
@@ -38,7 +38,7 @@ server "spooky-test-server-3" {
   }
 }
 
-server "spooky-test-server-4" {
+machine "spooky-test-server-4" {
   host     = "localhost"
   port     = 2224
   user     = "testuser"
@@ -50,7 +50,7 @@ server "spooky-test-server-4" {
   }
 }
 
-server "spooky-test-server-5" {
+machine "spooky-test-server-5" {
   host     = "localhost"
   port     = 2225
   user     = "testuser"
@@ -62,7 +62,7 @@ server "spooky-test-server-5" {
   }
 }
 
-server "spooky-test-server-6" {
+machine "spooky-test-server-6" {
   host     = "localhost"
   port     = 2226
   user     = "testuser"
@@ -74,7 +74,7 @@ server "spooky-test-server-6" {
   }
 }
 
-server "spooky-test-server-7" {
+machine "spooky-test-server-7" {
   host     = "localhost"
   port     = 2227
   user     = "testuser"
@@ -86,24 +86,24 @@ server "spooky-test-server-7" {
   }
 }
 
-# Test actions for working servers only
+# Test actions for working machines only
 action "check-status-all" {
-  description = "Check system status on all working servers"
-  command     = "uptime && df -h && echo 'Server: ' $(hostname)"
-  servers     = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-server-3", "spooky-test-server-4", "spooky-test-server-5", "spooky-test-server-6", "spooky-test-server-7"]
+  description = "Check system status on all working machines"
+  command     = "uptime && df -h && echo 'Machine: ' $(hostname)"
+  machines    = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-server-3", "spooky-test-server-4", "spooky-test-server-5", "spooky-test-server-6", "spooky-test-server-7"]
   parallel    = true
 }
 
 action "check-ssh-keys-all" {
-  description = "Check SSH key configuration on all working servers"
+  description = "Check SSH key configuration on all working machines"
   command     = "ls -la ~/.ssh/ && echo 'SSH keys mounted successfully on ' $(hostname)"
-  servers     = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-server-3", "spooky-test-server-4", "spooky-test-server-5", "spooky-test-server-6", "spooky-test-server-7"]
+  machines    = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-server-3", "spooky-test-server-4", "spooky-test-server-5", "spooky-test-server-6", "spooky-test-server-7"]
   parallel    = true
 }
 
 action "test-connection-all" {
-  description = "Test basic connectivity on all working servers"
+  description = "Test basic connectivity on all working machines"
   command     = "echo 'Connection test successful on ' $(hostname) && whoami && pwd"
-  servers     = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-server-3", "spooky-test-server-4", "spooky-test-server-5", "spooky-test-server-6", "spooky-test-server-7"]
+  machines    = ["spooky-test-server-1", "spooky-test-server-2", "spooky-test-server-3", "spooky-test-server-4", "spooky-test-server-5", "spooky-test-server-6", "spooky-test-server-7"]
   parallel    = true
 } 

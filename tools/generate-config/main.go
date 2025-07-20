@@ -518,7 +518,7 @@ func writeAction(f *os.File, action *Action) {
 // generateConfigFile generates a configuration file for a specific scale
 func generateConfigFile(scale ScaleConfig) error {
 	configID := generateID()
-	configDir := "../examples/configuration"
+	configDir := "../examples/actions"
 	filename := filepath.Join(configDir, fmt.Sprintf("%s-scale-example-%s.hcl", scale.Name, configID))
 
 	// Create output directory if it doesn't exist

@@ -167,15 +167,15 @@ coverage-html:
 
 # Run the tool with example configuration
 run: build
-	./build/spooky execute examples/configuration/example.hcl
+	./build/spooky execute examples/actions/example.hcl
 
 # Validate example configuration
 validate: build
-	./build/spooky validate examples/configuration/example.hcl
+	./build/spooky validate examples/actions/example.hcl
 
 # List servers and actions from example configuration
 list: build
-	./build/spooky list examples/configuration/example.hcl
+	./build/spooky list examples/actions/example.hcl
 
 # Show help
 help: build
@@ -184,7 +184,7 @@ help: build
 # Clean up generated configuration files
 clean-config:
 	@echo "Cleaning up generated configuration files..."
-	@find examples/configuration/ -name "*-scale-example-*.hcl" -type f -delete
+	@find examples/actions/ -name "*-scale-example-*.hcl" -type f -delete
 	@echo "Generated configuration files cleaned up"
 
 # Generate configuration files for testing

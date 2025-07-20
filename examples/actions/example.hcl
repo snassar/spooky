@@ -1,7 +1,7 @@
 # Example configuration for spooky SSH automation tool
 
-# Define servers
-server "debian-tester" {
+# Define machines
+machine "debian-tester" {
   host     = "192.168.178.73"
   port     = 22
   user     = "builder"
@@ -17,6 +17,6 @@ server "debian-tester" {
 action "check-status" {
   description = "Check system status"
   command     = "uptime && df -h"
-  servers     = ["debian-tester"]
+  machines    = ["debian-tester"]
   parallel    = true
 }

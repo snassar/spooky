@@ -9,7 +9,7 @@
 # SERVERS (400 total)
 # =============================================================================
 
-server "machine-fe8d67b1073acad1" {
+machine "machine-fe8d67b1073acad1" {
   host     = "10.1.1.1"
   port     = 22
   user     = "admin"
@@ -23,7 +23,7 @@ server "machine-fe8d67b1073acad1" {
   }
 }
 
-server "machine-d901fe5ad5a4c1da" {
+machine "machine-d901fe5ad5a4c1da" {
   host     = "10.1.1.2"
   port     = 22
   user     = "admin"
@@ -37,7 +37,7 @@ server "machine-d901fe5ad5a4c1da" {
   }
 }
 
-server "machine-09d6cdbeec529371" {
+machine "machine-09d6cdbeec529371" {
   host     = "10.1.1.3"
   port     = 22
   user     = "admin"
@@ -51,7 +51,7 @@ server "machine-09d6cdbeec529371" {
   }
 }
 
-server "machine-abb4ae3e23b58a38" {
+machine "machine-abb4ae3e23b58a38" {
   host     = "10.1.1.4"
   port     = 22
   user     = "admin"
@@ -65,7 +65,7 @@ server "machine-abb4ae3e23b58a38" {
   }
 }
 
-server "machine-8fb47c05992f0abf" {
+machine "machine-8fb47c05992f0abf" {
   host     = "10.1.1.5"
   port     = 22
   user     = "admin"
@@ -79,7 +79,7 @@ server "machine-8fb47c05992f0abf" {
   }
 }
 
-server "machine-0a5d5cd4a8fce37e" {
+machine "machine-0a5d5cd4a8fce37e" {
   host     = "10.1.1.6"
   port     = 22
   user     = "admin"
@@ -93,7 +93,7 @@ server "machine-0a5d5cd4a8fce37e" {
   }
 }
 
-server "machine-c64a6fdcbcb92c06" {
+machine "machine-c64a6fdcbcb92c06" {
   host     = "10.1.1.7"
   port     = 22
   user     = "admin"
@@ -107,7 +107,7 @@ server "machine-c64a6fdcbcb92c06" {
   }
 }
 
-server "machine-fb1728eed5b3ff78" {
+machine "machine-fb1728eed5b3ff78" {
   host     = "10.1.1.8"
   port     = 22
   user     = "admin"
@@ -121,7 +121,7 @@ server "machine-fb1728eed5b3ff78" {
   }
 }
 
-server "machine-29f0395903f03032" {
+machine "machine-29f0395903f03032" {
   host     = "10.1.1.9"
   port     = 22
   user     = "admin"
@@ -135,7 +135,7 @@ server "machine-29f0395903f03032" {
   }
 }
 
-server "machine-2a89036cf28150c7" {
+machine "machine-2a89036cf28150c7" {
   host     = "10.1.1.10"
   port     = 22
   user     = "admin"
@@ -149,7 +149,7 @@ server "machine-2a89036cf28150c7" {
   }
 }
 
-server "machine-23e58e7e7ef6436a" {
+machine "machine-23e58e7e7ef6436a" {
   host     = "10.1.1.11"
   port     = 22
   user     = "admin"
@@ -163,7 +163,7 @@ server "machine-23e58e7e7ef6436a" {
   }
 }
 
-server "machine-1126434b1bf4bac5" {
+machine "machine-1126434b1bf4bac5" {
   host     = "10.1.1.12"
   port     = 22
   user     = "admin"
@@ -177,7 +177,7 @@ server "machine-1126434b1bf4bac5" {
   }
 }
 
-server "machine-fbc155b97dc1738f" {
+machine "machine-fbc155b97dc1738f" {
   host     = "10.1.1.13"
   port     = 22
   user     = "admin"
@@ -191,7 +191,7 @@ server "machine-fbc155b97dc1738f" {
   }
 }
 
-server "machine-a60ef95e91267f62" {
+machine "machine-a60ef95e91267f62" {
   host     = "10.1.1.14"
   port     = 22
   user     = "admin"
@@ -205,7 +205,7 @@ server "machine-a60ef95e91267f62" {
   }
 }
 
-server "machine-9a81ccb5a0dd9aa8" {
+machine "machine-9a81ccb5a0dd9aa8" {
   host     = "10.1.1.15"
   port     = 22
   user     = "admin"
@@ -219,7 +219,7 @@ server "machine-9a81ccb5a0dd9aa8" {
   }
 }
 
-server "machine-c64f15e4c4cff512" {
+machine "machine-c64f15e4c4cff512" {
   host     = "10.1.1.16"
   port     = 22
   user     = "admin"
@@ -233,7 +233,7 @@ server "machine-c64f15e4c4cff512" {
   }
 }
 
-server "machine-29299e9377e18bc8" {
+machine "machine-29299e9377e18bc8" {
   host     = "10.1.1.17"
   port     = 22
   user     = "admin"
@@ -247,7 +247,7 @@ server "machine-29299e9377e18bc8" {
   }
 }
 
-server "machine-ed11966b60d5984d" {
+machine "machine-ed11966b60d5984d" {
   host     = "10.1.1.18"
   port     = 22
   user     = "admin"
@@ -261,7 +261,7 @@ server "machine-ed11966b60d5984d" {
   }
 }
 
-server "machine-37d9dc0d0c4c6a28" {
+machine "machine-37d9dc0d0c4c6a28" {
   host     = "10.1.1.19"
   port     = 22
   user     = "admin"
@@ -275,7 +275,7 @@ server "machine-37d9dc0d0c4c6a28" {
   }
 }
 
-server "machine-a5b449a8e00bc053" {
+machine "machine-a5b449a8e00bc053" {
   host     = "10.1.1.20"
   port     = 22
   user     = "admin"
@@ -289,7 +289,7 @@ server "machine-a5b449a8e00bc053" {
   }
 }
 
-server "machine-d3b6362920f429c9" {
+machine "machine-d3b6362920f429c9" {
   host     = "10.1.1.21"
   port     = 22
   user     = "admin"
@@ -303,7 +303,7 @@ server "machine-d3b6362920f429c9" {
   }
 }
 
-server "machine-c24581523e6e3b1d" {
+machine "machine-c24581523e6e3b1d" {
   host     = "10.1.1.22"
   port     = 22
   user     = "admin"
@@ -317,7 +317,7 @@ server "machine-c24581523e6e3b1d" {
   }
 }
 
-server "machine-e4bf3d53d5ea8ebc" {
+machine "machine-e4bf3d53d5ea8ebc" {
   host     = "10.1.1.23"
   port     = 22
   user     = "admin"
@@ -331,7 +331,7 @@ server "machine-e4bf3d53d5ea8ebc" {
   }
 }
 
-server "machine-0e4f034485a59b02" {
+machine "machine-0e4f034485a59b02" {
   host     = "10.1.1.24"
   port     = 22
   user     = "admin"
@@ -345,7 +345,7 @@ server "machine-0e4f034485a59b02" {
   }
 }
 
-server "machine-9bb9362712321b23" {
+machine "machine-9bb9362712321b23" {
   host     = "10.1.1.25"
   port     = 22
   user     = "admin"
@@ -359,7 +359,7 @@ server "machine-9bb9362712321b23" {
   }
 }
 
-server "machine-4ad85c21c0c0d46c" {
+machine "machine-4ad85c21c0c0d46c" {
   host     = "10.1.1.26"
   port     = 22
   user     = "admin"
@@ -373,7 +373,7 @@ server "machine-4ad85c21c0c0d46c" {
   }
 }
 
-server "machine-f57e01ff53bbaf44" {
+machine "machine-f57e01ff53bbaf44" {
   host     = "10.1.1.27"
   port     = 22
   user     = "admin"
@@ -387,7 +387,7 @@ server "machine-f57e01ff53bbaf44" {
   }
 }
 
-server "machine-fbea27a5a6b423dd" {
+machine "machine-fbea27a5a6b423dd" {
   host     = "10.1.1.28"
   port     = 22
   user     = "admin"
@@ -401,7 +401,7 @@ server "machine-fbea27a5a6b423dd" {
   }
 }
 
-server "machine-cc3e2b9b3681e060" {
+machine "machine-cc3e2b9b3681e060" {
   host     = "10.1.1.29"
   port     = 22
   user     = "admin"
@@ -415,7 +415,7 @@ server "machine-cc3e2b9b3681e060" {
   }
 }
 
-server "machine-3257befbe28a54f0" {
+machine "machine-3257befbe28a54f0" {
   host     = "10.1.1.30"
   port     = 22
   user     = "admin"
@@ -429,7 +429,7 @@ server "machine-3257befbe28a54f0" {
   }
 }
 
-server "machine-3062458ed659b2ef" {
+machine "machine-3062458ed659b2ef" {
   host     = "10.1.1.31"
   port     = 22
   user     = "admin"
@@ -443,7 +443,7 @@ server "machine-3062458ed659b2ef" {
   }
 }
 
-server "machine-74ea20890fe8b4b7" {
+machine "machine-74ea20890fe8b4b7" {
   host     = "10.1.1.32"
   port     = 22
   user     = "admin"
@@ -457,7 +457,7 @@ server "machine-74ea20890fe8b4b7" {
   }
 }
 
-server "machine-9ac1adb2c5e950ec" {
+machine "machine-9ac1adb2c5e950ec" {
   host     = "10.1.1.33"
   port     = 22
   user     = "admin"
@@ -471,7 +471,7 @@ server "machine-9ac1adb2c5e950ec" {
   }
 }
 
-server "machine-fd27121836a2b488" {
+machine "machine-fd27121836a2b488" {
   host     = "10.1.1.34"
   port     = 22
   user     = "admin"
@@ -485,7 +485,7 @@ server "machine-fd27121836a2b488" {
   }
 }
 
-server "machine-45ad9200435ff363" {
+machine "machine-45ad9200435ff363" {
   host     = "10.1.1.35"
   port     = 22
   user     = "admin"
@@ -499,7 +499,7 @@ server "machine-45ad9200435ff363" {
   }
 }
 
-server "machine-d67b3f8ea2ceb85f" {
+machine "machine-d67b3f8ea2ceb85f" {
   host     = "10.1.1.36"
   port     = 22
   user     = "admin"
@@ -513,7 +513,7 @@ server "machine-d67b3f8ea2ceb85f" {
   }
 }
 
-server "machine-7c71d458c3a00306" {
+machine "machine-7c71d458c3a00306" {
   host     = "10.1.1.37"
   port     = 22
   user     = "admin"
@@ -527,7 +527,7 @@ server "machine-7c71d458c3a00306" {
   }
 }
 
-server "machine-b37cfc23ecf05852" {
+machine "machine-b37cfc23ecf05852" {
   host     = "10.1.1.38"
   port     = 22
   user     = "admin"
@@ -541,7 +541,7 @@ server "machine-b37cfc23ecf05852" {
   }
 }
 
-server "machine-76fbaf8e826f5aad" {
+machine "machine-76fbaf8e826f5aad" {
   host     = "10.1.1.39"
   port     = 22
   user     = "admin"
@@ -555,7 +555,7 @@ server "machine-76fbaf8e826f5aad" {
   }
 }
 
-server "machine-2a0fd9f703780c3f" {
+machine "machine-2a0fd9f703780c3f" {
   host     = "10.1.1.40"
   port     = 22
   user     = "admin"
@@ -569,7 +569,7 @@ server "machine-2a0fd9f703780c3f" {
   }
 }
 
-server "machine-440dafb6f5a9a770" {
+machine "machine-440dafb6f5a9a770" {
   host     = "10.1.1.41"
   port     = 22
   user     = "admin"
@@ -583,7 +583,7 @@ server "machine-440dafb6f5a9a770" {
   }
 }
 
-server "machine-01352c7d11368321" {
+machine "machine-01352c7d11368321" {
   host     = "10.1.1.42"
   port     = 22
   user     = "admin"
@@ -597,7 +597,7 @@ server "machine-01352c7d11368321" {
   }
 }
 
-server "machine-5dbbaef49bd8e15e" {
+machine "machine-5dbbaef49bd8e15e" {
   host     = "10.1.1.43"
   port     = 22
   user     = "admin"
@@ -611,7 +611,7 @@ server "machine-5dbbaef49bd8e15e" {
   }
 }
 
-server "machine-269b5807d9804411" {
+machine "machine-269b5807d9804411" {
   host     = "10.1.1.44"
   port     = 22
   user     = "admin"
@@ -625,7 +625,7 @@ server "machine-269b5807d9804411" {
   }
 }
 
-server "machine-19b3592237b01675" {
+machine "machine-19b3592237b01675" {
   host     = "10.1.1.45"
   port     = 22
   user     = "admin"
@@ -639,7 +639,7 @@ server "machine-19b3592237b01675" {
   }
 }
 
-server "machine-cc04281b03d5c968" {
+machine "machine-cc04281b03d5c968" {
   host     = "10.1.1.46"
   port     = 22
   user     = "admin"
@@ -653,7 +653,7 @@ server "machine-cc04281b03d5c968" {
   }
 }
 
-server "machine-bf242c886fb80cfc" {
+machine "machine-bf242c886fb80cfc" {
   host     = "10.1.1.47"
   port     = 22
   user     = "admin"
@@ -667,7 +667,7 @@ server "machine-bf242c886fb80cfc" {
   }
 }
 
-server "machine-2d533f57407342ff" {
+machine "machine-2d533f57407342ff" {
   host     = "10.1.1.48"
   port     = 22
   user     = "admin"
@@ -681,7 +681,7 @@ server "machine-2d533f57407342ff" {
   }
 }
 
-server "machine-1365e516ea0939a9" {
+machine "machine-1365e516ea0939a9" {
   host     = "10.1.1.49"
   port     = 22
   user     = "admin"
@@ -695,7 +695,7 @@ server "machine-1365e516ea0939a9" {
   }
 }
 
-server "machine-ff49d273af23f7e4" {
+machine "machine-ff49d273af23f7e4" {
   host     = "10.1.1.50"
   port     = 22
   user     = "admin"
@@ -709,7 +709,7 @@ server "machine-ff49d273af23f7e4" {
   }
 }
 
-server "machine-9693ac14f4e38f90" {
+machine "machine-9693ac14f4e38f90" {
   host     = "10.2.1.1"
   port     = 22
   user     = "admin"
@@ -723,7 +723,7 @@ server "machine-9693ac14f4e38f90" {
   }
 }
 
-server "machine-255a10b65814aff9" {
+machine "machine-255a10b65814aff9" {
   host     = "10.2.1.2"
   port     = 22
   user     = "admin"
@@ -737,7 +737,7 @@ server "machine-255a10b65814aff9" {
   }
 }
 
-server "machine-01520dfeb71cfa26" {
+machine "machine-01520dfeb71cfa26" {
   host     = "10.2.1.3"
   port     = 22
   user     = "admin"
@@ -751,7 +751,7 @@ server "machine-01520dfeb71cfa26" {
   }
 }
 
-server "machine-63ee5c040398d256" {
+machine "machine-63ee5c040398d256" {
   host     = "10.2.1.4"
   port     = 22
   user     = "admin"
@@ -765,7 +765,7 @@ server "machine-63ee5c040398d256" {
   }
 }
 
-server "machine-2b6f1ee1ae7e9540" {
+machine "machine-2b6f1ee1ae7e9540" {
   host     = "10.2.1.5"
   port     = 22
   user     = "admin"
@@ -779,7 +779,7 @@ server "machine-2b6f1ee1ae7e9540" {
   }
 }
 
-server "machine-3f9f073f8b5bfbf9" {
+machine "machine-3f9f073f8b5bfbf9" {
   host     = "10.2.1.6"
   port     = 22
   user     = "admin"
@@ -793,7 +793,7 @@ server "machine-3f9f073f8b5bfbf9" {
   }
 }
 
-server "machine-97c23fb8365f355d" {
+machine "machine-97c23fb8365f355d" {
   host     = "10.2.1.7"
   port     = 22
   user     = "admin"
@@ -807,7 +807,7 @@ server "machine-97c23fb8365f355d" {
   }
 }
 
-server "machine-d223e20699a8a3df" {
+machine "machine-d223e20699a8a3df" {
   host     = "10.2.1.8"
   port     = 22
   user     = "admin"
@@ -821,7 +821,7 @@ server "machine-d223e20699a8a3df" {
   }
 }
 
-server "machine-d023080b14244473" {
+machine "machine-d023080b14244473" {
   host     = "10.2.1.9"
   port     = 22
   user     = "admin"
@@ -835,7 +835,7 @@ server "machine-d023080b14244473" {
   }
 }
 
-server "machine-32932f0046657c0c" {
+machine "machine-32932f0046657c0c" {
   host     = "10.2.1.10"
   port     = 22
   user     = "admin"
@@ -849,7 +849,7 @@ server "machine-32932f0046657c0c" {
   }
 }
 
-server "machine-8809d75289d0afce" {
+machine "machine-8809d75289d0afce" {
   host     = "10.2.1.11"
   port     = 22
   user     = "admin"
@@ -863,7 +863,7 @@ server "machine-8809d75289d0afce" {
   }
 }
 
-server "machine-1f36f419f54cd235" {
+machine "machine-1f36f419f54cd235" {
   host     = "10.2.1.12"
   port     = 22
   user     = "admin"
@@ -877,7 +877,7 @@ server "machine-1f36f419f54cd235" {
   }
 }
 
-server "machine-9f883d6f0b924ae8" {
+machine "machine-9f883d6f0b924ae8" {
   host     = "10.2.1.13"
   port     = 22
   user     = "admin"
@@ -891,7 +891,7 @@ server "machine-9f883d6f0b924ae8" {
   }
 }
 
-server "machine-8b481da884d52a8b" {
+machine "machine-8b481da884d52a8b" {
   host     = "10.2.1.14"
   port     = 22
   user     = "admin"
@@ -905,7 +905,7 @@ server "machine-8b481da884d52a8b" {
   }
 }
 
-server "machine-64bcffa6f0dbd6a7" {
+machine "machine-64bcffa6f0dbd6a7" {
   host     = "10.2.1.15"
   port     = 22
   user     = "admin"
@@ -919,7 +919,7 @@ server "machine-64bcffa6f0dbd6a7" {
   }
 }
 
-server "machine-9a50157a3be5c345" {
+machine "machine-9a50157a3be5c345" {
   host     = "10.2.1.16"
   port     = 22
   user     = "admin"
@@ -933,7 +933,7 @@ server "machine-9a50157a3be5c345" {
   }
 }
 
-server "machine-8f9e98eb56cddaa3" {
+machine "machine-8f9e98eb56cddaa3" {
   host     = "10.2.1.17"
   port     = 22
   user     = "admin"
@@ -947,7 +947,7 @@ server "machine-8f9e98eb56cddaa3" {
   }
 }
 
-server "machine-60256ced7995be0b" {
+machine "machine-60256ced7995be0b" {
   host     = "10.2.1.18"
   port     = 22
   user     = "admin"
@@ -961,7 +961,7 @@ server "machine-60256ced7995be0b" {
   }
 }
 
-server "machine-224f4189b8623579" {
+machine "machine-224f4189b8623579" {
   host     = "10.2.1.19"
   port     = 22
   user     = "admin"
@@ -975,7 +975,7 @@ server "machine-224f4189b8623579" {
   }
 }
 
-server "machine-8a329068003c7189" {
+machine "machine-8a329068003c7189" {
   host     = "10.2.1.20"
   port     = 22
   user     = "admin"
@@ -989,7 +989,7 @@ server "machine-8a329068003c7189" {
   }
 }
 
-server "machine-0f72679729b4b726" {
+machine "machine-0f72679729b4b726" {
   host     = "10.2.1.21"
   port     = 22
   user     = "admin"
@@ -1003,7 +1003,7 @@ server "machine-0f72679729b4b726" {
   }
 }
 
-server "machine-727a1fe22f2ac1d1" {
+machine "machine-727a1fe22f2ac1d1" {
   host     = "10.2.1.22"
   port     = 22
   user     = "admin"
@@ -1017,7 +1017,7 @@ server "machine-727a1fe22f2ac1d1" {
   }
 }
 
-server "machine-2e9848feaba3d2ba" {
+machine "machine-2e9848feaba3d2ba" {
   host     = "10.2.1.23"
   port     = 22
   user     = "admin"
@@ -1031,7 +1031,7 @@ server "machine-2e9848feaba3d2ba" {
   }
 }
 
-server "machine-bf9502132141a13a" {
+machine "machine-bf9502132141a13a" {
   host     = "10.2.1.24"
   port     = 22
   user     = "admin"
@@ -1045,7 +1045,7 @@ server "machine-bf9502132141a13a" {
   }
 }
 
-server "machine-8791a075c92a7656" {
+machine "machine-8791a075c92a7656" {
   host     = "10.2.1.25"
   port     = 22
   user     = "admin"
@@ -1059,7 +1059,7 @@ server "machine-8791a075c92a7656" {
   }
 }
 
-server "machine-58511ad23b0ff37c" {
+machine "machine-58511ad23b0ff37c" {
   host     = "10.2.1.26"
   port     = 22
   user     = "admin"
@@ -1073,7 +1073,7 @@ server "machine-58511ad23b0ff37c" {
   }
 }
 
-server "machine-8a18c8f186ab230d" {
+machine "machine-8a18c8f186ab230d" {
   host     = "10.2.1.27"
   port     = 22
   user     = "admin"
@@ -1087,7 +1087,7 @@ server "machine-8a18c8f186ab230d" {
   }
 }
 
-server "machine-c426aa8716901bd8" {
+machine "machine-c426aa8716901bd8" {
   host     = "10.2.1.28"
   port     = 22
   user     = "admin"
@@ -1101,7 +1101,7 @@ server "machine-c426aa8716901bd8" {
   }
 }
 
-server "machine-18307d58add44de3" {
+machine "machine-18307d58add44de3" {
   host     = "10.2.1.29"
   port     = 22
   user     = "admin"
@@ -1115,7 +1115,7 @@ server "machine-18307d58add44de3" {
   }
 }
 
-server "machine-4ef49be61c1a168f" {
+machine "machine-4ef49be61c1a168f" {
   host     = "10.2.1.30"
   port     = 22
   user     = "admin"
@@ -1129,7 +1129,7 @@ server "machine-4ef49be61c1a168f" {
   }
 }
 
-server "machine-b2aad324017c3633" {
+machine "machine-b2aad324017c3633" {
   host     = "10.2.1.31"
   port     = 22
   user     = "admin"
@@ -1143,7 +1143,7 @@ server "machine-b2aad324017c3633" {
   }
 }
 
-server "machine-1d3e125f00121665" {
+machine "machine-1d3e125f00121665" {
   host     = "10.2.1.32"
   port     = 22
   user     = "admin"
@@ -1157,7 +1157,7 @@ server "machine-1d3e125f00121665" {
   }
 }
 
-server "machine-642c5c2c79b6a161" {
+machine "machine-642c5c2c79b6a161" {
   host     = "10.2.1.33"
   port     = 22
   user     = "admin"
@@ -1171,7 +1171,7 @@ server "machine-642c5c2c79b6a161" {
   }
 }
 
-server "machine-90be7c04d7c3d46d" {
+machine "machine-90be7c04d7c3d46d" {
   host     = "10.2.1.34"
   port     = 22
   user     = "admin"
@@ -1185,7 +1185,7 @@ server "machine-90be7c04d7c3d46d" {
   }
 }
 
-server "machine-1b17034178573579" {
+machine "machine-1b17034178573579" {
   host     = "10.2.1.35"
   port     = 22
   user     = "admin"
@@ -1199,7 +1199,7 @@ server "machine-1b17034178573579" {
   }
 }
 
-server "machine-bd0f101433b2cb5d" {
+machine "machine-bd0f101433b2cb5d" {
   host     = "10.2.1.36"
   port     = 22
   user     = "admin"
@@ -1213,7 +1213,7 @@ server "machine-bd0f101433b2cb5d" {
   }
 }
 
-server "machine-e0d7beb2ef6195da" {
+machine "machine-e0d7beb2ef6195da" {
   host     = "10.2.1.37"
   port     = 22
   user     = "admin"
@@ -1227,7 +1227,7 @@ server "machine-e0d7beb2ef6195da" {
   }
 }
 
-server "machine-d91852a58f928d14" {
+machine "machine-d91852a58f928d14" {
   host     = "10.2.1.38"
   port     = 22
   user     = "admin"
@@ -1241,7 +1241,7 @@ server "machine-d91852a58f928d14" {
   }
 }
 
-server "machine-88548024ad08bfe6" {
+machine "machine-88548024ad08bfe6" {
   host     = "10.2.1.39"
   port     = 22
   user     = "admin"
@@ -1255,7 +1255,7 @@ server "machine-88548024ad08bfe6" {
   }
 }
 
-server "machine-09a06d76b2931cc3" {
+machine "machine-09a06d76b2931cc3" {
   host     = "10.2.1.40"
   port     = 22
   user     = "admin"
@@ -1269,7 +1269,7 @@ server "machine-09a06d76b2931cc3" {
   }
 }
 
-server "machine-c5c8092a7e5fb583" {
+machine "machine-c5c8092a7e5fb583" {
   host     = "10.2.1.41"
   port     = 22
   user     = "admin"
@@ -1283,7 +1283,7 @@ server "machine-c5c8092a7e5fb583" {
   }
 }
 
-server "machine-c21a8a70db29152b" {
+machine "machine-c21a8a70db29152b" {
   host     = "10.2.1.42"
   port     = 22
   user     = "admin"
@@ -1297,7 +1297,7 @@ server "machine-c21a8a70db29152b" {
   }
 }
 
-server "machine-92e02d056aebce3a" {
+machine "machine-92e02d056aebce3a" {
   host     = "10.2.1.43"
   port     = 22
   user     = "admin"
@@ -1311,7 +1311,7 @@ server "machine-92e02d056aebce3a" {
   }
 }
 
-server "machine-9dc2bff584e9b0e6" {
+machine "machine-9dc2bff584e9b0e6" {
   host     = "10.2.1.44"
   port     = 22
   user     = "admin"
@@ -1325,7 +1325,7 @@ server "machine-9dc2bff584e9b0e6" {
   }
 }
 
-server "machine-f0eb02e632edc1d7" {
+machine "machine-f0eb02e632edc1d7" {
   host     = "10.2.1.45"
   port     = 22
   user     = "admin"
@@ -1339,7 +1339,7 @@ server "machine-f0eb02e632edc1d7" {
   }
 }
 
-server "machine-eafc4642db7ccbfb" {
+machine "machine-eafc4642db7ccbfb" {
   host     = "10.2.1.46"
   port     = 22
   user     = "admin"
@@ -1353,7 +1353,7 @@ server "machine-eafc4642db7ccbfb" {
   }
 }
 
-server "machine-b3a840dca4f9a681" {
+machine "machine-b3a840dca4f9a681" {
   host     = "10.2.1.47"
   port     = 22
   user     = "admin"
@@ -1367,7 +1367,7 @@ server "machine-b3a840dca4f9a681" {
   }
 }
 
-server "machine-9cc17bb29780f53d" {
+machine "machine-9cc17bb29780f53d" {
   host     = "10.2.1.48"
   port     = 22
   user     = "admin"
@@ -1381,7 +1381,7 @@ server "machine-9cc17bb29780f53d" {
   }
 }
 
-server "machine-91044d10a45fd7a2" {
+machine "machine-91044d10a45fd7a2" {
   host     = "10.2.1.49"
   port     = 22
   user     = "admin"
@@ -1395,7 +1395,7 @@ server "machine-91044d10a45fd7a2" {
   }
 }
 
-server "machine-88d9297c6509cb7d" {
+machine "machine-88d9297c6509cb7d" {
   host     = "10.2.1.50"
   port     = 22
   user     = "admin"
@@ -1409,7 +1409,7 @@ server "machine-88d9297c6509cb7d" {
   }
 }
 
-server "vm-e5994bec43a922bd" {
+machine "vm-e5994bec43a922bd" {
   host     = "10.1.10.1"
   port     = 22
   user     = "debian"
@@ -1424,7 +1424,7 @@ server "vm-e5994bec43a922bd" {
   }
 }
 
-server "vm-673d4f53e03ed16b" {
+machine "vm-673d4f53e03ed16b" {
   host     = "10.1.10.2"
   port     = 22
   user     = "debian"
@@ -1439,7 +1439,7 @@ server "vm-673d4f53e03ed16b" {
   }
 }
 
-server "vm-1875e88a9247c59b" {
+machine "vm-1875e88a9247c59b" {
   host     = "10.1.10.3"
   port     = 22
   user     = "debian"
@@ -1454,7 +1454,7 @@ server "vm-1875e88a9247c59b" {
   }
 }
 
-server "vm-129ae1f1cb8670d2" {
+machine "vm-129ae1f1cb8670d2" {
   host     = "10.1.10.4"
   port     = 22
   user     = "debian"
@@ -1469,7 +1469,7 @@ server "vm-129ae1f1cb8670d2" {
   }
 }
 
-server "vm-a37e39b44e2ba8bb" {
+machine "vm-a37e39b44e2ba8bb" {
   host     = "10.1.10.5"
   port     = 22
   user     = "debian"
@@ -1484,7 +1484,7 @@ server "vm-a37e39b44e2ba8bb" {
   }
 }
 
-server "vm-a7d39c1618125ea9" {
+machine "vm-a7d39c1618125ea9" {
   host     = "10.1.10.6"
   port     = 22
   user     = "debian"
@@ -1499,7 +1499,7 @@ server "vm-a7d39c1618125ea9" {
   }
 }
 
-server "vm-4adbe7a08ebcdde1" {
+machine "vm-4adbe7a08ebcdde1" {
   host     = "10.1.10.7"
   port     = 22
   user     = "debian"
@@ -1514,7 +1514,7 @@ server "vm-4adbe7a08ebcdde1" {
   }
 }
 
-server "vm-b230d7206ab7e72d" {
+machine "vm-b230d7206ab7e72d" {
   host     = "10.1.10.8"
   port     = 22
   user     = "debian"
@@ -1529,7 +1529,7 @@ server "vm-b230d7206ab7e72d" {
   }
 }
 
-server "vm-648d357964c92281" {
+machine "vm-648d357964c92281" {
   host     = "10.1.10.9"
   port     = 22
   user     = "debian"
@@ -1544,7 +1544,7 @@ server "vm-648d357964c92281" {
   }
 }
 
-server "vm-c7cb0bcc82f2e6ca" {
+machine "vm-c7cb0bcc82f2e6ca" {
   host     = "10.1.10.10"
   port     = 22
   user     = "debian"
@@ -1559,7 +1559,7 @@ server "vm-c7cb0bcc82f2e6ca" {
   }
 }
 
-server "vm-f55f2b89a2fb191c" {
+machine "vm-f55f2b89a2fb191c" {
   host     = "10.1.10.11"
   port     = 22
   user     = "debian"
@@ -1574,7 +1574,7 @@ server "vm-f55f2b89a2fb191c" {
   }
 }
 
-server "vm-7e4dc6dc6cccee33" {
+machine "vm-7e4dc6dc6cccee33" {
   host     = "10.1.10.12"
   port     = 22
   user     = "debian"
@@ -1589,7 +1589,7 @@ server "vm-7e4dc6dc6cccee33" {
   }
 }
 
-server "vm-4e92ed7b134d533e" {
+machine "vm-4e92ed7b134d533e" {
   host     = "10.1.10.13"
   port     = 22
   user     = "debian"
@@ -1604,7 +1604,7 @@ server "vm-4e92ed7b134d533e" {
   }
 }
 
-server "vm-790b114eb6f4c2ad" {
+machine "vm-790b114eb6f4c2ad" {
   host     = "10.1.10.14"
   port     = 22
   user     = "debian"
@@ -1619,7 +1619,7 @@ server "vm-790b114eb6f4c2ad" {
   }
 }
 
-server "vm-de3390cd5ed2e2e5" {
+machine "vm-de3390cd5ed2e2e5" {
   host     = "10.1.10.15"
   port     = 22
   user     = "debian"
@@ -1634,7 +1634,7 @@ server "vm-de3390cd5ed2e2e5" {
   }
 }
 
-server "vm-3f1fa684975d8777" {
+machine "vm-3f1fa684975d8777" {
   host     = "10.1.10.16"
   port     = 22
   user     = "debian"
@@ -1649,7 +1649,7 @@ server "vm-3f1fa684975d8777" {
   }
 }
 
-server "vm-2d253c6d6803e408" {
+machine "vm-2d253c6d6803e408" {
   host     = "10.1.10.17"
   port     = 22
   user     = "debian"
@@ -1664,7 +1664,7 @@ server "vm-2d253c6d6803e408" {
   }
 }
 
-server "vm-f4ec6b9de1deeaa0" {
+machine "vm-f4ec6b9de1deeaa0" {
   host     = "10.1.10.18"
   port     = 22
   user     = "debian"
@@ -1679,7 +1679,7 @@ server "vm-f4ec6b9de1deeaa0" {
   }
 }
 
-server "vm-0cb722e65b1b63d8" {
+machine "vm-0cb722e65b1b63d8" {
   host     = "10.1.10.19"
   port     = 22
   user     = "debian"
@@ -1694,7 +1694,7 @@ server "vm-0cb722e65b1b63d8" {
   }
 }
 
-server "vm-423eb2934fc82a15" {
+machine "vm-423eb2934fc82a15" {
   host     = "10.1.10.20"
   port     = 22
   user     = "debian"
@@ -1709,7 +1709,7 @@ server "vm-423eb2934fc82a15" {
   }
 }
 
-server "vm-1a4646cc65b6a7fb" {
+machine "vm-1a4646cc65b6a7fb" {
   host     = "10.1.10.21"
   port     = 22
   user     = "debian"
@@ -1724,7 +1724,7 @@ server "vm-1a4646cc65b6a7fb" {
   }
 }
 
-server "vm-2c8ca3b2aeef8409" {
+machine "vm-2c8ca3b2aeef8409" {
   host     = "10.1.10.22"
   port     = 22
   user     = "debian"
@@ -1739,7 +1739,7 @@ server "vm-2c8ca3b2aeef8409" {
   }
 }
 
-server "vm-328abb5c9113d523" {
+machine "vm-328abb5c9113d523" {
   host     = "10.1.10.23"
   port     = 22
   user     = "debian"
@@ -1754,7 +1754,7 @@ server "vm-328abb5c9113d523" {
   }
 }
 
-server "vm-e43f88ec6fb6e07e" {
+machine "vm-e43f88ec6fb6e07e" {
   host     = "10.1.10.24"
   port     = 22
   user     = "debian"
@@ -1769,7 +1769,7 @@ server "vm-e43f88ec6fb6e07e" {
   }
 }
 
-server "vm-1c9230c11ab8608d" {
+machine "vm-1c9230c11ab8608d" {
   host     = "10.1.10.25"
   port     = 22
   user     = "debian"
@@ -1784,7 +1784,7 @@ server "vm-1c9230c11ab8608d" {
   }
 }
 
-server "vm-ac63064c31e776ba" {
+machine "vm-ac63064c31e776ba" {
   host     = "10.1.10.26"
   port     = 22
   user     = "debian"
@@ -1799,7 +1799,7 @@ server "vm-ac63064c31e776ba" {
   }
 }
 
-server "vm-f430d2542e0fd7d1" {
+machine "vm-f430d2542e0fd7d1" {
   host     = "10.1.10.27"
   port     = 22
   user     = "debian"
@@ -1814,7 +1814,7 @@ server "vm-f430d2542e0fd7d1" {
   }
 }
 
-server "vm-3d538d0965c1ae8f" {
+machine "vm-3d538d0965c1ae8f" {
   host     = "10.1.10.28"
   port     = 22
   user     = "debian"
@@ -1829,7 +1829,7 @@ server "vm-3d538d0965c1ae8f" {
   }
 }
 
-server "vm-1be12064a467fa34" {
+machine "vm-1be12064a467fa34" {
   host     = "10.1.10.29"
   port     = 22
   user     = "debian"
@@ -1844,7 +1844,7 @@ server "vm-1be12064a467fa34" {
   }
 }
 
-server "vm-0029a93e84c1e6d6" {
+machine "vm-0029a93e84c1e6d6" {
   host     = "10.1.10.30"
   port     = 22
   user     = "debian"
@@ -1859,7 +1859,7 @@ server "vm-0029a93e84c1e6d6" {
   }
 }
 
-server "vm-62b49fe106bfc774" {
+machine "vm-62b49fe106bfc774" {
   host     = "10.1.10.31"
   port     = 22
   user     = "debian"
@@ -1874,7 +1874,7 @@ server "vm-62b49fe106bfc774" {
   }
 }
 
-server "vm-fdf367a50b367329" {
+machine "vm-fdf367a50b367329" {
   host     = "10.1.10.32"
   port     = 22
   user     = "debian"
@@ -1889,7 +1889,7 @@ server "vm-fdf367a50b367329" {
   }
 }
 
-server "vm-15736f06185e59ec" {
+machine "vm-15736f06185e59ec" {
   host     = "10.1.10.33"
   port     = 22
   user     = "debian"
@@ -1904,7 +1904,7 @@ server "vm-15736f06185e59ec" {
   }
 }
 
-server "vm-b0eb9bda06ea0bbe" {
+machine "vm-b0eb9bda06ea0bbe" {
   host     = "10.1.10.34"
   port     = 22
   user     = "debian"
@@ -1919,7 +1919,7 @@ server "vm-b0eb9bda06ea0bbe" {
   }
 }
 
-server "vm-c8f4deb1aee12157" {
+machine "vm-c8f4deb1aee12157" {
   host     = "10.1.10.35"
   port     = 22
   user     = "debian"
@@ -1934,7 +1934,7 @@ server "vm-c8f4deb1aee12157" {
   }
 }
 
-server "vm-a4df34e3fadcf7cb" {
+machine "vm-a4df34e3fadcf7cb" {
   host     = "10.1.10.36"
   port     = 22
   user     = "debian"
@@ -1949,7 +1949,7 @@ server "vm-a4df34e3fadcf7cb" {
   }
 }
 
-server "vm-8b57a17981dc0862" {
+machine "vm-8b57a17981dc0862" {
   host     = "10.1.10.37"
   port     = 22
   user     = "debian"
@@ -1964,7 +1964,7 @@ server "vm-8b57a17981dc0862" {
   }
 }
 
-server "vm-9a5601746ea4abd3" {
+machine "vm-9a5601746ea4abd3" {
   host     = "10.1.20.1"
   port     = 22
   user     = "debian"
@@ -1979,7 +1979,7 @@ server "vm-9a5601746ea4abd3" {
   }
 }
 
-server "vm-9309e6427ee35428" {
+machine "vm-9309e6427ee35428" {
   host     = "10.1.20.2"
   port     = 22
   user     = "debian"
@@ -1994,7 +1994,7 @@ server "vm-9309e6427ee35428" {
   }
 }
 
-server "vm-3ed9cbf44ad72ea8" {
+machine "vm-3ed9cbf44ad72ea8" {
   host     = "10.1.20.3"
   port     = 22
   user     = "debian"
@@ -2009,7 +2009,7 @@ server "vm-3ed9cbf44ad72ea8" {
   }
 }
 
-server "vm-9ec5635b896f585e" {
+machine "vm-9ec5635b896f585e" {
   host     = "10.1.20.4"
   port     = 22
   user     = "debian"
@@ -2024,7 +2024,7 @@ server "vm-9ec5635b896f585e" {
   }
 }
 
-server "vm-29617d831810b034" {
+machine "vm-29617d831810b034" {
   host     = "10.1.20.5"
   port     = 22
   user     = "debian"
@@ -2039,7 +2039,7 @@ server "vm-29617d831810b034" {
   }
 }
 
-server "vm-30265c23f8747c2c" {
+machine "vm-30265c23f8747c2c" {
   host     = "10.1.20.6"
   port     = 22
   user     = "debian"
@@ -2054,7 +2054,7 @@ server "vm-30265c23f8747c2c" {
   }
 }
 
-server "vm-94b9e67ed9dc136d" {
+machine "vm-94b9e67ed9dc136d" {
   host     = "10.1.20.7"
   port     = 22
   user     = "debian"
@@ -2069,7 +2069,7 @@ server "vm-94b9e67ed9dc136d" {
   }
 }
 
-server "vm-1e7d53c48ce367c3" {
+machine "vm-1e7d53c48ce367c3" {
   host     = "10.1.20.8"
   port     = 22
   user     = "debian"
@@ -2084,7 +2084,7 @@ server "vm-1e7d53c48ce367c3" {
   }
 }
 
-server "vm-a76a80c97a5d8e64" {
+machine "vm-a76a80c97a5d8e64" {
   host     = "10.1.20.9"
   port     = 22
   user     = "debian"
@@ -2099,7 +2099,7 @@ server "vm-a76a80c97a5d8e64" {
   }
 }
 
-server "vm-142b780c812cdb61" {
+machine "vm-142b780c812cdb61" {
   host     = "10.1.20.10"
   port     = 22
   user     = "debian"
@@ -2114,7 +2114,7 @@ server "vm-142b780c812cdb61" {
   }
 }
 
-server "vm-469e8ba8a46c4aa8" {
+machine "vm-469e8ba8a46c4aa8" {
   host     = "10.1.20.11"
   port     = 22
   user     = "debian"
@@ -2129,7 +2129,7 @@ server "vm-469e8ba8a46c4aa8" {
   }
 }
 
-server "vm-b7d7a45ffb28c4b4" {
+machine "vm-b7d7a45ffb28c4b4" {
   host     = "10.1.20.12"
   port     = 22
   user     = "debian"
@@ -2144,7 +2144,7 @@ server "vm-b7d7a45ffb28c4b4" {
   }
 }
 
-server "vm-27155b43d09f048a" {
+machine "vm-27155b43d09f048a" {
   host     = "10.1.20.13"
   port     = 22
   user     = "debian"
@@ -2159,7 +2159,7 @@ server "vm-27155b43d09f048a" {
   }
 }
 
-server "vm-230197ad59ee237d" {
+machine "vm-230197ad59ee237d" {
   host     = "10.1.20.14"
   port     = 22
   user     = "debian"
@@ -2174,7 +2174,7 @@ server "vm-230197ad59ee237d" {
   }
 }
 
-server "vm-f7ad7741bdb0e6f8" {
+machine "vm-f7ad7741bdb0e6f8" {
   host     = "10.1.20.15"
   port     = 22
   user     = "debian"
@@ -2189,7 +2189,7 @@ server "vm-f7ad7741bdb0e6f8" {
   }
 }
 
-server "vm-bee0d4bb3038ed44" {
+machine "vm-bee0d4bb3038ed44" {
   host     = "10.1.20.16"
   port     = 22
   user     = "debian"
@@ -2204,7 +2204,7 @@ server "vm-bee0d4bb3038ed44" {
   }
 }
 
-server "vm-8d2b63ca92372d78" {
+machine "vm-8d2b63ca92372d78" {
   host     = "10.1.20.17"
   port     = 22
   user     = "debian"
@@ -2219,7 +2219,7 @@ server "vm-8d2b63ca92372d78" {
   }
 }
 
-server "vm-a06275f21b13efb9" {
+machine "vm-a06275f21b13efb9" {
   host     = "10.1.20.18"
   port     = 22
   user     = "debian"
@@ -2234,7 +2234,7 @@ server "vm-a06275f21b13efb9" {
   }
 }
 
-server "vm-68b60a1b3715b942" {
+machine "vm-68b60a1b3715b942" {
   host     = "10.1.20.19"
   port     = 22
   user     = "debian"
@@ -2249,7 +2249,7 @@ server "vm-68b60a1b3715b942" {
   }
 }
 
-server "vm-d884f7faef3fa2b7" {
+machine "vm-d884f7faef3fa2b7" {
   host     = "10.1.20.20"
   port     = 22
   user     = "debian"
@@ -2264,7 +2264,7 @@ server "vm-d884f7faef3fa2b7" {
   }
 }
 
-server "vm-cdec72935c0bfbc9" {
+machine "vm-cdec72935c0bfbc9" {
   host     = "10.1.20.21"
   port     = 22
   user     = "debian"
@@ -2279,7 +2279,7 @@ server "vm-cdec72935c0bfbc9" {
   }
 }
 
-server "vm-7c30bb193c9f525b" {
+machine "vm-7c30bb193c9f525b" {
   host     = "10.1.20.22"
   port     = 22
   user     = "debian"
@@ -2294,7 +2294,7 @@ server "vm-7c30bb193c9f525b" {
   }
 }
 
-server "vm-eb78742a0c45dcd5" {
+machine "vm-eb78742a0c45dcd5" {
   host     = "10.1.20.23"
   port     = 22
   user     = "debian"
@@ -2309,7 +2309,7 @@ server "vm-eb78742a0c45dcd5" {
   }
 }
 
-server "vm-920d7cda9ea9449a" {
+machine "vm-920d7cda9ea9449a" {
   host     = "10.1.20.24"
   port     = 22
   user     = "debian"
@@ -2324,7 +2324,7 @@ server "vm-920d7cda9ea9449a" {
   }
 }
 
-server "vm-e3c4d392d8d73664" {
+machine "vm-e3c4d392d8d73664" {
   host     = "10.1.20.25"
   port     = 22
   user     = "debian"
@@ -2339,7 +2339,7 @@ server "vm-e3c4d392d8d73664" {
   }
 }
 
-server "vm-50befc022abb7a5b" {
+machine "vm-50befc022abb7a5b" {
   host     = "10.1.20.26"
   port     = 22
   user     = "debian"
@@ -2354,7 +2354,7 @@ server "vm-50befc022abb7a5b" {
   }
 }
 
-server "vm-4a6c5a7013a2fe0e" {
+machine "vm-4a6c5a7013a2fe0e" {
   host     = "10.1.20.27"
   port     = 22
   user     = "debian"
@@ -2369,7 +2369,7 @@ server "vm-4a6c5a7013a2fe0e" {
   }
 }
 
-server "vm-519e5afc9f7e437b" {
+machine "vm-519e5afc9f7e437b" {
   host     = "10.1.20.28"
   port     = 22
   user     = "debian"
@@ -2384,7 +2384,7 @@ server "vm-519e5afc9f7e437b" {
   }
 }
 
-server "vm-4157f7b8c0c3b314" {
+machine "vm-4157f7b8c0c3b314" {
   host     = "10.1.20.29"
   port     = 22
   user     = "debian"
@@ -2399,7 +2399,7 @@ server "vm-4157f7b8c0c3b314" {
   }
 }
 
-server "vm-8f20dea4976fe5d0" {
+machine "vm-8f20dea4976fe5d0" {
   host     = "10.1.20.30"
   port     = 22
   user     = "debian"
@@ -2414,7 +2414,7 @@ server "vm-8f20dea4976fe5d0" {
   }
 }
 
-server "vm-4c196593f53226fe" {
+machine "vm-4c196593f53226fe" {
   host     = "10.1.20.31"
   port     = 22
   user     = "debian"
@@ -2429,7 +2429,7 @@ server "vm-4c196593f53226fe" {
   }
 }
 
-server "vm-eee5524a41d067f8" {
+machine "vm-eee5524a41d067f8" {
   host     = "10.1.20.32"
   port     = 22
   user     = "debian"
@@ -2444,7 +2444,7 @@ server "vm-eee5524a41d067f8" {
   }
 }
 
-server "vm-44c61db670bc0737" {
+machine "vm-44c61db670bc0737" {
   host     = "10.1.20.33"
   port     = 22
   user     = "debian"
@@ -2459,7 +2459,7 @@ server "vm-44c61db670bc0737" {
   }
 }
 
-server "vm-7a2f85e82d42e0f5" {
+machine "vm-7a2f85e82d42e0f5" {
   host     = "10.1.20.34"
   port     = 22
   user     = "debian"
@@ -2474,7 +2474,7 @@ server "vm-7a2f85e82d42e0f5" {
   }
 }
 
-server "vm-42febddd4c4179cb" {
+machine "vm-42febddd4c4179cb" {
   host     = "10.1.20.35"
   port     = 22
   user     = "debian"
@@ -2489,7 +2489,7 @@ server "vm-42febddd4c4179cb" {
   }
 }
 
-server "vm-94a283c3497b0cbf" {
+machine "vm-94a283c3497b0cbf" {
   host     = "10.1.20.36"
   port     = 22
   user     = "debian"
@@ -2504,7 +2504,7 @@ server "vm-94a283c3497b0cbf" {
   }
 }
 
-server "vm-b2cd4e3e6ab1dec6" {
+machine "vm-b2cd4e3e6ab1dec6" {
   host     = "10.1.20.37"
   port     = 22
   user     = "debian"
@@ -2519,7 +2519,7 @@ server "vm-b2cd4e3e6ab1dec6" {
   }
 }
 
-server "vm-c5be7cbcb3bfaaa9" {
+machine "vm-c5be7cbcb3bfaaa9" {
   host     = "10.1.30.1"
   port     = 22
   user     = "debian"
@@ -2534,7 +2534,7 @@ server "vm-c5be7cbcb3bfaaa9" {
   }
 }
 
-server "vm-91fbfa667e7d9665" {
+machine "vm-91fbfa667e7d9665" {
   host     = "10.1.30.2"
   port     = 22
   user     = "debian"
@@ -2549,7 +2549,7 @@ server "vm-91fbfa667e7d9665" {
   }
 }
 
-server "vm-679f3c936c5ad185" {
+machine "vm-679f3c936c5ad185" {
   host     = "10.1.30.3"
   port     = 22
   user     = "debian"
@@ -2564,7 +2564,7 @@ server "vm-679f3c936c5ad185" {
   }
 }
 
-server "vm-75a4c437a3c08aef" {
+machine "vm-75a4c437a3c08aef" {
   host     = "10.1.30.4"
   port     = 22
   user     = "debian"
@@ -2579,7 +2579,7 @@ server "vm-75a4c437a3c08aef" {
   }
 }
 
-server "vm-85481eaea9e4eda8" {
+machine "vm-85481eaea9e4eda8" {
   host     = "10.1.30.5"
   port     = 22
   user     = "debian"
@@ -2594,7 +2594,7 @@ server "vm-85481eaea9e4eda8" {
   }
 }
 
-server "vm-2c6c047123bac934" {
+machine "vm-2c6c047123bac934" {
   host     = "10.1.30.6"
   port     = 22
   user     = "debian"
@@ -2609,7 +2609,7 @@ server "vm-2c6c047123bac934" {
   }
 }
 
-server "vm-16abe01ee3dae424" {
+machine "vm-16abe01ee3dae424" {
   host     = "10.1.30.7"
   port     = 22
   user     = "debian"
@@ -2624,7 +2624,7 @@ server "vm-16abe01ee3dae424" {
   }
 }
 
-server "vm-71d17d462d3756b2" {
+machine "vm-71d17d462d3756b2" {
   host     = "10.1.30.8"
   port     = 22
   user     = "debian"
@@ -2639,7 +2639,7 @@ server "vm-71d17d462d3756b2" {
   }
 }
 
-server "vm-89bf1db197f1444d" {
+machine "vm-89bf1db197f1444d" {
   host     = "10.1.30.9"
   port     = 22
   user     = "debian"
@@ -2654,7 +2654,7 @@ server "vm-89bf1db197f1444d" {
   }
 }
 
-server "vm-781257f3c2ead575" {
+machine "vm-781257f3c2ead575" {
   host     = "10.1.30.10"
   port     = 22
   user     = "debian"
@@ -2669,7 +2669,7 @@ server "vm-781257f3c2ead575" {
   }
 }
 
-server "vm-127eb2d462cd52da" {
+machine "vm-127eb2d462cd52da" {
   host     = "10.1.30.11"
   port     = 22
   user     = "debian"
@@ -2684,7 +2684,7 @@ server "vm-127eb2d462cd52da" {
   }
 }
 
-server "vm-563c9a5a341a385b" {
+machine "vm-563c9a5a341a385b" {
   host     = "10.1.30.12"
   port     = 22
   user     = "debian"
@@ -2699,7 +2699,7 @@ server "vm-563c9a5a341a385b" {
   }
 }
 
-server "vm-45ce763755b3fd2c" {
+machine "vm-45ce763755b3fd2c" {
   host     = "10.1.30.13"
   port     = 22
   user     = "debian"
@@ -2714,7 +2714,7 @@ server "vm-45ce763755b3fd2c" {
   }
 }
 
-server "vm-09209a3aba1a63b1" {
+machine "vm-09209a3aba1a63b1" {
   host     = "10.1.30.14"
   port     = 22
   user     = "debian"
@@ -2729,7 +2729,7 @@ server "vm-09209a3aba1a63b1" {
   }
 }
 
-server "vm-67c3c3aed77a7804" {
+machine "vm-67c3c3aed77a7804" {
   host     = "10.1.30.15"
   port     = 22
   user     = "debian"
@@ -2744,7 +2744,7 @@ server "vm-67c3c3aed77a7804" {
   }
 }
 
-server "vm-d0dd57b435d6d5c8" {
+machine "vm-d0dd57b435d6d5c8" {
   host     = "10.1.30.16"
   port     = 22
   user     = "debian"
@@ -2759,7 +2759,7 @@ server "vm-d0dd57b435d6d5c8" {
   }
 }
 
-server "vm-f968720d966d1cc3" {
+machine "vm-f968720d966d1cc3" {
   host     = "10.1.30.17"
   port     = 22
   user     = "debian"
@@ -2774,7 +2774,7 @@ server "vm-f968720d966d1cc3" {
   }
 }
 
-server "vm-b8bf84e0dc5d468a" {
+machine "vm-b8bf84e0dc5d468a" {
   host     = "10.1.30.18"
   port     = 22
   user     = "debian"
@@ -2789,7 +2789,7 @@ server "vm-b8bf84e0dc5d468a" {
   }
 }
 
-server "vm-7ff0da72828e2f48" {
+machine "vm-7ff0da72828e2f48" {
   host     = "10.1.30.19"
   port     = 22
   user     = "debian"
@@ -2804,7 +2804,7 @@ server "vm-7ff0da72828e2f48" {
   }
 }
 
-server "vm-41cdfc69011c2292" {
+machine "vm-41cdfc69011c2292" {
   host     = "10.1.30.20"
   port     = 22
   user     = "debian"
@@ -2819,7 +2819,7 @@ server "vm-41cdfc69011c2292" {
   }
 }
 
-server "vm-e2d748c6fcddc032" {
+machine "vm-e2d748c6fcddc032" {
   host     = "10.1.30.21"
   port     = 22
   user     = "debian"
@@ -2834,7 +2834,7 @@ server "vm-e2d748c6fcddc032" {
   }
 }
 
-server "vm-67b3d94418972570" {
+machine "vm-67b3d94418972570" {
   host     = "10.1.30.22"
   port     = 22
   user     = "debian"
@@ -2849,7 +2849,7 @@ server "vm-67b3d94418972570" {
   }
 }
 
-server "vm-0a359f53b6df7123" {
+machine "vm-0a359f53b6df7123" {
   host     = "10.1.30.23"
   port     = 22
   user     = "debian"
@@ -2864,7 +2864,7 @@ server "vm-0a359f53b6df7123" {
   }
 }
 
-server "vm-b9a7ff4dd1e951dd" {
+machine "vm-b9a7ff4dd1e951dd" {
   host     = "10.1.30.24"
   port     = 22
   user     = "debian"
@@ -2879,7 +2879,7 @@ server "vm-b9a7ff4dd1e951dd" {
   }
 }
 
-server "vm-435381cc81958ac9" {
+machine "vm-435381cc81958ac9" {
   host     = "10.1.30.25"
   port     = 22
   user     = "debian"
@@ -2894,7 +2894,7 @@ server "vm-435381cc81958ac9" {
   }
 }
 
-server "vm-7e26c9f0af406cd0" {
+machine "vm-7e26c9f0af406cd0" {
   host     = "10.1.30.26"
   port     = 22
   user     = "debian"
@@ -2909,7 +2909,7 @@ server "vm-7e26c9f0af406cd0" {
   }
 }
 
-server "vm-ba1132bd14c6cd9c" {
+machine "vm-ba1132bd14c6cd9c" {
   host     = "10.1.30.27"
   port     = 22
   user     = "debian"
@@ -2924,7 +2924,7 @@ server "vm-ba1132bd14c6cd9c" {
   }
 }
 
-server "vm-982062cdd79e86b4" {
+machine "vm-982062cdd79e86b4" {
   host     = "10.1.30.28"
   port     = 22
   user     = "debian"
@@ -2939,7 +2939,7 @@ server "vm-982062cdd79e86b4" {
   }
 }
 
-server "vm-35bf95d31c480195" {
+machine "vm-35bf95d31c480195" {
   host     = "10.1.30.29"
   port     = 22
   user     = "debian"
@@ -2954,7 +2954,7 @@ server "vm-35bf95d31c480195" {
   }
 }
 
-server "vm-4c7693e9322c57d0" {
+machine "vm-4c7693e9322c57d0" {
   host     = "10.1.30.30"
   port     = 22
   user     = "debian"
@@ -2969,7 +2969,7 @@ server "vm-4c7693e9322c57d0" {
   }
 }
 
-server "vm-b9394abdf1e15b30" {
+machine "vm-b9394abdf1e15b30" {
   host     = "10.1.30.31"
   port     = 22
   user     = "debian"
@@ -2984,7 +2984,7 @@ server "vm-b9394abdf1e15b30" {
   }
 }
 
-server "vm-9bbcf3ac44fe7cd4" {
+machine "vm-9bbcf3ac44fe7cd4" {
   host     = "10.1.30.32"
   port     = 22
   user     = "debian"
@@ -2999,7 +2999,7 @@ server "vm-9bbcf3ac44fe7cd4" {
   }
 }
 
-server "vm-d1585b4bea3e32b4" {
+machine "vm-d1585b4bea3e32b4" {
   host     = "10.1.30.33"
   port     = 22
   user     = "debian"
@@ -3014,7 +3014,7 @@ server "vm-d1585b4bea3e32b4" {
   }
 }
 
-server "vm-ceb5f5413ba5b7cb" {
+machine "vm-ceb5f5413ba5b7cb" {
   host     = "10.1.30.34"
   port     = 22
   user     = "debian"
@@ -3029,7 +3029,7 @@ server "vm-ceb5f5413ba5b7cb" {
   }
 }
 
-server "vm-ace0801ab4ccf654" {
+machine "vm-ace0801ab4ccf654" {
   host     = "10.1.30.35"
   port     = 22
   user     = "debian"
@@ -3044,7 +3044,7 @@ server "vm-ace0801ab4ccf654" {
   }
 }
 
-server "vm-fad980ccf885d3be" {
+machine "vm-fad980ccf885d3be" {
   host     = "10.1.30.36"
   port     = 22
   user     = "debian"
@@ -3059,7 +3059,7 @@ server "vm-fad980ccf885d3be" {
   }
 }
 
-server "vm-0c48e67d917ce9e8" {
+machine "vm-0c48e67d917ce9e8" {
   host     = "10.1.30.37"
   port     = 22
   user     = "debian"
@@ -3074,7 +3074,7 @@ server "vm-0c48e67d917ce9e8" {
   }
 }
 
-server "vm-f2fe186bf6180ee6" {
+machine "vm-f2fe186bf6180ee6" {
   host     = "10.1.40.1"
   port     = 22
   user     = "debian"
@@ -3089,7 +3089,7 @@ server "vm-f2fe186bf6180ee6" {
   }
 }
 
-server "vm-cf0bb901a938deeb" {
+machine "vm-cf0bb901a938deeb" {
   host     = "10.1.40.2"
   port     = 22
   user     = "debian"
@@ -3104,7 +3104,7 @@ server "vm-cf0bb901a938deeb" {
   }
 }
 
-server "vm-139547b30e118e44" {
+machine "vm-139547b30e118e44" {
   host     = "10.1.40.3"
   port     = 22
   user     = "debian"
@@ -3119,7 +3119,7 @@ server "vm-139547b30e118e44" {
   }
 }
 
-server "vm-9a1368fc7176aae0" {
+machine "vm-9a1368fc7176aae0" {
   host     = "10.1.40.4"
   port     = 22
   user     = "debian"
@@ -3134,7 +3134,7 @@ server "vm-9a1368fc7176aae0" {
   }
 }
 
-server "vm-ac27d1a2b0b8ba02" {
+machine "vm-ac27d1a2b0b8ba02" {
   host     = "10.1.40.5"
   port     = 22
   user     = "debian"
@@ -3149,7 +3149,7 @@ server "vm-ac27d1a2b0b8ba02" {
   }
 }
 
-server "vm-f8b2cd064372c204" {
+machine "vm-f8b2cd064372c204" {
   host     = "10.1.40.6"
   port     = 22
   user     = "debian"
@@ -3164,7 +3164,7 @@ server "vm-f8b2cd064372c204" {
   }
 }
 
-server "vm-becac2f4536c41f7" {
+machine "vm-becac2f4536c41f7" {
   host     = "10.1.40.7"
   port     = 22
   user     = "debian"
@@ -3179,7 +3179,7 @@ server "vm-becac2f4536c41f7" {
   }
 }
 
-server "vm-aa8170a6464227a8" {
+machine "vm-aa8170a6464227a8" {
   host     = "10.1.40.8"
   port     = 22
   user     = "debian"
@@ -3194,7 +3194,7 @@ server "vm-aa8170a6464227a8" {
   }
 }
 
-server "vm-019ecd600e40fc3e" {
+machine "vm-019ecd600e40fc3e" {
   host     = "10.1.40.9"
   port     = 22
   user     = "debian"
@@ -3209,7 +3209,7 @@ server "vm-019ecd600e40fc3e" {
   }
 }
 
-server "vm-61cc1c3e5727b8ae" {
+machine "vm-61cc1c3e5727b8ae" {
   host     = "10.1.40.10"
   port     = 22
   user     = "debian"
@@ -3224,7 +3224,7 @@ server "vm-61cc1c3e5727b8ae" {
   }
 }
 
-server "vm-dbd0c7cd2041444e" {
+machine "vm-dbd0c7cd2041444e" {
   host     = "10.1.40.11"
   port     = 22
   user     = "debian"
@@ -3239,7 +3239,7 @@ server "vm-dbd0c7cd2041444e" {
   }
 }
 
-server "vm-537f4a05f0e0bdf0" {
+machine "vm-537f4a05f0e0bdf0" {
   host     = "10.1.40.12"
   port     = 22
   user     = "debian"
@@ -3254,7 +3254,7 @@ server "vm-537f4a05f0e0bdf0" {
   }
 }
 
-server "vm-35be4e5cdcbfe861" {
+machine "vm-35be4e5cdcbfe861" {
   host     = "10.1.40.13"
   port     = 22
   user     = "debian"
@@ -3269,7 +3269,7 @@ server "vm-35be4e5cdcbfe861" {
   }
 }
 
-server "vm-a961fa4b8b5e60a2" {
+machine "vm-a961fa4b8b5e60a2" {
   host     = "10.1.40.14"
   port     = 22
   user     = "debian"
@@ -3284,7 +3284,7 @@ server "vm-a961fa4b8b5e60a2" {
   }
 }
 
-server "vm-69fb6e3426455ed4" {
+machine "vm-69fb6e3426455ed4" {
   host     = "10.1.40.15"
   port     = 22
   user     = "debian"
@@ -3299,7 +3299,7 @@ server "vm-69fb6e3426455ed4" {
   }
 }
 
-server "vm-93db8da1a0e89cb1" {
+machine "vm-93db8da1a0e89cb1" {
   host     = "10.1.40.16"
   port     = 22
   user     = "debian"
@@ -3314,7 +3314,7 @@ server "vm-93db8da1a0e89cb1" {
   }
 }
 
-server "vm-576144530083767f" {
+machine "vm-576144530083767f" {
   host     = "10.1.40.17"
   port     = 22
   user     = "debian"
@@ -3329,7 +3329,7 @@ server "vm-576144530083767f" {
   }
 }
 
-server "vm-a325b80603492e79" {
+machine "vm-a325b80603492e79" {
   host     = "10.1.40.18"
   port     = 22
   user     = "debian"
@@ -3344,7 +3344,7 @@ server "vm-a325b80603492e79" {
   }
 }
 
-server "vm-076b82cde8e97b66" {
+machine "vm-076b82cde8e97b66" {
   host     = "10.1.40.19"
   port     = 22
   user     = "debian"
@@ -3359,7 +3359,7 @@ server "vm-076b82cde8e97b66" {
   }
 }
 
-server "vm-d25ce9f3b7e33245" {
+machine "vm-d25ce9f3b7e33245" {
   host     = "10.1.40.20"
   port     = 22
   user     = "debian"
@@ -3374,7 +3374,7 @@ server "vm-d25ce9f3b7e33245" {
   }
 }
 
-server "vm-239e3daa8b0cc158" {
+machine "vm-239e3daa8b0cc158" {
   host     = "10.1.40.21"
   port     = 22
   user     = "debian"
@@ -3389,7 +3389,7 @@ server "vm-239e3daa8b0cc158" {
   }
 }
 
-server "vm-c998d5c55fde56f4" {
+machine "vm-c998d5c55fde56f4" {
   host     = "10.1.40.22"
   port     = 22
   user     = "debian"
@@ -3404,7 +3404,7 @@ server "vm-c998d5c55fde56f4" {
   }
 }
 
-server "vm-c7816f02387adccf" {
+machine "vm-c7816f02387adccf" {
   host     = "10.1.40.23"
   port     = 22
   user     = "debian"
@@ -3419,7 +3419,7 @@ server "vm-c7816f02387adccf" {
   }
 }
 
-server "vm-d3f51bf8d0f6805a" {
+machine "vm-d3f51bf8d0f6805a" {
   host     = "10.1.40.24"
   port     = 22
   user     = "debian"
@@ -3434,7 +3434,7 @@ server "vm-d3f51bf8d0f6805a" {
   }
 }
 
-server "vm-ac32766a82b56554" {
+machine "vm-ac32766a82b56554" {
   host     = "10.1.40.25"
   port     = 22
   user     = "debian"
@@ -3449,7 +3449,7 @@ server "vm-ac32766a82b56554" {
   }
 }
 
-server "vm-dba240742be79c28" {
+machine "vm-dba240742be79c28" {
   host     = "10.1.40.26"
   port     = 22
   user     = "debian"
@@ -3464,7 +3464,7 @@ server "vm-dba240742be79c28" {
   }
 }
 
-server "vm-423164883fcbfa21" {
+machine "vm-423164883fcbfa21" {
   host     = "10.1.40.27"
   port     = 22
   user     = "debian"
@@ -3479,7 +3479,7 @@ server "vm-423164883fcbfa21" {
   }
 }
 
-server "vm-96102ca7d79f964b" {
+machine "vm-96102ca7d79f964b" {
   host     = "10.1.40.28"
   port     = 22
   user     = "debian"
@@ -3494,7 +3494,7 @@ server "vm-96102ca7d79f964b" {
   }
 }
 
-server "vm-d9883f1d89ab84ea" {
+machine "vm-d9883f1d89ab84ea" {
   host     = "10.1.40.29"
   port     = 22
   user     = "debian"
@@ -3509,7 +3509,7 @@ server "vm-d9883f1d89ab84ea" {
   }
 }
 
-server "vm-ba4eb8a701eb4f64" {
+machine "vm-ba4eb8a701eb4f64" {
   host     = "10.1.40.30"
   port     = 22
   user     = "debian"
@@ -3524,7 +3524,7 @@ server "vm-ba4eb8a701eb4f64" {
   }
 }
 
-server "vm-f5ea652596d7e118" {
+machine "vm-f5ea652596d7e118" {
   host     = "10.1.40.31"
   port     = 22
   user     = "debian"
@@ -3539,7 +3539,7 @@ server "vm-f5ea652596d7e118" {
   }
 }
 
-server "vm-6f7cbf626beea2b7" {
+machine "vm-6f7cbf626beea2b7" {
   host     = "10.1.40.32"
   port     = 22
   user     = "debian"
@@ -3554,7 +3554,7 @@ server "vm-6f7cbf626beea2b7" {
   }
 }
 
-server "vm-8a87e574703460a5" {
+machine "vm-8a87e574703460a5" {
   host     = "10.1.40.33"
   port     = 22
   user     = "debian"
@@ -3569,7 +3569,7 @@ server "vm-8a87e574703460a5" {
   }
 }
 
-server "vm-14a4367fa48dbf43" {
+machine "vm-14a4367fa48dbf43" {
   host     = "10.1.40.34"
   port     = 22
   user     = "debian"
@@ -3584,7 +3584,7 @@ server "vm-14a4367fa48dbf43" {
   }
 }
 
-server "vm-de2bdaf5afd1157b" {
+machine "vm-de2bdaf5afd1157b" {
   host     = "10.1.40.35"
   port     = 22
   user     = "debian"
@@ -3599,7 +3599,7 @@ server "vm-de2bdaf5afd1157b" {
   }
 }
 
-server "vm-28ad02b488eeb156" {
+machine "vm-28ad02b488eeb156" {
   host     = "10.1.40.36"
   port     = 22
   user     = "debian"
@@ -3614,7 +3614,7 @@ server "vm-28ad02b488eeb156" {
   }
 }
 
-server "vm-b5871572a9d68599" {
+machine "vm-b5871572a9d68599" {
   host     = "10.1.40.37"
   port     = 22
   user     = "debian"
@@ -3629,7 +3629,7 @@ server "vm-b5871572a9d68599" {
   }
 }
 
-server "vm-f117ad522fc8bb6c" {
+machine "vm-f117ad522fc8bb6c" {
   host     = "10.2.10.1"
   port     = 22
   user     = "debian"
@@ -3644,7 +3644,7 @@ server "vm-f117ad522fc8bb6c" {
   }
 }
 
-server "vm-03a35fa7b1335525" {
+machine "vm-03a35fa7b1335525" {
   host     = "10.2.10.2"
   port     = 22
   user     = "debian"
@@ -3659,7 +3659,7 @@ server "vm-03a35fa7b1335525" {
   }
 }
 
-server "vm-a38bf5b746914c48" {
+machine "vm-a38bf5b746914c48" {
   host     = "10.2.10.3"
   port     = 22
   user     = "debian"
@@ -3674,7 +3674,7 @@ server "vm-a38bf5b746914c48" {
   }
 }
 
-server "vm-4f1d404b378ec69e" {
+machine "vm-4f1d404b378ec69e" {
   host     = "10.2.10.4"
   port     = 22
   user     = "debian"
@@ -3689,7 +3689,7 @@ server "vm-4f1d404b378ec69e" {
   }
 }
 
-server "vm-598670663e6323a4" {
+machine "vm-598670663e6323a4" {
   host     = "10.2.10.5"
   port     = 22
   user     = "debian"
@@ -3704,7 +3704,7 @@ server "vm-598670663e6323a4" {
   }
 }
 
-server "vm-79b0c6cd90e98e4a" {
+machine "vm-79b0c6cd90e98e4a" {
   host     = "10.2.10.6"
   port     = 22
   user     = "debian"
@@ -3719,7 +3719,7 @@ server "vm-79b0c6cd90e98e4a" {
   }
 }
 
-server "vm-30e6dcf4b8aee8ce" {
+machine "vm-30e6dcf4b8aee8ce" {
   host     = "10.2.10.7"
   port     = 22
   user     = "debian"
@@ -3734,7 +3734,7 @@ server "vm-30e6dcf4b8aee8ce" {
   }
 }
 
-server "vm-2c6fdcdd6c756eca" {
+machine "vm-2c6fdcdd6c756eca" {
   host     = "10.2.10.8"
   port     = 22
   user     = "debian"
@@ -3749,7 +3749,7 @@ server "vm-2c6fdcdd6c756eca" {
   }
 }
 
-server "vm-c1d1f091fea6e5ca" {
+machine "vm-c1d1f091fea6e5ca" {
   host     = "10.2.10.9"
   port     = 22
   user     = "debian"
@@ -3764,7 +3764,7 @@ server "vm-c1d1f091fea6e5ca" {
   }
 }
 
-server "vm-32877f1a3d3ca95e" {
+machine "vm-32877f1a3d3ca95e" {
   host     = "10.2.10.10"
   port     = 22
   user     = "debian"
@@ -3779,7 +3779,7 @@ server "vm-32877f1a3d3ca95e" {
   }
 }
 
-server "vm-f37bffe45c407178" {
+machine "vm-f37bffe45c407178" {
   host     = "10.2.10.11"
   port     = 22
   user     = "debian"
@@ -3794,7 +3794,7 @@ server "vm-f37bffe45c407178" {
   }
 }
 
-server "vm-c265eb115d0f0fd3" {
+machine "vm-c265eb115d0f0fd3" {
   host     = "10.2.10.12"
   port     = 22
   user     = "debian"
@@ -3809,7 +3809,7 @@ server "vm-c265eb115d0f0fd3" {
   }
 }
 
-server "vm-ea7d98e3ebaf14bf" {
+machine "vm-ea7d98e3ebaf14bf" {
   host     = "10.2.10.13"
   port     = 22
   user     = "debian"
@@ -3824,7 +3824,7 @@ server "vm-ea7d98e3ebaf14bf" {
   }
 }
 
-server "vm-91c0b4d2bd2fb70e" {
+machine "vm-91c0b4d2bd2fb70e" {
   host     = "10.2.10.14"
   port     = 22
   user     = "debian"
@@ -3839,7 +3839,7 @@ server "vm-91c0b4d2bd2fb70e" {
   }
 }
 
-server "vm-64a2c5906e53723c" {
+machine "vm-64a2c5906e53723c" {
   host     = "10.2.10.15"
   port     = 22
   user     = "debian"
@@ -3854,7 +3854,7 @@ server "vm-64a2c5906e53723c" {
   }
 }
 
-server "vm-aa3b98bdc732cdb2" {
+machine "vm-aa3b98bdc732cdb2" {
   host     = "10.2.10.16"
   port     = 22
   user     = "debian"
@@ -3869,7 +3869,7 @@ server "vm-aa3b98bdc732cdb2" {
   }
 }
 
-server "vm-a9c7fe218dd4bc9f" {
+machine "vm-a9c7fe218dd4bc9f" {
   host     = "10.2.10.17"
   port     = 22
   user     = "debian"
@@ -3884,7 +3884,7 @@ server "vm-a9c7fe218dd4bc9f" {
   }
 }
 
-server "vm-27964bc14414f5d6" {
+machine "vm-27964bc14414f5d6" {
   host     = "10.2.10.18"
   port     = 22
   user     = "debian"
@@ -3899,7 +3899,7 @@ server "vm-27964bc14414f5d6" {
   }
 }
 
-server "vm-0210ee4d42435586" {
+machine "vm-0210ee4d42435586" {
   host     = "10.2.10.19"
   port     = 22
   user     = "debian"
@@ -3914,7 +3914,7 @@ server "vm-0210ee4d42435586" {
   }
 }
 
-server "vm-7639ff0e765cf2fa" {
+machine "vm-7639ff0e765cf2fa" {
   host     = "10.2.10.20"
   port     = 22
   user     = "debian"
@@ -3929,7 +3929,7 @@ server "vm-7639ff0e765cf2fa" {
   }
 }
 
-server "vm-c7c670c672671058" {
+machine "vm-c7c670c672671058" {
   host     = "10.2.10.21"
   port     = 22
   user     = "debian"
@@ -3944,7 +3944,7 @@ server "vm-c7c670c672671058" {
   }
 }
 
-server "vm-c96650236b685251" {
+machine "vm-c96650236b685251" {
   host     = "10.2.10.22"
   port     = 22
   user     = "debian"
@@ -3959,7 +3959,7 @@ server "vm-c96650236b685251" {
   }
 }
 
-server "vm-21b32242f4e6c14c" {
+machine "vm-21b32242f4e6c14c" {
   host     = "10.2.10.23"
   port     = 22
   user     = "debian"
@@ -3974,7 +3974,7 @@ server "vm-21b32242f4e6c14c" {
   }
 }
 
-server "vm-f0dd24f50b9273ac" {
+machine "vm-f0dd24f50b9273ac" {
   host     = "10.2.10.24"
   port     = 22
   user     = "debian"
@@ -3989,7 +3989,7 @@ server "vm-f0dd24f50b9273ac" {
   }
 }
 
-server "vm-adfd636d6a3b1783" {
+machine "vm-adfd636d6a3b1783" {
   host     = "10.2.10.25"
   port     = 22
   user     = "debian"
@@ -4004,7 +4004,7 @@ server "vm-adfd636d6a3b1783" {
   }
 }
 
-server "vm-ebdb50f7a35f0aa0" {
+machine "vm-ebdb50f7a35f0aa0" {
   host     = "10.2.10.26"
   port     = 22
   user     = "debian"
@@ -4019,7 +4019,7 @@ server "vm-ebdb50f7a35f0aa0" {
   }
 }
 
-server "vm-e09f80e9b6bbb2c4" {
+machine "vm-e09f80e9b6bbb2c4" {
   host     = "10.2.10.27"
   port     = 22
   user     = "debian"
@@ -4034,7 +4034,7 @@ server "vm-e09f80e9b6bbb2c4" {
   }
 }
 
-server "vm-46c1a625f8d0466a" {
+machine "vm-46c1a625f8d0466a" {
   host     = "10.2.10.28"
   port     = 22
   user     = "debian"
@@ -4049,7 +4049,7 @@ server "vm-46c1a625f8d0466a" {
   }
 }
 
-server "vm-208d35c6204f04e1" {
+machine "vm-208d35c6204f04e1" {
   host     = "10.2.10.29"
   port     = 22
   user     = "debian"
@@ -4064,7 +4064,7 @@ server "vm-208d35c6204f04e1" {
   }
 }
 
-server "vm-3c14edf99e783465" {
+machine "vm-3c14edf99e783465" {
   host     = "10.2.10.30"
   port     = 22
   user     = "debian"
@@ -4079,7 +4079,7 @@ server "vm-3c14edf99e783465" {
   }
 }
 
-server "vm-05f1d4562a9a2822" {
+machine "vm-05f1d4562a9a2822" {
   host     = "10.2.10.31"
   port     = 22
   user     = "debian"
@@ -4094,7 +4094,7 @@ server "vm-05f1d4562a9a2822" {
   }
 }
 
-server "vm-c48466e11a17de0b" {
+machine "vm-c48466e11a17de0b" {
   host     = "10.2.10.32"
   port     = 22
   user     = "debian"
@@ -4109,7 +4109,7 @@ server "vm-c48466e11a17de0b" {
   }
 }
 
-server "vm-52ab03c5f2da2d68" {
+machine "vm-52ab03c5f2da2d68" {
   host     = "10.2.10.33"
   port     = 22
   user     = "debian"
@@ -4124,7 +4124,7 @@ server "vm-52ab03c5f2da2d68" {
   }
 }
 
-server "vm-a7a1d27230ad84d3" {
+machine "vm-a7a1d27230ad84d3" {
   host     = "10.2.10.34"
   port     = 22
   user     = "debian"
@@ -4139,7 +4139,7 @@ server "vm-a7a1d27230ad84d3" {
   }
 }
 
-server "vm-439160d151527835" {
+machine "vm-439160d151527835" {
   host     = "10.2.10.35"
   port     = 22
   user     = "debian"
@@ -4154,7 +4154,7 @@ server "vm-439160d151527835" {
   }
 }
 
-server "vm-f249defadda6796d" {
+machine "vm-f249defadda6796d" {
   host     = "10.2.10.36"
   port     = 22
   user     = "debian"
@@ -4169,7 +4169,7 @@ server "vm-f249defadda6796d" {
   }
 }
 
-server "vm-833b1b5795789447" {
+machine "vm-833b1b5795789447" {
   host     = "10.2.10.37"
   port     = 22
   user     = "debian"
@@ -4184,7 +4184,7 @@ server "vm-833b1b5795789447" {
   }
 }
 
-server "vm-6a4949e27160c48c" {
+machine "vm-6a4949e27160c48c" {
   host     = "10.2.20.1"
   port     = 22
   user     = "debian"
@@ -4199,7 +4199,7 @@ server "vm-6a4949e27160c48c" {
   }
 }
 
-server "vm-b977828b6ce5320f" {
+machine "vm-b977828b6ce5320f" {
   host     = "10.2.20.2"
   port     = 22
   user     = "debian"
@@ -4214,7 +4214,7 @@ server "vm-b977828b6ce5320f" {
   }
 }
 
-server "vm-72823f982c4b2db9" {
+machine "vm-72823f982c4b2db9" {
   host     = "10.2.20.3"
   port     = 22
   user     = "debian"
@@ -4229,7 +4229,7 @@ server "vm-72823f982c4b2db9" {
   }
 }
 
-server "vm-558c5076c0cf40db" {
+machine "vm-558c5076c0cf40db" {
   host     = "10.2.20.4"
   port     = 22
   user     = "debian"
@@ -4244,7 +4244,7 @@ server "vm-558c5076c0cf40db" {
   }
 }
 
-server "vm-5eee875c276fba0b" {
+machine "vm-5eee875c276fba0b" {
   host     = "10.2.20.5"
   port     = 22
   user     = "debian"
@@ -4259,7 +4259,7 @@ server "vm-5eee875c276fba0b" {
   }
 }
 
-server "vm-60e493df1b80fd82" {
+machine "vm-60e493df1b80fd82" {
   host     = "10.2.20.6"
   port     = 22
   user     = "debian"
@@ -4274,7 +4274,7 @@ server "vm-60e493df1b80fd82" {
   }
 }
 
-server "vm-03725f2419e2d743" {
+machine "vm-03725f2419e2d743" {
   host     = "10.2.20.7"
   port     = 22
   user     = "debian"
@@ -4289,7 +4289,7 @@ server "vm-03725f2419e2d743" {
   }
 }
 
-server "vm-f2a1616d1ae0aef9" {
+machine "vm-f2a1616d1ae0aef9" {
   host     = "10.2.20.8"
   port     = 22
   user     = "debian"
@@ -4304,7 +4304,7 @@ server "vm-f2a1616d1ae0aef9" {
   }
 }
 
-server "vm-cdd3d742d567cc6c" {
+machine "vm-cdd3d742d567cc6c" {
   host     = "10.2.20.9"
   port     = 22
   user     = "debian"
@@ -4319,7 +4319,7 @@ server "vm-cdd3d742d567cc6c" {
   }
 }
 
-server "vm-cf2c74394d88325d" {
+machine "vm-cf2c74394d88325d" {
   host     = "10.2.20.10"
   port     = 22
   user     = "debian"
@@ -4334,7 +4334,7 @@ server "vm-cf2c74394d88325d" {
   }
 }
 
-server "vm-072bbc348d9c9777" {
+machine "vm-072bbc348d9c9777" {
   host     = "10.2.20.11"
   port     = 22
   user     = "debian"
@@ -4349,7 +4349,7 @@ server "vm-072bbc348d9c9777" {
   }
 }
 
-server "vm-1951ad7a90f065e9" {
+machine "vm-1951ad7a90f065e9" {
   host     = "10.2.20.12"
   port     = 22
   user     = "debian"
@@ -4364,7 +4364,7 @@ server "vm-1951ad7a90f065e9" {
   }
 }
 
-server "vm-e8fdbd92dc67619a" {
+machine "vm-e8fdbd92dc67619a" {
   host     = "10.2.20.13"
   port     = 22
   user     = "debian"
@@ -4379,7 +4379,7 @@ server "vm-e8fdbd92dc67619a" {
   }
 }
 
-server "vm-608f5f31c0db0d86" {
+machine "vm-608f5f31c0db0d86" {
   host     = "10.2.20.14"
   port     = 22
   user     = "debian"
@@ -4394,7 +4394,7 @@ server "vm-608f5f31c0db0d86" {
   }
 }
 
-server "vm-571a1c25e61e23de" {
+machine "vm-571a1c25e61e23de" {
   host     = "10.2.20.15"
   port     = 22
   user     = "debian"
@@ -4409,7 +4409,7 @@ server "vm-571a1c25e61e23de" {
   }
 }
 
-server "vm-aacd431e6c38cad7" {
+machine "vm-aacd431e6c38cad7" {
   host     = "10.2.20.16"
   port     = 22
   user     = "debian"
@@ -4424,7 +4424,7 @@ server "vm-aacd431e6c38cad7" {
   }
 }
 
-server "vm-069f9d48f83a2c4b" {
+machine "vm-069f9d48f83a2c4b" {
   host     = "10.2.20.17"
   port     = 22
   user     = "debian"
@@ -4439,7 +4439,7 @@ server "vm-069f9d48f83a2c4b" {
   }
 }
 
-server "vm-c1dad26e325b5ed5" {
+machine "vm-c1dad26e325b5ed5" {
   host     = "10.2.20.18"
   port     = 22
   user     = "debian"
@@ -4454,7 +4454,7 @@ server "vm-c1dad26e325b5ed5" {
   }
 }
 
-server "vm-b18e410dd0269a5a" {
+machine "vm-b18e410dd0269a5a" {
   host     = "10.2.20.19"
   port     = 22
   user     = "debian"
@@ -4469,7 +4469,7 @@ server "vm-b18e410dd0269a5a" {
   }
 }
 
-server "vm-28c99b5e15e550d2" {
+machine "vm-28c99b5e15e550d2" {
   host     = "10.2.20.20"
   port     = 22
   user     = "debian"
@@ -4484,7 +4484,7 @@ server "vm-28c99b5e15e550d2" {
   }
 }
 
-server "vm-d315778d21cab5f6" {
+machine "vm-d315778d21cab5f6" {
   host     = "10.2.20.21"
   port     = 22
   user     = "debian"
@@ -4499,7 +4499,7 @@ server "vm-d315778d21cab5f6" {
   }
 }
 
-server "vm-b5170883b17a7f45" {
+machine "vm-b5170883b17a7f45" {
   host     = "10.2.20.22"
   port     = 22
   user     = "debian"
@@ -4514,7 +4514,7 @@ server "vm-b5170883b17a7f45" {
   }
 }
 
-server "vm-2f326db05472e2ec" {
+machine "vm-2f326db05472e2ec" {
   host     = "10.2.20.23"
   port     = 22
   user     = "debian"
@@ -4529,7 +4529,7 @@ server "vm-2f326db05472e2ec" {
   }
 }
 
-server "vm-e016d8540b288091" {
+machine "vm-e016d8540b288091" {
   host     = "10.2.20.24"
   port     = 22
   user     = "debian"
@@ -4544,7 +4544,7 @@ server "vm-e016d8540b288091" {
   }
 }
 
-server "vm-08ef9cd4ebb49cdd" {
+machine "vm-08ef9cd4ebb49cdd" {
   host     = "10.2.20.25"
   port     = 22
   user     = "debian"
@@ -4559,7 +4559,7 @@ server "vm-08ef9cd4ebb49cdd" {
   }
 }
 
-server "vm-e893f4eeebe2550a" {
+machine "vm-e893f4eeebe2550a" {
   host     = "10.2.20.26"
   port     = 22
   user     = "debian"
@@ -4574,7 +4574,7 @@ server "vm-e893f4eeebe2550a" {
   }
 }
 
-server "vm-d46422f17d8c93d0" {
+machine "vm-d46422f17d8c93d0" {
   host     = "10.2.20.27"
   port     = 22
   user     = "debian"
@@ -4589,7 +4589,7 @@ server "vm-d46422f17d8c93d0" {
   }
 }
 
-server "vm-d03be358b3138e80" {
+machine "vm-d03be358b3138e80" {
   host     = "10.2.20.28"
   port     = 22
   user     = "debian"
@@ -4604,7 +4604,7 @@ server "vm-d03be358b3138e80" {
   }
 }
 
-server "vm-4d6eb731b1ce9676" {
+machine "vm-4d6eb731b1ce9676" {
   host     = "10.2.20.29"
   port     = 22
   user     = "debian"
@@ -4619,7 +4619,7 @@ server "vm-4d6eb731b1ce9676" {
   }
 }
 
-server "vm-32a5cdaf510d9e7a" {
+machine "vm-32a5cdaf510d9e7a" {
   host     = "10.2.20.30"
   port     = 22
   user     = "debian"
@@ -4634,7 +4634,7 @@ server "vm-32a5cdaf510d9e7a" {
   }
 }
 
-server "vm-2fbe3ca3cbda9cf8" {
+machine "vm-2fbe3ca3cbda9cf8" {
   host     = "10.2.20.31"
   port     = 22
   user     = "debian"
@@ -4649,7 +4649,7 @@ server "vm-2fbe3ca3cbda9cf8" {
   }
 }
 
-server "vm-a7d1e4ed8d7711d0" {
+machine "vm-a7d1e4ed8d7711d0" {
   host     = "10.2.20.32"
   port     = 22
   user     = "debian"
@@ -4664,7 +4664,7 @@ server "vm-a7d1e4ed8d7711d0" {
   }
 }
 
-server "vm-fe8df73b7d7bdd1f" {
+machine "vm-fe8df73b7d7bdd1f" {
   host     = "10.2.20.33"
   port     = 22
   user     = "debian"
@@ -4679,7 +4679,7 @@ server "vm-fe8df73b7d7bdd1f" {
   }
 }
 
-server "vm-28e802b8b304733a" {
+machine "vm-28e802b8b304733a" {
   host     = "10.2.20.34"
   port     = 22
   user     = "debian"
@@ -4694,7 +4694,7 @@ server "vm-28e802b8b304733a" {
   }
 }
 
-server "vm-bc700bbe2845a96d" {
+machine "vm-bc700bbe2845a96d" {
   host     = "10.2.20.35"
   port     = 22
   user     = "debian"
@@ -4709,7 +4709,7 @@ server "vm-bc700bbe2845a96d" {
   }
 }
 
-server "vm-d213a895e6423bf7" {
+machine "vm-d213a895e6423bf7" {
   host     = "10.2.20.36"
   port     = 22
   user     = "debian"
@@ -4724,7 +4724,7 @@ server "vm-d213a895e6423bf7" {
   }
 }
 
-server "vm-257bcb1130549fcd" {
+machine "vm-257bcb1130549fcd" {
   host     = "10.2.20.37"
   port     = 22
   user     = "debian"
@@ -4739,7 +4739,7 @@ server "vm-257bcb1130549fcd" {
   }
 }
 
-server "vm-3f17439f62e204cd" {
+machine "vm-3f17439f62e204cd" {
   host     = "10.2.30.1"
   port     = 22
   user     = "debian"
@@ -4754,7 +4754,7 @@ server "vm-3f17439f62e204cd" {
   }
 }
 
-server "vm-7db875d2dd81636c" {
+machine "vm-7db875d2dd81636c" {
   host     = "10.2.30.2"
   port     = 22
   user     = "debian"
@@ -4769,7 +4769,7 @@ server "vm-7db875d2dd81636c" {
   }
 }
 
-server "vm-8ae1811ed5a97cae" {
+machine "vm-8ae1811ed5a97cae" {
   host     = "10.2.30.3"
   port     = 22
   user     = "debian"
@@ -4784,7 +4784,7 @@ server "vm-8ae1811ed5a97cae" {
   }
 }
 
-server "vm-d30875a45d508d42" {
+machine "vm-d30875a45d508d42" {
   host     = "10.2.30.4"
   port     = 22
   user     = "debian"
@@ -4799,7 +4799,7 @@ server "vm-d30875a45d508d42" {
   }
 }
 
-server "vm-fc082d2ba4f306da" {
+machine "vm-fc082d2ba4f306da" {
   host     = "10.2.30.5"
   port     = 22
   user     = "debian"
@@ -4814,7 +4814,7 @@ server "vm-fc082d2ba4f306da" {
   }
 }
 
-server "vm-e2acfdcb12580438" {
+machine "vm-e2acfdcb12580438" {
   host     = "10.2.30.6"
   port     = 22
   user     = "debian"
@@ -4829,7 +4829,7 @@ server "vm-e2acfdcb12580438" {
   }
 }
 
-server "vm-494954534aadf512" {
+machine "vm-494954534aadf512" {
   host     = "10.2.30.7"
   port     = 22
   user     = "debian"
@@ -4844,7 +4844,7 @@ server "vm-494954534aadf512" {
   }
 }
 
-server "vm-8c82839dcff71483" {
+machine "vm-8c82839dcff71483" {
   host     = "10.2.30.8"
   port     = 22
   user     = "debian"
@@ -4859,7 +4859,7 @@ server "vm-8c82839dcff71483" {
   }
 }
 
-server "vm-1f0f650209b4bb23" {
+machine "vm-1f0f650209b4bb23" {
   host     = "10.2.30.9"
   port     = 22
   user     = "debian"
@@ -4874,7 +4874,7 @@ server "vm-1f0f650209b4bb23" {
   }
 }
 
-server "vm-83e5487ed3a847a9" {
+machine "vm-83e5487ed3a847a9" {
   host     = "10.2.30.10"
   port     = 22
   user     = "debian"
@@ -4889,7 +4889,7 @@ server "vm-83e5487ed3a847a9" {
   }
 }
 
-server "vm-0194e154fabde521" {
+machine "vm-0194e154fabde521" {
   host     = "10.2.30.11"
   port     = 22
   user     = "debian"
@@ -4904,7 +4904,7 @@ server "vm-0194e154fabde521" {
   }
 }
 
-server "vm-bfa6146bd49f1ad9" {
+machine "vm-bfa6146bd49f1ad9" {
   host     = "10.2.30.12"
   port     = 22
   user     = "debian"
@@ -4919,7 +4919,7 @@ server "vm-bfa6146bd49f1ad9" {
   }
 }
 
-server "vm-79801914f931fff9" {
+machine "vm-79801914f931fff9" {
   host     = "10.2.30.13"
   port     = 22
   user     = "debian"
@@ -4934,7 +4934,7 @@ server "vm-79801914f931fff9" {
   }
 }
 
-server "vm-5149b2a5edb6cb62" {
+machine "vm-5149b2a5edb6cb62" {
   host     = "10.2.30.14"
   port     = 22
   user     = "debian"
@@ -4949,7 +4949,7 @@ server "vm-5149b2a5edb6cb62" {
   }
 }
 
-server "vm-3fa443d3a81cf751" {
+machine "vm-3fa443d3a81cf751" {
   host     = "10.2.30.15"
   port     = 22
   user     = "debian"
@@ -4964,7 +4964,7 @@ server "vm-3fa443d3a81cf751" {
   }
 }
 
-server "vm-cbffd09363e9aa70" {
+machine "vm-cbffd09363e9aa70" {
   host     = "10.2.30.16"
   port     = 22
   user     = "debian"
@@ -4979,7 +4979,7 @@ server "vm-cbffd09363e9aa70" {
   }
 }
 
-server "vm-dff0cbe1f69c072a" {
+machine "vm-dff0cbe1f69c072a" {
   host     = "10.2.30.17"
   port     = 22
   user     = "debian"
@@ -4994,7 +4994,7 @@ server "vm-dff0cbe1f69c072a" {
   }
 }
 
-server "vm-18415aef908b8589" {
+machine "vm-18415aef908b8589" {
   host     = "10.2.30.18"
   port     = 22
   user     = "debian"
@@ -5009,7 +5009,7 @@ server "vm-18415aef908b8589" {
   }
 }
 
-server "vm-4ea6ffd36720e89e" {
+machine "vm-4ea6ffd36720e89e" {
   host     = "10.2.30.19"
   port     = 22
   user     = "debian"
@@ -5024,7 +5024,7 @@ server "vm-4ea6ffd36720e89e" {
   }
 }
 
-server "vm-dcf24143477590aa" {
+machine "vm-dcf24143477590aa" {
   host     = "10.2.30.20"
   port     = 22
   user     = "debian"
@@ -5039,7 +5039,7 @@ server "vm-dcf24143477590aa" {
   }
 }
 
-server "vm-6bb0a1ec418a98f1" {
+machine "vm-6bb0a1ec418a98f1" {
   host     = "10.2.30.21"
   port     = 22
   user     = "debian"
@@ -5054,7 +5054,7 @@ server "vm-6bb0a1ec418a98f1" {
   }
 }
 
-server "vm-10e3747bb454c037" {
+machine "vm-10e3747bb454c037" {
   host     = "10.2.30.22"
   port     = 22
   user     = "debian"
@@ -5069,7 +5069,7 @@ server "vm-10e3747bb454c037" {
   }
 }
 
-server "vm-c0dd18b1732a176a" {
+machine "vm-c0dd18b1732a176a" {
   host     = "10.2.30.23"
   port     = 22
   user     = "debian"
@@ -5084,7 +5084,7 @@ server "vm-c0dd18b1732a176a" {
   }
 }
 
-server "vm-cd9eea06e78ed6cd" {
+machine "vm-cd9eea06e78ed6cd" {
   host     = "10.2.30.24"
   port     = 22
   user     = "debian"
@@ -5099,7 +5099,7 @@ server "vm-cd9eea06e78ed6cd" {
   }
 }
 
-server "vm-d9ebe48efedad86c" {
+machine "vm-d9ebe48efedad86c" {
   host     = "10.2.30.25"
   port     = 22
   user     = "debian"
@@ -5114,7 +5114,7 @@ server "vm-d9ebe48efedad86c" {
   }
 }
 
-server "vm-0007a70c320ddbbf" {
+machine "vm-0007a70c320ddbbf" {
   host     = "10.2.30.26"
   port     = 22
   user     = "debian"
@@ -5129,7 +5129,7 @@ server "vm-0007a70c320ddbbf" {
   }
 }
 
-server "vm-1ecf20087fd1a8cb" {
+machine "vm-1ecf20087fd1a8cb" {
   host     = "10.2.30.27"
   port     = 22
   user     = "debian"
@@ -5144,7 +5144,7 @@ server "vm-1ecf20087fd1a8cb" {
   }
 }
 
-server "vm-80251f41cd4a5134" {
+machine "vm-80251f41cd4a5134" {
   host     = "10.2.30.28"
   port     = 22
   user     = "debian"
@@ -5159,7 +5159,7 @@ server "vm-80251f41cd4a5134" {
   }
 }
 
-server "vm-0fd00b345a7d251a" {
+machine "vm-0fd00b345a7d251a" {
   host     = "10.2.30.29"
   port     = 22
   user     = "debian"
@@ -5174,7 +5174,7 @@ server "vm-0fd00b345a7d251a" {
   }
 }
 
-server "vm-6eb57bcd39cc5cb7" {
+machine "vm-6eb57bcd39cc5cb7" {
   host     = "10.2.30.30"
   port     = 22
   user     = "debian"
@@ -5189,7 +5189,7 @@ server "vm-6eb57bcd39cc5cb7" {
   }
 }
 
-server "vm-e657651ae23f5bae" {
+machine "vm-e657651ae23f5bae" {
   host     = "10.2.30.31"
   port     = 22
   user     = "debian"
@@ -5204,7 +5204,7 @@ server "vm-e657651ae23f5bae" {
   }
 }
 
-server "vm-70a4a2d9b7984d90" {
+machine "vm-70a4a2d9b7984d90" {
   host     = "10.2.30.32"
   port     = 22
   user     = "debian"
@@ -5219,7 +5219,7 @@ server "vm-70a4a2d9b7984d90" {
   }
 }
 
-server "vm-74a11aa4f9977722" {
+machine "vm-74a11aa4f9977722" {
   host     = "10.2.30.33"
   port     = 22
   user     = "debian"
@@ -5234,7 +5234,7 @@ server "vm-74a11aa4f9977722" {
   }
 }
 
-server "vm-d941bed40e97532c" {
+machine "vm-d941bed40e97532c" {
   host     = "10.2.30.34"
   port     = 22
   user     = "debian"
@@ -5249,7 +5249,7 @@ server "vm-d941bed40e97532c" {
   }
 }
 
-server "vm-a5ee17a099db66a5" {
+machine "vm-a5ee17a099db66a5" {
   host     = "10.2.30.35"
   port     = 22
   user     = "debian"
@@ -5264,7 +5264,7 @@ server "vm-a5ee17a099db66a5" {
   }
 }
 
-server "vm-82e0e3fa2ef0d20d" {
+machine "vm-82e0e3fa2ef0d20d" {
   host     = "10.2.30.36"
   port     = 22
   user     = "debian"
@@ -5279,7 +5279,7 @@ server "vm-82e0e3fa2ef0d20d" {
   }
 }
 
-server "vm-3c311507596c857b" {
+machine "vm-3c311507596c857b" {
   host     = "10.2.30.37"
   port     = 22
   user     = "debian"
@@ -5294,7 +5294,7 @@ server "vm-3c311507596c857b" {
   }
 }
 
-server "vm-44e2c3366a307954" {
+machine "vm-44e2c3366a307954" {
   host     = "10.2.40.1"
   port     = 22
   user     = "debian"
@@ -5309,7 +5309,7 @@ server "vm-44e2c3366a307954" {
   }
 }
 
-server "vm-0a7a0f62e44c67d0" {
+machine "vm-0a7a0f62e44c67d0" {
   host     = "10.2.40.2"
   port     = 22
   user     = "debian"
@@ -5324,7 +5324,7 @@ server "vm-0a7a0f62e44c67d0" {
   }
 }
 
-server "vm-1c08dc3b8226a3f2" {
+machine "vm-1c08dc3b8226a3f2" {
   host     = "10.2.40.3"
   port     = 22
   user     = "debian"
@@ -5339,7 +5339,7 @@ server "vm-1c08dc3b8226a3f2" {
   }
 }
 
-server "vm-ff812ab07f53dc37" {
+machine "vm-ff812ab07f53dc37" {
   host     = "10.2.40.4"
   port     = 22
   user     = "debian"
@@ -5354,7 +5354,7 @@ server "vm-ff812ab07f53dc37" {
   }
 }
 
-server "vm-5df3c4c88581f39b" {
+machine "vm-5df3c4c88581f39b" {
   host     = "10.2.40.5"
   port     = 22
   user     = "debian"
@@ -5369,7 +5369,7 @@ server "vm-5df3c4c88581f39b" {
   }
 }
 
-server "vm-5a271fd1de8ba29a" {
+machine "vm-5a271fd1de8ba29a" {
   host     = "10.2.40.6"
   port     = 22
   user     = "debian"
@@ -5384,7 +5384,7 @@ server "vm-5a271fd1de8ba29a" {
   }
 }
 
-server "vm-ca6baa580d787977" {
+machine "vm-ca6baa580d787977" {
   host     = "10.2.40.7"
   port     = 22
   user     = "debian"
@@ -5399,7 +5399,7 @@ server "vm-ca6baa580d787977" {
   }
 }
 
-server "vm-8b42cd724a7099db" {
+machine "vm-8b42cd724a7099db" {
   host     = "10.2.40.8"
   port     = 22
   user     = "debian"
@@ -5414,7 +5414,7 @@ server "vm-8b42cd724a7099db" {
   }
 }
 
-server "vm-536b7877b2cb96c5" {
+machine "vm-536b7877b2cb96c5" {
   host     = "10.2.40.9"
   port     = 22
   user     = "debian"
@@ -5429,7 +5429,7 @@ server "vm-536b7877b2cb96c5" {
   }
 }
 
-server "vm-697676ac4d6752c3" {
+machine "vm-697676ac4d6752c3" {
   host     = "10.2.40.10"
   port     = 22
   user     = "debian"
@@ -5444,7 +5444,7 @@ server "vm-697676ac4d6752c3" {
   }
 }
 
-server "vm-20f4671e2387da4d" {
+machine "vm-20f4671e2387da4d" {
   host     = "10.2.40.11"
   port     = 22
   user     = "debian"
@@ -5459,7 +5459,7 @@ server "vm-20f4671e2387da4d" {
   }
 }
 
-server "vm-19ddcf6903afacf4" {
+machine "vm-19ddcf6903afacf4" {
   host     = "10.2.40.12"
   port     = 22
   user     = "debian"
@@ -5474,7 +5474,7 @@ server "vm-19ddcf6903afacf4" {
   }
 }
 
-server "vm-3b366ee0ae48e223" {
+machine "vm-3b366ee0ae48e223" {
   host     = "10.2.40.13"
   port     = 22
   user     = "debian"
@@ -5489,7 +5489,7 @@ server "vm-3b366ee0ae48e223" {
   }
 }
 
-server "vm-3c199a6a97691b63" {
+machine "vm-3c199a6a97691b63" {
   host     = "10.2.40.14"
   port     = 22
   user     = "debian"
@@ -5504,7 +5504,7 @@ server "vm-3c199a6a97691b63" {
   }
 }
 
-server "vm-d86f1951146b72f0" {
+machine "vm-d86f1951146b72f0" {
   host     = "10.2.40.15"
   port     = 22
   user     = "debian"
@@ -5519,7 +5519,7 @@ server "vm-d86f1951146b72f0" {
   }
 }
 
-server "vm-a08e41352ba0f265" {
+machine "vm-a08e41352ba0f265" {
   host     = "10.2.40.16"
   port     = 22
   user     = "debian"
@@ -5534,7 +5534,7 @@ server "vm-a08e41352ba0f265" {
   }
 }
 
-server "vm-f33b172a3877a612" {
+machine "vm-f33b172a3877a612" {
   host     = "10.2.40.17"
   port     = 22
   user     = "debian"
@@ -5549,7 +5549,7 @@ server "vm-f33b172a3877a612" {
   }
 }
 
-server "vm-da40e02b81a87c5d" {
+machine "vm-da40e02b81a87c5d" {
   host     = "10.2.40.18"
   port     = 22
   user     = "debian"
@@ -5564,7 +5564,7 @@ server "vm-da40e02b81a87c5d" {
   }
 }
 
-server "vm-0ffbd0d326600c51" {
+machine "vm-0ffbd0d326600c51" {
   host     = "10.2.40.19"
   port     = 22
   user     = "debian"
@@ -5579,7 +5579,7 @@ server "vm-0ffbd0d326600c51" {
   }
 }
 
-server "vm-01fbeb6c3be8a939" {
+machine "vm-01fbeb6c3be8a939" {
   host     = "10.2.40.20"
   port     = 22
   user     = "debian"
@@ -5594,7 +5594,7 @@ server "vm-01fbeb6c3be8a939" {
   }
 }
 
-server "vm-9c765d067f1a348b" {
+machine "vm-9c765d067f1a348b" {
   host     = "10.2.40.21"
   port     = 22
   user     = "debian"
@@ -5609,7 +5609,7 @@ server "vm-9c765d067f1a348b" {
   }
 }
 
-server "vm-bbd8375c79d5358f" {
+machine "vm-bbd8375c79d5358f" {
   host     = "10.2.40.22"
   port     = 22
   user     = "debian"
@@ -5624,7 +5624,7 @@ server "vm-bbd8375c79d5358f" {
   }
 }
 
-server "vm-abb7569bbbc39c21" {
+machine "vm-abb7569bbbc39c21" {
   host     = "10.2.40.23"
   port     = 22
   user     = "debian"
@@ -5639,7 +5639,7 @@ server "vm-abb7569bbbc39c21" {
   }
 }
 
-server "vm-9ed07c6766bac427" {
+machine "vm-9ed07c6766bac427" {
   host     = "10.2.40.24"
   port     = 22
   user     = "debian"
@@ -5654,7 +5654,7 @@ server "vm-9ed07c6766bac427" {
   }
 }
 
-server "vm-d187ec14142d92ef" {
+machine "vm-d187ec14142d92ef" {
   host     = "10.2.40.25"
   port     = 22
   user     = "debian"
@@ -5669,7 +5669,7 @@ server "vm-d187ec14142d92ef" {
   }
 }
 
-server "vm-82df5fbb91bf1411" {
+machine "vm-82df5fbb91bf1411" {
   host     = "10.2.40.26"
   port     = 22
   user     = "debian"
@@ -5684,7 +5684,7 @@ server "vm-82df5fbb91bf1411" {
   }
 }
 
-server "vm-f3caa98864e173d6" {
+machine "vm-f3caa98864e173d6" {
   host     = "10.2.40.27"
   port     = 22
   user     = "debian"
@@ -5699,7 +5699,7 @@ server "vm-f3caa98864e173d6" {
   }
 }
 
-server "vm-31a129fb61b827be" {
+machine "vm-31a129fb61b827be" {
   host     = "10.2.40.28"
   port     = 22
   user     = "debian"
@@ -5714,7 +5714,7 @@ server "vm-31a129fb61b827be" {
   }
 }
 
-server "vm-95ca7466e63440c5" {
+machine "vm-95ca7466e63440c5" {
   host     = "10.2.40.29"
   port     = 22
   user     = "debian"
@@ -5729,7 +5729,7 @@ server "vm-95ca7466e63440c5" {
   }
 }
 
-server "vm-a947e2210198b463" {
+machine "vm-a947e2210198b463" {
   host     = "10.2.40.30"
   port     = 22
   user     = "debian"
@@ -5744,7 +5744,7 @@ server "vm-a947e2210198b463" {
   }
 }
 
-server "vm-18f606efdb9d6495" {
+machine "vm-18f606efdb9d6495" {
   host     = "10.2.40.31"
   port     = 22
   user     = "debian"
@@ -5759,7 +5759,7 @@ server "vm-18f606efdb9d6495" {
   }
 }
 
-server "vm-569bd2141dd72bbb" {
+machine "vm-569bd2141dd72bbb" {
   host     = "10.2.40.32"
   port     = 22
   user     = "debian"
@@ -5774,7 +5774,7 @@ server "vm-569bd2141dd72bbb" {
   }
 }
 
-server "vm-86eed7c17beeadb6" {
+machine "vm-86eed7c17beeadb6" {
   host     = "10.2.40.33"
   port     = 22
   user     = "debian"
@@ -5789,7 +5789,7 @@ server "vm-86eed7c17beeadb6" {
   }
 }
 
-server "vm-d58e4573b39d276e" {
+machine "vm-d58e4573b39d276e" {
   host     = "10.2.40.34"
   port     = 22
   user     = "debian"
@@ -5804,7 +5804,7 @@ server "vm-d58e4573b39d276e" {
   }
 }
 
-server "vm-951f7860620a3e80" {
+machine "vm-951f7860620a3e80" {
   host     = "10.2.40.35"
   port     = 22
   user     = "debian"
@@ -5819,7 +5819,7 @@ server "vm-951f7860620a3e80" {
   }
 }
 
-server "vm-a3ea4fa92664c899" {
+machine "vm-a3ea4fa92664c899" {
   host     = "10.2.40.36"
   port     = 22
   user     = "debian"
@@ -5834,7 +5834,7 @@ server "vm-a3ea4fa92664c899" {
   }
 }
 
-server "vm-f8851a924915703c" {
+machine "vm-f8851a924915703c" {
   host     = "10.2.40.37"
   port     = 22
   user     = "debian"
@@ -5928,7 +5928,7 @@ action "check-nginx" {
 action "full-system-check" {
   description = "Comprehensive system check"
   command     = "uptime && df -h && free -h && systemctl --failed --no-pager"
-  servers     = ["machine-fe8d67b1073acad1", "machine-d901fe5ad5a4c1da", "machine-09d6cdbeec529371"]
+  machines    = ["machine-fe8d67b1073acad1", "machine-d901fe5ad5a4c1da", "machine-09d6cdbeec529371"]
   parallel    = true
   timeout     = 300
 }
