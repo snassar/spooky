@@ -4,18 +4,18 @@ import (
 	"testing"
 )
 
-func TestSetDefaults_ServerPort(t *testing.T) {
+func TestSetDefaults_MachinePort(t *testing.T) {
 	config := &Config{
-		Servers: []Server{
+		Machines: []Machine{
 			{
-				Name:     "server1",
+				Name:     "machine1",
 				Host:     "192.168.1.10",
 				User:     "admin",
 				Password: "secret",
 				Port:     0, // Should be set to DefaultSSHPort
 			},
 			{
-				Name:     "server2",
+				Name:     "machine2",
 				Host:     "192.168.1.11",
 				User:     "admin",
 				Password: "secret",
@@ -26,14 +26,14 @@ func TestSetDefaults_ServerPort(t *testing.T) {
 
 	SetDefaults(config)
 
-	// Check that server1 got the default port
-	if config.Servers[0].Port != DefaultSSHPort {
-		t.Errorf("expected server1 port to be %d, got %d", DefaultSSHPort, config.Servers[0].Port)
+	// Check that machine1 got the default port
+	if config.Machines[0].Port != DefaultSSHPort {
+		t.Errorf("expected machine1 port to be %d, got %d", DefaultSSHPort, config.Machines[0].Port)
 	}
 
-	// Check that server2 port remained unchanged
-	if config.Servers[1].Port != 2222 {
-		t.Errorf("expected server2 port to remain 2222, got %d", config.Servers[1].Port)
+	// Check that machine2 port remained unchanged
+	if config.Machines[1].Port != 2222 {
+		t.Errorf("expected machine2 port to remain 2222, got %d", config.Machines[1].Port)
 	}
 }
 
@@ -68,9 +68,9 @@ func TestSetDefaults_ActionTimeout(t *testing.T) {
 
 func TestSetDefaults_MixedConfig(t *testing.T) {
 	config := &Config{
-		Servers: []Server{
+		Machines: []Machine{
 			{
-				Name:     "server1",
+				Name:     "machine1",
 				Host:     "192.168.1.10",
 				User:     "admin",
 				Password: "secret",
@@ -88,9 +88,9 @@ func TestSetDefaults_MixedConfig(t *testing.T) {
 
 	SetDefaults(config)
 
-	// Check server defaults
-	if config.Servers[0].Port != DefaultSSHPort {
-		t.Errorf("expected server port to be %d, got %d", DefaultSSHPort, config.Servers[0].Port)
+	// Check machine defaults
+	if config.Machines[0].Port != DefaultSSHPort {
+		t.Errorf("expected machine port to be %d, got %d", DefaultSSHPort, config.Machines[0].Port)
 	}
 
 	// Check action defaults
@@ -101,16 +101,16 @@ func TestSetDefaults_MixedConfig(t *testing.T) {
 
 func TestSetDefaults_EmptyConfig(t *testing.T) {
 	config := &Config{
-		Servers: []Server{},
-		Actions: []Action{},
+		Machines: []Machine{},
+		Actions:  []Action{},
 	}
 
 	// Should not panic or error
 	SetDefaults(config)
 
 	// Config should remain empty
-	if len(config.Servers) != 0 {
-		t.Error("expected empty servers list to remain empty")
+	if len(config.Machines) != 0 {
+		t.Error("expected empty machines list to remain empty")
 	}
 	if len(config.Actions) != 0 {
 		t.Error("expected empty actions list to remain empty")

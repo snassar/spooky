@@ -14,8 +14,8 @@ import (
 	"golang.org/x/text/language"
 )
 
-// Server represents a server configuration
-type Server struct {
+// Machine represents a machine configuration
+type Machine struct {
 	ID       string
 	Host     string
 	Port     int
@@ -31,7 +31,7 @@ type Action struct {
 	Command     string
 	Script      string
 	Tags        []string
-	Servers     []string
+	Machines    []string
 	Parallel    bool
 	Timeout     int
 }
@@ -65,18 +65,18 @@ func generateGitStyleID(metadata string) string {
 	return hex.EncodeToString(hash[:8]) // 16-character short ID
 }
 
-// generateServers creates servers for a specific scale configuration
-func generateServers(scale ScaleConfig) []Server {
-	var servers []Server
-	serverCount := 0
+// generateMachines creates machines for a specific scale configuration
+func generateMachines(scale ScaleConfig) []Machine {
+	var machines []Machine
+	machineCount := 0
 
-	// Hardware servers
+	// Hardware machines
 	hardwarePerDC := scale.Hardware / 2
-	// FRA00 Hardware servers
+	// FRA00 Hardware machines
 	for i := 1; i <= hardwarePerDC; i++ {
 		metadata := fmt.Sprintf("hardware-fra00-%d-admin-debian12-vm-host-high", i)
 		id := generateGitStyleID(metadata)
-		server := Server{
+		machine := Machine{
 			ID:       fmt.Sprintf("machine-%s", id),
 			Host:     fmt.Sprintf("10.1.1.%d", i),
 			Port:     22,
@@ -90,15 +90,15 @@ func generateServers(scale ScaleConfig) []Server {
 				"capacity":   "high",
 			},
 		}
-		servers = append(servers, server)
-		serverCount++
+		machines = append(machines, machine)
+		machineCount++
 	}
 
-	// BER0 Hardware servers
+	// BER0 Hardware machines
 	for i := 1; i <= hardwarePerDC; i++ {
 		metadata := fmt.Sprintf("hardware-ber0-%d-admin-debian12-vm-host-high", i)
 		id := generateGitStyleID(metadata)
-		server := Server{
+		machine := Machine{
 			ID:       fmt.Sprintf("machine-%s", id),
 			Host:     fmt.Sprintf("10.2.1.%d", i),
 			Port:     22,
@@ -112,8 +112,8 @@ func generateServers(scale ScaleConfig) []Server {
 				"capacity":   "high",
 			},
 		}
-		servers = append(servers, server)
-		serverCount++
+		machines = append(machines, machine)
+		machineCount++
 	}
 
 	// VMs
@@ -139,7 +139,7 @@ func generateServers(scale ScaleConfig) []Server {
 		if i > vmsPerType*4/5 {
 			tier = "staging"
 		}
-		server := Server{
+		machine := Machine{
 			ID:       fmt.Sprintf("vm-%s", id),
 			Host:     fmt.Sprintf("10.1.10.%d", i),
 			Port:     22,
@@ -154,9 +154,9 @@ func generateServers(scale ScaleConfig) []Server {
 				"db_type":    dbType,
 			},
 		}
-		servers = append(servers, server)
+		machines = append(machines, machine)
 		vmCount++
-		serverCount++
+		machineCount++
 	}
 
 	// Web VMs
@@ -171,7 +171,7 @@ func generateServers(scale ScaleConfig) []Server {
 		if i > vmsPerType*4/5 {
 			tier = "staging"
 		}
-		server := Server{
+		machine := Machine{
 			ID:       fmt.Sprintf("vm-%s", id),
 			Host:     fmt.Sprintf("10.1.20.%d", i),
 			Port:     22,
@@ -186,9 +186,9 @@ func generateServers(scale ScaleConfig) []Server {
 				"web_type":   webType,
 			},
 		}
-		servers = append(servers, server)
+		machines = append(machines, machine)
 		vmCount++
-		serverCount++
+		machineCount++
 	}
 
 	// Workload VMs
@@ -203,7 +203,7 @@ func generateServers(scale ScaleConfig) []Server {
 		if i > vmsPerType*4/5 {
 			tier = "staging"
 		}
-		server := Server{
+		machine := Machine{
 			ID:       fmt.Sprintf("vm-%s", id),
 			Host:     fmt.Sprintf("10.1.30.%d", i),
 			Port:     22,
@@ -218,9 +218,9 @@ func generateServers(scale ScaleConfig) []Server {
 				"workload_type": workloadType,
 			},
 		}
-		servers = append(servers, server)
+		machines = append(machines, machine)
 		vmCount++
-		serverCount++
+		machineCount++
 	}
 
 	// Storage VMs
@@ -235,7 +235,7 @@ func generateServers(scale ScaleConfig) []Server {
 		if i > vmsPerType*4/5 {
 			tier = "staging"
 		}
-		server := Server{
+		machine := Machine{
 			ID:       fmt.Sprintf("vm-%s", id),
 			Host:     fmt.Sprintf("10.1.40.%d", i),
 			Port:     22,
@@ -250,9 +250,9 @@ func generateServers(scale ScaleConfig) []Server {
 				"storage_type": storageType,
 			},
 		}
-		servers = append(servers, server)
+		machines = append(machines, machine)
 		vmCount++
-		serverCount++
+		machineCount++
 	}
 
 	// BER0 VMs (same pattern as FRA00)
@@ -273,7 +273,7 @@ func generateServers(scale ScaleConfig) []Server {
 		if i > vmsPerType*4/5 {
 			tier = "staging"
 		}
-		server := Server{
+		machine := Machine{
 			ID:       fmt.Sprintf("vm-%s", id),
 			Host:     fmt.Sprintf("10.2.10.%d", i),
 			Port:     22,
@@ -288,9 +288,9 @@ func generateServers(scale ScaleConfig) []Server {
 				"db_type":    dbType,
 			},
 		}
-		servers = append(servers, server)
+		machines = append(machines, machine)
 		vmCount++
-		serverCount++
+		machineCount++
 	}
 
 	// Web VMs
@@ -305,7 +305,7 @@ func generateServers(scale ScaleConfig) []Server {
 		if i > vmsPerType*4/5 {
 			tier = "staging"
 		}
-		server := Server{
+		machine := Machine{
 			ID:       fmt.Sprintf("vm-%s", id),
 			Host:     fmt.Sprintf("10.2.20.%d", i),
 			Port:     22,
@@ -320,9 +320,9 @@ func generateServers(scale ScaleConfig) []Server {
 				"web_type":   webType,
 			},
 		}
-		servers = append(servers, server)
+		machines = append(machines, machine)
 		vmCount++
-		serverCount++
+		machineCount++
 	}
 
 	// Workload VMs
@@ -337,7 +337,7 @@ func generateServers(scale ScaleConfig) []Server {
 		if i > vmsPerType*4/5 {
 			tier = "staging"
 		}
-		server := Server{
+		machine := Machine{
 			ID:       fmt.Sprintf("vm-%s", id),
 			Host:     fmt.Sprintf("10.2.30.%d", i),
 			Port:     22,
@@ -352,9 +352,9 @@ func generateServers(scale ScaleConfig) []Server {
 				"workload_type": workloadType,
 			},
 		}
-		servers = append(servers, server)
+		machines = append(machines, machine)
 		vmCount++
-		serverCount++
+		machineCount++
 	}
 
 	// Storage VMs
@@ -369,7 +369,7 @@ func generateServers(scale ScaleConfig) []Server {
 		if i > vmsPerType*4/5 {
 			tier = "staging"
 		}
-		server := Server{
+		machine := Machine{
 			ID:       fmt.Sprintf("vm-%s", id),
 			Host:     fmt.Sprintf("10.2.40.%d", i),
 			Port:     22,
@@ -384,13 +384,13 @@ func generateServers(scale ScaleConfig) []Server {
 				"storage_type": storageType,
 			},
 		}
-		servers = append(servers, server)
+		machines = append(machines, machine)
 		vmCount++
-		serverCount++
+		machineCount++
 	}
 
-	fmt.Printf("Generated %d servers (%d hardware + %d VMs) for %s scale\n", serverCount, scale.Hardware, scale.VMs, scale.Name)
-	return servers
+	fmt.Printf("Generated %d machines (%d hardware + %d VMs) for %s scale\n", machineCount, scale.Hardware, scale.VMs, scale.Name)
+	return machines
 }
 
 // generateActions creates test actions
@@ -471,7 +471,7 @@ func generateActions() []Action {
 		{
 			Name:        "full-system-check",
 			Description: "Comprehensive system check",
-			Servers:     []string{"machine-550e8400e29b41d4", "vm-550e8400e29b41da", "vm-550e8400e29b41e6"},
+			Machines:    []string{"machine-550e8400e29b41d4", "vm-550e8400e29b41da", "vm-550e8400e29b41e6"},
 			Command:     "uptime && df -h && free -h && systemctl --failed --no-pager",
 			Parallel:    true,
 			Timeout:     300,
@@ -479,15 +479,15 @@ func generateActions() []Action {
 	}
 }
 
-// writeServer writes a server configuration to the file
-func writeServer(f *os.File, server *Server) {
-	fmt.Fprintf(f, "server \"%s\" {\n", server.ID)
-	fmt.Fprintf(f, "  host     = \"%s\"\n", server.Host)
-	fmt.Fprintf(f, "  port     = %d\n", server.Port)
-	fmt.Fprintf(f, "  user     = \"%s\"\n", server.User)
-	fmt.Fprintf(f, "  password = \"%s\"\n", server.Password)
+// writeMachine writes a machine configuration to the file
+func writeMachine(f *os.File, machine *Machine) {
+	fmt.Fprintf(f, "machine \"%s\" {\n", machine.ID)
+	fmt.Fprintf(f, "  host     = \"%s\"\n", machine.Host)
+	fmt.Fprintf(f, "  port     = %d\n", machine.Port)
+	fmt.Fprintf(f, "  user     = \"%s\"\n", machine.User)
+	fmt.Fprintf(f, "  password = \"%s\"\n", machine.Password)
 	fmt.Fprintf(f, "  tags = {\n")
-	for k, v := range server.Tags {
+	for k, v := range machine.Tags {
 		fmt.Fprintf(f, "    %s = \"%s\"\n", k, v)
 	}
 	fmt.Fprintf(f, "  }\n")
@@ -507,8 +507,8 @@ func writeAction(f *os.File, action *Action) {
 	if len(action.Tags) > 0 {
 		fmt.Fprintf(f, "  tags        = [\"%s\"]\n", strings.Join(action.Tags, "\", \""))
 	}
-	if len(action.Servers) > 0 {
-		fmt.Fprintf(f, "  servers     = [\"%s\"]\n", strings.Join(action.Servers, "\", \""))
+	if len(action.Machines) > 0 {
+		fmt.Fprintf(f, "  machines     = [\"%s\"]\n", strings.Join(action.Machines, "\", \""))
 	}
 	fmt.Fprintf(f, "  parallel    = %t\n", action.Parallel)
 	fmt.Fprintf(f, "  timeout     = %d\n", action.Timeout)
@@ -541,18 +541,18 @@ func generateConfigFile(scale ScaleConfig) error {
 	fmt.Fprintf(file, "# Generated with Git-style IDs for deterministic identification\n")
 	fmt.Fprintf(file, "# Config ID: %s\n\n", configID)
 
-	// Write server section header
+	// Write machine section header
 	fmt.Fprintf(file, "# =============================================================================\n")
-	fmt.Fprintf(file, "# SERVERS (%d total)\n", scale.Hardware+scale.VMs)
+	fmt.Fprintf(file, "# MACHINES (%d total)\n", scale.Hardware+scale.VMs)
 	fmt.Fprintf(file, "# =============================================================================\n\n")
 
-	// Generate and write all servers
-	servers := generateServers(scale)
-	fmt.Printf("Writing %d servers to %s...\n", len(servers), filename)
-	for i, server := range servers {
-		writeServer(file, &server)
+	// Generate and write all machines
+	machines := generateMachines(scale)
+	fmt.Printf("Writing %d machines to %s...\n", len(machines), filename)
+	for i, machine := range machines {
+		writeMachine(file, &machine)
 		if i%1000 == 0 && i > 0 {
-			fmt.Printf("Written %d servers...\n", i)
+			fmt.Printf("Written %d machines...\n", i)
 		}
 	}
 
@@ -568,7 +568,7 @@ func generateConfigFile(scale ScaleConfig) error {
 	}
 
 	fmt.Printf("Generated configuration file: %s\n", filename)
-	fmt.Printf("Total servers: %d\n", len(servers))
+	fmt.Printf("Total machines: %d\n", len(machines))
 	fmt.Printf("Total actions: %d\n", len(actions))
 
 	return nil

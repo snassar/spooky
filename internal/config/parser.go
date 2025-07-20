@@ -23,10 +23,10 @@ func resolvePath(configFile, path string) string {
 	return resolved
 }
 
-// resolveServerPaths resolves relative paths in server configuration
-func resolveServerPaths(configFile string, server *Server) {
-	if server.KeyFile != "" {
-		server.KeyFile = resolvePath(configFile, server.KeyFile)
+// resolveMachinePaths resolves relative paths in machine configuration
+func resolveMachinePaths(configFile string, machine *Machine) {
+	if machine.KeyFile != "" {
+		machine.KeyFile = resolvePath(configFile, machine.KeyFile)
 	}
 }
 
@@ -70,13 +70,13 @@ func ParseConfig(filename string) (*Config, error) {
 
 	logger.Debug("Configuration decoded successfully",
 		logging.String("config_file", filename),
-		logging.Int("server_count", len(config.Servers)),
+		logging.Int("machine_count", len(config.Machines)),
 		logging.Int("action_count", len(config.Actions)),
 	)
 
-	// Resolve relative paths in server configurations
-	for i := range config.Servers {
-		resolveServerPaths(filename, &config.Servers[i])
+	// Resolve relative paths in machine configurations
+	for i := range config.Machines {
+		resolveMachinePaths(filename, &config.Machines[i])
 	}
 
 	// Resolve relative paths in action configurations
@@ -101,7 +101,7 @@ func ParseConfig(filename string) (*Config, error) {
 
 	logger.Info("Configuration parsed and validated successfully",
 		logging.String("config_file", filename),
-		logging.Int("server_count", len(config.Servers)),
+		logging.Int("machine_count", len(config.Machines)),
 		logging.Int("action_count", len(config.Actions)),
 	)
 

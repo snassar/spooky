@@ -7,22 +7,22 @@ import (
 )
 
 func TestBuildEnterpriseIndex(t *testing.T) {
-	servers := []Server{
+	machines := []Machine{
 		{
-			Name: "server1",
+			Name: "machine1",
 			Tags: map[string]string{"env": "prod", "region": "us-west"},
 		},
 		{
-			Name: "server2",
+			Name: "machine2",
 			Tags: map[string]string{"env": "prod", "region": "us-east"},
 		},
 		{
-			Name: "server3",
+			Name: "machine3",
 			Tags: map[string]string{"env": "dev", "region": "us-west"},
 		},
 	}
 
-	index := buildEnterpriseIndex(servers)
+	index := buildEnterpriseIndex(machines)
 
 	// Test tag index
 	if len(index.TagIndex) != 4 { // 2 env values + 2 region values
@@ -30,12 +30,12 @@ func TestBuildEnterpriseIndex(t *testing.T) {
 	}
 
 	// Test specific tag lookups
-	if servers, exists := index.TagIndex["env=prod"]; !exists || len(servers) != 2 {
-		t.Errorf("Expected 2 servers with env=prod, got %d", len(servers))
+	if machines, exists := index.TagIndex["env=prod"]; !exists || len(machines) != 2 {
+		t.Errorf("Expected 2 machines with env=prod, got %d", len(machines))
 	}
 
-	if servers, exists := index.TagIndex["region=us-west"]; !exists || len(servers) != 2 {
-		t.Errorf("Expected 2 servers with region=us-west, got %d", len(servers))
+	if machines, exists := index.TagIndex["region=us-west"]; !exists || len(machines) != 2 {
+		t.Errorf("Expected 2 machines with region=us-west, got %d", len(machines))
 	}
 
 	// Test tag count
@@ -47,21 +47,21 @@ func TestBuildEnterpriseIndex(t *testing.T) {
 	if index.Metrics == nil {
 		t.Error("Expected metrics to be set")
 	}
-	if index.Metrics.ServerCount != 3 {
-		t.Errorf("Expected 3 servers in metrics, got %d", index.Metrics.ServerCount)
+	if index.Metrics.MachineCount != 3 {
+		t.Errorf("Expected 3 machines in metrics, got %d", index.Metrics.MachineCount)
 	}
 }
 
-func TestGetServersForActionLarge(t *testing.T) {
+func TestGetMachinesForActionLarge(t *testing.T) {
 	config := &Config{
-		Servers: []Server{
-			{Name: "server1", Tags: map[string]string{"env": "prod", "region": "us-west"}},
-			{Name: "server2", Tags: map[string]string{"env": "prod", "region": "us-east"}},
-			{Name: "server3", Tags: map[string]string{"env": "dev", "region": "us-west"}},
+		Machines: []Machine{
+			{Name: "machine1", Tags: map[string]string{"env": "prod", "region": "us-west"}},
+			{Name: "machine2", Tags: map[string]string{"env": "prod", "region": "us-east"}},
+			{Name: "machine3", Tags: map[string]string{"env": "dev", "region": "us-west"}},
 		},
 	}
 
-	index := buildEnterpriseIndex(config.Servers)
+	index := buildEnterpriseIndex(config.Machines)
 
 	tests := []struct {
 		name     string
@@ -69,8 +69,8 @@ func TestGetServersForActionLarge(t *testing.T) {
 		expected int
 	}{
 		{
-			name:     "specific servers",
-			action:   Action{Servers: []string{"server1", "server2"}},
+			name:     "specific machines",
+			action:   Action{Machines: []string{"machine1", "machine2"}},
 			expected: 2,
 		},
 		{
@@ -84,7 +84,7 @@ func TestGetServersForActionLarge(t *testing.T) {
 			expected: 1,
 		},
 		{
-			name:     "all servers",
+			name:     "all machines",
 			action:   Action{},
 			expected: 3,
 		},
@@ -92,12 +92,12 @@ func TestGetServersForActionLarge(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			servers, err := GetServersForActionLarge(config, &tt.action, index)
+			machines, err := GetMachinesForActionLarge(config, &tt.action, index)
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
-			if len(servers) != tt.expected {
-				t.Errorf("Expected %d servers, got %d", tt.expected, len(servers))
+			if len(machines) != tt.expected {
+				t.Errorf("Expected %d machines, got %d", tt.expected, len(machines))
 			}
 		})
 	}
@@ -105,9 +105,9 @@ func TestGetServersForActionLarge(t *testing.T) {
 
 func TestIndexCache(t *testing.T) {
 	config := &Config{
-		Servers: []Server{
-			{Name: "server1", Tags: map[string]string{"env": "prod"}},
-			{Name: "server2", Tags: map[string]string{"env": "dev"}},
+		Machines: []Machine{
+			{Name: "machine1", Tags: map[string]string{"env": "prod"}},
+			{Name: "machine2", Tags: map[string]string{"env": "dev"}},
 		},
 	}
 
@@ -127,17 +127,17 @@ func TestIndexCache(t *testing.T) {
 
 	// Test metrics
 	metrics := cache.GetIndexMetrics()
-	if metrics.ServerCount != 2 {
-		t.Errorf("Expected 2 servers in metrics, got %d", metrics.ServerCount)
+	if metrics.MachineCount != 2 {
+		t.Errorf("Expected 2 machines in metrics, got %d", metrics.MachineCount)
 	}
 }
 
 func TestIndexPerformance(t *testing.T) {
 	// Create large test dataset
-	servers := make([]Server, 1000)
+	machines := make([]Machine, 1000)
 	for i := 0; i < 1000; i++ {
-		servers[i] = Server{
-			Name: fmt.Sprintf("server%d", i),
+		machines[i] = Machine{
+			Name: fmt.Sprintf("machine%d", i),
 			Tags: map[string]string{
 				"env":      fmt.Sprintf("env%d", i%10),
 				"region":   fmt.Sprintf("region%d", i%5),
@@ -146,11 +146,11 @@ func TestIndexPerformance(t *testing.T) {
 		}
 	}
 
-	config := &Config{Servers: servers}
+	config := &Config{Machines: machines}
 
 	// Test index building performance
 	start := time.Now()
-	index := buildEnterpriseIndex(config.Servers)
+	index := buildEnterpriseIndex(config.Machines)
 	buildTime := time.Since(start)
 
 	if buildTime > 100*time.Millisecond {
@@ -161,7 +161,7 @@ func TestIndexPerformance(t *testing.T) {
 	action := &Action{Tags: []string{"env=env1", "region=region1"}}
 
 	start = time.Now()
-	targetServers, err := GetServersForActionLarge(config, action, index)
+	targetMachines, err := GetMachinesForActionLarge(config, action, index)
 	lookupTime := time.Since(start)
 
 	if err != nil {
@@ -174,8 +174,8 @@ func TestIndexPerformance(t *testing.T) {
 
 	// Verify results
 	expectedCount := 100
-	if len(targetServers) != expectedCount {
-		t.Errorf("Expected %d servers, got %d", expectedCount, len(targetServers))
+	if len(targetMachines) != expectedCount {
+		t.Errorf("Expected %d machines, got %d", expectedCount, len(targetMachines))
 	}
 }
 

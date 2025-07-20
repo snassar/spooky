@@ -16,9 +16,9 @@ const (
 
 // SetDefaults applies default values to a configuration
 func SetDefaults(config *Config) {
-	for i := range config.Servers {
-		if config.Servers[i].Port == 0 {
-			config.Servers[i].Port = DefaultSSHPort
+	for i := range config.Machines {
+		if config.Machines[i].Port == 0 {
+			config.Machines[i].Port = DefaultSSHPort
 		}
 	}
 

@@ -8,6 +8,11 @@ import (
 	"testing"
 
 	"github.com/spf13/pflag"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"spooky/internal/facts"
+	"spooky/internal/logging"
 )
 
 var initOnce sync.Once
@@ -84,7 +89,7 @@ func TestExecuteCmd_ValidConfig(t *testing.T) {
 	validConfig := filepath.Join(tempDir, "valid.hcl")
 
 	configContent := `
-server "test" {
+machine "test" {
   host = "localhost"
   user = "testuser"
   password = "testpass"
@@ -117,7 +122,7 @@ func TestExecuteCmd_ValidConfigWithParallel(t *testing.T) {
 	validConfig := filepath.Join(tempDir, "valid.hcl")
 
 	configContent := `
-server "test" {
+machine "test" {
   host = "localhost"
   user = "testuser"
   password = "testpass"
@@ -151,7 +156,7 @@ func TestExecuteCmd_ValidConfigWithTimeout(t *testing.T) {
 	validConfig := filepath.Join(tempDir, "valid.hcl")
 
 	configContent := `
-server "test" {
+machine "test" {
   host = "localhost"
   user = "testuser"
   password = "testpass"
@@ -184,13 +189,13 @@ func TestExecuteCmd_ConfigWithMultipleServers(t *testing.T) {
 	validConfig := filepath.Join(tempDir, "valid.hcl")
 
 	configContent := `
-server "server1" {
+machine "server1" {
   host = "localhost"
   user = "testuser"
   password = "testpass"
 }
 
-server "server2" {
+machine "server2" {
   host = "localhost"
   user = "testuser"
   password = "testpass"
@@ -223,7 +228,7 @@ func TestExecuteCmd_ConfigWithScript(t *testing.T) {
 	validConfig := filepath.Join(tempDir, "valid.hcl")
 
 	configContent := `
-server "test" {
+machine "test" {
   host = "localhost"
   user = "testuser"
   password = "testpass"
@@ -297,7 +302,7 @@ func TestValidateCmd_ValidConfig(t *testing.T) {
 	validConfig := filepath.Join(tempDir, "valid.hcl")
 
 	configContent := `
-server "test" {
+machine "test" {
   host = "localhost"
   user = "testuser"
   password = "testpass"
@@ -329,7 +334,7 @@ func TestValidateCmd_ConfigWithKeyFile(t *testing.T) {
 	validConfig := filepath.Join(tempDir, "valid.hcl")
 
 	configContent := `
-server "test" {
+machine "test" {
   host = "localhost"
   user = "testuser"
   key_file = "/path/to/key"
@@ -361,7 +366,7 @@ func TestValidateCmd_ConfigWithTags(t *testing.T) {
 	validConfig := filepath.Join(tempDir, "valid.hcl")
 
 	configContent := `
-server "test" {
+machine "test" {
   host = "localhost"
   user = "testuser"
   password = "testpass"
@@ -484,7 +489,7 @@ func TestExecuteCmd_InvalidTimeout(t *testing.T) {
 	tempDir := t.TempDir()
 	validConfig := filepath.Join(tempDir, "valid.hcl")
 	configContent := `
-server "test" {
+machine "test" {
   host = "localhost"
   user = "testuser"
   password = "testpass"
@@ -515,7 +520,7 @@ func TestExecuteCmd_NegativeTimeout(t *testing.T) {
 	tempDir := t.TempDir()
 	validConfig := filepath.Join(tempDir, "valid.hcl")
 	configContent := `
-server "test" {
+machine "test" {
   host = "localhost"
   user = "testuser"
   password = "testpass"
@@ -547,7 +552,7 @@ func TestExecuteCmd_ZeroTimeout(t *testing.T) {
 	tempDir := t.TempDir()
 	validConfig := filepath.Join(tempDir, "valid.hcl")
 	configContent := `
-server "test" {
+machine "test" {
   host = "localhost"
   user = "testuser"
   password = "testpass"
@@ -570,4 +575,276 @@ action "test_action" {
 	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") && !strings.Contains(err.Error(), "unable to authenticate") {
 		t.Errorf("expected connection/authentication error, got: %v", err)
 	}
+}
+
+func TestIsLocalFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   string
+		expected bool
+	}{
+		{"local file", "config.hcl", true},
+		{"local file with path", "./config.hcl", true},
+		{"local file with absolute path", "/tmp/config.hcl", true},
+		{"github remote", "github.com/user/repo", false},
+		{"git remote", "git://github.com/user/repo", false},
+		{"s3 remote", "s3://bucket/path", false},
+		{"http remote", "http://example.com/config.hcl", false},
+		{"https remote", "https://example.com/config.hcl", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isLocalFile(tt.source)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestListFromConfigFile(t *testing.T) {
+	// Create a temporary test config file
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "test.hcl")
+
+	configContent := `
+machine "test1" {
+  host = "192.168.1.10"
+  user = "admin"
+  password = "secret"
+  port = 22
+}
+
+machine "test2" {
+  host = "192.168.1.11"
+  user = "user"
+  password = "pass"
+  port = 2222
+}
+
+action "test-action" {
+  description = "Test action"
+  command = "echo test"
+}
+
+action "another-action" {
+  description = ""
+  command = "echo another"
+}
+`
+
+	err := os.WriteFile(configFile, []byte(configContent), 0o600)
+	require.NoError(t, err)
+
+	logger := logging.GetLogger()
+
+	// Test successful listing
+	err = listFromConfigFile(logger, configFile)
+	assert.NoError(t, err)
+
+	// Test non-existent file
+	err = listFromConfigFile(logger, "nonexistent.hcl")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "does not exist")
+
+	// Test invalid config file
+	invalidConfigFile := filepath.Join(tempDir, "invalid.hcl")
+	err = os.WriteFile(invalidConfigFile, []byte("invalid hcl content"), 0o600)
+	require.NoError(t, err)
+
+	err = listFromConfigFile(logger, invalidConfigFile)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to parse config")
+}
+
+func TestListFromConfigFileEmptyConfig(t *testing.T) {
+	// Create a temporary test config file with no machines or actions
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "empty.hcl")
+
+	configContent := `
+# Empty configuration file
+`
+
+	err := os.WriteFile(configFile, []byte(configContent), 0o600)
+	require.NoError(t, err)
+
+	logger := logging.GetLogger()
+
+	// Test listing empty config - should fail validation
+	err = listFromConfigFile(logger, configFile)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "validation failed")
+}
+
+func TestListMachines(t *testing.T) {
+	logger := logging.GetLogger()
+
+	// Test that listMachines returns an error (not implemented)
+	err := listMachines(logger)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not yet implemented")
+}
+
+func TestListFacts(t *testing.T) {
+	logger := logging.GetLogger()
+
+	// Test listFacts with no cached facts
+	err := listFacts(logger)
+	// This might succeed or fail depending on the environment, but shouldn't panic
+	assert.NoError(t, err)
+}
+
+func TestListFactsWithJSONFormat(t *testing.T) {
+	// Set format to JSON
+	originalFormat := format
+	format = "json"
+	defer func() { format = originalFormat }()
+
+	logger := logging.GetLogger()
+
+	// Test listFacts with JSON format
+	err := listFacts(logger)
+	// This might succeed or fail depending on the environment, but shouldn't panic
+	assert.NoError(t, err)
+}
+
+func TestGetUniqueServers(t *testing.T) {
+	// Create test facts
+	testFacts := []*facts.Fact{
+		{Server: "server1", Key: "hostname", Value: "host1"},
+		{Server: "server1", Key: "os", Value: "linux"},
+		{Server: "server2", Key: "hostname", Value: "host2"},
+		{Server: "server3", Key: "hostname", Value: "host3"},
+		{Server: "server2", Key: "os", Value: "linux"},
+	}
+
+	uniqueServers := getUniqueServers(testFacts)
+
+	// Should have 3 unique servers
+	assert.Len(t, uniqueServers, 3)
+	assert.Contains(t, uniqueServers, "server1")
+	assert.Contains(t, uniqueServers, "server2")
+	assert.Contains(t, uniqueServers, "server3")
+}
+
+func TestGetUniqueServersEmpty(t *testing.T) {
+	uniqueServers := getUniqueServers([]*facts.Fact{})
+	assert.Len(t, uniqueServers, 0)
+}
+
+func TestListTemplates(t *testing.T) {
+	logger := logging.GetLogger()
+
+	// Test listTemplates (not implemented)
+	err := listTemplates(logger)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not yet implemented")
+}
+
+func TestListConfigs(t *testing.T) {
+	logger := logging.GetLogger()
+
+	// Test listConfigs (not implemented)
+	err := listConfigs(logger)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not yet implemented")
+}
+
+func TestListActions(t *testing.T) {
+	logger := logging.GetLogger()
+
+	// Test listActions (not implemented)
+	err := listActions(logger)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not yet implemented")
+}
+
+func TestExecuteCmdWithInvalidSource(t *testing.T) {
+	// Test execute command with remote source (not supported)
+	cmd := ExecuteCmd
+	cmd.SetArgs([]string{"https://example.com/config.hcl"})
+
+	err := cmd.Execute()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "remote sources not yet supported")
+}
+
+func TestExecuteCmdWithNonExistentFile(t *testing.T) {
+	// Test execute command with non-existent file
+	cmd := ExecuteCmd
+	cmd.SetArgs([]string{"nonexistent.hcl"})
+
+	err := cmd.Execute()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "does not exist")
+}
+
+func TestValidateCmdWithInvalidSource(t *testing.T) {
+	// Test validate command with remote source (not supported)
+	cmd := ValidateCmd
+	cmd.SetArgs([]string{"https://example.com/config.hcl"})
+
+	err := cmd.Execute()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "remote sources not yet supported")
+}
+
+func TestValidateCmdWithNonExistentFile(t *testing.T) {
+	// Test validate command with non-existent file
+	cmd := ValidateCmd
+	cmd.SetArgs([]string{"nonexistent.hcl"})
+
+	err := cmd.Execute()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "does not exist")
+}
+
+func TestListCmdWithConfigFile(t *testing.T) {
+	// Create a temporary test config file
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "test.hcl")
+
+	configContent := `
+machine "test1" {
+  host = "192.168.1.10"
+  user = "admin"
+  password = "secret"
+}
+`
+
+	err := os.WriteFile(configFile, []byte(configContent), 0o600)
+	require.NoError(t, err)
+
+	// Test list command with config file
+	cmd := ListCmd
+	cmd.SetArgs([]string{configFile})
+
+	err = cmd.Execute()
+	assert.NoError(t, err)
+}
+
+func TestListCmdWithInvalidResourceType(t *testing.T) {
+	// Test list command with invalid resource type
+	cmd := ListCmd
+	cmd.SetArgs([]string{"invalid-resource"})
+
+	err := cmd.Execute()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown resource type")
+}
+
+func TestListCmdWithValidResourceType(t *testing.T) {
+	// Test list command with valid resource type
+	cmd := ListCmd
+	cmd.SetArgs([]string{"machines"})
+
+	err := cmd.Execute()
+	assert.Error(t, err) // Should fail because not implemented
+	assert.Contains(t, err.Error(), "not yet implemented")
+}
+
+func TestInitCommandsDuplicate(t *testing.T) {
+	// Note: InitCommands can only be called once due to flag redefinition
+	// This test is skipped as it would cause a panic
+	t.Skip("InitCommands can only be called once due to flag redefinition")
 }

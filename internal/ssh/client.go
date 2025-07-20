@@ -1,6 +1,7 @@
 package ssh
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"strings"
@@ -64,20 +65,20 @@ func getHostKeyCallback(callbackType HostKeyCallbackType, knownHostsPath string)
 	}
 }
 
-// NewSSHClient creates a new SSH client connection
-func NewSSHClient(server *config.Server, timeout int) (*SSHClient, error) {
-	return NewSSHClientWithHostKeyCallback(server, timeout, InsecureHostKey, "")
+// NewSSHClient creates a new SSH client for the given machine
+func NewSSHClient(machine *config.Machine, timeout int) (*SSHClient, error) {
+	return NewSSHClientWithHostKeyCallback(machine, timeout, InsecureHostKey, "")
 }
 
 // NewSSHClientWithHostKeyCallback creates a new SSH client with custom host key verification
-func NewSSHClientWithHostKeyCallback(server *config.Server, timeout int, hostKeyType HostKeyCallbackType, knownHostsPath string) (*SSHClient, error) {
+func NewSSHClientWithHostKeyCallback(machine *config.Machine, timeout int, hostKeyType HostKeyCallbackType, knownHostsPath string) (*SSHClient, error) {
 	logger := logging.GetLogger()
 
 	logger.Info("Creating SSH client",
-		logging.Server(server.Name),
-		logging.Host(server.Host),
-		logging.Port(server.Port),
-		logging.String("user", server.User),
+		logging.Server(machine.Name),
+		logging.Host(machine.Host),
+		logging.Port(machine.Port),
+		logging.String("user", machine.User),
 		logging.Int("timeout_seconds", timeout),
 		logging.String("host_key_type", string(hostKeyType)),
 	)
@@ -85,34 +86,34 @@ func NewSSHClientWithHostKeyCallback(server *config.Server, timeout int, hostKey
 	var authMethods []ssh.AuthMethod
 
 	// Add password authentication if provided
-	if server.Password != "" {
+	if machine.Password != "" {
 		logger.Debug("Adding password authentication",
-			logging.Server(server.Name),
+			logging.Server(machine.Name),
 		)
-		authMethods = append(authMethods, ssh.Password(server.Password))
+		authMethods = append(authMethods, ssh.Password(machine.Password))
 	}
 
 	// Add key-based authentication if provided
-	if server.KeyFile != "" {
+	if machine.KeyFile != "" {
 		logger.Debug("Adding key-based authentication",
-			logging.Server(server.Name),
-			logging.String("key_file", server.KeyFile),
+			logging.Server(machine.Name),
+			logging.String("key_file", machine.KeyFile),
 		)
 
-		key, err := os.ReadFile(server.KeyFile)
+		key, err := os.ReadFile(machine.KeyFile)
 		if err != nil {
 			logger.Error("Failed to read SSH key file", err,
-				logging.Server(server.Name),
-				logging.String("key_file", server.KeyFile),
+				logging.Server(machine.Name),
+				logging.String("key_file", machine.KeyFile),
 			)
-			return nil, fmt.Errorf("failed to read key file %s: %w", server.KeyFile, err)
+			return nil, fmt.Errorf("failed to read key file %s: %w", machine.KeyFile, err)
 		}
 
 		signer, err := ssh.ParsePrivateKey(key)
 		if err != nil {
 			logger.Error("Failed to parse SSH private key", err,
-				logging.Server(server.Name),
-				logging.String("key_file", server.KeyFile),
+				logging.Server(machine.Name),
+				logging.String("key_file", machine.KeyFile),
 			)
 			return nil, fmt.Errorf("failed to parse private key: %w", err)
 		}
@@ -121,16 +122,16 @@ func NewSSHClientWithHostKeyCallback(server *config.Server, timeout int, hostKey
 
 	if len(authMethods) == 0 {
 		logger.Error("No authentication method available", fmt.Errorf("no auth methods"),
-			logging.Server(server.Name),
+			logging.Server(machine.Name),
 		)
-		return nil, fmt.Errorf("no authentication method available for server %s", server.Name)
+		return nil, fmt.Errorf("no authentication method available for server %s", machine.Name)
 	}
 
 	// Get host key callback
 	hostKeyCallback, err := getHostKeyCallback(hostKeyType, knownHostsPath)
 	if err != nil {
 		logger.Error("Failed to create host key callback", err,
-			logging.Server(server.Name),
+			logging.Server(machine.Name),
 			logging.String("host_key_type", string(hostKeyType)),
 		)
 		return nil, fmt.Errorf("failed to create host key callback: %w", err)
@@ -138,7 +139,7 @@ func NewSSHClientWithHostKeyCallback(server *config.Server, timeout int, hostKey
 
 	// SSH client configuration
 	sshConfig := &ssh.ClientConfig{
-		User:            server.User,
+		User:            machine.User,
 		Auth:            authMethods,
 		HostKeyCallback: hostKeyCallback,
 		Timeout:         time.Duration(timeout) * time.Second,
@@ -146,120 +147,126 @@ func NewSSHClientWithHostKeyCallback(server *config.Server, timeout int, hostKey
 
 	// Connect to the server
 	startTime := time.Now()
-	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", server.Host, server.Port), sshConfig)
+	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", machine.Host, machine.Port), sshConfig)
 	if err != nil {
 		logger.Error("Failed to establish SSH connection", err,
-			logging.Server(server.Name),
-			logging.Host(server.Host),
-			logging.Port(server.Port),
-			logging.String("user", server.User),
+			logging.Server(machine.Name),
+			logging.Host(machine.Host),
+			logging.Port(machine.Port),
+			logging.String("user", machine.User),
 			logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
 		)
-		return nil, fmt.Errorf("failed to connect to %s@%s:%d: %w", server.User, server.Host, server.Port, err)
+		return nil, fmt.Errorf("failed to connect to %s@%s:%d: %w", machine.User, machine.Host, machine.Port, err)
 	}
 
 	logger.Info("SSH connection established successfully",
-		logging.Server(server.Name),
-		logging.Host(server.Host),
-		logging.Port(server.Port),
-		logging.String("user", server.User),
+		logging.Server(machine.Name),
+		logging.Host(machine.Host),
+		logging.Port(machine.Port),
+		logging.String("user", machine.User),
 		logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
 		logging.Int("auth_methods", len(authMethods)),
 	)
 
 	return &SSHClient{
-		Client: client,
-		Server: server,
+		client: client,
+		config: machine,
 	}, nil
 }
 
+// Connect establishes a connection to the machine
+func (c *SSHClient) Connect() error {
+	if c.client == nil {
+		return fmt.Errorf("SSH client not initialized")
+	}
+	return nil
+}
+
 // Close closes the SSH connection
-func (s *SSHClient) Close() error {
-	if s.Client == nil {
+func (c *SSHClient) Close() error {
+	if c.client == nil {
 		return nil
 	}
-	return s.Client.Close()
+	return c.client.Close()
+}
+
+// GetMachine returns the machine configuration
+func (c *SSHClient) GetMachine() *config.Machine {
+	return c.config
 }
 
 // ExecuteCommand executes a command on the remote server
-func (s *SSHClient) ExecuteCommand(command string) (string, error) {
+func (c *SSHClient) ExecuteCommand(command string) (string, error) {
 	logger := logging.GetLogger()
 
-	if s.Client == nil {
+	if c.client == nil {
 		logger.Error("No SSH connection available", fmt.Errorf("client is nil"),
-			logging.Server(s.Server.Name),
+			logging.Server(c.config.Name),
 		)
 		return "", fmt.Errorf("failed to create session: no SSH connection exists (Client is nil)")
 	}
 
 	logger.Debug("Creating SSH session",
-		logging.Server(s.Server.Name),
+		logging.Server(c.config.Name),
 		logging.String("command_length", fmt.Sprintf("%d chars", len(command))),
 	)
 
-	session, err := s.Client.NewSession()
+	session, err := c.client.NewSession()
 	if err != nil {
 		logger.Error("Failed to create SSH session", err,
-			logging.Server(s.Server.Name),
+			logging.Server(c.config.Name),
 		)
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
 	defer session.Close()
 
-	// Capture stdout and stderr
-	var stdout, stderr strings.Builder
+	var stdout, stderr bytes.Buffer
 	session.Stdout = &stdout
 	session.Stderr = &stderr
 
-	// Execute the command
-	startTime := time.Now()
-	err = session.Run(command)
-	if err != nil {
+	if err := session.Run(command); err != nil {
 		logger.Error("Command execution failed", err,
-			logging.Server(s.Server.Name),
+			logging.Server(c.config.Name),
 			logging.String("command_length", fmt.Sprintf("%d chars", len(command))),
 			logging.String("stderr", stderr.String()),
-			logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
 		)
-		return "", fmt.Errorf("command execution failed: %s, stderr: %s", err, stderr.String())
+		return "", fmt.Errorf("command execution failed: %w", err)
 	}
 
 	output := stdout.String()
 	logger.Debug("Command executed successfully",
-		logging.Server(s.Server.Name),
+		logging.Server(c.config.Name),
 		logging.String("command_length", fmt.Sprintf("%d chars", len(command))),
 		logging.String("output_length", fmt.Sprintf("%d chars", len(output))),
-		logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
 	)
 
 	return output, nil
 }
 
 // ExecuteScript executes a script file on the remote server
-func (s *SSHClient) ExecuteScript(scriptPath string) (string, error) {
+func (c *SSHClient) ExecuteScript(scriptPath string) (string, error) {
 	logger := logging.GetLogger()
 
 	logger.Info("Loading script file",
-		logging.Server(s.Server.Name),
+		logging.Server(c.config.Name),
 		logging.String("script_path", scriptPath),
 	)
 
-	// Read the script file
 	scriptContent, err := os.ReadFile(scriptPath)
 	if err != nil {
 		logger.Error("Failed to read script file", err,
-			logging.Server(s.Server.Name),
+			logging.Server(c.config.Name),
 			logging.String("script_path", scriptPath),
 		)
 		return "", fmt.Errorf("failed to read script file %s: %w", scriptPath, err)
 	}
 
 	logger.Debug("Script file loaded successfully",
-		logging.Server(s.Server.Name),
+		logging.Server(c.config.Name),
 		logging.String("script_path", scriptPath),
 		logging.String("script_size", fmt.Sprintf("%d bytes", len(scriptContent))),
 	)
 
 	// Execute the script content
-	return s.ExecuteCommand(string(scriptContent))
+	return c.ExecuteCommand(string(scriptContent))
 }

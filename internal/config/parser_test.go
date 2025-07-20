@@ -7,7 +7,7 @@ import (
 
 func TestParseConfig_ValidFile(t *testing.T) {
 	// Create a temporary valid config file
-	content := `server "web1" {
+	content := `machine "web1" {
   host = "192.168.1.10"
   user = "admin"
   password = "secret"
@@ -40,7 +40,7 @@ func TestParseConfig_NonExistentFile(t *testing.T) {
 
 func TestParseConfig_InvalidSyntax(t *testing.T) {
 	// Create a temporary invalid config file
-	content := `server "web1" { host = "192.168.1.10" user = "admin" password = "secret"` // missing closing brace
+	content := `machine "web1" { host = "192.168.1.10" user = "admin" password = "secret"` // missing closing brace
 	f, err := os.CreateTemp("", "invalid_config_*.hcl")
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)

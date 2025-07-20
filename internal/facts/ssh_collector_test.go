@@ -22,8 +22,8 @@ type MockSSHServer struct {
 
 // NewMockSSHServer creates a new mock SSH server
 func NewMockSSHServer() (*MockSSHServer, error) {
-	// Find an available port
-	listener, err := net.Listen("tcp", ":0")
+	// Find an available port on localhost only
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find available port: %w", err)
 	}
@@ -32,7 +32,7 @@ func NewMockSSHServer() (*MockSSHServer, error) {
 
 	// Create SSH server
 	s := &gliderssh.Server{
-		Addr: fmt.Sprintf(":%d", port),
+		Addr: fmt.Sprintf("127.0.0.1:%d", port),
 		Handler: func(s gliderssh.Session) {
 			// Handle different commands
 			cmd := s.Command()
@@ -57,7 +57,7 @@ func NewMockSSHServer() (*MockSSHServer, error) {
 					}
 					return
 				case "cat /etc/os-release":
-					s.Write([]byte(`NAME="Ubuntu"
+					if _, err := s.Write([]byte(`NAME="Ubuntu"
 VERSION="22.04.3 LTS (Jammy Jellyfish)"
 ID=ubuntu
 ID_LIKE=debian
@@ -68,25 +68,37 @@ SUPPORT_URL="https://help.ubuntu.com/"
 BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
 PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
 UBUNTU_CODENAME=jammy
-`))
+`)); err != nil {
+						return
+					}
 					return
 				case "uname -m":
-					s.Write([]byte("x86_64\n"))
+					if _, err := s.Write([]byte("x86_64\n")); err != nil {
+						return
+					}
 					return
 				case "uname -r":
-					s.Write([]byte("5.15.0-88-generic\n"))
+					if _, err := s.Write([]byte("5.15.0-88-generic\n")); err != nil {
+						return
+					}
 					return
 				case "cat /proc/cpuinfo":
-					s.Write([]byte(`processor\t: 0\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 142\nmodel name\t: Intel(R) Core(TM) i7-8565U CPU @ 1.80GHz\nstepping\t: 11\nmicrocode\t: 0xde\ncpu MHz\t\t: 1992.002\ncache size\t: 8192 KB\nphysical id\t: 0\nsiblings\t: 8\ncore id\t\t: 0\ncpu cores\t: 4\napicid\t\t: 0\ninitial apicid\t: 0\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 22\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb invpcid_single ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow vnmi flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid mpx rdseed adx smap clflushopt intel_pt xsaveopt xsavec xgetbv1 xsaves dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp md_clear flush_l1d\nvmx flags\t: vnmi preemption_timer invvpid ept_x_only ept_ad ept_1gb flexpriority tsc_offset vtpr mtf vapic ept vpid unrestricted_guest pml ept_mode_based_exec\nbugs\t\t: spectre_v1 spectre_v2 mds swapgs taa itlb_multihit srbds mmio_stale_data retbleed\nbogomips\t: 3984.00\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 39 bits physical, 48 bits virtual\npower management:\n`))
+					if _, err := s.Write([]byte(`processor\t: 0\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 142\nmodel name\t: Intel(R) Core(TM) i7-8565U CPU @ 1.80GHz\nstepping\t: 11\nmicrocode\t: 0xde\ncpu MHz\t\t: 1992.002\ncache size\t: 8192 KB\nphysical id\t: 0\nsiblings\t: 8\ncore id\t\t: 0\ncpu cores\t: 4\napicid\t\t: 0\ninitial apicid\t: 0\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 22\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb invpcid_single ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow vnmi flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid mpx rdseed adx smap clflushopt intel_pt xsaveopt xsavec xgetbv1 xsaves dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp md_clear flush_l1d\nvmx flags\t: vnmi preemption_timer invvpid ept_x_only ept_ad ept_1gb flexpriority tsc_offset vtpr mtf vapic ept vpid unrestricted_guest pml ept_mode_based_exec\nbugs\t\t: spectre_v1 spectre_v2 mds swapgs taa itlb_multihit srbds mmio_stale_data retbleed\nbogomips\t: 3984.00\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 39 bits physical, 48 bits virtual\npower management:\n`)); err != nil {
+						return
+					}
 					return
 				case "cat /proc/meminfo":
-					s.Write([]byte(`MemTotal:       16384000 kB\nMemFree:         8192000 kB\nMemAvailable:    12288000 kB\nBuffers:          1024000 kB\nCached:          4096000 kB\nSwapCached:            0 kB\nActive:          6144000 kB\nInactive:        4096000 kB\nActive(anon):    3072000 kB\nInactive(anon):        0 kB\nActive(file):    3072000 kB\nInactive(file):  4096000 kB\nUnevictable:           0 kB\nMlocked:               0 kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\nDirty:                 0 kB\nWriteback:             0 kB\nAnonPages:       3072000 kB\nMapped:          2048000 kB\nShmem:                 0 kB\nKReclaimable:     512000 kB\nSlab:            1024000 kB\nSReclaimable:     512000 kB\nSUnreclaim:       512000 kB\nKernelStack:       81920 kB\nPageTables:       102400 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:     8192000 kB\nCommitted_AS:    6144000 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:           0 kB\nVmallocChunk:          0 kB\nPercpu:             2048 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:         0 kB\nFilePmdMapped:         0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:     4194304 kB\nDirectMap2M:    16777216 kB\nDirectMap1G:           0 kB\n`))
+					if _, err := s.Write([]byte(`MemTotal:       16384000 kB\nMemFree:         8192000 kB\nMemAvailable:    12288000 kB\nBuffers:          1024000 kB\nCached:          4096000 kB\nSwapCached:            0 kB\nActive:          6144000 kB\nInactive:        4096000 kB\nActive(anon):    3072000 kB\nInactive(anon):        0 kB\nActive(file):    3072000 kB\nInactive(file):  4096000 kB\nUnevictable:           0 kB\nMlocked:               0 kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\nDirty:                 0 kB\nWriteback:             0 kB\nAnonPages:       3072000 kB\nMapped:          2048000 kB\nShmem:                 0 kB\nKReclaimable:     512000 kB\nSlab:            1024000 kB\nSReclaimable:     512000 kB\nSUnreclaim:       512000 kB\nKernelStack:       81920 kB\nPageTables:       102400 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:     8192000 kB\nCommitted_AS:    6144000 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:           0 kB\nVmallocChunk:          0 kB\nPercpu:             2048 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:         0 kB\nFilePmdMapped:         0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:     4194304 kB\nDirectMap2M:    16777216 kB\nDirectMap1G:           0 kB\n`)); err != nil {
+						return
+					}
 					return
 				case "df -B1 /":
-					s.Write([]byte(`Filesystem     1B-blocks        Used   Available Use% Mounted on\n/dev/sda1     107374182400  21474836480  85899345920  20% /\n`))
+					if _, err := s.Write([]byte(`Filesystem     1B-blocks        Used   Available Use% Mounted on\n/dev/sda1     107374182400  21474836480  85899345920  20% /\n`)); err != nil {
+						return
+					}
 					return
 				case "ip -json addr":
-					s.Write([]byte(`[
+					if _, err := s.Write([]byte(`[
   {
     "ifindex": 1,
     "ifname": "lo",
@@ -135,10 +147,12 @@ UBUNTU_CODENAME=jammy
       }
     ]
   }
-]`))
+]`)); err != nil {
+						return
+					}
 					return
 				case "ip -json link":
-					s.Write([]byte(`[
+					if _, err := s.Write([]byte(`[
   {
     "ifindex": 1,
     "ifname": "lo",
@@ -165,27 +179,39 @@ UBUNTU_CODENAME=jammy
     "address": "52:54:00:12:34:56",
     "broadcast": "ff:ff:ff:ff:ff:ff"
   }
-]`))
+]`)); err != nil {
+						return
+					}
 					return
 				case "cat /etc/resolv.conf":
-					s.Write([]byte(`# Generated by NetworkManager
+					if _, err := s.Write([]byte(`# Generated by NetworkManager
 search example.com
 nameserver 8.8.8.8
 nameserver 8.8.4.4
-`))
+`)); err != nil {
+						return
+					}
 					return
 				}
 			}
 			// Handle single-argument commands
 			switch cmd[0] {
 			case "hostname":
-				s.Write([]byte("test-host\n"))
+				if _, err := s.Write([]byte("test-host\n")); err != nil {
+					return
+				}
 			case "nproc":
-				s.Write([]byte("8\n"))
+				if _, err := s.Write([]byte("8\n")); err != nil {
+					return
+				}
 			case "env":
-				s.Write([]byte("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nHOME=/home/testuser\nUSER=testuser\nSHELL=/bin/bash\nTERM=xterm-256color\nLANG=en_US.UTF-8\n"))
+				if _, err := s.Write([]byte("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nHOME=/home/testuser\nUSER=testuser\nSHELL=/bin/bash\nTERM=xterm-256color\nLANG=en_US.UTF-8\n")); err != nil {
+					return
+				}
 			default:
-				s.Write([]byte("command not found\n"))
+				if _, err := s.Write([]byte("command not found\n")); err != nil {
+					return
+				}
 			}
 		},
 	}
@@ -240,14 +266,14 @@ func TestSSHCollector(t *testing.T) {
 	}()
 
 	// Create SSH client
-	server := &config.Server{
+	machine := &config.Machine{
 		Name:     "mock",
 		Host:     "localhost",
 		Port:     mockServer.port,
 		User:     "testuser",
 		Password: "testpass",
 	}
-	sshClient, err := ssh.NewSSHClient(server, 5)
+	sshClient, err := ssh.NewSSHClient(machine, 5)
 	if err != nil {
 		t.Fatalf("Failed to create SSH client: %v", err)
 	}

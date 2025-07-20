@@ -66,7 +66,7 @@ var ExecuteCmd = &cobra.Command{
 		logger.Info("Starting configuration execution",
 			logging.String("config_file", source),
 			logging.Int("action_count", len(config.Actions)),
-			logging.Int("server_count", len(config.Servers)),
+			logging.Int("machine_count", len(config.Machines)),
 			logging.Int("parallel", parallel),
 			logging.Int("timeout", timeout),
 		)
@@ -105,7 +105,7 @@ var ValidateCmd = &cobra.Command{
 
 		logger.Info("Configuration file validated successfully",
 			logging.String("config_file", source),
-			logging.Int("server_count", len(config.Servers)),
+			logging.Int("machine_count", len(config.Machines)),
 			logging.Int("action_count", len(config.Actions)),
 		)
 
@@ -129,8 +129,8 @@ var ListCmd = &cobra.Command{
 
 		// Otherwise treat as resource type
 		switch resource {
-		case "servers":
-			return listServers(logger)
+		case "machines":
+			return listMachines(logger)
 		case "facts":
 			return listFacts(logger)
 		case "templates":
@@ -140,7 +140,7 @@ var ListCmd = &cobra.Command{
 		case "actions":
 			return listActions(logger)
 		default:
-			return fmt.Errorf("unknown resource type: %s. Supported types: servers, facts, templates, configs, actions", resource)
+			return fmt.Errorf("unknown resource type: %s. Supported types: machines, facts, templates, configs, actions", resource)
 		}
 	},
 }
@@ -200,14 +200,14 @@ func listFromConfigFile(logger logging.Logger, configFile string) error {
 
 	logger.Info("Listing resources from configuration file",
 		logging.String("config_file", configFile),
-		logging.Int("server_count", len(config.Servers)),
+		logging.Int("machine_count", len(config.Machines)),
 		logging.Int("action_count", len(config.Actions)))
 
-	// Display servers
-	if len(config.Servers) > 0 {
-		fmt.Printf("Servers (%d):\n", len(config.Servers))
-		for _, server := range config.Servers {
-			fmt.Printf("  - %s (%s@%s:%d)\n", server.Name, server.User, server.Host, server.Port)
+	// Display machines
+	if len(config.Machines) > 0 {
+		fmt.Printf("Machines (%d):\n", len(config.Machines))
+		for _, machine := range config.Machines {
+			fmt.Printf("  - %s (%s@%s:%d)\n", machine.Name, machine.User, machine.Host, machine.Port)
 		}
 		fmt.Println()
 	}
@@ -229,17 +229,17 @@ func listFromConfigFile(logger logging.Logger, configFile string) error {
 	// Display summary
 	fmt.Printf("Configuration Summary:\n")
 	fmt.Printf("  File: %s\n", configFile)
-	fmt.Printf("  Servers: %d\n", len(config.Servers))
+	fmt.Printf("  Machines: %d\n", len(config.Machines))
 	fmt.Printf("  Actions: %d\n", len(config.Actions))
 
 	return nil
 }
 
 // List functions for different resource types
-func listServers(logger logging.Logger) error {
-	// TODO: Implement server listing from configuration or inventory
-	logger.Info("Listing servers (not yet implemented)")
-	return fmt.Errorf("server listing not yet implemented")
+func listMachines(logger logging.Logger) error {
+	// TODO: Implement machine listing from configuration or inventory
+	logger.Info("Listing machines (not yet implemented)")
+	return fmt.Errorf("machine listing not yet implemented")
 }
 
 func listFacts(logger logging.Logger) error {
