@@ -310,80 +310,18 @@ func runFactsGather(_ *cobra.Command, args []string) error {
 	logger := logging.GetLogger()
 
 	// Determine target hosts
-	var hosts []string
-
-	switch {
-	case len(args) > 0:
-		// Use provided hosts argument
-		hosts = strings.Split(args[0], ",")
-		for i, host := range hosts {
-			hosts[i] = strings.TrimSpace(host)
-		}
-	case factsConfig != "":
-		// Load hosts from spooky config file
-		logger.Info("Loading hosts from config file", logging.String("config", factsConfig))
-		config, err := config.ParseConfig(factsConfig)
-		if err != nil {
-			logger.Error("Failed to parse config file", err, logging.String("config", factsConfig))
-			return fmt.Errorf("failed to parse config file %s: %w", factsConfig, err)
-		}
-
-		// Extract server names from config
-		for _, server := range config.Servers {
-			hosts = append(hosts, server.Name)
-		}
-
-		if len(hosts) == 0 {
-			return fmt.Errorf("no servers found in config file %s", factsConfig)
-		}
-
-		logger.Info("Loaded hosts from config", logging.Int("host_count", len(hosts)))
-	case factsInventory != "":
-		// TODO: Load hosts from inventory file
-		logger.Info("Inventory file support not yet implemented", logging.String("inventory", factsInventory))
-		return fmt.Errorf("inventory file support not yet implemented")
-	default:
-		// Default to local host
-		hosts = []string{"local"}
+	hosts, err := determineTargetHosts(args)
+	if err != nil {
+		return err
 	}
 
 	logger.Info("Starting fact gathering",
 		logging.Int("parallel", factsParallel),
 		logging.Int("timeout", factsTimeout))
 
-	// Create fact manager
+	// Create fact manager and collect facts
 	manager := facts.NewManager(nil)
-
-	// Collect facts from all hosts
-	var allCollections []*facts.FactCollection
-	var errors []error
-
-	// For now, collect sequentially (parallel implementation would require goroutines and channels)
-	for _, host := range hosts {
-		logger.Info("Collecting facts from host", logging.String("host", host))
-
-		var collection *facts.FactCollection
-		var err error
-
-		if len(factsSpecificKeys) > 0 {
-			// Collect specific facts
-			collection, err = manager.CollectSpecificFacts(host, factsSpecificKeys)
-		} else {
-			// Collect all facts
-			collection, err = manager.CollectAllFacts(host)
-		}
-
-		if err != nil {
-			logger.Error("Failed to collect facts from host", err, logging.String("host", host))
-			errors = append(errors, fmt.Errorf("host %s: %w", host, err))
-			continue
-		}
-
-		allCollections = append(allCollections, collection)
-		logger.Info("Successfully collected facts from host",
-			logging.String("host", host),
-			logging.Int("fact_count", len(collection.Facts)))
-	}
+	allCollections, errors := collectFactsFromHosts(manager, hosts, logger)
 
 	// Report results
 	if len(errors) > 0 {
@@ -397,6 +335,100 @@ func runFactsGather(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("no facts collected from any host")
 	}
 
+	// Display results
+	displayFactGatheringResults(allCollections, errors)
+
+	logger.Info("Fact gathering completed successfully",
+		logging.Int("hosts_processed", len(allCollections)),
+		logging.Int("hosts_failed", len(errors)),
+		logging.Int("total_facts", getTotalFactCount(allCollections)))
+
+	return nil
+}
+
+// determineTargetHosts determines which hosts to collect facts from
+func determineTargetHosts(args []string) ([]string, error) {
+	logger := logging.GetLogger()
+
+	switch {
+	case len(args) > 0:
+		// Use provided hosts argument
+		hosts := strings.Split(args[0], ",")
+		for i, host := range hosts {
+			hosts[i] = strings.TrimSpace(host)
+		}
+		return hosts, nil
+
+	case factsConfig != "":
+		// Load hosts from spooky config file
+		logger.Info("Loading hosts from config file", logging.String("config", factsConfig))
+		config, err := config.ParseConfig(factsConfig)
+		if err != nil {
+			logger.Error("Failed to parse config file", err, logging.String("config", factsConfig))
+			return nil, fmt.Errorf("failed to parse config file %s: %w", factsConfig, err)
+		}
+
+		// Extract server names from config
+		var hosts []string
+		for _, server := range config.Servers {
+			hosts = append(hosts, server.Name)
+		}
+
+		if len(hosts) == 0 {
+			return nil, fmt.Errorf("no servers found in config file %s", factsConfig)
+		}
+
+		logger.Info("Loaded hosts from config", logging.Int("host_count", len(hosts)))
+		return hosts, nil
+
+	case factsInventory != "":
+		// TODO: Load hosts from inventory file
+		logger.Info("Inventory file support not yet implemented", logging.String("inventory", factsInventory))
+		return nil, fmt.Errorf("inventory file support not yet implemented")
+
+	default:
+		// Default to local host
+		return []string{"local"}, nil
+	}
+}
+
+// collectFactsFromHosts collects facts from all specified hosts
+func collectFactsFromHosts(manager *facts.Manager, hosts []string, logger logging.Logger) ([]*facts.FactCollection, []error) {
+	var allCollections []*facts.FactCollection
+	var errors []error
+
+	// For now, collect sequentially (parallel implementation would require goroutines and channels)
+	for _, host := range hosts {
+		logger.Info("Collecting facts from host", logging.String("host", host))
+
+		collection, err := collectFactsFromHost(manager, host)
+		if err != nil {
+			logger.Error("Failed to collect facts from host", err, logging.String("host", host))
+			errors = append(errors, fmt.Errorf("host %s: %w", host, err))
+			continue
+		}
+
+		allCollections = append(allCollections, collection)
+		logger.Info("Successfully collected facts from host",
+			logging.String("host", host),
+			logging.Int("fact_count", len(collection.Facts)))
+	}
+
+	return allCollections, errors
+}
+
+// collectFactsFromHost collects facts from a single host
+func collectFactsFromHost(manager *facts.Manager, host string) (*facts.FactCollection, error) {
+	if len(factsSpecificKeys) > 0 {
+		// Collect specific facts
+		return manager.CollectSpecificFacts(host, factsSpecificKeys)
+	}
+	// Collect all facts
+	return manager.CollectAllFacts(host)
+}
+
+// displayFactGatheringResults displays the results of fact gathering
+func displayFactGatheringResults(allCollections []*facts.FactCollection, errors []error) {
 	// Display summary
 	fmt.Printf("Fact Gathering Summary:\n")
 	fmt.Printf("Hosts processed: %d\n", len(allCollections))
@@ -406,35 +438,33 @@ func runFactsGather(_ *cobra.Command, args []string) error {
 
 	// Display facts for each host
 	for _, collection := range allCollections {
-		fmt.Printf("Host: %s (%d facts)\n", collection.Server, len(collection.Facts))
-		fmt.Printf("Collected at: %s\n", collection.Timestamp.Format("2006-01-02 15:04:05"))
-		fmt.Println()
-
-		// Show first few facts as preview
-		count := 0
-		for key, fact := range collection.Facts {
-			if count >= 5 { // Show only first 5 facts as preview
-				fmt.Printf("... and %d more facts\n", len(collection.Facts)-5)
-				break
-			}
-
-			valueStr := fmt.Sprintf("%v", fact.Value)
-			if len(valueStr) > 40 {
-				valueStr = valueStr[:37] + "..."
-			}
-
-			fmt.Printf("  %-25s: %s\n", key, valueStr)
-			count++
-		}
-		fmt.Println()
+		displayHostFacts(collection)
 	}
+}
 
-	logger.Info("Fact gathering completed successfully",
-		logging.Int("hosts_processed", len(allCollections)),
-		logging.Int("hosts_failed", len(errors)),
-		logging.Int("total_facts", getTotalFactCount(allCollections)))
+// displayHostFacts displays facts for a single host
+func displayHostFacts(collection *facts.FactCollection) {
+	fmt.Printf("Host: %s (%d facts)\n", collection.Server, len(collection.Facts))
+	fmt.Printf("Collected at: %s\n", collection.Timestamp.Format("2006-01-02 15:04:05"))
+	fmt.Println()
 
-	return nil
+	// Show first few facts as preview
+	count := 0
+	for key, fact := range collection.Facts {
+		if count >= 5 { // Show only first 5 facts as preview
+			fmt.Printf("... and %d more facts\n", len(collection.Facts)-5)
+			break
+		}
+
+		valueStr := fmt.Sprintf("%v", fact.Value)
+		if len(valueStr) > 40 {
+			valueStr = valueStr[:37] + "..."
+		}
+
+		fmt.Printf("  %-25s: %s\n", key, valueStr)
+		count++
+	}
+	fmt.Println()
 }
 
 // Helper function to get total fact count from collections

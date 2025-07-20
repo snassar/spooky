@@ -95,60 +95,13 @@ func (m *Manager) CollectAllFacts(server string) (*FactCollection, error) {
 func (m *Manager) CollectSpecificFacts(server string, keys []string) (*FactCollection, error) {
 	// Check cache first for specific keys
 	if cached := m.getCachedFacts(server); cached != nil {
-		// Check if all requested keys are in cache and not expired
-		allCached := true
-		for _, key := range keys {
-			if fact, exists := cached.Facts[key]; !exists || m.isExpired(fact) {
-				allCached = false
-				break
-			}
-		}
-		if allCached {
-			// Return only requested facts
-			filtered := &FactCollection{
-				Server:    cached.Server,
-				Timestamp: cached.Timestamp,
-				Facts:     make(map[string]*Fact),
-			}
-			for _, key := range keys {
-				if fact, exists := cached.Facts[key]; exists {
-					filtered.Facts[key] = fact
-				}
-			}
+		if filtered := m.getFilteredCachedFacts(cached, keys); filtered != nil {
 			return filtered, nil
 		}
 	}
 
 	// Collect from appropriate sources based on keys
-	var collections []*FactCollection
-	var errors []error
-
-	// Determine which sources to use based on fact keys
-	sources := m.determineSources(keys)
-
-	for _, source := range sources {
-		var collection *FactCollection
-		var err error
-
-		switch source {
-		case SourceSSH:
-			if server != "local" {
-				collection, err = m.sshCollector.CollectSpecific(server, keys)
-			}
-		case SourceLocal:
-			collection, err = m.localCollector.CollectSpecific(server, keys)
-		case SourceHCL:
-			collection, err = m.hclCollector.CollectSpecific(server, keys)
-		case SourceOpenTofu:
-			collection, err = m.tofuCollector.CollectSpecific(server, keys)
-		}
-
-		if err == nil && collection != nil {
-			collections = append(collections, collection)
-		} else if err != nil {
-			errors = append(errors, fmt.Errorf("%s collection failed: %w", source, err))
-		}
-	}
+	collections, errors := m.collectFromSources(server, keys)
 
 	if len(collections) == 0 {
 		return nil, fmt.Errorf("no facts collected from any source: %v", errors)
@@ -160,6 +113,66 @@ func (m *Manager) CollectSpecificFacts(server string, keys []string) (*FactColle
 	m.cacheFacts(server, merged)
 
 	return merged, nil
+}
+
+// getFilteredCachedFacts returns filtered facts from cache if all are available and not expired
+func (m *Manager) getFilteredCachedFacts(cached *FactCollection, keys []string) *FactCollection {
+	// Check if all requested keys are in cache and not expired
+	for _, key := range keys {
+		if fact, exists := cached.Facts[key]; !exists || m.isExpired(fact) {
+			return nil
+		}
+	}
+
+	// Return only requested facts
+	filtered := &FactCollection{
+		Server:    cached.Server,
+		Timestamp: cached.Timestamp,
+		Facts:     make(map[string]*Fact),
+	}
+	for _, key := range keys {
+		if fact, exists := cached.Facts[key]; exists {
+			filtered.Facts[key] = fact
+		}
+	}
+	return filtered
+}
+
+// collectFromSources collects facts from the appropriate sources
+func (m *Manager) collectFromSources(server string, keys []string) ([]*FactCollection, []error) {
+	var collections []*FactCollection
+	var errors []error
+
+	// Determine which sources to use based on fact keys
+	sources := m.determineSources(keys)
+
+	for _, source := range sources {
+		collection, err := m.collectFromSource(source, server, keys)
+		if err == nil && collection != nil {
+			collections = append(collections, collection)
+		} else if err != nil {
+			errors = append(errors, fmt.Errorf("%s collection failed: %w", source, err))
+		}
+	}
+
+	return collections, errors
+}
+
+// collectFromSource collects facts from a specific source
+func (m *Manager) collectFromSource(source FactSource, server string, keys []string) (*FactCollection, error) {
+	switch source {
+	case SourceSSH:
+		if server != "local" {
+			return m.sshCollector.CollectSpecific(server, keys)
+		}
+	case SourceLocal:
+		return m.localCollector.CollectSpecific(server, keys)
+	case SourceHCL:
+		return m.hclCollector.CollectSpecific(server, keys)
+	case SourceOpenTofu:
+		return m.tofuCollector.CollectSpecific(server, keys)
+	}
+	return nil, nil
 }
 
 // GetFact retrieves a single fact
