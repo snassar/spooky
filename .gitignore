@@ -54,3 +54,4 @@ examples/actions/small-scale-example-*.hcl
 
 # Facts database
 .facts.db
+examples/projects/development/facts.db

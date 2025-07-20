@@ -17,7 +17,26 @@ var (
 	FactsCmd = &cobra.Command{
 		Use:   "facts",
 		Short: "Manage server facts and fact collection",
-		Long:  `Manage server facts and fact collection from multiple sources.`,
+		Long: `Manage server facts and fact collection from multiple sources.
+
+Facts are machine-specific information that can be collected from various sources
+including SSH connections, local system information, and external data sources.
+
+Examples:
+  # Gather facts from all machines in a configuration
+  spooky facts gather config.hcl
+
+  # List all collected facts
+  spooky facts list
+
+  # Query facts for specific information
+  spooky facts query "os.name == 'linux'"
+
+  # Export facts to JSON format
+  spooky facts export --output facts.json
+
+  # Import facts from external source
+  spooky facts import external-facts.json`,
 	}
 
 	factsGatherCmd = &cobra.Command{
@@ -56,6 +75,13 @@ var (
 		Long:  `Query facts using expressions and filters to find specific information.`,
 		Args:  cobra.ExactArgs(1),
 		RunE:  runFactsQuery,
+	}
+
+	factsListCmd = &cobra.Command{
+		Use:   "list",
+		Short: "List all facts",
+		Long:  `List all collected facts in table or JSON format.`,
+		RunE:  runFactsList,
 	}
 
 	factsCacheCmd = &cobra.Command{
@@ -108,6 +134,7 @@ func initFactsCommands() {
 	FactsCmd.AddCommand(factsExportCmd)
 	FactsCmd.AddCommand(factsValidateCmd)
 	FactsCmd.AddCommand(factsQueryCmd)
+	FactsCmd.AddCommand(factsListCmd)
 
 	// Add cache subcommand
 	FactsCmd.AddCommand(factsCacheCmd)
@@ -191,6 +218,11 @@ func runFactsCacheExpired(_ *cobra.Command, _ []string) error {
 	return nil
 }
 
+func runFactsList(_ *cobra.Command, _ []string) error {
+	logger := logging.GetLogger()
+	return listFacts(logger)
+}
+
 // New fact command functions
 func runFactsGather(_ *cobra.Command, args []string) error {
 	logger := logging.GetLogger()
@@ -208,7 +240,7 @@ func runFactsGather(_ *cobra.Command, args []string) error {
 	// Create storage and fact manager
 	storage, err := facts.NewFactStorage(facts.StorageOptions{
 		Type: facts.StorageTypeBadger, // Default to BadgerDB
-		Path: ".facts.db",             // Use local path for now
+		Path: getFactsDBPath(),        // Use configured facts database path
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create storage: %w", err)
@@ -381,7 +413,7 @@ func runFactsImport(_ *cobra.Command, args []string) error {
 	// Create storage and fact manager
 	storage, err := facts.NewFactStorage(facts.StorageOptions{
 		Type: facts.StorageTypeBadger, // Default to BadgerDB
-		Path: ".facts.db",             // Use local path for now
+		Path: getFactsDBPath(),        // Use configured facts database path
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create storage: %w", err)
@@ -408,7 +440,7 @@ func runFactsExport(_ *cobra.Command, _ []string) error {
 	// Create storage and fact manager
 	storage, err := facts.NewFactStorage(facts.StorageOptions{
 		Type: facts.StorageTypeBadger, // Default to BadgerDB
-		Path: ".facts.db",             // Use local path for now
+		Path: getFactsDBPath(),        // Use configured facts database path
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create storage: %w", err)
@@ -439,7 +471,7 @@ func runFactsValidate(_ *cobra.Command, _ []string) error {
 	// Create storage and fact manager
 	storage, err := facts.NewFactStorage(facts.StorageOptions{
 		Type: facts.StorageTypeBadger, // Default to BadgerDB
-		Path: ".facts.db",             // Use local path for now
+		Path: getFactsDBPath(),        // Use configured facts database path
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create storage: %w", err)
@@ -544,7 +576,7 @@ func runFactsQuery(_ *cobra.Command, args []string) error {
 	// Create storage and fact manager
 	storage, err := facts.NewFactStorage(facts.StorageOptions{
 		Type: facts.StorageTypeBadger, // Default to BadgerDB
-		Path: ".facts.db",             // Use local path for now
+		Path: getFactsDBPath(),        // Use configured facts database path
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create storage: %w", err)
