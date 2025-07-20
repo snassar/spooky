@@ -130,6 +130,7 @@ const (
 	FactCPUCores    = "cpu.cores"
 	FactCPUModel    = "cpu.model"
 	FactCPUArch     = "cpu.arch"
+	FactCPUFreq     = "cpu.frequency"
 	FactMemoryTotal = "memory.total"
 	FactMemoryUsed  = "memory.used"
 	FactMemoryAvail = "memory.available"

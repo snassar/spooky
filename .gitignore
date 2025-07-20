@@ -51,3 +51,6 @@ build/*
 examples/actions/large-scale-example-*.hcl
 examples/actions/medium-scale-example-*.hcl
 examples/actions/small-scale-example-*.hcl
+
+# Facts database
+.facts.db

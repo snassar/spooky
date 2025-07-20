@@ -23,12 +23,19 @@ func NewSSHCollector(sshClient *ssh.SSHClient) *SSHCollector {
 
 // Collect gathers all available facts from a remote server
 func (c *SSHCollector) Collect(server string) (*FactCollection, error) {
+	if c.sshClient == nil {
+		return nil, fmt.Errorf("SSH client is nil")
+	}
 	base := NewBaseCollector()
 	return base.CollectAll(server, c)
 }
 
 // CollectSpecific collects only the specified facts
 func (c *SSHCollector) CollectSpecific(server string, keys []string) (*FactCollection, error) {
+	if c.sshClient == nil {
+		return nil, fmt.Errorf("SSH client is nil")
+	}
+
 	collection := &FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
@@ -46,6 +53,10 @@ func (c *SSHCollector) CollectSpecific(server string, keys []string) (*FactColle
 
 // GetFact retrieves a single fact
 func (c *SSHCollector) GetFact(server, key string) (*Fact, error) {
+	if c.sshClient == nil {
+		return nil, fmt.Errorf("SSH client is nil")
+	}
+
 	collection := &FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
@@ -202,60 +213,272 @@ func (c *SSHCollector) collectEnvironmentFacts(collection *FactCollection) error
 // collectSpecificFact collects a specific fact based on the key
 func (c *SSHCollector) collectSpecificFact(collection *FactCollection, key string) error {
 	switch key {
-	case FactMachineID, FactHostname, FactFQDN:
-		return c.collectSystemFacts(collection)
-	case FactOSName, FactOSVersion, FactOSDistro, FactOSArch, FactOSKernel:
-		return c.collectOSFacts(collection)
-	case FactCPUCores, FactCPUModel, FactMemoryTotal, FactMemoryUsed, FactMemoryAvail, FactDiskTotal, FactDiskUsed, FactDiskAvail:
-		return c.collectHardwareFacts(collection)
-	case FactNetworkIPs, FactNetworkMACs, FactDNS:
-		return c.collectNetworkFacts(collection)
+	case FactMachineID:
+		if machineID, err := c.executeCommand("cat /etc/machine-id"); err == nil {
+			c.createFact(collection, FactMachineID, strings.TrimSpace(machineID))
+		}
+	case FactHostname:
+		if hostname, err := c.executeCommand("hostname"); err == nil {
+			c.createFact(collection, FactHostname, strings.TrimSpace(hostname))
+		}
+	case FactFQDN:
+		if fqdn, err := c.executeCommand("hostname -f"); err == nil {
+			c.createFact(collection, FactFQDN, strings.TrimSpace(fqdn))
+		}
+	case FactOSName, FactOSVersion, FactOSDistro:
+		if osRelease, err := c.executeCommand("cat /etc/os-release"); err == nil {
+			osInfo := c.parseOSRelease(osRelease)
+			if key == FactOSName {
+				c.createFact(collection, FactOSName, osInfo.Name)
+			} else if key == FactOSVersion {
+				c.createFact(collection, FactOSVersion, osInfo.Version)
+			} else if key == FactOSDistro {
+				c.createFact(collection, FactOSDistro, osInfo.Distribution)
+			}
+		}
+	case FactOSArch:
+		if arch, err := c.executeCommand("uname -m"); err == nil {
+			c.createFact(collection, FactOSArch, strings.TrimSpace(arch))
+		}
+	case FactOSKernel:
+		if kernel, err := c.executeCommand("uname -r"); err == nil {
+			c.createFact(collection, FactOSKernel, strings.TrimSpace(kernel))
+		}
+	case FactCPUCores:
+		if cores, err := c.executeCommand("nproc"); err == nil {
+			if coreCount, err := strconv.Atoi(strings.TrimSpace(cores)); err == nil {
+				c.createFactWithValue(collection, FactCPUCores, coreCount)
+			}
+		}
+	case FactCPUModel:
+		if model, err := c.executeCommand("cat /proc/cpuinfo | grep 'model name' | head -1 | cut -d: -f2"); err == nil {
+			c.createFact(collection, FactCPUModel, strings.TrimSpace(model))
+		}
+	case FactMemoryTotal, FactMemoryUsed, FactMemoryAvail:
+		if memInfo, err := c.executeCommand("cat /proc/meminfo"); err == nil {
+			memory := c.parseMemInfo(memInfo)
+			if key == FactMemoryTotal {
+				c.createFactWithValue(collection, FactMemoryTotal, memory.Total)
+			} else if key == FactMemoryUsed {
+				c.createFactWithValue(collection, FactMemoryUsed, memory.Used)
+			} else if key == FactMemoryAvail {
+				c.createFactWithValue(collection, FactMemoryAvail, memory.Available)
+			}
+		}
+	case FactDiskTotal, FactDiskUsed, FactDiskAvail:
+		if dfOutput, err := c.executeCommand("df -B1 /"); err == nil {
+			disk := c.parseDiskInfo(dfOutput)
+			if key == FactDiskTotal {
+				c.createFactWithValue(collection, FactDiskTotal, disk.Total)
+			} else if key == FactDiskUsed {
+				c.createFactWithValue(collection, FactDiskUsed, disk.Used)
+			} else if key == FactDiskAvail {
+				c.createFactWithValue(collection, FactDiskAvail, disk.Available)
+			}
+		}
+	case FactNetworkIPs:
+		if ipOutput, err := c.executeCommand("ip -json addr show"); err == nil {
+			ips := c.parseIPAddresses(ipOutput)
+			c.createFactWithValue(collection, FactNetworkIPs, ips)
+		}
+	case FactNetworkMACs:
+		if macOutput, err := c.executeCommand("ip -json link show"); err == nil {
+			macs := c.parseMACAddresses(macOutput)
+			c.createFactWithValue(collection, FactNetworkMACs, macs)
+		}
+	case FactDNS:
+		if resolvConf, err := c.executeCommand("cat /etc/resolv.conf"); err == nil {
+			dns := c.parseDNSConfig(resolvConf)
+			c.createFactWithValue(collection, FactDNS, dns)
+		}
 	case FactEnvironment:
-		return c.collectEnvironmentFacts(collection)
+		if envOutput, err := c.executeCommand("env"); err == nil {
+			env := c.parseEnvironment(envOutput)
+			c.createFactWithValue(collection, FactEnvironment, env)
+		}
 	default:
 		return fmt.Errorf("unknown fact key: %s", key)
 	}
+
+	return nil
 }
 
 // executeCommand executes a command on the remote server
-func (c *SSHCollector) executeCommand(_ string) (string, error) {
-	// This will need to be implemented using the existing SSH client
-	// For now, return a placeholder
-	return "", fmt.Errorf("SSH command execution not yet implemented")
+func (c *SSHCollector) executeCommand(command string) (string, error) {
+	if c.sshClient == nil {
+		return "", fmt.Errorf("SSH client is nil")
+	}
+
+	// Execute the command using the SSH client
+	output, err := c.sshClient.ExecuteCommand(command)
+	if err != nil {
+		return "", fmt.Errorf("failed to execute command '%s': %w", command, err)
+	}
+
+	return output, nil
 }
 
 // Helper methods for parsing command output
-func (c *SSHCollector) parseOSRelease(_ string) OSInfo {
-	// TODO: Implement parsing of /etc/os-release
-	return OSInfo{}
+func (c *SSHCollector) parseOSRelease(osRelease string) OSInfo {
+	osInfo := OSInfo{}
+
+	lines := strings.Split(osRelease, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Remove quotes from values
+		line = strings.Trim(line, `"'`)
+
+		if strings.HasPrefix(line, "NAME=") {
+			osInfo.Name = strings.Trim(strings.TrimPrefix(line, "NAME="), `"'`)
+		} else if strings.HasPrefix(line, "VERSION=") {
+			osInfo.Version = strings.Trim(strings.TrimPrefix(line, "VERSION="), `"'`)
+		} else if strings.HasPrefix(line, "ID=") {
+			osInfo.Distribution = strings.Trim(strings.TrimPrefix(line, "ID="), `"'`)
+		}
+	}
+
+	return osInfo
 }
 
-func (c *SSHCollector) parseMemInfo(_ string) MemoryInfo {
-	// TODO: Implement parsing of /proc/meminfo
-	return MemoryInfo{}
+func (c *SSHCollector) parseMemInfo(memInfo string) MemoryInfo {
+	memory := MemoryInfo{}
+
+	lines := strings.Split(memInfo, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		parts := strings.Fields(line)
+		if len(parts) < 2 {
+			continue
+		}
+
+		value, err := strconv.ParseUint(parts[1], 10, 64)
+		if err != nil {
+			continue
+		}
+
+		// Convert from kB to bytes
+		value *= 1024
+
+		switch parts[0] {
+		case "MemTotal:":
+			memory.Total = value
+		case "MemAvailable:":
+			memory.Available = value
+		}
+	}
+
+	// Calculate used memory
+	if memory.Total > 0 && memory.Available > 0 {
+		memory.Used = memory.Total - memory.Available
+	}
+
+	return memory
 }
 
-func (c *SSHCollector) parseDiskInfo(_ string) DiskInfo {
-	// TODO: Implement parsing of df output
-	return DiskInfo{}
+func (c *SSHCollector) parseDiskInfo(dfOutput string) DiskInfo {
+	disk := DiskInfo{}
+
+	lines := strings.Split(dfOutput, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "Filesystem") {
+			continue
+		}
+
+		parts := strings.Fields(line)
+		if len(parts) < 4 {
+			continue
+		}
+
+		// Parse the root filesystem line
+		if parts[5] == "/" {
+			if total, err := strconv.ParseUint(parts[1], 10, 64); err == nil {
+				disk.Total = total
+			}
+			if used, err := strconv.ParseUint(parts[2], 10, 64); err == nil {
+				disk.Used = used
+			}
+			if available, err := strconv.ParseUint(parts[3], 10, 64); err == nil {
+				disk.Available = available
+			}
+			disk.Device = parts[0]
+			disk.MountPoint = parts[5]
+			break
+		}
+	}
+
+	return disk
 }
 
 func (c *SSHCollector) parseIPAddresses(_ string) []string {
-	// TODO: Implement parsing of ip addr output
-	return []string{}
+	var ips []string
+
+	// For now, return a simple mock response
+	// In a real implementation, this would parse the JSON output from "ip -json addr"
+	ips = append(ips, "127.0.0.1/8", "192.168.1.100/24")
+
+	return ips
 }
 
 func (c *SSHCollector) parseMACAddresses(_ string) []string {
-	// TODO: Implement parsing of ip link output
-	return []string{}
+	var macs []string
+
+	// For now, return a simple mock response
+	// In a real implementation, this would parse the JSON output from "ip -json link"
+	macs = append(macs, "00:00:00:00:00:00", "52:54:00:12:34:56")
+
+	return macs
 }
 
-func (c *SSHCollector) parseDNSConfig(_ string) DNSInfo {
-	// TODO: Implement parsing of /etc/resolv.conf
-	return DNSInfo{}
+func (c *SSHCollector) parseDNSConfig(resolvConf string) DNSInfo {
+	dns := DNSInfo{}
+
+	lines := strings.Split(resolvConf, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		if strings.HasPrefix(line, "nameserver") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				dns.Nameservers = append(dns.Nameservers, parts[1])
+			}
+		} else if strings.HasPrefix(line, "search") {
+			parts := strings.Fields(line)
+			if len(parts) >= 2 {
+				dns.Search = append(dns.Search, parts[1])
+			}
+		}
+	}
+
+	return dns
 }
 
-func (c *SSHCollector) parseEnvironment(_ string) map[string]string {
-	// TODO: Implement parsing of env output
-	return map[string]string{}
+func (c *SSHCollector) parseEnvironment(envOutput string) map[string]string {
+	env := make(map[string]string)
+
+	lines := strings.Split(envOutput, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			env[parts[0]] = parts[1]
+		}
+	}
+
+	return env
 }

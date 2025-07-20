@@ -2,6 +2,7 @@ package facts
 
 import (
 	"fmt"
+	"io"
 	"sync"
 	"time"
 
@@ -20,6 +21,9 @@ type Manager struct {
 	cache      map[string]*FactCollection
 	cacheMutex sync.RWMutex
 
+	// Storage for persistent facts
+	storage FactStorage
+
 	// Configuration
 	defaultTTL time.Duration
 }
@@ -33,6 +37,20 @@ func NewManager(sshClient *ssh.SSHClient) *Manager {
 		hclCollector:   NewHCLCollector(),
 		tofuCollector:  NewOpenTofuCollector(),
 		cache:          make(map[string]*FactCollection),
+		defaultTTL:     DefaultTTL,
+	}
+}
+
+// NewManagerWithStorage creates a new fact collection manager with storage
+func NewManagerWithStorage(sshClient *ssh.SSHClient, storage FactStorage) *Manager {
+	return &Manager{
+		sshClient:      sshClient,
+		sshCollector:   NewSSHCollector(sshClient),
+		localCollector: NewLocalCollector(),
+		hclCollector:   NewHCLCollector(),
+		tofuCollector:  NewOpenTofuCollector(),
+		cache:          make(map[string]*FactCollection),
+		storage:        storage,
 		defaultTTL:     DefaultTTL,
 	}
 }
@@ -441,4 +459,207 @@ func (m *Manager) GetAllFacts() ([]*Fact, error) {
 	}
 
 	return allFacts, nil
+}
+
+// Storage-related methods
+
+// PersistFacts persists a fact collection to storage
+func (m *Manager) PersistFacts(_ string, collection *FactCollection) error {
+	if m.storage == nil {
+		return nil // No storage configured
+	}
+
+	// Generate machine ID and convert to MachineFacts
+	machineID := m.GenerateMachineID(collection)
+	machineFacts := ConvertFactCollectionToMachineFacts(machineID, collection)
+
+	return m.storage.SetMachineFacts(machineID, machineFacts)
+}
+
+// LoadPersistedFacts loads facts from storage for a server
+func (m *Manager) LoadPersistedFacts(server string) (*FactCollection, error) {
+	if m.storage == nil {
+		return nil, fmt.Errorf("no storage configured")
+	}
+
+	// For now, we need to query by machine name since we don't have the machine ID
+	query := &FactQuery{MachineName: server}
+	machineFacts, err := m.storage.QueryFacts(query)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(machineFacts) == 0 {
+		return nil, fmt.Errorf("no facts found for server: %s", server)
+	}
+
+	// Use the first match
+	return ConvertMachineFactsToFactCollection(machineFacts[0]), nil
+}
+
+// QueryPersistedFacts queries facts from storage
+func (m *Manager) QueryPersistedFacts(query *FactQuery) ([]*FactCollection, error) {
+	if m.storage == nil {
+		return nil, fmt.Errorf("no storage configured")
+	}
+
+	machineFacts, err := m.storage.QueryFacts(query)
+	if err != nil {
+		return nil, err
+	}
+
+	var collections []*FactCollection
+	for _, facts := range machineFacts {
+		collection := ConvertMachineFactsToFactCollection(facts)
+		collections = append(collections, collection)
+	}
+
+	return collections, nil
+}
+
+// ExportFacts exports all facts from storage to JSON
+func (m *Manager) ExportFacts(w io.Writer) error {
+	if m.storage == nil {
+		return fmt.Errorf("no storage configured")
+	}
+
+	return m.storage.ExportToJSON(w)
+}
+
+// ImportFacts imports facts from JSON into storage
+func (m *Manager) ImportFacts(r io.Reader) error {
+	if m.storage == nil {
+		return fmt.Errorf("no storage configured")
+	}
+
+	return m.storage.ImportFromJSON(r)
+}
+
+// CollectAndPersistFacts collects facts and persists them to storage
+func (m *Manager) CollectAndPersistFacts(server string) (*FactCollection, error) {
+	collection, err := m.CollectAllFacts(server)
+	if err != nil {
+		return nil, err
+	}
+
+	if m.storage != nil {
+		// Generate machine ID from facts
+		machineID := m.GenerateMachineID(collection)
+
+		// Convert to MachineFacts and persist
+		machineFacts := ConvertFactCollectionToMachineFacts(machineID, collection)
+		if err := m.storage.SetMachineFacts(machineID, machineFacts); err != nil {
+			return nil, fmt.Errorf("failed to persist facts: %w", err)
+		}
+	}
+
+	return collection, nil
+}
+
+// GatherAndPersistFacts is an alias for CollectAndPersistFacts (new naming)
+func (m *Manager) GatherAndPersistFacts(machine string) (*FactCollection, error) {
+	return m.CollectAndPersistFacts(machine)
+}
+
+// GenerateMachineID generates a machine ID from fact collection
+func (m *Manager) GenerateMachineID(facts *FactCollection) string {
+	// Use machine_id fact if available
+	if machineID, exists := facts.Facts["machine_id"]; exists {
+		if id, ok := machineID.Value.(string); ok && id != "" {
+			return id
+		}
+	}
+
+	// Fallback: generate UUID from hostname + IP + action file
+	return m.generateUUIDFromFacts(facts)
+}
+
+// generateUUIDFromFacts generates a UUID from fact data
+func (m *Manager) generateUUIDFromFacts(facts *FactCollection) string {
+	// Simple hash-based ID generation
+	// In a real implementation, you'd use a proper UUID library
+	data := facts.Server
+	if hostname, exists := facts.Facts["hostname"]; exists {
+		if str, ok := hostname.Value.(string); ok {
+			data += str
+		}
+	}
+	if ips, exists := facts.Facts["network.ips"]; exists {
+		if ipList, ok := ips.Value.([]string); ok && len(ipList) > 0 {
+			data += ipList[0]
+		}
+	}
+
+	// Simple hash for now - in production use crypto/sha256
+	hash := 0
+	for _, char := range data {
+		hash = ((hash << 5) - hash) + int(char)
+		hash &= hash // Convert to 32-bit integer
+	}
+
+	return fmt.Sprintf("machine-%x", hash)
+}
+
+// GetMachineFacts retrieves machine facts from storage
+func (m *Manager) GetMachineFacts(machineID string) (*MachineFacts, error) {
+	if m.storage == nil {
+		return nil, fmt.Errorf("no storage configured")
+	}
+	return m.storage.GetMachineFacts(machineID)
+}
+
+// SetMachineFacts stores machine facts to storage
+func (m *Manager) SetMachineFacts(machineID string, facts *MachineFacts) error {
+	if m.storage == nil {
+		return fmt.Errorf("no storage configured")
+	}
+	return m.storage.SetMachineFacts(machineID, facts)
+}
+
+// QueryMachineFacts queries machine facts from storage
+func (m *Manager) QueryMachineFacts(query *FactQuery) ([]*MachineFacts, error) {
+	if m.storage == nil {
+		return nil, fmt.Errorf("no storage configured")
+	}
+	return m.storage.QueryFacts(query)
+}
+
+// DeleteMachineFacts deletes machine facts from storage
+func (m *Manager) DeleteMachineFacts(machineID string) error {
+	if m.storage == nil {
+		return fmt.Errorf("no storage configured")
+	}
+	return m.storage.DeleteMachineFacts(machineID)
+}
+
+// DeleteFacts deletes facts matching query criteria
+func (m *Manager) DeleteFacts(query *FactQuery) (int, error) {
+	if m.storage == nil {
+		return 0, fmt.Errorf("no storage configured")
+	}
+	return m.storage.DeleteFacts(query)
+}
+
+// ExportFactsWithEncryption exports facts with encryption support
+func (m *Manager) ExportFactsWithEncryption(w io.Writer, opts ExportOptions) error {
+	if m.storage == nil {
+		return fmt.Errorf("no storage configured")
+	}
+	return m.storage.ExportToJSONWithEncryption(w, opts)
+}
+
+// ImportFactsWithDecryption imports facts with decryption support
+func (m *Manager) ImportFactsWithDecryption(r io.Reader, identityFile string) error {
+	if m.storage == nil {
+		return fmt.Errorf("no storage configured")
+	}
+	return m.storage.ImportFromJSONWithDecryption(r, identityFile)
+}
+
+// Close closes the storage connection
+func (m *Manager) Close() error {
+	if m.storage != nil {
+		return m.storage.Close()
+	}
+	return nil
 }

@@ -132,11 +132,24 @@ func (c *LocalCollector) collectOSFacts(collection *FactCollection) error {
 func (c *LocalCollector) collectHardwareFacts(collection *FactCollection) error {
 	// CPU information
 	if cpuInfo, err := cpu.Info(); err == nil && len(cpuInfo) > 0 {
-		c.createFactWithValue(collection, FactCPUCores, int(cpuInfo[0].Cores))
+		// Calculate total cores across all CPUs
+		totalCores := 0
+		for i := range cpuInfo {
+			totalCores += int(cpuInfo[i].Cores)
+		}
+		c.createFactWithValue(collection, FactCPUCores, totalCores)
 
 		c.createFact(collection, FactCPUModel, cpuInfo[0].ModelName)
 
 		c.createFact(collection, FactCPUArch, runtime.GOARCH)
+
+		// Get CPU frequency (current frequency in MHz)
+		if freq, err := cpu.Percent(0, false); err == nil && len(freq) > 0 {
+			// Get current frequency from /proc/cpuinfo as gopsutil doesn't provide it directly
+			if freqStr, err := c.getCPUFrequency(); err == nil {
+				c.createFact(collection, FactCPUFreq, freqStr)
+			}
+		}
 	}
 
 	// Memory information
@@ -211,7 +224,7 @@ func (c *LocalCollector) collectSpecificFact(collection *FactCollection, key str
 		return c.collectSystemFacts(collection)
 	case FactOSName, FactOSVersion, FactOSDistro, FactOSArch, FactOSKernel:
 		return c.collectOSFacts(collection)
-	case FactCPUCores, FactCPUModel, FactCPUArch, FactMemoryTotal, FactMemoryUsed, FactMemoryAvail, FactDiskTotal, FactDiskUsed, FactDiskAvail:
+	case FactCPUCores, FactCPUModel, FactCPUArch, FactCPUFreq, FactMemoryTotal, FactMemoryUsed, FactMemoryAvail, FactDiskTotal, FactDiskUsed, FactDiskAvail:
 		return c.collectHardwareFacts(collection)
 	case FactNetworkIPs, FactNetworkMACs, FactDNS:
 		return c.collectNetworkFacts(collection)
@@ -239,6 +252,27 @@ func (c *LocalCollector) executeCommand(command string, args ...string) (string,
 		return "", err
 	}
 	return string(output), nil
+}
+
+// getCPUFrequency gets the current CPU frequency from /proc/cpuinfo
+func (c *LocalCollector) getCPUFrequency() (string, error) {
+	content, err := c.readFile("/proc/cpuinfo")
+	if err != nil {
+		return "", err
+	}
+
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "cpu MHz") {
+			parts := strings.Split(line, ":")
+			if len(parts) == 2 {
+				freq := strings.TrimSpace(parts[1])
+				return freq + " MHz", nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("CPU frequency not found in /proc/cpuinfo")
 }
 
 // parseDNSConfig parses /etc/resolv.conf content
