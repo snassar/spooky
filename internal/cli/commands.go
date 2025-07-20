@@ -114,14 +114,20 @@ var ValidateCmd = &cobra.Command{
 }
 
 var ListCmd = &cobra.Command{
-	Use:   "list <resource>",
+	Use:   "list <resource|config-file>",
 	Short: "List resources, facts, or configurations",
-	Long:  `Display resources, facts, or configurations based on the specified resource type`,
+	Long:  `Display resources, facts, or configurations based on the specified resource type or from a configuration file`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
 		logger := logging.GetLogger()
 		resource := args[0]
 
+		// Check if it's a config file path
+		if strings.HasSuffix(resource, ".hcl") || strings.HasSuffix(resource, ".yaml") || strings.HasSuffix(resource, ".yml") {
+			return listFromConfigFile(logger, resource)
+		}
+
+		// Otherwise treat as resource type
 		switch resource {
 		case "servers":
 			return listServers(logger)
@@ -175,6 +181,58 @@ func isLocalFile(source string) bool {
 		return false
 	}
 	return true
+}
+
+// listFromConfigFile lists resources from a configuration file
+func listFromConfigFile(logger logging.Logger, configFile string) error {
+	// Validate config file exists
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+		logger.Error("Config file not found", err, logging.String("config_file", configFile))
+		return fmt.Errorf("config file %s does not exist", configFile)
+	}
+
+	// Parse configuration
+	config, err := config.ParseConfig(configFile)
+	if err != nil {
+		logger.Error("Failed to parse configuration", err, logging.String("config_file", configFile))
+		return fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	logger.Info("Listing resources from configuration file",
+		logging.String("config_file", configFile),
+		logging.Int("server_count", len(config.Servers)),
+		logging.Int("action_count", len(config.Actions)))
+
+	// Display servers
+	if len(config.Servers) > 0 {
+		fmt.Printf("Servers (%d):\n", len(config.Servers))
+		for _, server := range config.Servers {
+			fmt.Printf("  - %s (%s@%s:%d)\n", server.Name, server.User, server.Host, server.Port)
+		}
+		fmt.Println()
+	}
+
+	// Display actions
+	if len(config.Actions) > 0 {
+		fmt.Printf("Actions (%d):\n", len(config.Actions))
+		for i := range config.Actions {
+			action := &config.Actions[i]
+			desc := action.Description
+			if desc == "" {
+				desc = "No description"
+			}
+			fmt.Printf("  - %s: %s\n", action.Name, desc)
+		}
+		fmt.Println()
+	}
+
+	// Display summary
+	fmt.Printf("Configuration Summary:\n")
+	fmt.Printf("  File: %s\n", configFile)
+	fmt.Printf("  Servers: %d\n", len(config.Servers))
+	fmt.Printf("  Actions: %d\n", len(config.Actions))
+
+	return nil
 }
 
 // List functions for different resource types
