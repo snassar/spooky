@@ -112,9 +112,9 @@ go run tools/generate-config/main.go
 go run tools/generate-config/main.go
 
 # This creates:
-# - examples/configuration/small-scale-example.hcl
-# - examples/configuration/medium-scale-example.hcl
-# - examples/configuration/large-scale-example.hcl
+# - examples/actions/small-scale-example.hcl
+# - examples/actions/medium-scale-example.hcl
+# - examples/actions/large-scale-example.hcl
 ```
 
 ## Directory Structure

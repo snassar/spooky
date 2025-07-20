@@ -1,8 +1,8 @@
 # Failure test configuration for spooky SSH automation tool
-# Points to failure scenario SSH servers for integration testing
+# Points to failure scenario SSH machines for integration testing
 
-# Failure scenario servers
-server "spooky-test-no-ssh" {
+# Failure scenario machines
+machine "spooky-test-no-ssh" {
   host     = "localhost"
   port     = 2228
   user     = "testuser"
@@ -14,7 +14,7 @@ server "spooky-test-no-ssh" {
   }
 }
 
-server "spooky-test-ssh-no-key" {
+machine "spooky-test-ssh-no-key" {
   host     = "localhost"
   port     = 2229
   user     = "testuser"
@@ -29,7 +29,7 @@ server "spooky-test-ssh-no-key" {
 # Test actions for connection failure scenarios
 action "test-connection-failures" {
   description = "Test connection failures (no SSH, no key)"
-  command     = "echo 'This should fail on failure-test servers' && hostname"
-  servers     = ["spooky-test-no-ssh", "spooky-test-ssh-no-key"]
+  command     = "echo 'This should fail on failure-test machines' && hostname"
+  machines    = ["spooky-test-no-ssh", "spooky-test-ssh-no-key"]
   parallel    = true
 } 

@@ -225,7 +225,7 @@ jobs:
     - name: Update test configuration paths
       run: |
         # Update SSH key paths in configuration files to use absolute paths
-        sed -i "s|~/.ssh/id_ed25519|$HOME/.ssh/id_ed25519|g" examples/configuration/integration-*.hcl
+        sed -i "s|~/.ssh/id_ed25519|$HOME/.ssh/id_ed25519|g" examples/actions/integration-*.hcl
 
     - name: Build binary
       run: |
@@ -296,7 +296,7 @@ jobs:
         # Test 1: Time validation of simple config
         echo "Testing validate command with simple config..."
         start_time=$(date +%s.%N)
-        ./build/spooky validate examples/configuration/integration-simple-test.hcl || {
+        ./build/spooky validate examples/actions/integration-simple-test.hcl || {
           echo "Validate command failed with simple config"
           exit 1
         }
@@ -307,7 +307,7 @@ jobs:
         # Test 2: Time validation of working servers config
         echo "Testing validate command with working servers config..."
         start_time=$(date +%s.%N)
-        ./build/spooky validate examples/configuration/integration-working-servers.hcl || {
+        ./build/spooky validate examples/actions/integration-working-servers.hcl || {
           echo "Validate command failed with working servers config"
           exit 1
         }
@@ -318,7 +318,7 @@ jobs:
         # Test 3: Time list command (simple config)
         echo "Testing list command with simple config..."
         start_time=$(date +%s.%N)
-        ./build/spooky list examples/configuration/integration-simple-test.hcl || {
+        ./build/spooky list examples/actions/integration-simple-test.hcl || {
           echo "List command failed with simple config"
           exit 1
         }
@@ -329,7 +329,7 @@ jobs:
         # Test 4: Time list command (working servers config)
         echo "Testing list command with working servers config..."
         start_time=$(date +%s.%N)
-        ./build/spooky list examples/configuration/integration-working-servers.hcl || {
+        ./build/spooky list examples/actions/integration-working-servers.hcl || {
           echo "List command failed with working servers config"
           exit 1
         }
@@ -339,7 +339,7 @@ jobs:
         
         # Test 5: Execute command (simple config - 2 servers)
         echo "Testing execute command with simple config (2 servers)..."
-        ./build/spooky execute examples/configuration/integration-simple-test.hcl || {
+        ./build/spooky execute examples/actions/integration-simple-test.hcl || {
           echo "Execute command failed with simple config"
           exit 1
         }
@@ -347,7 +347,7 @@ jobs:
         
         # Test 6: Execute command (working servers only - 7 servers, parallel execution)
         echo "Testing execute command with working servers only..."
-        ./build/spooky execute examples/configuration/integration-working-servers.hcl || {
+        ./build/spooky execute examples/actions/integration-working-servers.hcl || {
           echo "Execute command failed with working servers config"
           exit 1
         }
@@ -355,7 +355,7 @@ jobs:
         
         # Test 7: Test failure scenarios (these should fail as expected)
         echo "Testing failure scenarios (expected to fail)..."
-        if ./build/spooky execute examples/configuration/integration-failure-test.hcl 2>/dev/null; then
+        if ./build/spooky execute examples/actions/integration-failure-test.hcl 2>/dev/null; then
           echo "✗ Failure scenario test should have failed but succeeded"
           exit 1
         else
@@ -364,7 +364,7 @@ jobs:
         
         # Test 8: Test mixed success/failure scenarios (should fail due to parallel execution behavior)
         echo "Testing mixed success/failure scenarios..."
-        if ./build/spooky execute examples/configuration/integration-mixed-test.hcl 2>/dev/null; then
+        if ./build/spooky execute examples/actions/integration-mixed-test.hcl 2>/dev/null; then
           echo "✗ Mixed success/failure test should have failed but succeeded"
           exit 1
         else
@@ -374,7 +374,7 @@ jobs:
         # Test 9: Time validation of small-scale configuration
         echo "Testing validation timing for small-scale configuration..."
         start_time=$(date +%s.%N)
-        ./build/spooky validate examples/configuration/small-scale-example.hcl || {
+        ./build/spooky validate examples/actions/small-scale-example.hcl || {
           echo "Small-scale validation failed"
           exit 1
         }
@@ -385,7 +385,7 @@ jobs:
         # Test 10: Time validation of medium-scale configuration
         echo "Testing validation timing for medium-scale configuration..."
         start_time=$(date +%s.%N)
-        ./build/spooky validate examples/configuration/medium-scale-example.hcl || {
+        ./build/spooky validate examples/actions/medium-scale-example.hcl || {
           echo "Medium-scale validation failed"
           exit 1
         }
@@ -396,7 +396,7 @@ jobs:
         # Test 11: Time list command for small-scale configuration
         echo "Testing list timing for small-scale configuration..."
         start_time=$(date +%s.%N)
-        ./build/spooky list examples/configuration/small-scale-example.hcl || {
+        ./build/spooky list examples/actions/small-scale-example.hcl || {
           echo "Small-scale list failed"
           exit 1
         }
@@ -407,7 +407,7 @@ jobs:
         # Test 12: Time list command for medium-scale configuration
         echo "Testing list timing for medium-scale configuration..."
         start_time=$(date +%s.%N)
-        ./build/spooky list examples/configuration/medium-scale-example.hcl || {
+        ./build/spooky list examples/actions/medium-scale-example.hcl || {
           echo "Medium-scale list failed"
           exit 1
         }
@@ -418,7 +418,7 @@ jobs:
         # Test 13: Time validation of large-scale configuration
         echo "Testing validation timing for large-scale configuration..."
         start_time=$(date +%s.%N)
-        ./build/spooky validate examples/configuration/large-scale-example.hcl || {
+        ./build/spooky validate examples/actions/large-scale-example.hcl || {
           echo "Large-scale validation failed"
           exit 1
         }
@@ -429,7 +429,7 @@ jobs:
         # Test 14: Time list command for large-scale configuration
         echo "Testing list timing for large-scale configuration..."
         start_time=$(date +%s.%N)
-        ./build/spooky list examples/configuration/large-scale-example.hcl || {
+        ./build/spooky list examples/actions/large-scale-example.hcl || {
           echo "Large-scale list failed"
           exit 1
         }

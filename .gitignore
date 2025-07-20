@@ -48,6 +48,6 @@ examples/test-environment/ssh-keys/
 spooky.exe
 spooky
 build/*
-examples/configuration/large-scale-example-*.hcl
-examples/configuration/medium-scale-example-*.hcl
-examples/configuration/small-scale-example-*.hcl
+examples/actions/large-scale-example-*.hcl
+examples/actions/medium-scale-example-*.hcl
+examples/actions/small-scale-example-*.hcl
