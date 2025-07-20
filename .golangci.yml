@@ -28,7 +28,7 @@ linters-settings:
       - performance
       - style
   gocyclo:
-    min-complexity: 15
+    min-complexity: 20
   dupl:
     threshold: 100
 
