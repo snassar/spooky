@@ -1,0 +1,15 @@
+[Unit]
+Description=Spooky Test Container spooky-test-server-1
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+Image=spooky-test-ssh
+ContainerName=spooky-test-server-1
+PublishPort=2221:22
+Environment=DEBIAN_FRONTEND=noninteractive
+DNS=8.8.8.8
+DNS=8.8.4.4
+
+[Install]
+WantedBy=default.target

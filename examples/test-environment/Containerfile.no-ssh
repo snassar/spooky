@@ -1,0 +1,7 @@
+FROM debian:12-slim
+
+# Create test user
+RUN useradd -m -s /bin/bash testuser
+
+# Just keep container running without SSH
+CMD ["tail", "-f", "/dev/null"] 
