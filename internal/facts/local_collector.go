@@ -86,7 +86,7 @@ func (c *LocalCollector) GetFact(server, key string) (*Fact, error) {
 		return fact, nil
 	}
 
-	return nil, fmt.Errorf("fact %s not found for server %s", key, server)
+	return nil, ErrFactNotFound(key, server)
 }
 
 // collectSystemFacts collects basic system identification facts

@@ -3,9 +3,13 @@ package facts
 import (
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 	"time"
 
+	"encoding/json"
+	"net/http" // Added for HTTP custom facts
+	"os"
 	"spooky/internal/ssh"
 )
 
@@ -16,6 +20,9 @@ type Manager struct {
 	localCollector *LocalCollector
 	hclCollector   *HCLCollector
 	tofuCollector  *OpenTofuCollector
+
+	// Custom collectors
+	customCollectors map[string]FactCollector
 
 	// Cache for collected facts
 	cache      map[string]*FactCollection
@@ -31,28 +38,40 @@ type Manager struct {
 // NewManager creates a new fact collection manager
 func NewManager(sshClient *ssh.SSHClient) *Manager {
 	return &Manager{
-		sshClient:      sshClient,
-		sshCollector:   NewSSHCollector(sshClient),
-		localCollector: NewLocalCollector(),
-		hclCollector:   NewHCLCollector(),
-		tofuCollector:  NewOpenTofuCollector(),
-		cache:          make(map[string]*FactCollection),
-		defaultTTL:     DefaultTTL,
+		sshClient:        sshClient,
+		sshCollector:     NewSSHCollector(sshClient),
+		localCollector:   NewLocalCollector(),
+		hclCollector:     nil, // Will be configured when file path is provided
+		tofuCollector:    nil, // Will be configured when state path is provided
+		customCollectors: make(map[string]FactCollector),
+		cache:            make(map[string]*FactCollection),
+		defaultTTL:       DefaultTTL,
 	}
 }
 
 // NewManagerWithStorage creates a new fact collection manager with storage
 func NewManagerWithStorage(sshClient *ssh.SSHClient, storage FactStorage) *Manager {
 	return &Manager{
-		sshClient:      sshClient,
-		sshCollector:   NewSSHCollector(sshClient),
-		localCollector: NewLocalCollector(),
-		hclCollector:   NewHCLCollector(),
-		tofuCollector:  NewOpenTofuCollector(),
-		cache:          make(map[string]*FactCollection),
-		storage:        storage,
-		defaultTTL:     DefaultTTL,
+		sshClient:        sshClient,
+		sshCollector:     NewSSHCollector(sshClient),
+		localCollector:   NewLocalCollector(),
+		hclCollector:     nil, // Will be configured when file path is provided
+		tofuCollector:    nil, // Will be configured when state path is provided
+		customCollectors: make(map[string]FactCollector),
+		cache:            make(map[string]*FactCollection),
+		storage:          storage,
+		defaultTTL:       DefaultTTL,
 	}
+}
+
+// ConfigureHCLCollector configures the HCL collector with a file path
+func (m *Manager) ConfigureHCLCollector(filePath string) {
+	m.hclCollector = NewHCLCollector(filePath, nil, MergePolicyReplace)
+}
+
+// ConfigureOpenTofuCollector configures the OpenTofu collector with a state path
+func (m *Manager) ConfigureOpenTofuCollector(statePath string) {
+	m.tofuCollector = NewOpenTofuCollector(statePath, nil, MergePolicyReplace)
 }
 
 // CollectAllFacts collects facts from all sources for a server
@@ -83,17 +102,21 @@ func (m *Manager) CollectAllFacts(server string) (*FactCollection, error) {
 	}
 
 	// HCL collection
-	if collection, err := m.hclCollector.Collect(server); err == nil {
-		collections = append(collections, collection)
-	} else {
-		errors = append(errors, fmt.Errorf("HCL collection failed: %w", err))
+	if m.hclCollector != nil {
+		if collection, err := m.hclCollector.Collect(server); err == nil {
+			collections = append(collections, collection)
+		} else {
+			errors = append(errors, fmt.Errorf("HCL collection failed: %w", err))
+		}
 	}
 
 	// OpenTofu collection
-	if collection, err := m.tofuCollector.Collect(server); err == nil {
-		collections = append(collections, collection)
-	} else {
-		errors = append(errors, fmt.Errorf("OpenTofu collection failed: %w", err))
+	if m.tofuCollector != nil {
+		if collection, err := m.tofuCollector.Collect(server); err == nil {
+			collections = append(collections, collection)
+		} else {
+			errors = append(errors, fmt.Errorf("OpenTofu collection failed: %w", err))
+		}
 	}
 
 	// Merge all collections
@@ -186,9 +209,15 @@ func (m *Manager) collectFromSource(source FactSource, server string, keys []str
 	case SourceLocal:
 		return m.localCollector.CollectSpecific(server, keys)
 	case SourceHCL:
-		return m.hclCollector.CollectSpecific(server, keys)
+		if m.hclCollector != nil {
+			return m.hclCollector.CollectSpecific(server, keys)
+		}
+		return nil, fmt.Errorf("HCL collector not configured")
 	case SourceOpenTofu:
-		return m.tofuCollector.CollectSpecific(server, keys)
+		if m.tofuCollector != nil {
+			return m.tofuCollector.CollectSpecific(server, keys)
+		}
+		return nil, fmt.Errorf("OpenTofu collector not configured")
 	}
 	return nil, nil
 }
@@ -217,9 +246,17 @@ func (m *Manager) GetFact(server, key string) (*Fact, error) {
 		case SourceLocal:
 			fact, err = m.localCollector.GetFact(server, key)
 		case SourceHCL:
-			fact, err = m.hclCollector.GetFact(server, key)
+			if m.hclCollector != nil {
+				fact, err = m.hclCollector.GetFact(server, key)
+			} else {
+				err = fmt.Errorf("HCL collector not configured")
+			}
 		case SourceOpenTofu:
-			fact, err = m.tofuCollector.GetFact(server, key)
+			if m.tofuCollector != nil {
+				fact, err = m.tofuCollector.GetFact(server, key)
+			} else {
+				err = fmt.Errorf("OpenTofu collector not configured")
+			}
 		}
 
 		if err == nil && fact != nil {
@@ -662,4 +699,376 @@ func (m *Manager) Close() error {
 		return m.storage.Close()
 	}
 	return nil
+}
+
+// RegisterCustomCollector registers a custom fact collector
+func (m *Manager) RegisterCustomCollector(name string, collector FactCollector) {
+	m.customCollectors[name] = collector
+}
+
+// ImportCustomFacts imports facts from a custom source (JSON file or HTTP endpoint)
+func (m *Manager) ImportCustomFacts(source, server string, mergePolicy MergePolicy) (*FactCollection, error) {
+	var collector FactCollector
+	var err error
+
+	// Determine source type and create appropriate collector
+	if isHTTPURL(source) {
+		collector = NewHTTPCollector(source, nil, 30*time.Second, mergePolicy)
+	} else {
+		// Assume local file
+		collector = NewJSONCollector(source, mergePolicy)
+	}
+
+	// Collect facts from the custom source
+	newCollection, err := collector.Collect(server)
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect facts from %s: %w", source, err)
+	}
+
+	// Get existing facts if we have storage
+	var existingCollection *FactCollection
+	if m.storage != nil {
+		existingCollection, _ = m.LoadPersistedFacts(server)
+	}
+
+	// Merge facts according to policy
+	merger := NewFactMerger(mergePolicy)
+	mergedCollection, err := merger.MergeCollections(existingCollection, newCollection)
+	if err != nil {
+		return nil, fmt.Errorf("failed to merge facts: %w", err)
+	}
+
+	// Persist merged facts if we have storage
+	if m.storage != nil {
+		if err := m.PersistFacts(server, mergedCollection); err != nil {
+			return nil, fmt.Errorf("failed to persist merged facts: %w", err)
+		}
+	}
+
+	// Update cache
+	m.cacheFacts(server, mergedCollection)
+
+	return mergedCollection, nil
+}
+
+// ImportCustomFactsWithOptions imports facts with enhanced options
+func (m *Manager) ImportCustomFactsWithOptions(source string, options *ImportOptions) error {
+	// Load custom facts from source
+	var customFacts map[string]*CustomFacts
+	var err error
+
+	if isHTTPURL(source) {
+		customFacts, err = m.loadHTTPCustomFacts(source)
+	} else {
+		customFacts, err = m.loadLocalCustomFacts(source)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to load custom facts: %w", err)
+	}
+
+	// Filter custom facts based on selectFacts list
+	customFacts = m.filterCustomFacts(customFacts, options.SelectFacts)
+
+	// Validate facts if requested
+	if options.Validate {
+		result := ValidateCustomFacts(customFacts)
+		if !result.Valid {
+			return fmt.Errorf("fact validation failed: %v", result.Errors)
+		}
+	}
+
+	// Apply facts to storage
+	for serverID, facts := range customFacts {
+		// Skip if specific server is requested and this doesn't match
+		if options.Server != "" && serverID != options.Server {
+			continue
+		}
+
+		if options.DryRun {
+			fmt.Printf("DRY RUN: Would import facts for %s\n", serverID)
+			continue
+		}
+
+		existing, err := m.LoadPersistedFacts(serverID)
+		if err != nil && !strings.Contains(err.Error(), "no facts found") {
+			return fmt.Errorf("failed to get existing facts for %s: %w", serverID, err)
+		}
+
+		var merged *FactCollection
+		if existing != nil {
+			merged = m.mergeCustomFacts(existing, facts, options)
+		} else {
+			merged = m.convertCustomToFactCollection(facts, serverID)
+		}
+
+		if err := m.PersistFacts(serverID, merged); err != nil {
+			return fmt.Errorf("failed to store merged facts for %s: %w", serverID, err)
+		}
+
+		fmt.Printf("Imported facts for %s\n", serverID)
+	}
+
+	return nil
+}
+
+// GetCustomFacts retrieves custom facts for template usage
+func (m *Manager) GetCustomFacts(server string) (map[string]interface{}, error) {
+	if m.storage == nil {
+		return nil, fmt.Errorf("no storage configured")
+	}
+
+	// Load persisted facts
+	collection, err := m.LoadPersistedFacts(server)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract custom facts
+	customFacts := make(map[string]interface{})
+	for key, fact := range collection.Facts {
+		if strings.HasPrefix(key, "custom.") {
+			parts := strings.Split(key, ".")
+			if len(parts) >= 3 {
+				category := parts[1]
+				factKey := parts[2]
+
+				if customFacts[category] == nil {
+					customFacts[category] = make(map[string]interface{})
+				}
+
+				if categoryMap, ok := customFacts[category].(map[string]interface{}); ok {
+					categoryMap[factKey] = fact.Value
+				}
+			}
+		}
+	}
+
+	return customFacts, nil
+}
+
+// loadLocalCustomFacts loads custom facts from a local file
+func (m *Manager) loadLocalCustomFacts(filePath string) (map[string]*CustomFacts, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	var customFacts map[string]*CustomFacts
+	if err := json.Unmarshal(data, &customFacts); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	return customFacts, nil
+}
+
+// loadHTTPCustomFacts loads custom facts from an HTTP endpoint
+func (m *Manager) loadHTTPCustomFacts(url string) (map[string]*CustomFacts, error) {
+	// Enforce HTTPS-only connections for security
+	if !strings.HasPrefix(url, "https://") {
+		return nil, fmt.Errorf("HTTPS is required for custom facts import. HTTP URLs are not allowed for security reasons. Use https:// instead of http://")
+	}
+
+	// Create HTTP client with timeout
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	// Make HTTP request
+	req, err := http.NewRequest("GET", url, http.NoBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	// Add default headers
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "spooky-facts-collector/1.0")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make HTTP request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP request failed with status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Parse JSON response as CustomFacts
+	var customFacts map[string]*CustomFacts
+	if err := json.Unmarshal(body, &customFacts); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
+	}
+
+	// Set source for all custom facts
+	for _, facts := range customFacts {
+		facts.Source = url
+	}
+
+	return customFacts, nil
+}
+
+// mergeCustomFacts merges custom facts with existing facts
+func (m *Manager) mergeCustomFacts(existing *FactCollection, custom *CustomFacts, _ *ImportOptions) *FactCollection {
+	merged := existing.Clone()
+
+	// Merge custom facts
+	if custom.Custom != nil {
+		merged = m.mergeCustomFactSections(merged, custom.Custom, "custom")
+	}
+
+	// Apply overrides
+	if custom.Overrides != nil {
+		merged = ApplyOverrides(merged, custom.Overrides)
+	}
+
+	// Update metadata
+	merged.Timestamp = time.Now()
+
+	return merged
+}
+
+// mergeCustomFactSections merges custom fact sections
+func (m *Manager) mergeCustomFactSections(collection *FactCollection, custom map[string]interface{}, prefix string) *FactCollection {
+	for category, facts := range custom {
+		if factsMap, ok := facts.(map[string]interface{}); ok {
+			for key, value := range factsMap {
+				factKey := fmt.Sprintf("%s.%s.%s", prefix, category, key)
+				collection.Facts[factKey] = &Fact{
+					Key:       factKey,
+					Value:     value,
+					Source:    string(SourceCustom),
+					Server:    collection.Server,
+					Timestamp: time.Now(),
+					TTL:       DefaultTTL,
+					Metadata:  map[string]interface{}{"category": category},
+				}
+			}
+		}
+	}
+
+	return collection
+}
+
+// convertCustomToFactCollection converts CustomFacts to FactCollection
+func (m *Manager) convertCustomToFactCollection(custom *CustomFacts, server string) *FactCollection {
+	collection := &FactCollection{
+		Server:    server,
+		Timestamp: time.Now(),
+		Facts:     make(map[string]*Fact),
+	}
+
+	// Add custom facts
+	if custom.Custom != nil {
+		collection = m.mergeCustomFactSections(collection, custom.Custom, "custom")
+	}
+
+	// Add overrides
+	if custom.Overrides != nil {
+		collection = ApplyOverrides(collection, custom.Overrides)
+	}
+
+	return collection
+}
+
+// isHTTPURL checks if a string is an HTTPS URL (HTTP is not allowed for security)
+func isHTTPURL(s string) bool {
+	return len(s) > 8 && s[:8] == "https://"
+}
+
+// filterCustomFacts filters custom facts based on selectFacts list
+func (m *Manager) filterCustomFacts(customFacts map[string]*CustomFacts, selectFacts []string) map[string]*CustomFacts {
+	if len(selectFacts) == 0 {
+		return customFacts // No filtering needed
+	}
+
+	filtered := make(map[string]*CustomFacts)
+
+	for serverID, facts := range customFacts {
+		filteredFacts := &CustomFacts{
+			Custom:    make(map[string]interface{}),
+			Overrides: make(map[string]interface{}),
+			Source:    facts.Source,
+		}
+
+		// Filter custom facts
+		if facts.Custom != nil {
+			for category, categoryFacts := range facts.Custom {
+				if categoryMap, ok := categoryFacts.(map[string]interface{}); ok {
+					filteredCategory := make(map[string]interface{})
+
+					for key, value := range categoryMap {
+						// Check if this fact matches any of the select patterns
+						factPath := fmt.Sprintf("%s.%s", category, key)
+						if m.matchesSelectPattern(factPath, selectFacts) {
+							filteredCategory[key] = value
+						}
+					}
+
+					if len(filteredCategory) > 0 {
+						filteredFacts.Custom[category] = filteredCategory
+					}
+				}
+			}
+		}
+
+		// Filter overrides
+		if facts.Overrides != nil {
+			for category, categoryFacts := range facts.Overrides {
+				if categoryMap, ok := categoryFacts.(map[string]interface{}); ok {
+					filteredCategory := make(map[string]interface{})
+
+					for key, value := range categoryMap {
+						// Check if this fact matches any of the select patterns
+						factPath := fmt.Sprintf("%s.%s", category, key)
+						if m.matchesSelectPattern(factPath, selectFacts) {
+							filteredCategory[key] = value
+						}
+					}
+
+					if len(filteredCategory) > 0 {
+						filteredFacts.Overrides[category] = filteredCategory
+					}
+				}
+			}
+		}
+
+		// Only include server if it has any filtered facts
+		if len(filteredFacts.Custom) > 0 || len(filteredFacts.Overrides) > 0 {
+			filtered[serverID] = filteredFacts
+		}
+	}
+
+	return filtered
+}
+
+// matchesSelectPattern checks if a fact path matches any of the select patterns
+func (m *Manager) matchesSelectPattern(factPath string, selectFacts []string) bool {
+	for _, pattern := range selectFacts {
+		// Exact match
+		if factPath == pattern {
+			return true
+		}
+
+		// Category match (e.g., "application" matches "application.name", "application.version")
+		if strings.HasPrefix(factPath, pattern+".") {
+			return true
+		}
+
+		// Wildcard match (e.g., "*.name" matches "application.name", "environment.name")
+		if strings.HasSuffix(pattern, ".*") {
+			category := strings.TrimSuffix(pattern, ".*")
+			if strings.HasPrefix(factPath, category+".") {
+				return true
+			}
+		}
+	}
+
+	return false
 }

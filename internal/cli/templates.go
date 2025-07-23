@@ -1,11 +1,14 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+
+	"spooky/internal/facts"
 )
 
 var TemplatesCmd = &cobra.Command{
@@ -74,6 +77,7 @@ func init() {
 	templatesRenderCmd.Flags().String("data-file", "", "Path to JSON file containing template data")
 	templatesRenderCmd.Flags().String("output", "", "Output file path (default: stdout)")
 	templatesRenderCmd.Flags().Bool("dry-run", false, "Show what would be rendered without writing output")
+	templatesRenderCmd.Flags().String("server", "", "Server name for fact integration (e.g., web-001)")
 
 	// Add subcommands to templates command
 	TemplatesCmd.AddCommand(templatesListCmd)
@@ -197,44 +201,53 @@ func runTemplatesRender(cmd *cobra.Command, args []string) error {
 	dataFile, _ := cmd.Flags().GetString("data-file")
 	outputFile, _ := cmd.Flags().GetString("output")
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	server, _ := cmd.Flags().GetString("server")
 
 	// Check if template file exists
 	if _, err := os.Stat(templateFile); os.IsNotExist(err) {
 		return fmt.Errorf("template file does not exist: %s", templateFile)
 	}
 
-	// Read template file
-	content, err := os.ReadFile(templateFile)
-	if err != nil {
-		return fmt.Errorf("error reading template file: %w", err)
-	}
-
-	// Load data if provided
-	var data map[string]interface{}
+	// Load additional data if provided
+	var additionalData map[string]interface{}
 	if dataFile != "" {
 		if _, err := os.Stat(dataFile); os.IsNotExist(err) {
 			return fmt.Errorf("data file does not exist: %s", dataFile)
 		}
 
-		_, err = os.ReadFile(dataFile)
+		dataBytes, err := os.ReadFile(dataFile)
 		if err != nil {
 			return fmt.Errorf("error reading data file: %w", err)
 		}
 
-		// Parse JSON data (placeholder - would use actual JSON parser)
+		// Parse JSON data
+		if err := json.Unmarshal(dataBytes, &additionalData); err != nil {
+			return fmt.Errorf("error parsing JSON data file: %w", err)
+		}
 		fmt.Printf("Loading data from: %s\n", dataFile)
-		data = make(map[string]interface{})
-		// In a real implementation, you'd parse the JSON here
 	}
 
-	// Render template (placeholder implementation)
-	// In a real system, you'd use the actual template engine
-	rendered := string(content)
+	// Create fact manager for template rendering
+	var manager *facts.Manager
+	if server != "" {
+		// Create storage for fact manager
+		storage, err := facts.NewFactStorage(facts.StorageOptions{
+			Type: facts.StorageTypeBadger,
+			Path: getFactsDBPath(),
+		})
+		if err == nil {
+			defer storage.Close()
+			manager = facts.NewManagerWithStorage(nil, storage)
+		}
+	}
 
-	// Simple placeholder replacement for demonstration
-	if data != nil {
-		// This would be actual template rendering logic
-		rendered = "Rendered template content would appear here"
+	// Create template engine
+	templateEngine := NewTemplateEngine(manager)
+
+	// Render template
+	rendered, err := templateEngine.RenderTemplate(templateFile, server, additionalData)
+	if err != nil {
+		return fmt.Errorf("error rendering template: %w", err)
 	}
 
 	if dryRun {

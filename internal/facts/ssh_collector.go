@@ -71,7 +71,7 @@ func (c *SSHCollector) GetFact(server, key string) (*Fact, error) {
 		return fact, nil
 	}
 
-	return nil, fmt.Errorf("fact %s not found for server %s", key, server)
+	return nil, ErrFactNotFound(key, server)
 }
 
 // Helper function to create a fact

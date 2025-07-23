@@ -4,9 +4,9 @@
 [![Go Version](https://img.shields.io/badge/go-1.24+-blue.svg)](https://golang.org)
 [![License](https://img.shields.io/badge/license-AGPL%203.0-green.svg)](LICENSE)
 
-> SSH automation tool written in Go that executes commands and scripts on multiple remote servers using HCL2 configuration files.
+> Remote configuration tool written in Go that executes commands and scripts on multiple remote servers using HCL2 configuration files.
 
-Spooky is a lightweight alternative to Ansible with declarative configuration and parallel execution capabilities. When spooky grows up it wants to be Ansible.
+Spooky provides agent-less automation with declarative configuration, parallel execution capabilities, and intelligent fact-driven decision making for heterogeneous environments.
 
 ## ✨ Features
 
@@ -16,6 +16,8 @@ Spooky is a lightweight alternative to Ansible with declarative configuration an
 - 🏷️ **Tag-based Targeting** - Target servers using tags for flexible grouping
 - 📝 **Script Support** - Execute both inline commands and external script files
 - ✅ **Validation** - Built-in configuration validation and syntax checking
+- 🧠 **Fact-Driven Decisions** - Collect machine facts to inform configuration in heterogeneous environments
+- 🔍 **Multi-Source Facts** - Gather facts from SSH, local access, HCL configs, and OpenTofu
 
 ## 🚀 Quick Start
 
@@ -61,6 +63,14 @@ action "check-status" {
   servers     = ["web-server-1"]
   parallel    = true
 }
+
+# Use facts to make intelligent decisions
+action "configure-web" {
+  description = "Configure web server based on OS facts"
+  command     = "if [ \"$(cat /etc/os-release | grep -i ubuntu)\" ]; then apt update; else yum update; fi"
+  servers     = ["web-server-1"]
+  parallel    = true
+}
 ```
 
 ## 📖 Documentation
@@ -71,6 +81,8 @@ action "check-status" {
 - **[Tools](docs/tools.md)** - Development tools and utilities
 - **[Testing](docs/coverage.md)** - Testing guidelines and coverage requirements
 - **[Coverage](docs/coverage.md)** - Test coverage analysis and requirements
+- **[CLI Specification](docs/cli-specification.md)** - Command-line interface reference
+- **[Configuration Guide](docs/configuration.md)** - HCL2 configuration syntax and examples
 
 ## 🛠️ Development
 

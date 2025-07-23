@@ -53,6 +53,7 @@ func main() {
 	rootCmd.AddCommand(cli.TemplatesCmd)
 	rootCmd.AddCommand(cli.MachinesCmd)
 	rootCmd.AddCommand(cli.ConfigCmd)
+	rootCmd.AddCommand(cli.ProjectCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		// Configure logger for error output if not already configured

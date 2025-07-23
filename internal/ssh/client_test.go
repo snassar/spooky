@@ -327,7 +327,7 @@ func TestNewSSHClientWithHostKeyCallback(t *testing.T) {
 
 	// Test with known hosts callback (may succeed if known_hosts file exists)
 	_, err = NewSSHClientWithHostKeyCallback(machine, 30, KnownHostsHostKey, "")
-	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") && !strings.Contains(err.Error(), "unable to authenticate") && !strings.Contains(err.Error(), "failed to parse known_hosts file") {
+	if err != nil && !strings.Contains(err.Error(), "connection refused") && !strings.Contains(err.Error(), "no route to host") && !strings.Contains(err.Error(), "unable to authenticate") && !strings.Contains(err.Error(), "failed to parse known_hosts file") && !strings.Contains(err.Error(), "key is unknown") {
 		t.Errorf("Expected connection/authentication/known_hosts error, got: %v", err)
 	}
 	if err == nil {

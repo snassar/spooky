@@ -22,6 +22,38 @@ type FactCollection struct {
 	Facts     map[string]*Fact `json:"facts"`
 }
 
+// Clone creates a deep copy of the FactCollection
+func (fc *FactCollection) Clone() *FactCollection {
+	if fc == nil {
+		return nil
+	}
+
+	cloned := &FactCollection{
+		Server:    fc.Server,
+		Timestamp: fc.Timestamp,
+		Facts:     make(map[string]*Fact),
+	}
+
+	for key, fact := range fc.Facts {
+		cloned.Facts[key] = &Fact{
+			Key:       fact.Key,
+			Value:     fact.Value,
+			Source:    fact.Source,
+			Server:    fact.Server,
+			Timestamp: fact.Timestamp,
+			TTL:       fact.TTL,
+			Metadata:  make(map[string]interface{}),
+		}
+
+		// Copy metadata
+		for k, v := range fact.Metadata {
+			cloned.Facts[key].Metadata[k] = v
+		}
+	}
+
+	return cloned
+}
+
 // FactCollector defines the interface for collecting facts
 type FactCollector interface {
 	Collect(server string) (*FactCollection, error)
@@ -115,6 +147,17 @@ const (
 	SourceLocal    FactSource = "local"
 	SourceHCL      FactSource = "hcl"
 	SourceOpenTofu FactSource = "opentofu"
+	SourceCustom   FactSource = "custom"
+)
+
+// MergePolicy defines how to handle fact conflicts during import
+type MergePolicy string
+
+const (
+	MergePolicyReplace MergePolicy = "replace" // Replace existing facts
+	MergePolicyMerge   MergePolicy = "merge"   // Merge with existing facts
+	MergePolicySkip    MergePolicy = "skip"    // Skip if conflict exists
+	MergePolicyAppend  MergePolicy = "append"  // Append with suffix
 )
 
 // FactKey represents common fact keys
@@ -145,3 +188,32 @@ const (
 
 // DefaultTTL is the default time-to-live for facts
 const DefaultTTL = 1 * time.Hour
+
+// CustomFacts represents the custom fact format for a server
+type CustomFacts struct {
+	Custom    map[string]interface{} `json:"custom"`
+	Overrides map[string]interface{} `json:"overrides"`
+	Source    string                 `json:"source,omitempty"`
+}
+
+// ImportOptions defines import configuration
+type ImportOptions struct {
+	Source      string    `json:"source"`
+	Path        string    `json:"path"`
+	MergeMode   MergeMode `json:"merge_mode"`
+	SelectFacts []string  `json:"select_facts"`
+	Override    bool      `json:"override"`
+	Validate    bool      `json:"validate"`
+	DryRun      bool      `json:"dry_run"`
+	Server      string    `json:"server"`
+}
+
+// MergeMode defines merge behavior
+type MergeMode string
+
+const (
+	MergeModeReplace MergeMode = "replace"
+	MergeModeMerge   MergeMode = "merge"
+	MergeModeAppend  MergeMode = "append"
+	MergeModeSelect  MergeMode = "select"
+)
