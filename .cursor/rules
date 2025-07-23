@@ -73,4 +73,5 @@ Spooky is a remote configuration tool that executes commands and scripts on mult
 ## AI Assistant Behavior
 - Know and use local environment context (installed tool versions)
 - Implement requested changes directly without asking for approvals
-- Focus on the specific solutions requested without offering alternatives 
+- Focus on the specific solutions requested without offering alternatives
+- When user asks for something "in markdown", provide the markdown content itself, not a file (only create files when specifically requested) 
