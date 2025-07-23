@@ -1,9 +1,70 @@
 package config
 
-// Config represents the main configuration structure
+// Config represents the main configuration structure (legacy combined format)
 type Config struct {
 	Machines []Machine `hcl:"machine,block" validate:"required,min=1,dive"`
 	Actions  []Action  `hcl:"action,block" validate:"dive"`
+}
+
+// ProjectConfig represents a project configuration
+type ProjectConfig struct {
+	Name        string `hcl:"name,label" validate:"required"`
+	Description string `hcl:"description,optional"`
+	Version     string `hcl:"version,optional"`
+	Environment string `hcl:"environment,optional"`
+
+	// File references
+	InventoryFile string `hcl:"inventory_file,optional"`
+	ActionsFile   string `hcl:"actions_file,optional"`
+
+	// Project settings
+	DefaultTimeout  int  `hcl:"default_timeout,optional" validate:"omitempty,min=1,max=3600"`
+	DefaultParallel bool `hcl:"default_parallel,optional"`
+
+	// Configuration blocks
+	Storage *StorageConfig `hcl:"storage,block"`
+	Logging *LoggingConfig `hcl:"logging,block"`
+	SSH     *SSHConfig     `hcl:"ssh,block"`
+
+	// Project-wide tags
+	Tags map[string]string `hcl:"tags,optional"`
+}
+
+// ProjectConfigWrapper wraps ProjectConfig for HCL parsing
+type ProjectConfigWrapper struct {
+	Project *ProjectConfig `hcl:"project,block"`
+}
+
+// StorageConfig represents storage configuration
+type StorageConfig struct {
+	Type string `hcl:"type" validate:"required,oneof=badgerdb json"`
+	Path string `hcl:"path" validate:"required"`
+}
+
+// LoggingConfig represents logging configuration
+type LoggingConfig struct {
+	Level  string `hcl:"level,optional" validate:"omitempty,oneof=debug info warn error"`
+	Format string `hcl:"format,optional" validate:"omitempty,oneof=json text"`
+	Output string `hcl:"output,optional"`
+}
+
+// SSHConfig represents SSH configuration
+type SSHConfig struct {
+	DefaultUser       string `hcl:"default_user,optional"`
+	DefaultPort       int    `hcl:"default_port,optional" validate:"omitempty,min=1,max=65535"`
+	ConnectionTimeout int    `hcl:"connection_timeout,optional" validate:"omitempty,min=1,max=300"`
+	CommandTimeout    int    `hcl:"command_timeout,optional" validate:"omitempty,min=1,max=3600"`
+	RetryAttempts     int    `hcl:"retry_attempts,optional" validate:"omitempty,min=0,max=10"`
+}
+
+// InventoryConfig represents an inventory configuration (machines only)
+type InventoryConfig struct {
+	Machines []Machine `hcl:"machine,block" validate:"required,min=1,dive"`
+}
+
+// ActionsConfig represents an actions configuration (actions only)
+type ActionsConfig struct {
+	Actions []Action `hcl:"action,block" validate:"dive"`
 }
 
 // Machine represents a remote machine configuration

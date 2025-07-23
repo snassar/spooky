@@ -50,7 +50,7 @@ Examples:
 	factsImportCmd = &cobra.Command{
 		Use:   "import <source>",
 		Short: "Import facts from external sources",
-		Long:  `Import facts from local JSON file, Git repository, S3 bucket, or HTTP URL.`,
+		Long:  `Import facts from local JSON file or HTTPS URL (HTTPS required for security).`,
 		Args:  cobra.ExactArgs(1),
 		RunE:  runFactsImport,
 	}
@@ -124,6 +124,16 @@ Examples:
 	factsSchema       string
 	factsStrict       bool
 	factsLimit        int
+
+	// Enhanced import flags
+	importSource      string
+	importFile        string
+	importURL         string
+	importMergeMode   string
+	importSelectFacts []string
+	importOverride    bool
+	importDryRun      bool
+	importServer      string
 )
 
 // initFactsCommands initializes the facts command and its subcommands
@@ -156,6 +166,16 @@ func initFactsCommands() {
 	factsImportCmd.Flags().BoolVar(&factsValidate, "validate", false, "Validate facts before importing")
 	factsImportCmd.Flags().StringVar(&factsFormat, "format", "", "Source format: json, yaml, csv (default: auto-detect)")
 	factsImportCmd.Flags().StringVar(&factsMapping, "mapping", "", "Path to field mapping configuration")
+
+	// Enhanced import flags
+	factsImportCmd.Flags().StringVar(&importSource, "source", "local", "Import source: local, http")
+	factsImportCmd.Flags().StringVar(&importFile, "file", "", "Path to local JSON file")
+	factsImportCmd.Flags().StringVar(&importURL, "url", "", "HTTPS URL for remote import (HTTPS required for security)")
+	factsImportCmd.Flags().StringVar(&importMergeMode, "merge-mode", "replace", "Merge mode: replace, merge, append, select")
+	factsImportCmd.Flags().StringSliceVar(&importSelectFacts, "select-facts", nil, "Comma-separated list of facts to import")
+	factsImportCmd.Flags().BoolVar(&importOverride, "override", false, "Allow fact overrides")
+	factsImportCmd.Flags().BoolVar(&importDryRun, "dry-run", false, "Show what would be imported without importing")
+	factsImportCmd.Flags().StringVar(&importServer, "server", "", "Specific server to import facts for")
 
 	factsExportCmd.Flags().StringVar(&factsFormat, "format", "json", "Output format: json, yaml, csv, table")
 	factsExportCmd.Flags().StringVar(&factsOutput, "output", "", "Output file path (default: stdout)")
@@ -408,7 +428,7 @@ func runFactsImport(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("import source file is required")
 	}
 
-	sourceFile := args[0]
+	source := args[0]
 
 	// Create storage and fact manager
 	storage, err := facts.NewFactStorage(facts.StorageOptions{
@@ -420,8 +440,56 @@ func runFactsImport(_ *cobra.Command, args []string) error {
 	}
 	defer storage.Close()
 
-	// Open source file
-	file, err := os.Open(sourceFile)
+	manager := facts.NewManagerWithStorage(nil, storage)
+
+	// Determine source path based on flags
+	var sourcePath string
+	switch importSource {
+	case "local":
+		if importFile != "" {
+			sourcePath = importFile
+		} else {
+			sourcePath = source
+		}
+	case "http":
+		if importURL != "" {
+			sourcePath = importURL
+		} else {
+			sourcePath = source
+		}
+	default:
+		sourcePath = source
+	}
+
+	// Create import options
+	options := &facts.ImportOptions{
+		Source:      importSource,
+		Path:        sourcePath,
+		MergeMode:   facts.MergeMode(importMergeMode),
+		SelectFacts: importSelectFacts,
+		Override:    importOverride,
+		Validate:    factsValidate || importOverride, // Validate if override is enabled
+		DryRun:      importDryRun,
+		Server:      importServer,
+	}
+
+	// Check if it's a custom source (JSON file or HTTP URL)
+	if isCustomSource(sourcePath) {
+		// Use enhanced custom fact import
+		if err := manager.ImportCustomFactsWithOptions(sourcePath, options); err != nil {
+			return fmt.Errorf("failed to import custom facts: %w", err)
+		}
+
+		if importDryRun {
+			fmt.Println("DRY RUN: Facts would be imported successfully")
+		} else {
+			fmt.Printf("Custom facts imported successfully from %s\n", sourcePath)
+		}
+		return nil
+	}
+
+	// Fall back to storage import for existing format
+	file, err := os.Open(sourcePath)
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %w", err)
 	}
@@ -432,8 +500,24 @@ func runFactsImport(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to import facts: %w", err)
 	}
 
-	fmt.Printf("Facts imported successfully from %s\n", sourceFile)
+	fmt.Printf("Facts imported successfully from %s\n", sourcePath)
 	return nil
+}
+
+// isCustomSource checks if the source is a custom format (JSON file or HTTPS URL)
+func isCustomSource(source string) bool {
+	// Check if it's an HTTPS URL (HTTP is not allowed for security)
+	if len(source) > 8 && source[:8] == "https://" {
+		return true
+	}
+
+	// Check if it's a JSON file
+	if len(source) > 5 && source[len(source)-5:] == ".json" {
+		return true
+	}
+
+	// For now, assume all local files are custom sources
+	return true
 }
 
 func runFactsExport(_ *cobra.Command, _ []string) error {

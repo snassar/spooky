@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -23,7 +24,81 @@ var (
 	filter  string
 	sort    string
 	reverse bool
+
+	// Project command flags
+	projectPath   string
+	projectName   string
+	listVerbose   bool
+	validateDebug bool
 )
+
+var ProjectCmd = &cobra.Command{
+	Use:   "project",
+	Short: "Manage spooky projects",
+	Long:  `Manage spooky projects with separated inventory and actions configuration`,
+}
+
+func init() {
+	// Add subcommands to ProjectCmd
+	ProjectCmd.AddCommand(ProjectInitCmd)
+	ProjectCmd.AddCommand(ProjectValidateCmd)
+	ProjectCmd.AddCommand(ProjectListCmd)
+
+	// Add flags to ProjectListCmd
+	ProjectListCmd.Flags().BoolVar(&listVerbose, "verbose", false, "Show detailed output including machine and action details")
+
+	// Add flags to ProjectValidateCmd
+	ProjectValidateCmd.Flags().BoolVar(&validateDebug, "debug", false, "Show debug output including path resolution details")
+}
+
+var ProjectInitCmd = &cobra.Command{
+	Use:   "init <PROJECT_NAME> [PATH]",
+	Short: "Initialize a new spooky project",
+	Long:  `Create a new spooky project with separated inventory and actions configuration`,
+	Args:  cobra.RangeArgs(1, 2),
+	RunE: func(_ *cobra.Command, args []string) error {
+		logger := logging.GetLogger()
+		projectName := args[0]
+		path := "."
+		if len(args) > 1 {
+			path = args[1]
+		}
+
+		return initProject(logger, projectName, path)
+	},
+}
+
+var ProjectValidateCmd = &cobra.Command{
+	Use:   "validate [PROJECT_PATH]",
+	Short: "Validate a spooky project",
+	Long:  `Validate the configuration files in a spooky project`,
+	Args:  cobra.MaximumNArgs(1),
+	RunE: func(_ *cobra.Command, args []string) error {
+		logger := logging.GetLogger()
+		path := "."
+		if len(args) > 0 {
+			path = args[0]
+		}
+
+		return validateProject(logger, path)
+	},
+}
+
+var ProjectListCmd = &cobra.Command{
+	Use:   "list [PROJECT_PATH]",
+	Short: "List project resources",
+	Long:  `List machines and actions from a spooky project`,
+	Args:  cobra.MaximumNArgs(1),
+	RunE: func(_ *cobra.Command, args []string) error {
+		logger := logging.GetLogger()
+		path := "."
+		if len(args) > 0 {
+			path = args[0]
+		}
+
+		return listProject(logger, path)
+	},
+}
 
 var ValidateCmd = &cobra.Command{
 	Use:   "validate <source>",
@@ -116,6 +191,10 @@ func InitCommands() {
 	ListCmd.Flags().StringVar(&filter, "filter", "", "Filter results by expression")
 	ListCmd.Flags().StringVar(&sort, "sort", "name", "Sort field")
 	ListCmd.Flags().BoolVar(&reverse, "reverse", false, "Reverse sort order")
+
+	// Project command flags
+	ProjectCmd.Flags().StringVar(&projectPath, "path", ".", "Path to the project directory")
+	ProjectCmd.Flags().StringVar(&projectName, "name", "", "Name of the project (required for init)")
 
 	// Initialize facts commands
 	initFactsCommands()
@@ -311,7 +390,409 @@ func listConfigs(logger logging.Logger) error {
 }
 
 func listActions(logger logging.Logger) error {
-	// TODO: Implement action listing
+	// TODO: Implement actions listing from configuration
 	logger.Info("Listing actions (not yet implemented)")
-	return fmt.Errorf("action listing not yet implemented")
+	return fmt.Errorf("actions listing not yet implemented")
+}
+
+// Project functions
+
+// initProject initializes a new spooky project
+func initProject(logger logging.Logger, projectName, path string) error {
+	logger.Info("Initializing new spooky project",
+		logging.String("project_name", projectName),
+		logging.String("path", path))
+
+	// Create project directory
+	projectDir := filepath.Join(path, projectName)
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		logger.Error("Failed to create project directory", err,
+			logging.String("project_dir", projectDir))
+		return fmt.Errorf("failed to create project directory: %w", err)
+	}
+
+	// Create subdirectories
+	dirs := []string{"templates", "files", "logs"}
+	for _, dir := range dirs {
+		dirPath := filepath.Join(projectDir, dir)
+		if err := os.MkdirAll(dirPath, 0o755); err != nil {
+			logger.Error("Failed to create subdirectory", err,
+				logging.String("dir", dirPath))
+			return fmt.Errorf("failed to create subdirectory %s: %w", dir, err)
+		}
+	}
+
+	// Create project.hcl
+	projectConfig := fmt.Sprintf(`project "%s" {
+  description = "%s project"
+  version = "1.0.0"
+  environment = "development"
+  
+  # File references
+  inventory_file = "inventory.hcl"
+  actions_file = "actions.hcl"
+  
+  # Project settings
+  default_timeout = 300
+  default_parallel = true
+  
+  # Storage configuration
+  storage {
+    type = "badgerdb"
+    path = ".facts.db"
+  }
+  
+  # Logging configuration
+  logging {
+    level = "info"
+    format = "json"
+    output = "logs/spooky.log"
+  }
+  
+  # SSH configuration
+  ssh {
+    default_user = "debian"
+    default_port = 22
+    connection_timeout = 30
+    command_timeout = 300
+    retry_attempts = 3
+  }
+  
+  # Tags for project-wide targeting
+  tags = {
+    project = "%s"
+  }
+}`, projectName, projectName, projectName)
+
+	projectFile := filepath.Join(projectDir, "project.hcl")
+	if err := os.WriteFile(projectFile, []byte(projectConfig), 0o600); err != nil {
+		logger.Error("Failed to create project.hcl", err,
+			logging.String("file", projectFile))
+		return fmt.Errorf("failed to create project.hcl: %w", err)
+	}
+
+	// Create inventory.hcl
+	inventoryConfig := fmt.Sprintf(`# Inventory for %s project
+# Add your machine definitions here
+
+machine "example-server" {
+  host     = "192.168.1.100"
+  port     = 22
+  user     = "debian"
+  password = "your-password"
+  tags = {
+    environment = "development"
+    role = "web"
+  }
+}`, projectName)
+
+	inventoryFile := filepath.Join(projectDir, "inventory.hcl")
+	if err := os.WriteFile(inventoryFile, []byte(inventoryConfig), 0o600); err != nil {
+		logger.Error("Failed to create inventory.hcl", err,
+			logging.String("file", inventoryFile))
+		return fmt.Errorf("failed to create inventory.hcl: %w", err)
+	}
+
+	// Create actions.hcl
+	actionsConfig := fmt.Sprintf(`# Actions for %s project
+# Add your action definitions here
+
+action "check-status" {
+  description = "Check server status"
+  command     = "uptime && df -h"
+  tags        = ["role=web"]
+  parallel    = true
+  timeout     = 300
+}
+
+action "update-system" {
+  description = "Update system packages"
+  command     = "apt update && apt upgrade -y"
+  tags        = ["environment=development"]
+  parallel    = true
+  timeout     = 600
+}`, projectName)
+
+	actionsFile := filepath.Join(projectDir, "actions.hcl")
+	if err := os.WriteFile(actionsFile, []byte(actionsConfig), 0o600); err != nil {
+		logger.Error("Failed to create actions.hcl", err,
+			logging.String("file", actionsFile))
+		return fmt.Errorf("failed to create actions.hcl: %w", err)
+	}
+
+	// Create .gitignore
+	gitignore := `# Spooky project gitignore
+
+# Facts database
+.facts.db/
+*.db
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# SSH keys and sensitive files
+*.pem
+*.key
+id_rsa*
+*.pub
+
+# Environment files
+.env
+.env.local
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Backup files
+*.bak
+*.backup`
+
+	gitignoreFile := filepath.Join(projectDir, ".gitignore")
+	if err := os.WriteFile(gitignoreFile, []byte(gitignore), 0o600); err != nil {
+		logger.Error("Failed to create .gitignore", err,
+			logging.String("file", gitignoreFile))
+		return fmt.Errorf("failed to create .gitignore: %w", err)
+	}
+
+	// Create README.md
+	readme := fmt.Sprintf(`# %s Project
+
+This is a spooky project with separated inventory and actions configuration.
+
+## Project Structure
+
+%s/
+├── project.hcl          # Project configuration and settings
+├── inventory.hcl        # Machine definitions
+├── actions.hcl          # Action definitions for automation
+├── .gitignore          # Git ignore rules
+├── templates/           # Template files for dynamic content
+├── files/              # Static files to be deployed
+└── README.md           # This file
+
+## Usage
+
+### Execute an action:
+spooky execute actions.hcl --inventory inventory.hcl --action check-status
+
+### Execute with tag targeting:
+spooky execute actions.hcl --inventory inventory.hcl --action update-system --tags "role=web"
+
+## Configuration
+
+- **project.hcl**: Project settings, storage, logging, and SSH configuration
+- **inventory.hcl**: Machine definitions with tags for targeting
+- **actions.hcl**: Automation actions with tag-based targeting
+
+## Benefits
+
+1. **Reusability**: Actions can be applied to different inventories
+2. **Maintainability**: Clear separation of concerns
+3. **Flexibility**: Mix and match actions with different machine groups
+4. **Version Control**: Better tracking of changes to machines vs actions
+`, projectName, projectName)
+
+	readmeFile := filepath.Join(projectDir, "README.md")
+	if err := os.WriteFile(readmeFile, []byte(readme), 0o600); err != nil {
+		logger.Error("Failed to create README.md", err,
+			logging.String("file", readmeFile))
+		return fmt.Errorf("failed to create README.md: %w", err)
+	}
+
+	logger.Info("Project initialized successfully",
+		logging.String("project_name", projectName),
+		logging.String("project_dir", projectDir))
+
+	fmt.Printf("✅ Project '%s' initialized successfully at %s\n", projectName, projectDir)
+	fmt.Printf("📁 Project structure created with separated inventory and actions\n")
+	fmt.Printf("📝 Edit inventory.hcl to add your machines\n")
+	fmt.Printf("⚡ Edit actions.hcl to add your automation actions\n")
+	fmt.Printf("🔧 Edit project.hcl to configure project settings\n")
+
+	return nil
+}
+
+// validateConfigFile validates a configuration file using the provided parser function
+func validateConfigFile(logger logging.Logger, filePath, fileType string, parser func(string) error) error {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		logger.Warn(fileType+" file not found",
+			logging.String("file", filePath))
+		return nil
+	}
+
+	if err := parser(filePath); err != nil {
+		logger.Error("Failed to parse "+fileType+" configuration", err,
+			logging.String("file", filePath))
+		return fmt.Errorf("failed to parse "+fileType+" configuration: %w", err)
+	}
+
+	logger.Info(fileType+" configuration validated",
+		logging.String("file", filePath))
+	return nil
+}
+
+// validateProject validates a spooky project
+func validateProject(logger logging.Logger, path string) error {
+	logger.Info("Validating spooky project",
+		logging.String("path", path))
+
+	// Check if project.hcl exists
+	projectFile := filepath.Join(path, "project.hcl")
+	if _, err := os.Stat(projectFile); os.IsNotExist(err) {
+		logger.Error("Project file not found", err,
+			logging.String("file", projectFile))
+		return fmt.Errorf("project.hcl not found in %s", path)
+	}
+
+	// Parse project configuration with debug flag
+	projectConfig, err := config.ParseProjectConfigWithDebug(projectFile, validateDebug)
+	if err != nil {
+		logger.Error("Failed to parse project configuration", err,
+			logging.String("file", projectFile))
+		return fmt.Errorf("failed to parse project configuration: %w", err)
+	}
+
+	logger.Info("Project configuration validated",
+		logging.String("project_name", projectConfig.Name),
+		logging.String("inventory_file", projectConfig.InventoryFile),
+		logging.String("actions_file", projectConfig.ActionsFile))
+
+	// Validate inventory file if it exists
+	if projectConfig.InventoryFile != "" {
+		if err := validateConfigFile(logger, projectConfig.InventoryFile, "Inventory", func(file string) error {
+			_, err := config.ParseInventoryConfig(file)
+			return err
+		}); err != nil {
+			return err
+		}
+	}
+
+	// Validate actions file if it exists
+	if projectConfig.ActionsFile != "" {
+		if err := validateConfigFile(logger, projectConfig.ActionsFile, "Actions", func(file string) error {
+			_, err := config.ParseActionsConfig(file)
+			return err
+		}); err != nil {
+			return err
+		}
+	}
+
+	fmt.Printf("✅ Project validation successful\n")
+	fmt.Printf("📋 Project: %s\n", projectConfig.Name)
+	fmt.Printf("📁 Path: %s\n", path)
+	if projectConfig.Description != "" {
+		fmt.Printf("📝 Description: %s\n", projectConfig.Description)
+	}
+
+	return nil
+}
+
+// listProject lists resources from a spooky project
+func listProject(logger logging.Logger, path string) error {
+	logger.Info("Listing spooky project resources",
+		logging.String("path", path))
+
+	// Check if project.hcl exists
+	projectFile := filepath.Join(path, "project.hcl")
+	if _, err := os.Stat(projectFile); os.IsNotExist(err) {
+		logger.Error("Project file not found", err,
+			logging.String("file", projectFile))
+		return fmt.Errorf("project.hcl not found in %s", path)
+	}
+
+	// Parse project configuration
+	projectConfig, err := config.ParseProjectConfig(projectFile)
+	if err != nil {
+		logger.Error("Failed to parse project configuration", err,
+			logging.String("file", projectFile))
+		return fmt.Errorf("failed to parse project configuration: %w", err)
+	}
+
+	fmt.Printf("Project: %s\n", projectConfig.Name)
+	if projectConfig.Description != "" {
+		fmt.Printf("Description: %s\n", projectConfig.Description)
+	}
+	fmt.Printf("Path: %s\n\n", path)
+
+	machineCount := 0
+	actionCount := 0
+
+	// Count machines from inventory
+	if projectConfig.InventoryFile != "" {
+		if _, err := os.Stat(projectConfig.InventoryFile); os.IsNotExist(err) {
+			fmt.Printf("⚠️  Inventory file not found: %s\n", projectConfig.InventoryFile)
+		} else {
+			inventoryConfig, err := config.ParseInventoryConfig(projectConfig.InventoryFile)
+			if err != nil {
+				logger.Error("Failed to parse inventory configuration", err,
+					logging.String("file", projectConfig.InventoryFile))
+				return fmt.Errorf("failed to parse inventory configuration: %w", err)
+			}
+
+			machineCount = len(inventoryConfig.Machines)
+
+			if listVerbose {
+				fmt.Printf("Machines (%d):\n", machineCount)
+				for _, machine := range inventoryConfig.Machines {
+					fmt.Printf("  - %s (%s@%s:%d)\n", machine.Name, machine.User, machine.Host, machine.Port)
+				}
+				fmt.Println()
+			}
+		}
+	}
+
+	// Count actions
+	if projectConfig.ActionsFile != "" {
+		if _, err := os.Stat(projectConfig.ActionsFile); os.IsNotExist(err) {
+			fmt.Printf("⚠️  Actions file not found: %s\n", projectConfig.ActionsFile)
+		} else {
+			actionsConfig, err := config.ParseActionsConfig(projectConfig.ActionsFile)
+			if err != nil {
+				logger.Error("Failed to parse actions configuration", err,
+					logging.String("file", projectConfig.ActionsFile))
+				return fmt.Errorf("failed to parse actions configuration: %w", err)
+			}
+
+			actionCount = len(actionsConfig.Actions)
+
+			if listVerbose {
+				fmt.Printf("Actions (%d):\n", actionCount)
+				for i := range actionsConfig.Actions {
+					action := &actionsConfig.Actions[i]
+					desc := action.Description
+					if desc == "" {
+						desc = "No description"
+					}
+					fmt.Printf("  - %s: %s\n", action.Name, desc)
+				}
+				fmt.Println()
+			}
+		}
+	}
+
+	// Show summary
+	fmt.Printf("Summary: %d machines, %d actions\n", machineCount, actionCount)
+	if !listVerbose {
+		fmt.Printf("Use --verbose for detailed output\n")
+	}
+
+	return nil
 }

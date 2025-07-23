@@ -1,0 +1,88 @@
+{
+  "web-001": {
+    "custom": {
+      "application": {
+        "name": "nginx",
+        "version": "1.18.0",
+        "config_path": "/etc/nginx/nginx.conf",
+        "ports": [80, 443],
+        "ssl_enabled": true
+      },
+      "environment": {
+        "datacenter": "fra00",
+        "rack": "A01",
+        "power_zone": "PZ-1",
+        "tier": "production"
+      },
+      "monitoring": {
+        "prometheus_port": 9100,
+        "alert_manager": "alert.example.com",
+        "grafana_dashboard": "web-servers"
+      },
+      "deployment": {
+        "method": "ansible",
+        "last_deployed": "2024-01-15T10:30:00Z",
+        "version_control": "git",
+        "repository": "https://github.com/company/web-app"
+      }
+    },
+    "overrides": {
+      "os": {
+        "name": "ubuntu",
+        "version": "22.04.2"
+      },
+      "network": {
+        "primary_ip": "192.168.1.100"
+      }
+    }
+  },
+  "web-002": {
+    "custom": {
+      "application": {
+        "name": "apache",
+        "version": "2.4.54",
+        "config_path": "/etc/apache2/apache2.conf",
+        "ports": [8080],
+        "ssl_enabled": false
+      },
+      "environment": {
+        "datacenter": "fra00",
+        "rack": "A02",
+        "power_zone": "PZ-1",
+        "tier": "staging"
+      },
+      "monitoring": {
+        "prometheus_port": 9100,
+        "alert_manager": "alert-staging.example.com"
+      }
+    }
+  },
+  "db-001": {
+    "custom": {
+      "application": {
+        "name": "postgresql",
+        "version": "14.5",
+        "data_directory": "/var/lib/postgresql/14/main",
+        "port": 5432,
+        "max_connections": 200
+      },
+      "environment": {
+        "datacenter": "fra00",
+        "rack": "B01",
+        "power_zone": "PZ-2",
+        "tier": "production"
+      },
+      "backup": {
+        "schedule": "daily",
+        "retention_days": 30,
+        "storage_location": "s3://backups/database"
+      }
+    },
+    "overrides": {
+      "os": {
+        "name": "ubuntu",
+        "version": "20.04.5"
+      }
+    }
+  }
+} 
