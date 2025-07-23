@@ -1,0 +1,37 @@
+FROM debian:12-slim
+
+# Install SSH server and required packages
+RUN apt-get update && apt-get install -y \
+    openssh-server \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create SSH directory
+RUN mkdir -p /var/run/sshd
+
+# Create test user
+RUN useradd -m -s /bin/bash testuser && \
+    echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Create .ssh directory for testuser
+RUN mkdir -p /home/testuser/.ssh && \
+    chown testuser:testuser /home/testuser/.ssh && \
+    chmod 700 /home/testuser/.ssh
+
+# Copy SSH public key content (copied as authorized_keys during build)
+COPY authorized_keys /home/testuser/.ssh/authorized_keys
+RUN chown testuser:testuser /home/testuser/.ssh/authorized_keys && \
+    chmod 600 /home/testuser/.ssh/authorized_keys
+
+# Configure SSH
+RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config && \
+    sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config && \
+    sed -i 's/#AuthorizedKeysFile/AuthorizedKeysFile/' /etc/ssh/sshd_config && \
+    echo "StrictModes no" >> /etc/ssh/sshd_config
+
+# Expose SSH port
+EXPOSE 22
+
+# Start SSH daemon
+CMD ["/usr/sbin/sshd", "-D"] 

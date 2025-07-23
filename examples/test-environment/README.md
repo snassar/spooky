@@ -1,186 +1,231 @@
-# Podman-Based Test Environment
+# Spooky Test Environment
 
-This directory contains the Podman-based test environment for spooky integration testing, replacing the custom SSH server implementations with real Debian 12 containers.
+This directory contains the test environment configuration for spooky, which provides SSH-enabled containers for testing spooky's remote management capabilities.
 
 ## Overview
 
-The test environment consists of three Debian 12 containers running SSH servers with different configurations:
+The test environment creates 9 containers that match the integration test workflow:
 
-- **spooky-server1**: Root user with password authentication (port 2221)
-- **spooky-server2**: Admin user with key-based authentication (port 2222)
-- **spooky-server3**: User with SFTP support (port 2223)
+- **7 working SSH containers** (spooky-test-server-1 through spooky-test-server-7)
+  - SSH server with key-based authentication
+  - User: `testuser` with sudo access
+  - Ports: 2221-2227
 
-## Files
+- **1 no-SSH container** (spooky-test-no-ssh)
+  - Container without SSH server running
+  - Used for testing failure scenarios
+  - Port: 2228
 
-### Quadlet Configuration Files
+- **1 SSH-no-key container** (spooky-test-ssh-no-key)
+  - SSH server without authorized keys
+  - Used for testing authentication failures
+  - Port: 2229
 
-- `spooky-test.network` - Podman network configuration
-- `spooky-server1.container` - Container configuration for root/password auth
-- `spooky-server2.container` - Container configuration for admin/key auth
-- `spooky-server3.container` - Container configuration for user/SFTP
+## Prerequisites
 
-### Test Configuration
+- Podman 5.2+ with rootless support
+- systemd (Linux only)
+- Quadlet support
+- SSH key pair (default: `~/.ssh/id_ed25519`)
 
-- `test-config.hcl` - Comprehensive test configuration with all scenarios
+## SSH Key Configuration
 
-## Usage
+The tool supports multiple ways to specify the SSH key:
 
-### Prerequisites
+1. **Command line flag:**
+   ```bash
+   go run tools/spooky-test-env/main.go --ssh-key /path/to/your/key start
+   ```
 
-- Podman 4.4+ with Quadlet support
-- systemd user session enabled
-- Rootless Podman capability
+2. **Environment variable:**
+   ```bash
+   export SPOOKY_TEST_SSH_KEY=/path/to/your/key
+   go run tools/spooky-test-env/main.go start
+   ```
 
-### Quick Start
+3. **Default location:** `~/.ssh/id_ed25519`
 
-```bash
-# Build the test environment tool
-make build-spooky-test-env
+The tool will automatically generate a key at the specified location if it doesn't exist.
 
-# Run preflight check
-./build/spooky-test-env preflight
+## Quick Start
 
-# Start the test environment
-./build/spooky-test-env start
+1. **Check prerequisites:**
+   ```bash
+   go run tools/spooky-test-env/main.go preflight
+   ```
 
-# Run integration tests
-go test -v -podman ./tests/podman_integration_test.go
+2. **Build container images:**
+   ```bash
+   go run tools/spooky-test-env/main.go build
+   ```
 
-# Stop the test environment
-./build/spooky-test-env stop
+3. **Start the test environment:**
+   ```bash
+   go run tools/spooky-test-env/main.go start
+   ```
 
-# Clean up everything
-./build/spooky-test-env cleanup
+4. **Check status:**
+   ```bash
+   go run tools/spooky-test-env/main.go status
+   ```
+
+5. **Stop the environment:**
+   ```bash
+   go run tools/spooky-test-env/main.go stop
+   ```
+
+6. **Clean up everything:**
+   ```bash
+   go run tools/spooky-test-env/main.go cleanup
+   ```
+
+## Container Images
+
+### spooky-test-ssh
+- **Base:** debian:12-slim
+- **Features:** SSH server with key-based authentication
+- **User:** testuser (with sudo access)
+- **Authentication:** SSH public key only (no password)
+
+### spooky-test-no-ssh
+- **Base:** debian:12-slim
+- **Features:** No SSH server
+- **User:** testuser
+- **Purpose:** Test failure scenarios
+
+### spooky-test-ssh-no-key
+- **Base:** debian:12-slim
+- **Features:** SSH server without authorized keys
+- **User:** testuser
+- **Purpose:** Test authentication failures
+
+## SSH Configuration
+
+All SSH containers use:
+- **User:** testuser
+- **Authentication:** Public key only (no password)
+- **Key:** `~/.ssh/id_ed25519` (automatically generated if missing)
+- **Sudo:** testuser has passwordless sudo access
+- **Security:** Root login disabled, strict modes disabled
+
+## Quadlet Integration
+
+The test environment uses Podman Quadlet for container management:
+
+- **Container files:** Generated automatically as `.container` files
+- **Systemd integration:** Containers run as systemd user services
+- **Automatic startup:** Containers start automatically with systemd
+- **Clean shutdown:** Proper systemd service management
+
+## File Structure
+
+```
+examples/test-environment/
+├── README.md                    # This file
+├── Containerfile.ssh            # SSH container definition
+├── Containerfile.no-ssh         # No-SSH container definition
+├── Containerfile.ssh-no-key     # SSH-no-key container definition
+├── test-config.hcl              # Test configuration
+├── spooky-test-server.container # Legacy container file
+├── spooky-test.pod              # Legacy pod file
+├── spooky-test.network          # Legacy network file
+└── Containerfile                # Legacy container file
 ```
 
-### Using the Test Configuration
+## Testing with spooky
+
+Once the test environment is running, you can test spooky with:
 
 ```bash
-# Execute all tests
-go run main.go execute examples/test-environment/test-config.hcl
+# Test SSH fact collection (using default key)
+./build/spooky facts gather --ssh-user testuser --ssh-key ~/.ssh/id_ed25519 localhost:2221
 
-# Execute specific actions
-go run main.go execute examples/test-environment/test-config.hcl --action test-authentication
-go run main.go execute examples/test-environment/test-config.hcl --action test-sftp-operations
+# Test SSH fact collection (using custom key)
+./build/spooky facts gather --ssh-user testuser --ssh-key /path/to/your/key localhost:2221
+
+# Test with multiple servers
+./build/spooky execute examples/actions/integration-working-servers.hcl
+
+# Test failure scenarios
+./build/spooky execute examples/actions/integration-failure-test.hcl
 ```
 
-## Test Scenarios
+## SSH Access to Containers
 
-The test configuration includes comprehensive scenarios:
+The containers are accessible via SSH using port forwarding:
 
-### Authentication Tests
-- **test-authentication**: Basic user authentication across all servers
-- **test-system-info**: System information gathering
+### Working SSH Containers (ports 2221-2227)
+```bash
+# SSH to container 1
+ssh -i ~/testkeys/spooky/containers -p 2221 testuser@localhost
 
-### File Operations
-- **test-file-operations**: Basic file operations on standard servers
-- **test-sftp-operations**: SFTP-specific operations
+# SSH to container 2
+ssh -i ~/testkeys/spooky/containers -p 2222 testuser@localhost
 
-### Tag-Based Targeting
-- **test-production-servers**: Target servers by production tier
-- **test-staging-servers**: Target servers by staging tier
-- **test-database-servers**: Target servers by database role
-- **test-web-servers**: Target servers by web role
+# And so on for containers 3-7
+```
 
-### Advanced Scenarios
-- **test-concurrent-operations**: Parallel execution testing
-- **test-error-handling**: Error handling scenarios
-- **test-network-connectivity**: Network connectivity between servers
+### Container IP Addresses
+The containers also have static IP addresses on the internal `spooky-test` network:
+- spooky-test-server-1: 10.1.10.1
+- spooky-test-server-2: 10.1.10.2
+- spooky-test-server-3: 10.1.10.3
+- spooky-test-server-4: 10.1.10.4
+- spooky-test-server-5: 10.1.10.5
+- spooky-test-server-6: 10.1.10.6
+- spooky-test-server-7: 10.1.10.7
+- spooky-test-no-ssh: 10.1.10.8
+- spooky-test-ssh-no-key: 10.1.10.9
 
-## Server Details
-
-### spooky-server1 (Root/Password)
-- **Host**: localhost:2221
-- **User**: root
-- **Password**: password
-- **Authentication**: Password-based
-- **Tags**: role=database, tier=production
-
-### spooky-server2 (Admin/Key)
-- **Host**: localhost:2222
-- **User**: admin
-- **Password**: adminpass (fallback)
-- **Authentication**: Key-based (with password fallback)
-- **Tags**: role=web, tier=staging
-
-### spooky-server3 (User/SFTP)
-- **Host**: localhost:2223
-- **User**: user
-- **Password**: userpass
-- **Authentication**: Password-based
-- **SFTP**: Enabled with chroot
-- **Tags**: role=storage, tier=development
-
-## Network Configuration
-
-- **Network**: spooky-test
-- **Subnet**: 10.1.0.0/16
-- **Gateway**: 10.1.0.1
-- **Server IPs**: 10.1.10.1, 10.1.10.2, 10.1.10.3
-
-## Migration from Legacy Tests
-
-This environment replaces the custom SSH server implementations in `tests/infrastructure/` with:
-
-### Benefits
-- **Real SSH behavior**: Actual OpenSSH servers instead of mocks
-- **Multiple authentication methods**: Password, key-based, SFTP
-- **Professional tooling**: Quadlet-based container management
-- **Cross-platform compatibility**: Works on Linux, macOS, Windows
-- **CI/CD integration**: Already configured in GitHub Actions
-
-### Migration Path
-1. **Phase 1**: Use both environments in parallel
-2. **Phase 2**: Migrate critical test scenarios
-3. **Phase 3**: Remove legacy infrastructure
+**Note**: The IP addresses are only accessible from within other containers on the same network. For external access, use the port-forwarded localhost connections.
 
 ## Troubleshooting
 
-### Common Issues
+### SSH Key Issues
+If you don't have an SSH key or want to use a different one:
 
-**Port conflicts**: Ensure ports 2221-2223 are not in use
 ```bash
-sudo netstat -tlnp | grep :222
+# Generate default key
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -N ""
+
+# Or generate a custom key
+ssh-keygen -t ed25519 -f /path/to/your/key -N ""
+
+# Or let the tool generate it automatically
+go run tools/spooky-test-env/main.go build
 ```
 
-**Container startup issues**: Check container logs
+### Quadlet Issues
+If Quadlet is not working:
 ```bash
-podman logs spooky-server1
-podman logs spooky-server2
-podman logs spooky-server3
-```
-
-**Network issues**: Recreate the network
-```bash
-podman network rm spooky-test
-podman network create spooky-test
-```
-
-**Quadlet issues**: Check Quadlet support
-```bash
+# Check Quadlet support
 podman quadlet --help
+
+# Check systemd user services
+systemctl --user list-units --type=service
 ```
 
-### Debug Commands
-
+### Container Issues
+If containers fail to start:
 ```bash
-# Check environment status
-./build/spooky-test-env status
+# Check container status
+podman ps -a
 
-# Check container IPs
-podman inspect spooky-server1 --format "{{.NetworkSettings.Networks.spooky-test.IPAddress}}"
+# Check container logs
+podman logs spooky-test-server-1
 
-# Test SSH connectivity
-ssh -p 2221 root@localhost
-ssh -p 2222 admin@localhost
-ssh -p 2223 user@localhost
+# Check systemd service status
+systemctl --user status spooky-test-server-1
 ```
 
-## Security Note
+### Network Issues
+If containers can't reach each other:
+```bash
+# Check network configuration
+podman network ls
+podman network inspect bridge
+```
 
-This test environment is configured for testing purposes only:
-- Root login is enabled
-- Simple password authentication
-- No firewall or security hardening
+## Integration with CI
 
-**Do not use this configuration in production environments.** 
+This test environment matches the containers created in the GitHub Actions integration tests workflow (`.github/workflows/integration-tests.yml`), ensuring consistent testing between local development and CI environments. 

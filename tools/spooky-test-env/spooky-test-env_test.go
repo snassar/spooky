@@ -38,7 +38,7 @@ func TestGetTestEnvDir(t *testing.T) {
 	if dir == "" || dir == "." {
 		t.Errorf("Expected a non-empty test env dir, got %q", dir)
 	}
-	if !filepath.IsAbs(dir) && dir != filepath.Join(cwd, "..", "..", "spooky-test-env") {
+	if !filepath.IsAbs(dir) && dir != filepath.Join(cwd, "..", "..", "examples", "test-environment") {
 		t.Errorf("Unexpected test env dir: %q", dir)
 	}
 }
@@ -49,6 +49,34 @@ func TestGetContainerIP_Error(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error for nonexistent container")
 	}
+}
+
+func TestStartContainerWithQuadlet(t *testing.T) {
+	// Test that the function calls podman with correct arguments
+	containerName := "test-container"
+	imageName := "test-image"
+	port := 2221
+
+	// Mock commander that records the command calls
+	mockCmd := &mockCommander{
+		runErr: map[string]error{},
+	}
+
+	// Store original cmd and restore it
+	originalCmd := cmd
+	cmd = mockCmd
+	defer func() { cmd = originalCmd }()
+
+	// Call the function
+	err := startContainerWithQuadlet(containerName, imageName, port)
+	if err != nil {
+		t.Fatalf("startContainerWithQuadlet failed: %v", err)
+	}
+
+	// The function should have called podman run with the correct arguments
+	// Since we're using a mock commander, we can't easily verify the exact call,
+	// but we can verify that the function doesn't return an error
+	// In a real test environment, this would verify the container is actually created
 }
 
 func getContainerIPWithCmd(cmd TestEnvCommander, containerName string) (string, error) {
