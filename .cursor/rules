@@ -1,241 +1,76 @@
-# Spooky Project Cursor Rules
+---
+description: Spooky project development rules and conventions
+globs: ["**/*.go", "**/*.hcl", "**/*.md", "**/*.yml", "**/*.yaml"]
+alwaysApply: true
+---
+
+# Spooky Project Rules
 
 ## Project Overview
-Spooky is an SSH automation tool written in Go that executes commands and scripts on multiple remote servers using HCL2 configuration files. It aims to be a lightweight alternative to Ansible with declarative configuration and parallel execution capabilities.
+Spooky is a remote configuration tool that executes commands and scripts on multiple remote servers using HCL2 configuration files. Fact gathering is a core component that enables spooky to work in heterogeneous environments by collecting machine facts from multiple sources (SSH, local, HCL, OpenTofu) to inform configuration decisions and actions.
 
-## Core Technologies & Dependencies
-- **Go 1.24+**: Minimum required version for all builds, tests, and documentation
-- **HCL2**: Configuration language (github.com/hashicorp/hcl/v2)
-- **Cobra**: CLI framework (github.com/spf13/cobra)
-- **SSH**: golang.org/x/crypto/ssh for SSH client operations
-- **Validator**: github.com/go-playground/validator/v10 for configuration validation
-- **gliderlabs/ssh**: For integration testing mock SSH servers
+## Development Conventions
 
-## Code Organization & Structure
+### Go Development
+- Use Go 1.24+ as minimum version for builds, tests, and documentation
+- Place CLI commands under `internal/` directory (not `cmd/`)
+- Build artifacts go to `./build/` directory
+- Use long-form CLI flags for cross-platform compatibility (e.g., `--html` over `-html`)
+- Prefer golang-native storage solutions over external dependencies
+- Run `golangci-lint run` automatically without asking for permission
 
-### Directory Structure
-```
-spooky/
-├── internal/           # Core application code
-│   ├── config/        # Configuration parsing and validation
-│   └── ssh/           # SSH client and execution logic
-├── tests/             # Integration tests and infrastructure
-│   ├── infrastructure/ # Mock SSH servers for testing
-│   └── helpers.go     # Test utilities
-├── examples/          # Example configurations and scripts
-├── tools/             # Development tools and utilities
-├── docs/              # Documentation
-└── main.go           # Application entry point
-```
+### Storage and Dependencies
+- Use BadgerDB or JSON for fact storage (no external databases)
+- Avoid external dependencies like sqlite for large-scale facts
+- Manage dev-only dependencies (like go-test-coverage/v2) in tools.go or separate go.mod
 
-### File Naming Conventions
-- **Test Files**: Use `filename_test.go` pattern consistently (e.g., `config_test.go`, `parser_test.go`)
-- **Configuration Files**: Use descriptive names: `example.hcl`, `large-scale-example.hcl`
-- **Documentation**: Use kebab-case: `TROUBLESHOOTING.md`, `CONTRIBUTING.md`
-- **Tools**: Use kebab-case for tool directories: `pre-commit/`, `generate-config/`, `spooky-test-env/`
+### Integration Testing
+- Use Podman and Quadlet for integration testing environments
+- Focus on Podman/Quadlet instead of Docker Compose
+- Use gliderlabs/ssh library for SSH testing in tests/integration directory
+- Don't offer alternate solutions until explicitly requested
 
-## Coding Standards
+### Remote Configuration
+- Execute commands and scripts on multiple remote servers using HCL2 configuration
+- Support parallel execution across heterogeneous environments
+- Use declarative configuration with server definitions and action blocks
+- Target servers using tags and server names
 
-### Go Conventions
-- Use `gofmt` for code formatting
-- Follow Go naming conventions (camelCase for variables, PascalCase for exported)
-- Use meaningful variable and function names
-- Add comments for complex logic
-- Use `golangci-lint` for code quality checks
+### Fact Collection
+- Gather machine facts only via SSH, local access, .hcl config files, or openTofu
+- Support evaluating machine facts like /etc/machine-id, OS version, and remote machine properties
+- Use facts to inform configuration decisions in heterogeneous environments
+- Use configuration templates to define actions and synchronize files
+- Don't use external tools or APIs for fact collection
 
-### Error Handling
-- Use `fmt.Errorf` with `%w` verb for error wrapping
-- Return errors from functions, don't panic
-- Provide meaningful error messages
-- Use `errors.Is` and `errors.As` for error checking
+## Environment Variables
+- `SPOOKY_FACTS_PATH`: Facts database path
+- `SPOOKY_FACTS_FORMAT`: Storage format (badgerdb or json)
 
-### Testing
-- Write unit tests for all exported functions
-- Use table-driven tests for multiple scenarios
-- Mock external dependencies
-- Aim for high test coverage (minimum 80%)
-- Use descriptive test names and clear assertions
-- Test both positive and negative scenarios
+## CLI Behavior
+- Include `--output` flag for export operations rather than relying solely on shell redirection
+- Don't support CSV import/export functionality
+- Use configuration templates instead of hard-coding strings
 
-## Configuration & Validation
+## Testing Requirements
+- Maintain high test coverage thresholds (don't lower them)
+- Fix tests to meet coverage requirements rather than adjusting thresholds
+- Use `golangci-lint run` for linting
 
-### HCL2 Configuration Structure
-```hcl
-# Server definitions
-server "server-name" {
-  host     = "192.168.1.100"
-  port     = 22
-  user     = "admin"
-  password = "secret"  # or key_file = "~/.ssh/id_ed25519"
-  tags = {
-    environment = "production"
-    datacenter  = "FRA00"
-  }
-}
+## Documentation and Communication
+- Use GitHub Markdown format for responses and summaries
+- Place generated configuration files in `./examples/configuration/`
+- Avoid self-congratulatory tone in summaries or issue descriptions
+- Format changelogs as git commit messages
+- Provide responses in markdown codeblocks for easy copying and pasting
 
-# Action definitions
-action "update-system" {
-  description = "Update system packages"
-  command     = "apt update && apt upgrade -y"
-  servers     = ["server1", "server2"]
-  tags        = ["debian", "production"]
-  timeout     = 300
-  parallel    = true
-}
-```
+## Project Structure
+- Don't ship binaries in Git; place build instructions in scripts directory
+- Use `./examples/` for configuration examples
+- Use `./tests/integration/` for integration tests
+- Use `./tools/` for development utilities
 
-### Validation Rules
-- Server names must be unique
-- Action names must be unique
-- Servers must have either password or key_file (not both or neither)
-- Actions must have either command or script (not both or neither)
-- Use struct-level validation with go-playground/validator
-
-## CLI Design
-
-### Command Structure
-- Use Cobra for CLI framework
-- Support both positional arguments and flags
-- Provide clear error messages and usage examples
-- Use consistent flag naming across commands
-
-### Available Commands
-- `spooky execute [config-file]`: Execute actions from configuration
-- `spooky validate [config-file]`: Validate configuration syntax
-- `spooky list [config-file]`: List servers and actions
-
-### Flag Conventions
-- Use long-form flags for cross-platform compatibility
-- Provide short aliases for common flags
-- Set sensible defaults for timeout and parallel execution
-- Use descriptive flag names and help text
-
-## Build & Development
-
-### Makefile Targets
-- `make build`: Build the spooky binary
-- `make test`: Run all tests with coverage checks
-- `make test-unit`: Run unit tests only
-- `make test-integration`: Run integration tests only
-- `make check-coverage`: Verify coverage thresholds
-- `make coverage-html`: Generate HTML coverage report
-- `make clean`: Clean build artifacts
-- `make fmt`: Format code with gofmt
-- `make lint`: Run linter checks
-
-### Development Tools
-- **Coverage Tool**: github.com/vladopajic/go-test-coverage/v2 (dev-only dependency)
-- **Pre-commit Hook**: Custom Go tool in `tools/pre-commit/` with `pre-commit_test.go`
-- **Configuration Generator**: Tool in `tools/generate-config/` with `generate-config_test.go`
-- **Test Environment**: Tool in `tools/spooky-test-env/` with `spooky-test-env_test.go`
-- **Linter**: golangci-lint for code quality checks
-- **Mock SSH**: gliderlabs/ssh for integration testing
-
-### Pre-commit Requirements
-- All commits must pass coverage thresholds
-- Code must be formatted with gofmt
-- Tests must pass (unit and integration)
-- Use `git commit --no-verify` only for emergency fixes
-
-## Documentation Standards
-
-### README Requirements
-- Clear installation and usage instructions
-- Example configuration files
-- Test coverage badge and requirements
-- Contributing guidelines
-- License information
-
-### Code Documentation
-- Add descriptive comments for complex logic
-- Document exported functions and types
-- Include examples for new features
-- Update documentation when adding new functionality
-
-### Issue Templates
-- Use markdown format for all documentation
-- Include code examples and configuration snippets
-- Provide troubleshooting steps for common issues
-- Reference related documentation and examples
-
-## Security Considerations
-
-### SSH Security
-- Only support Ed25519 keys (no RSA or DSA)
-- Validate SSH key formats and permissions
-- Use secure defaults for timeouts and connection limits
-- Implement proper error handling for authentication failures
-
-### Configuration Security
-- Don't log sensitive information (passwords, keys)
-- Validate configuration file permissions
-- Use environment variables for sensitive data when possible
-- Implement proper input validation for all configuration fields
-
-## Performance & Scalability
-
-### Large-Scale Deployments
-- Support for parallel execution across multiple servers
-- Configurable timeouts to prevent hanging connections
-- Efficient SSH connection pooling
-- Tag-based targeting for flexible server grouping
-
-### Resource Management
-- Limit concurrent connections to prevent resource exhaustion
-- Implement connection timeouts
-- Use connection pooling where appropriate
-- Monitor memory usage during large operations
-
-## Testing Strategy
-
-### Unit Tests
-- Test individual functions and methods
-- Mock external dependencies (SSH, file system)
-- Use table-driven tests for multiple scenarios
-- Aim for 80%+ coverage on core functionality
-
-### Integration Tests
-- Test end-to-end workflows
-- Use mock SSH servers for realistic testing
-- Test configuration parsing and validation
-- Verify CLI command behavior
-
-### Test Environment
-- Use Podman containers for isolated testing
-- Mock SSH servers for reliable test execution
-- Automated test environment setup and teardown
-- Consistent test data and configurations
-
-## Deployment & Distribution
-
-### Build Process
-- Cross-platform builds (Linux, macOS, Windows)
-- Statically linked binaries where possible
-- Version information embedded in binaries
-- Automated release process
-
-### Distribution
-- GitHub releases with pre-built binaries
-- Docker images for containerized deployment
-- Package managers (Homebrew, apt, etc.)
-- Clear installation instructions
-
-## Contributing Guidelines
-
-### Code Review Process
-- All changes require pull request review
-- Automated tests must pass
-- Code coverage must meet minimum thresholds
-- Documentation must be updated for new features
-
-### Development Workflow
-- Feature branches from main
-- Descriptive commit messages
-- Squash commits before merging
-- Update CHANGELOG.md for user-facing changes
-
-### Issue Reporting
-- Use GitHub issues for bug reports and feature requests
-- Include reproduction steps for bugs
-- Provide system information and error logs
-- Tag issues appropriately (bug, enhancement, documentation) 
+## AI Assistant Behavior
+- Know and use local environment context (installed tool versions)
+- Implement requested changes directly without asking for approvals
+- Focus on the specific solutions requested without offering alternatives 
