@@ -1,0 +1,47 @@
+; PHP Configuration for {{hostname}}
+; Generated on {{osVersion}} with {{memoryInfo}} RAM
+; Machine ID: {{machineID}}
+
+[PHP]
+; Memory settings
+memory_limit = {{if gt (atoi (fact "memory_total")) 4096}}512M{{else}}256M{{end}}
+max_execution_time = 300
+max_input_time = 300
+
+; File upload settings
+upload_max_filesize = 64M
+post_max_size = 64M
+max_file_uploads = 20
+
+; Error reporting
+display_errors = Off
+display_startup_errors = Off
+log_errors = On
+error_log = /var/log/php/{{hostname}}_error.log
+
+; Session settings
+session.save_handler = files
+session.save_path = "/var/lib/php/sessions"
+session.gc_maxlifetime = 1440
+session.gc_probability = 1
+session.gc_divisor = 100
+
+; Security settings
+expose_php = Off
+allow_url_fopen = Off
+allow_url_include = Off
+
+; Performance settings
+opcache.enable = 1
+opcache.enable_cli = 1
+opcache.memory_consumption = 128
+opcache.interned_strings_buffer = 8
+opcache.max_accelerated_files = 4000
+opcache.revalidate_freq = 2
+opcache.fast_shutdown = 1
+
+; Date settings
+date.timezone = "UTC"
+
+; Mail settings
+sendmail_path = "/usr/sbin/sendmail -t -i" 

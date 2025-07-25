@@ -1,0 +1,50 @@
+{
+  "web-server-1": {
+    "hostname": "web1.test.local",
+    "ip_address": "192.168.1.100",
+    "os": "ubuntu",
+    "os_version": "22.04",
+    "cpu_cores": 4,
+    "memory_total": "8192",
+    "disk_total": "100GB",
+    "services": ["nginx", "php-fpm", "redis"],
+    "ssl_cert": "/etc/ssl/certs/web1.test.local.crt",
+    "ssl_key": "/etc/ssl/private/web1.test.local.key"
+  },
+  "web-server-2": {
+    "hostname": "web2.test.local",
+    "ip_address": "192.168.1.101",
+    "os": "ubuntu",
+    "os_version": "22.04",
+    "cpu_cores": 4,
+    "memory_total": "8192",
+    "disk_total": "100GB",
+    "services": ["nginx", "php-fpm", "redis"],
+    "ssl_cert": "/etc/ssl/certs/web2.test.local.crt",
+    "ssl_key": "/etc/ssl/private/web2.test.local.key"
+  },
+  "db-server": {
+    "hostname": "db.test.local",
+    "ip_address": "192.168.1.102",
+    "os": "ubuntu",
+    "os_version": "22.04",
+    "cpu_cores": 8,
+    "memory_total": "16384",
+    "disk_total": "500GB",
+    "services": ["postgresql", "redis"],
+    "database_name": "app_db",
+    "database_user": "app_user"
+  },
+  "app-server": {
+    "hostname": "app.test.local",
+    "ip_address": "192.168.1.103",
+    "os": "ubuntu",
+    "os_version": "22.04",
+    "cpu_cores": 2,
+    "memory_total": "4096",
+    "disk_total": "50GB",
+    "services": ["nodejs", "pm2"],
+    "app_port": 3000,
+    "app_env": "production"
+  }
+} 
