@@ -1,4 +1,0 @@
-[Pod]
-Network=spooky-test.network
-PodName=spooky-test
-PublishPort=2221:22 
