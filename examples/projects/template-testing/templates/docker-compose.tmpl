@@ -1,0 +1,53 @@
+# Docker Compose for {{projectName}}
+# Generated on {{env "USER"}}@{{env "HOSTNAME"}}
+
+version: '3.8'
+
+services:
+  {{projectName}}-app:
+    image: nginx:alpine
+    container_name: {{projectName}}-app
+    ports:
+      - "{{envOrDefault "APP_PORT" "8080"}}:80"
+    volumes:
+      - ./app:/var/www/html
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    environment:
+      - NGINX_HOST={{env "HOSTNAME"}}
+      - NGINX_PORT=80
+    networks:
+      - {{projectName}}-network
+    {{if fact "environment"}}
+    labels:
+      - "environment={{fact "environment"}}"
+    {{end}}
+
+  {{projectName}}-db:
+    image: postgres:15-alpine
+    container_name: {{projectName}}-db
+    environment:
+      - POSTGRES_DB={{projectName}}
+      - POSTGRES_USER={{envOrDefault "DB_USER" "postgres"}}
+      - POSTGRES_PASSWORD={{envOrDefault "DB_PASSWORD" "password"}}
+    volumes:
+      - {{projectName}}-db-data:/var/lib/postgresql/data
+    networks:
+      - {{projectName}}-network
+    {{if len machines}}
+    # Database will be accessible to {{len machines}} machines
+    {{end}}
+
+  {{projectName}}-redis:
+    image: redis:7-alpine
+    container_name: {{projectName}}-redis
+    ports:
+      - "{{envOrDefault "REDIS_PORT" "6379"}}:6379"
+    networks:
+      - {{projectName}}-network
+
+networks:
+  {{projectName}}-network:
+    driver: bridge
+
+volumes:
+  {{projectName}}-db-data: 

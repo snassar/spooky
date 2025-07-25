@@ -256,11 +256,12 @@ func TestWriteInventoryFile(t *testing.T) {
 	// Check that the content contains expected elements
 	expectedElements := []string{
 		"# Inventory file for test project",
-		"# Total machines: 2",
+		"inventory {",
 		"machine \"machine-1\"",
 		"machine \"machine-2\"",
 		"192.168.1.1",
 		"192.168.1.2",
+		"}",
 	}
 
 	for _, element := range expectedElements {
@@ -321,6 +322,7 @@ func TestWriteActionsFile(t *testing.T) {
 	// Check that the content contains expected elements
 	expectedElements := []string{
 		"# Actions file for test project",
+		"actions {",
 		"action \"action-1\"",
 		"action \"action-2\"",
 		"echo 'test1'",
@@ -329,6 +331,7 @@ func TestWriteActionsFile(t *testing.T) {
 		"\"script\"",
 		"\"all\"",
 		"\"tag:type=hardware\"",
+		"}",
 	}
 
 	for _, element := range expectedElements {

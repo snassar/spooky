@@ -90,14 +90,27 @@ type Machine struct {
 
 // Action represents an action to be executed on machines
 type Action struct {
-	Name        string   `hcl:"name,label" validate:"required"`
-	Description string   `hcl:"description,optional"`
-	Command     string   `hcl:"command,optional"`
-	Script      string   `hcl:"script,optional"`
-	Machines    []string `hcl:"machines,optional" validate:"omitempty,dive,required"`
-	Tags        []string `hcl:"tags,optional" validate:"omitempty,dive,required"`
-	Timeout     int      `hcl:"timeout,optional" validate:"omitempty,min=1,max=3600"`
-	Parallel    bool     `hcl:"parallel,optional"`
+	Name        string          `hcl:"name,label" validate:"required"`
+	Description string          `hcl:"description,optional"`
+	Type        string          `hcl:"type,optional" validate:"omitempty,oneof=command script template_deploy template_evaluate template_validate template_cleanup"`
+	Command     string          `hcl:"command,optional"`
+	Script      string          `hcl:"script,optional"`
+	Template    *TemplateConfig `hcl:"template,block"`
+	Machines    []string        `hcl:"machines,optional" validate:"omitempty,dive,required"`
+	Tags        []string        `hcl:"tags,optional" validate:"omitempty,dive,required"`
+	Timeout     int             `hcl:"timeout,optional" validate:"omitempty,min=1,max=3600"`
+	Parallel    bool            `hcl:"parallel,optional"`
+}
+
+// TemplateConfig represents template-specific configuration
+type TemplateConfig struct {
+	Source      string `hcl:"source" validate:"required"`
+	Destination string `hcl:"destination" validate:"required"`
+	Validate    bool   `hcl:"validate,optional"`
+	Backup      bool   `hcl:"backup,optional"`
+	Permissions string `hcl:"permissions,optional" validate:"omitempty,regexp=^[0-7]{3,4}$"`
+	Owner       string `hcl:"owner,optional"`
+	Group       string `hcl:"group,optional"`
 }
 
 // Custom validation tags for mutual exclusivity and authentication requirements

@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	"github.com/spf13/cobra"
 
@@ -15,12 +17,8 @@ import (
 )
 
 var (
-	// Validate command flags
-	schema string
-	strict bool
-	format string
-
 	// List command flags
+	format  string
 	filter  string
 	sort    string
 	reverse bool
@@ -43,12 +41,20 @@ func init() {
 	ProjectCmd.AddCommand(ProjectInitCmd)
 	ProjectCmd.AddCommand(ProjectValidateCmd)
 	ProjectCmd.AddCommand(ProjectListCmd)
+	ProjectCmd.AddCommand(ProjectListTemplatesCmd)
+	ProjectCmd.AddCommand(ProjectRenderTemplateCmd)
+	ProjectCmd.AddCommand(ProjectValidateTemplateCmd)
 
 	// Add flags to ProjectListCmd
 	ProjectListCmd.Flags().BoolVar(&listVerbose, "verbose", false, "Show detailed output including machine and action details")
 
 	// Add flags to ProjectValidateCmd
 	ProjectValidateCmd.Flags().BoolVar(&validateDebug, "debug", false, "Show debug output including path resolution details")
+
+	// Add flags to ProjectRenderTemplateCmd
+	ProjectRenderTemplateCmd.Flags().String("output", "", "Output file path (default: stdout)")
+	ProjectRenderTemplateCmd.Flags().Bool("dry-run", false, "Show what would be rendered without writing output")
+	ProjectRenderTemplateCmd.Flags().String("server", "", "Server name for fact integration (e.g., web-001)")
 }
 
 var ProjectInitCmd = &cobra.Command{
@@ -100,41 +106,57 @@ var ProjectListCmd = &cobra.Command{
 	},
 }
 
-var ValidateCmd = &cobra.Command{
-	Use:   "validate <source>",
-	Short: "Validate configuration files and templates",
-	Long:  `Validate the syntax and structure of configuration files and templates`,
-	Args:  cobra.ExactArgs(1),
+var ProjectListTemplatesCmd = &cobra.Command{
+	Use:   "list-templates [PROJECT_PATH]",
+	Short: "List project templates",
+	Long:  `List available templates in a spooky project`,
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
 		logger := logging.GetLogger()
-		source := args[0]
-
-		// TODO: Support remote sources (Git, S3, HTTP)
-		// For now, only support local files
-		if !isLocalFile(source) {
-			return fmt.Errorf("remote sources not yet supported: %s", source)
+		path := "."
+		if len(args) > 0 {
+			path = args[0]
 		}
 
-		// Validate config file exists
-		if _, err := os.Stat(source); os.IsNotExist(err) {
-			logger.Error("Config file not found", err, logging.String("config_file", source))
-			return fmt.Errorf("config file %s does not exist", source)
+		return listProjectTemplates(logger, path)
+	},
+}
+
+var ProjectRenderTemplateCmd = &cobra.Command{
+	Use:   "render-template <template> [PROJECT_PATH]",
+	Short: "Render project template",
+	Long:  `Render a template in the context of a spooky project with facts and configuration`,
+	Args:  cobra.RangeArgs(1, 2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		logger := logging.GetLogger()
+		templateFile := args[0]
+		path := "."
+		if len(args) > 1 {
+			path = args[1]
 		}
 
-		// Parse configuration
-		config, err := config.ParseConfig(source)
-		if err != nil {
-			logger.Error("Configuration validation failed", err, logging.String("config_file", source))
-			return fmt.Errorf("validation failed: %w", err)
+		output, _ := cmd.Flags().GetString("output")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		server, _ := cmd.Flags().GetString("server")
+
+		return renderProjectTemplate(logger, templateFile, path, output, dryRun, server)
+	},
+}
+
+var ProjectValidateTemplateCmd = &cobra.Command{
+	Use:   "validate-template <template> [PROJECT_PATH]",
+	Short: "Validate project template",
+	Long:  `Validate template syntax and check for available context variables`,
+	Args:  cobra.RangeArgs(1, 2),
+	RunE: func(_ *cobra.Command, args []string) error {
+		logger := logging.GetLogger()
+		templateFile := args[0]
+		path := "."
+		if len(args) > 1 {
+			path = args[1]
 		}
 
-		logger.Info("Configuration file validated successfully",
-			logging.String("config_file", source),
-			logging.Int("machine_count", len(config.Machines)),
-			logging.Int("action_count", len(config.Actions)),
-		)
-
-		return nil
+		return validateProjectTemplate(logger, templateFile, path)
 	},
 }
 
@@ -177,14 +199,9 @@ var ListCmd = &cobra.Command{
 // InitCommands initializes all CLI commands and their flags
 func InitCommands() {
 	// Check if flags are already initialized to prevent redefinition
-	if ValidateCmd.Flags().Lookup("schema") != nil {
+	if ListCmd.Flags().Lookup("format") != nil {
 		return // Already initialized
 	}
-
-	// Validate command flags
-	ValidateCmd.Flags().StringVar(&schema, "schema", "", "Path to schema file for validation")
-	ValidateCmd.Flags().BoolVar(&strict, "strict", false, "Enable strict validation mode")
-	ValidateCmd.Flags().StringVar(&format, "format", "text", "Output format: text, json, yaml")
 
 	// List command flags
 	ListCmd.Flags().StringVar(&format, "format", "table", "Output format: table, json, yaml")
@@ -198,19 +215,6 @@ func InitCommands() {
 
 	// Initialize facts commands
 	initFactsCommands()
-}
-
-// isLocalFile checks if the source is a local file
-func isLocalFile(source string) bool {
-	// Check if it's a remote source (Git, S3, HTTP)
-	if strings.HasPrefix(source, "github.com/") ||
-		strings.HasPrefix(source, "git://") ||
-		strings.HasPrefix(source, "s3://") ||
-		strings.HasPrefix(source, "http://") ||
-		strings.HasPrefix(source, "https://") {
-		return false
-	}
-	return true
 }
 
 // listFromConfigFile lists resources from a configuration file
@@ -796,6 +800,211 @@ func listProject(logger logging.Logger, path string) error {
 	fmt.Printf("Summary: %d machines, %d actions\n", machineCount, actionCount)
 	if !listVerbose {
 		fmt.Printf("Use --verbose for detailed output\n")
+	}
+
+	return nil
+}
+
+// listProjectTemplates lists templates in a spooky project
+func listProjectTemplates(logger logging.Logger, path string) error {
+	logger.Info("Listing templates in spooky project",
+		logging.String("path", path))
+
+	// Check if project.hcl exists
+	projectFile := filepath.Join(path, "project.hcl")
+	if _, err := os.Stat(projectFile); os.IsNotExist(err) {
+		logger.Error("Project file not found", err,
+			logging.String("file", projectFile))
+		return fmt.Errorf("project.hcl not found in %s", path)
+	}
+
+	// Look for templates in common locations
+	templateDirs := []string{
+		filepath.Join(path, "templates"),
+		filepath.Join(path, "files"),
+	}
+
+	// Use a map to deduplicate templates
+	templateMap := make(map[string]bool)
+	var templates []string
+
+	for _, dir := range templateDirs {
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			continue
+		}
+
+		err := filepath.Walk(dir, func(filePath string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if !info.IsDir() {
+				ext := filepath.Ext(filePath)
+				// Only include actual template files, not HCL config files
+				if ext == ".tmpl" || ext == ".template" {
+					// Make path relative to project root
+					relPath, _ := filepath.Rel(path, filePath)
+					if !templateMap[relPath] {
+						templateMap[relPath] = true
+						templates = append(templates, relPath)
+					}
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			logger.Error("Failed to walk directory", err,
+				logging.String("directory", dir))
+		}
+	}
+
+	if len(templates) == 0 {
+		fmt.Printf("No templates found in project: %s\n", path)
+		return nil
+	}
+
+	fmt.Printf("Templates found in %s:\n", path)
+	for _, template := range templates {
+		fmt.Printf("  %s\n", template)
+	}
+
+	return nil
+}
+
+// renderProjectTemplate renders a template in the context of a spooky project
+func renderProjectTemplate(logger logging.Logger, templateFile, path, output string, dryRun bool, server string) error {
+	logger.Info("Rendering project template",
+		logging.String("template", templateFile),
+		logging.String("path", path),
+		logging.String("output", output),
+		logging.Bool("dry_run", dryRun),
+		logging.String("server", server))
+
+	// Create template context
+	ctx, err := NewTemplateContext(logger, path)
+	if err != nil {
+		return fmt.Errorf("failed to create template context: %w", err)
+	}
+
+	// Load server-specific facts if server is specified
+	if server != "" {
+		if err := ctx.LoadServerFacts(logger, server); err != nil {
+			logger.Warn("Failed to load server facts",
+				logging.String("server", server),
+				logging.String("error", err.Error()))
+		}
+	}
+
+	// Check if template file exists
+	templatePath := filepath.Join(path, templateFile)
+	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+		logger.Error("Template file not found", err,
+			logging.String("file", templatePath))
+		return fmt.Errorf("template file not found: %s", templatePath)
+	}
+
+	// Read template content
+	templateContent, err := os.ReadFile(templatePath)
+	if err != nil {
+		logger.Error("Failed to read template file", err,
+			logging.String("file", templatePath))
+		return fmt.Errorf("failed to read template file: %w", err)
+	}
+
+	// Create template engine with context
+	tmpl, err := template.New("project-template").Funcs(ctx.GetTemplateFunctions()).Parse(string(templateContent))
+	if err != nil {
+		logger.Error("Failed to parse template", err,
+			logging.String("file", templatePath))
+		return fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	// Execute template
+	var result bytes.Buffer
+	if err := tmpl.Execute(&result, ctx); err != nil {
+		logger.Error("Failed to execute template", err,
+			logging.String("file", templatePath))
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	// Output result
+	switch {
+	case dryRun:
+		fmt.Printf("=== DRY RUN: Template would be rendered as ===\n")
+		fmt.Printf("%s\n", result.String())
+		fmt.Printf("=== END DRY RUN ===\n")
+	case output != "":
+		// Write to file
+		if err := os.WriteFile(output, result.Bytes(), 0o600); err != nil {
+			logger.Error("Failed to write output file", err,
+				logging.String("file", output))
+			return fmt.Errorf("failed to write output file: %w", err)
+		}
+		fmt.Printf("Template rendered successfully to: %s\n", output)
+	default:
+		// Write to stdout
+		fmt.Printf("%s", result.String())
+	}
+
+	return nil
+}
+
+// validateProjectTemplate validates a template in the context of a spooky project
+func validateProjectTemplate(logger logging.Logger, templateFile, path string) error {
+	logger.Info("Validating project template",
+		logging.String("template", templateFile),
+		logging.String("path", path))
+
+	// Create template context
+	ctx, err := NewTemplateContext(logger, path)
+	if err != nil {
+		return fmt.Errorf("failed to create template context: %w", err)
+	}
+
+	// Check if template file exists
+	templatePath := filepath.Join(path, templateFile)
+	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
+		logger.Error("Template file not found", err,
+			logging.String("file", templatePath))
+		return fmt.Errorf("template file not found: %s", templatePath)
+	}
+
+	// Read template content
+	templateContent, err := os.ReadFile(templatePath)
+	if err != nil {
+		logger.Error("Failed to read template file", err,
+			logging.String("file", templatePath))
+		return fmt.Errorf("failed to read template file: %w", err)
+	}
+
+	// Parse template to check syntax
+	tmpl, err := template.New("validation-template").Funcs(ctx.GetTemplateFunctions()).Parse(string(templateContent))
+	if err != nil {
+		logger.Error("Template syntax error", err,
+			logging.String("file", templatePath))
+		return fmt.Errorf("template syntax error: %w", err)
+	}
+
+	// Get template information
+	_ = tmpl.DefinedTemplates()
+
+	fmt.Printf("✅ Template validation successful\n")
+	fmt.Printf("📄 Template: %s\n", templateFile)
+	fmt.Printf("📁 Project: %s\n", ctx.Project.Name)
+	fmt.Printf("🔧 Template functions available: %d\n", len(ctx.GetTemplateFunctions()))
+
+	// Show available context
+	fmt.Printf("\n📋 Available Context:\n")
+	fmt.Printf("  • Project: %s (%s)\n", ctx.Project.Name, ctx.Project.Description)
+	fmt.Printf("  • Machines: %d\n", len(ctx.Machines))
+	fmt.Printf("  • Actions: %d\n", len(ctx.Actions))
+	fmt.Printf("  • Facts: %d\n", len(ctx.Facts))
+	fmt.Printf("  • Environment variables: %d\n", len(ctx.Environment))
+	fmt.Printf("  • Custom data files: %d\n", len(ctx.CustomData))
+
+	// Show template functions
+	fmt.Printf("\n🔧 Template Functions:\n")
+	for funcName := range ctx.GetTemplateFunctions() {
+		fmt.Printf("  • {{%s}}\n", funcName)
 	}
 
 	return nil

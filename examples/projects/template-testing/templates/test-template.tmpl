@@ -1,0 +1,50 @@
+# Test Template for {{projectName}}
+
+## Project Information
+- **Name**: {{projectName}}
+- **Description**: {{projectDescription}}
+- **Environment**: {{env "USER"}}
+- **Working Directory**: {{env "PWD"}}
+
+## Machines ({{len machines}})
+{{range machines}}
+### {{.Name}}
+- **Host**: {{.Host}}
+- **User**: {{.User}}
+- **Port**: {{.Port}}
+{{if .Tags}}
+- **Tags**:
+{{range $key, $value := .Tags}}  - {{$key}}: {{$value}}
+{{end}}
+{{end}}
+{{end}}
+
+## Actions ({{len actions}})
+{{range actions}}
+### {{.Name}}
+- **Description**: {{.Description}}
+- **Type**: {{.Type}}
+{{if .Command}}- **Command**: {{.Command}}{{end}}
+{{if .Script}}- **Script**: {{.Script}}{{end}}
+{{if .Tags}}- **Tags**: {{range .Tags}}{{.}} {{end}}{{end}}
+{{end}}
+
+## Facts
+{{range $key, $value := facts}}
+### {{$key}}
+{{$value}}
+{{end}}
+
+## Custom Data
+{{range $key, $value := data}}
+### {{$key}}
+{{$value}}
+{{end}}
+
+## Template Functions Test
+- **Project Name**: {{projectName}}
+- **Fact Test**: {{fact "os"}}
+- **Machine Test**: {{machine "example-server"}}
+- **Action Test**: {{action "check-status"}}
+- **Environment Test**: {{env "HOME"}}
+- **Data Test**: {{dataKey "test-key"}} 

@@ -1,0 +1,48 @@
+# Nginx Configuration for {{projectName}}
+# Generated on {{env "USER"}}@{{env "HOSTNAME"}}
+
+server {
+    listen 80;
+    server_name {{env "HOSTNAME"}};
+    
+    # Document root
+    root /var/www/html;
+    index index.html index.php;
+    
+    # Logging
+    access_log /var/log/nginx/{{projectName}}-access.log;
+    error_log /var/log/nginx/{{projectName}}-error.log;
+    
+    # PHP processing
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+        fastcgi_index index.php;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    }
+    
+    # Static files
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    
+    # Project-specific configuration
+    {{if fact "environment"}}
+    # Environment: {{fact "environment"}}
+    {{end}}
+    
+    {{if len machines}}
+    # Upstream servers ({{len machines}} machines)
+    upstream {{projectName}}-backend {
+    {{range machines}}
+        server {{.Host}}:{{.Port}} weight=1;
+    {{end}}
+    }
+    {{end}}
+} 

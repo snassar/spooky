@@ -1,0 +1,20 @@
+{
+  "environment": "development",
+  "deployment_type": "docker",
+  "app_version": "1.0.0",
+  "database": {
+    "type": "postgresql",
+    "version": "15",
+    "port": 5432
+  },
+  "cache": {
+    "type": "redis",
+    "version": "7",
+    "port": 6379
+  },
+  "monitoring": {
+    "enabled": true,
+    "prometheus_port": 9090,
+    "grafana_port": 3000
+  }
+} 
