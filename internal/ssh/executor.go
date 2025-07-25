@@ -19,6 +19,9 @@ func ExecuteConfig(cfg *config.Config) error {
 		logging.Int("machine_count", len(cfg.Machines)),
 	)
 
+	// Initialize template action executor
+	templateExecutor := NewTemplateActionExecutor()
+
 	// Initialize index cache for enterprise-scale performance
 	indexCache := &config.IndexCache{}
 
@@ -29,6 +32,7 @@ func ExecuteConfig(cfg *config.Config) error {
 		logger.Info("Executing action",
 			logging.Action(action.Name),
 			logging.String("description", action.Description),
+			logging.String("type", action.Type),
 		)
 
 		// Get target machines for this action using optimized lookup
@@ -50,11 +54,16 @@ func ExecuteConfig(cfg *config.Config) error {
 			logging.Int("target_machine_count", len(targetMachines)),
 		)
 
-		// Execute on each machine
-		if action.Parallel {
-			err = executeActionParallel(action, targetMachines)
+		// Execute action based on type
+		if isTemplateAction(action) {
+			err = executeTemplateAction(templateExecutor, action, targetMachines)
 		} else {
-			err = executeActionSequential(action, targetMachines)
+			// Execute on each machine
+			if action.Parallel {
+				err = executeActionParallel(action, targetMachines)
+			} else {
+				err = executeActionSequential(action, targetMachines)
+			}
 		}
 
 		if err != nil {
@@ -75,6 +84,27 @@ func ExecuteConfig(cfg *config.Config) error {
 		logging.Int("total_actions", len(cfg.Actions)),
 	)
 	return nil
+}
+
+// isTemplateAction checks if an action is a template action
+func isTemplateAction(action *config.Action) bool {
+	return action.Type == "template_deploy" ||
+		action.Type == "template_evaluate" ||
+		action.Type == "template_validate" ||
+		action.Type == "template_cleanup"
+}
+
+// executeTemplateAction executes a template action using the template executor
+func executeTemplateAction(templateExecutor *TemplateActionExecutor, action *config.Action, machines []*config.Machine) error {
+	logger := logging.GetLogger()
+
+	logger.Info("Executing template action",
+		logging.Action(action.Name),
+		logging.String("type", action.Type),
+		logging.Int("machine_count", len(machines)),
+	)
+
+	return templateExecutor.ExecuteAction(action, machines)
 }
 
 // executeActionSequential executes an action sequentially on all target machines

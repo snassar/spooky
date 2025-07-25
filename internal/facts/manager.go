@@ -1062,6 +1062,14 @@ func (m *Manager) matchesSelectPattern(factPath string, selectFacts []string) bo
 		}
 
 		// Wildcard match (e.g., "*.name" matches "application.name", "environment.name")
+		if strings.HasPrefix(pattern, "*.") {
+			suffix := strings.TrimPrefix(pattern, "*.")
+			if strings.HasSuffix(factPath, "."+suffix) {
+				return true
+			}
+		}
+
+		// Wildcard match (e.g., "*.port" matches "application.port", "monitoring.prometheus_port")
 		if strings.HasSuffix(pattern, ".*") {
 			category := strings.TrimSuffix(pattern, ".*")
 			if strings.HasPrefix(factPath, category+".") {

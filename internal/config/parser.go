@@ -40,60 +40,14 @@ func resolveActionPaths(configFile string, action *Action) {
 	}
 }
 
-// parseConfigFile is a common function for parsing HCL configuration files
-func parseConfigFile(filename, configType string, target interface{}, resolvePaths func(string, interface{})) error {
-	logger := logging.GetLogger()
-
-	logger.Info("Parsing "+configType+" configuration file",
-		logging.String("config_file", filename),
-	)
-
-	parser := hclparse.NewParser()
-
-	// Read the file
-	file, diags := parser.ParseHCLFile(filename)
-	if diags.HasErrors() {
-		diagError := diags.Error()
-		logger.Error("Failed to parse "+configType+" HCL file", errors.New(diagError),
-			logging.String("config_file", filename),
-		)
-		return errors.New("failed to parse " + configType + " HCL file: " + diagError)
+// resolveProjectPaths resolves relative paths in project configuration
+func resolveProjectPaths(configFile string, project *ProjectConfig) {
+	if project.InventoryFile != "" {
+		project.InventoryFile = resolvePath(configFile, project.InventoryFile, false)
 	}
-
-	// Decode the configuration
-	diags = gohcl.DecodeBody(file.Body, nil, target)
-	if diags.HasErrors() {
-		diagError := diags.Error()
-		logger.Error("Failed to decode "+configType+" configuration", errors.New(diagError),
-			logging.String("config_file", filename),
-		)
-		return errors.New("failed to decode " + configType + " configuration: " + diagError)
+	if project.ActionsFile != "" {
+		project.ActionsFile = resolvePath(configFile, project.ActionsFile, false)
 	}
-
-	// Resolve paths if resolver function is provided
-	if resolvePaths != nil {
-		resolvePaths(filename, target)
-	}
-
-	return nil
-}
-
-// parseConfigWithResolver is a generic function for parsing configs with path resolution
-func parseConfigWithResolver[T any](filename, configType string, target *T, resolver func(string, *T)) (*T, error) {
-	logger := logging.GetLogger()
-
-	err := parseConfigFile(filename, configType, target, func(filename string, target interface{}) {
-		if cfg, ok := target.(*T); ok {
-			resolver(filename, cfg)
-		}
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	logger.Info(configType+" configuration parsed successfully",
-		logging.String("config_file", filename))
-	return target, nil
 }
 
 // ParseConfig parses an HCL2 configuration file (legacy combined format)
@@ -169,7 +123,50 @@ func ParseConfig(filename string) (*Config, error) {
 
 // ParseProjectConfig parses a project configuration file
 func ParseProjectConfig(filename string) (*ProjectConfig, error) {
-	return ParseProjectConfigWithDebug(filename, false)
+	logger := logging.GetLogger()
+
+	logger.Info("Parsing project configuration",
+		logging.String("config_file", filename),
+	)
+
+	parser := hclparse.NewParser()
+
+	// Read the file
+	file, diags := parser.ParseHCLFile(filename)
+	if diags.HasErrors() {
+		diagError := diags.Error()
+		logger.Error("Failed to parse project HCL file", errors.New(diagError),
+			logging.String("config_file", filename),
+		)
+		return nil, errors.New("failed to parse project HCL file: " + diagError)
+	}
+
+	// Decode the configuration using wrapper
+	var wrapper ProjectConfigWrapper
+	diags = gohcl.DecodeBody(file.Body, nil, &wrapper)
+	if diags.HasErrors() {
+		diagError := diags.Error()
+		logger.Error("Failed to decode project configuration", errors.New(diagError),
+			logging.String("config_file", filename),
+		)
+		return nil, errors.New("failed to decode project configuration: " + diagError)
+	}
+
+	if wrapper.Project == nil {
+		return nil, errors.New("no project block found in configuration")
+	}
+
+	config := wrapper.Project
+
+	// Resolve relative paths
+	resolveProjectPaths(filename, config)
+
+	logger.Info("Project configuration parsed successfully",
+		logging.String("config_file", filename),
+		logging.String("project_name", config.Name),
+	)
+
+	return config, nil
 }
 
 // ParseProjectConfigWithDebug parses a project configuration file with optional debug output
@@ -242,74 +239,50 @@ func ParseActionsConfig(filename string) (*ActionsConfig, error) {
 	return parseActionsWithWrapper(filename)
 }
 
-// parseInventoryWithWrapper parses inventory configuration with wrapper block
+// parseInventoryWithWrapper parses an inventory configuration file with wrapper block
+// nolint:dupl // Acceptable duplication - different types and purposes
 func parseInventoryWithWrapper(filename string) (*InventoryConfig, error) {
-	logger := logging.GetLogger()
-
-	logger.Info("Parsing inventory configuration with wrapper block",
-		logging.String("config_file", filename),
-	)
-
-	parser := hclparse.NewParser()
-
-	// Read the file
-	file, diags := parser.ParseHCLFile(filename)
-	if diags.HasErrors() {
-		diagError := diags.Error()
-		logger.Error("Failed to parse inventory HCL file", errors.New(diagError),
-			logging.String("config_file", filename),
-		)
-		return nil, errors.New("failed to parse inventory HCL file: " + diagError)
-	}
-
-	// Validate wrapper blocks
-	if err := validateWrapperBlocks(file); err != nil {
-		logger.Error("Failed to validate wrapper blocks", err,
-			logging.String("config_file", filename),
-		)
-		return nil, fmt.Errorf("wrapper block validation failed: %w", err)
-	}
-
-	// Decode the configuration using wrapper
-	var wrapper InventoryWrapper
-	diags = gohcl.DecodeBody(file.Body, nil, &wrapper)
-	if diags.HasErrors() {
-		diagError := diags.Error()
-		logger.Error("Failed to decode inventory configuration", errors.New(diagError),
-			logging.String("config_file", filename),
-		)
-		return nil, errors.New("failed to decode inventory configuration: " + diagError)
-	}
-
-	if wrapper.Inventory == nil {
-		return nil, errors.New("no inventory block found in configuration")
-	}
-
-	config := wrapper.Inventory
-
-	logger.Debug("Inventory configuration decoded successfully",
-		logging.String("config_file", filename),
-		logging.Int("machine_count", len(config.Machines)),
-	)
-
-	// Resolve relative paths in machine configurations
-	for i := range config.Machines {
-		resolveMachinePaths(filename, &config.Machines[i])
-	}
-
-	logger.Info("Inventory configuration parsed successfully",
-		logging.String("config_file", filename),
-		logging.Int("machine_count", len(config.Machines)),
-	)
-
-	return config, nil
+	return parseConfigWithWrapper(filename, "inventory", &InventoryWrapper{},
+		func(wrapper *InventoryWrapper) (*InventoryConfig, error) {
+			if wrapper.Inventory == nil {
+				return nil, errors.New("no inventory block found in configuration")
+			}
+			return wrapper.Inventory, nil
+		},
+		func(config *InventoryConfig) {
+			for i := range config.Machines {
+				resolveMachinePaths(filename, &config.Machines[i])
+			}
+		})
 }
 
-// parseActionsWithWrapper parses actions configuration with wrapper block
+// parseActionsWithWrapper parses an actions configuration file with wrapper block
+// nolint:dupl // Acceptable duplication - different types and purposes
 func parseActionsWithWrapper(filename string) (*ActionsConfig, error) {
+	return parseConfigWithWrapper(filename, "actions", &ActionsWrapper{},
+		func(wrapper *ActionsWrapper) (*ActionsConfig, error) {
+			if wrapper.Actions == nil {
+				return nil, errors.New("no actions block found in configuration")
+			}
+			return wrapper.Actions, nil
+		},
+		func(config *ActionsConfig) {
+			for i := range config.Actions {
+				resolveActionPaths(filename, &config.Actions[i])
+			}
+		})
+}
+
+// parseConfigWithWrapper is a generic helper function to reduce code duplication
+func parseConfigWithWrapper[T any, W any](
+	filename, configType string,
+	wrapper W,
+	extractConfig func(W) (*T, error),
+	resolvePaths func(*T),
+) (*T, error) {
 	logger := logging.GetLogger()
 
-	logger.Info("Parsing actions configuration with wrapper block",
+	logger.Info("Parsing "+configType+" configuration with wrapper block",
 		logging.String("config_file", filename),
 	)
 
@@ -319,10 +292,10 @@ func parseActionsWithWrapper(filename string) (*ActionsConfig, error) {
 	file, diags := parser.ParseHCLFile(filename)
 	if diags.HasErrors() {
 		diagError := diags.Error()
-		logger.Error("Failed to parse actions HCL file", errors.New(diagError),
+		logger.Error("Failed to parse "+configType+" HCL file", errors.New(diagError),
 			logging.String("config_file", filename),
 		)
-		return nil, errors.New("failed to parse actions HCL file: " + diagError)
+		return nil, errors.New("failed to parse " + configType + " HCL file: " + diagError)
 	}
 
 	// Validate wrapper blocks
@@ -334,35 +307,30 @@ func parseActionsWithWrapper(filename string) (*ActionsConfig, error) {
 	}
 
 	// Decode the configuration using wrapper
-	var wrapper ActionsWrapper
-	diags = gohcl.DecodeBody(file.Body, nil, &wrapper)
+	diags = gohcl.DecodeBody(file.Body, nil, wrapper)
 	if diags.HasErrors() {
 		diagError := diags.Error()
-		logger.Error("Failed to decode actions configuration", errors.New(diagError),
+		logger.Error("Failed to decode "+configType+" configuration", errors.New(diagError),
 			logging.String("config_file", filename),
 		)
-		return nil, errors.New("failed to decode actions configuration: " + diagError)
+		return nil, errors.New("failed to decode " + configType + " configuration: " + diagError)
 	}
 
-	if wrapper.Actions == nil {
-		return nil, errors.New("no actions block found in configuration")
+	// Extract configuration from wrapper
+	config, err := extractConfig(wrapper)
+	if err != nil {
+		return nil, err
 	}
 
-	config := wrapper.Actions
-
-	logger.Debug("Actions configuration decoded successfully",
+	logger.Debug(configType+" configuration decoded successfully",
 		logging.String("config_file", filename),
-		logging.Int("action_count", len(config.Actions)),
 	)
 
-	// Resolve relative paths in action configurations
-	for i := range config.Actions {
-		resolveActionPaths(filename, &config.Actions[i])
-	}
+	// Resolve relative paths
+	resolvePaths(config)
 
-	logger.Info("Actions configuration parsed successfully",
+	logger.Info(configType+" configuration parsed successfully",
 		logging.String("config_file", filename),
-		logging.Int("action_count", len(config.Actions)),
 	)
 
 	return config, nil

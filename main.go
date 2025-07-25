@@ -47,10 +47,9 @@ func main() {
 	cli.InitCommands()
 
 	// Add subcommands
-	rootCmd.AddCommand(cli.ValidateCmd)
+
 	rootCmd.AddCommand(cli.ListCmd)
 	rootCmd.AddCommand(cli.FactsCmd)
-	rootCmd.AddCommand(cli.TemplatesCmd)
 	rootCmd.AddCommand(cli.MachinesCmd)
 	rootCmd.AddCommand(cli.ConfigCmd)
 	rootCmd.AddCommand(cli.ProjectCmd)
