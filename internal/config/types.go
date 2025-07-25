@@ -35,6 +35,16 @@ type ProjectConfigWrapper struct {
 	Project *ProjectConfig `hcl:"project,block"`
 }
 
+// InventoryWrapper wraps InventoryConfig for HCL parsing
+type InventoryWrapper struct {
+	Inventory *InventoryConfig `hcl:"inventory,block"`
+}
+
+// ActionsWrapper wraps ActionsConfig for HCL parsing
+type ActionsWrapper struct {
+	Actions *ActionsConfig `hcl:"actions,block"`
+}
+
 // StorageConfig represents storage configuration
 type StorageConfig struct {
 	Type string `hcl:"type" validate:"required,oneof=badgerdb json"`

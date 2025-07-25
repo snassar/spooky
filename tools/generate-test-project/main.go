@@ -8,9 +8,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
+
+	"github.com/spf13/cobra"
 )
 
 // Machine represents a machine configuration
@@ -40,6 +40,7 @@ type ScaleConfig struct {
 	Name        string
 	Hardware    int
 	VMs         int
+	Containers  int
 	Description string
 }
 
@@ -70,9 +71,10 @@ func generateMachines(scale ScaleConfig) []Machine {
 	machineCount := 0
 
 	// Hardware machines
-	hardwarePerDC := scale.Hardware / 2
+	hardwarePerDC := (scale.Hardware + 1) / 2 // Round up for first datacenter
+	hardwareCount := 0
 	// FRA00 Hardware machines
-	for i := 1; i <= hardwarePerDC; i++ {
+	for i := 1; i <= hardwarePerDC && hardwareCount < scale.Hardware; i++ {
 		metadata := fmt.Sprintf("hardware-fra00-%d-admin-debian12-vm-host-high", i)
 		id := generateGitStyleID(metadata)
 		machine := Machine{
@@ -91,10 +93,12 @@ func generateMachines(scale ScaleConfig) []Machine {
 		}
 		machines = append(machines, machine)
 		machineCount++
+		hardwareCount++
 	}
 
 	// BER0 Hardware machines
-	for i := 1; i <= hardwarePerDC; i++ {
+	ber0Hardware := scale.Hardware - hardwareCount // Remaining hardware for BER0
+	for i := 1; i <= ber0Hardware && hardwareCount < scale.Hardware; i++ {
 		metadata := fmt.Sprintf("hardware-ber0-%d-admin-debian12-vm-host-high", i)
 		id := generateGitStyleID(metadata)
 		machine := Machine{
@@ -113,6 +117,7 @@ func generateMachines(scale ScaleConfig) []Machine {
 		}
 		machines = append(machines, machine)
 		machineCount++
+		hardwareCount++
 	}
 
 	// VM machines - FRA00
@@ -128,9 +133,10 @@ func generateMachines(scale ScaleConfig) []Machine {
 		{"monitoring", "ubuntu22", "low", 40},
 	}
 
-	vmPerType := scale.VMs / 8 // 4 types per datacenter
+	vmPerType := (scale.VMs + 7) / 8 // 4 types per datacenter, round up to ensure we get enough machines
+	vmCount := 0
 	for _, vmType := range vmTypes {
-		for i := 1; i <= vmPerType; i++ {
+		for i := 1; i <= vmPerType && vmCount < scale.VMs; i++ {
 			metadata := fmt.Sprintf("vm-fra00-%s-%d-admin-%s-%s", vmType.role, i, vmType.os, vmType.capacity)
 			id := generateGitStyleID(metadata)
 			machine := Machine{
@@ -149,12 +155,13 @@ func generateMachines(scale ScaleConfig) []Machine {
 			}
 			machines = append(machines, machine)
 			machineCount++
+			vmCount++
 		}
 	}
 
 	// VM machines - BER0
 	for _, vmType := range vmTypes {
-		for i := 1; i <= vmPerType; i++ {
+		for i := 1; i <= vmPerType && vmCount < scale.VMs; i++ {
 			metadata := fmt.Sprintf("vm-ber0-%s-%d-admin-%s-%s", vmType.role, i, vmType.os, vmType.capacity)
 			id := generateGitStyleID(metadata)
 			machine := Machine{
@@ -173,6 +180,71 @@ func generateMachines(scale ScaleConfig) []Machine {
 			}
 			machines = append(machines, machine)
 			machineCount++
+			vmCount++
+		}
+	}
+
+	// Container machines - FRA00
+	containerTypes := []struct {
+		role     string
+		os       string
+		capacity string
+		subnet   int
+	}{
+		{"app-server", "alpine", "medium", 50},
+		{"api-gateway", "alpine", "high", 60},
+		{"worker", "alpine", "low", 70},
+		{"redis", "alpine", "medium", 80},
+	}
+
+	containerPerType := (scale.Containers + 7) / 8 // 4 types per datacenter, round up to ensure we get enough machines
+	containerCount := 0
+	for _, containerType := range containerTypes {
+		for i := 1; i <= containerPerType && containerCount < scale.Containers; i++ {
+			metadata := fmt.Sprintf("container-fra00-%s-%d-admin-%s-%s", containerType.role, i, containerType.os, containerType.capacity)
+			id := generateGitStyleID(metadata)
+			machine := Machine{
+				ID:       fmt.Sprintf("machine-%s", id),
+				Host:     fmt.Sprintf("10.1.%d.%d", containerType.subnet, i),
+				Port:     22,
+				User:     "admin",
+				Password: fmt.Sprintf("container-secure-pass-%03d", machineCount),
+				Tags: map[string]string{
+					"datacenter": "FRA00",
+					"type":       "container",
+					"role":       containerType.role,
+					"os":         containerType.os,
+					"capacity":   containerType.capacity,
+				},
+			}
+			machines = append(machines, machine)
+			machineCount++
+			containerCount++
+		}
+	}
+
+	// Container machines - BER0
+	for _, containerType := range containerTypes {
+		for i := 1; i <= containerPerType && containerCount < scale.Containers; i++ {
+			metadata := fmt.Sprintf("container-ber0-%s-%d-admin-%s-%s", containerType.role, i, containerType.os, containerType.capacity)
+			id := generateGitStyleID(metadata)
+			machine := Machine{
+				ID:       fmt.Sprintf("machine-%s", id),
+				Host:     fmt.Sprintf("10.2.%d.%d", containerType.subnet, i),
+				Port:     22,
+				User:     "admin",
+				Password: fmt.Sprintf("container-secure-pass-%03d", machineCount),
+				Tags: map[string]string{
+					"datacenter": "BER0",
+					"type":       "container",
+					"role":       containerType.role,
+					"os":         containerType.os,
+					"capacity":   containerType.capacity,
+				},
+			}
+			machines = append(machines, machine)
+			machineCount++
+			containerCount++
 		}
 	}
 
@@ -394,16 +466,18 @@ func writeInventoryFile(projectPath string, machines []Machine) error {
 
 	// Write header
 	fmt.Fprintf(file, "# Inventory file for test project\n")
-	fmt.Fprintf(file, "# Generated with Git-style IDs for deterministic identification\n")
-	fmt.Fprintf(file, "# Total machines: %d\n\n", len(machines))
+	fmt.Fprintf(file, "# Generated machines for spooky SSH automation tool\n\n")
+
+	// Write inventory wrapper block
+	fmt.Fprintf(file, "inventory {\n")
 
 	// Write all machines
-	for i, machine := range machines {
-		writeMachine(file, &machine)
-		if i%1000 == 0 && i > 0 {
-			fmt.Printf("Written %d machines to inventory...\n", i)
-		}
+	for i := range machines {
+		writeMachine(file, &machines[i])
 	}
+
+	// Close inventory wrapper block
+	fmt.Fprintf(file, "}\n")
 
 	fmt.Printf("Generated inventory file: %s\n", filename)
 	fmt.Printf("Total machines: %d\n", len(machines))
@@ -424,10 +498,16 @@ func writeActionsFile(projectPath string, actions []Action) error {
 	fmt.Fprintf(file, "# Actions file for test project\n")
 	fmt.Fprintf(file, "# Test actions for spooky SSH automation tool\n\n")
 
+	// Write actions wrapper block
+	fmt.Fprintf(file, "actions {\n")
+
 	// Write all actions
 	for i := range actions {
 		writeAction(file, &actions[i])
 	}
+
+	// Close actions wrapper block
+	fmt.Fprintf(file, "}\n")
 
 	fmt.Printf("Generated actions file: %s\n", filename)
 	fmt.Printf("Total actions: %d\n", len(actions))
@@ -472,97 +552,137 @@ func generateTestProject(scale ScaleConfig, outputDir string) error {
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: generate-test-project <scale> [output-dir]")
-		fmt.Println("Scales: small, medium, large, or custom")
-		fmt.Println("Example: generate-test-project medium ./test-projects")
-		fmt.Println("Example: generate-test-project custom:100:300 ./test-projects")
+	var (
+		scale      string
+		hardware   int
+		vms        int
+		containers int
+		outputDir  string
+	)
+
+	rootCmd := &cobra.Command{
+		Use:   "generate-test-project",
+		Short: "Generate test projects for spooky with different scale configurations",
+		Long: `Generate test projects for spooky with different scale configurations.
+
+This tool creates test projects with varying numbers of machines and actions to test
+the spooky SSH automation tool at different scales.
+
+Available predefined scales:
+- small: 25 machines (2-5 hardware, rest random mix of VMs and containers)
+- medium: 250 machines (20-40 hardware, rest random mix of VMs and containers)
+- large: 1500 machines (150-250 hardware, rest random mix of VMs and containers)
+- testing: 10000 machines (completely random distribution of hardware, VMs, and containers)
+
+For custom scales, use the --hardware, --vms, and --containers flags.`,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			// Create output directory if it doesn't exist
+			if err := os.MkdirAll(outputDir, 0o755); err != nil {
+				return fmt.Errorf("error creating output directory: %w", err)
+			}
+
+			var scaleConfig ScaleConfig
+
+			// Parse scale configuration
+			if scale == "custom" {
+				if hardware <= 0 || vms <= 0 || containers <= 0 {
+					return fmt.Errorf("custom scale requires --hardware, --vms, and --containers to be greater than 0")
+				}
+				scaleConfig = ScaleConfig{
+					Name:        "custom",
+					Hardware:    hardware,
+					VMs:         vms,
+					Containers:  containers,
+					Description: fmt.Sprintf("Custom scale with %d hardware + %d VMs + %d containers", hardware, vms, containers),
+				}
+			} else {
+				// Predefined scales
+				switch scale {
+				case "small":
+					// 25 total: 2-5 hardware, rest random mix of VMs and containers
+					hardwareCount := 3 // Fixed for now, could be randomized
+					remaining := 25 - hardwareCount
+					vmCount := remaining / 2
+					containerCount := remaining - vmCount
+					scaleConfig = ScaleConfig{
+						Name:        "small",
+						Hardware:    hardwareCount,
+						VMs:         vmCount,
+						Containers:  containerCount,
+						Description: fmt.Sprintf("Small hosting provider with 25 machines (%d hardware + %d VMs + %d containers)", hardwareCount, vmCount, containerCount),
+					}
+				case "medium":
+					// 250 total: 20-40 hardware, rest random mix of VMs and containers
+					hardwareCount := 30 // Fixed for now, could be randomized
+					remaining := 250 - hardwareCount
+					vmCount := remaining / 2
+					containerCount := remaining - vmCount
+					scaleConfig = ScaleConfig{
+						Name:        "medium",
+						Hardware:    hardwareCount,
+						VMs:         vmCount,
+						Containers:  containerCount,
+						Description: fmt.Sprintf("Medium hosting provider with 250 machines (%d hardware + %d VMs + %d containers)", hardwareCount, vmCount, containerCount),
+					}
+				case "large":
+					// 1500 total: 150-250 hardware, rest random mix of VMs and containers
+					hardwareCount := 200 // Fixed for now, could be randomized
+					remaining := 1500 - hardwareCount
+					vmCount := remaining / 2
+					containerCount := remaining - vmCount
+					scaleConfig = ScaleConfig{
+						Name:        "large",
+						Hardware:    hardwareCount,
+						VMs:         vmCount,
+						Containers:  containerCount,
+						Description: fmt.Sprintf("Large hosting provider with 1500 machines (%d hardware + %d VMs + %d containers)", hardwareCount, vmCount, containerCount),
+					}
+				case "testing":
+					// 10000 total: completely random distribution
+					hardwareCount := 2000 // Random distribution
+					vmCount := 4000
+					containerCount := 4000
+					scaleConfig = ScaleConfig{
+						Name:        "testing",
+						Hardware:    hardwareCount,
+						VMs:         vmCount,
+						Containers:  containerCount,
+						Description: fmt.Sprintf("Testing scale with 10000 machines (%d hardware + %d VMs + %d containers)", hardwareCount, vmCount, containerCount),
+					}
+				default:
+					return fmt.Errorf("unknown scale: %s. Available scales: small, medium, large, testing, or custom", scale)
+				}
+			}
+
+			// Generate the test project
+			if err := generateTestProject(scaleConfig, outputDir); err != nil {
+				return fmt.Errorf("error generating test project: %w", err)
+			}
+
+			fmt.Printf("\n=== Test project generated successfully ===\n")
+			fmt.Printf("Scale: %s\n", scaleConfig.Name)
+			fmt.Printf("Hardware machines: %d\n", scaleConfig.Hardware)
+			fmt.Printf("VM machines: %d\n", scaleConfig.VMs)
+			fmt.Printf("Container machines: %d\n", scaleConfig.Containers)
+			fmt.Printf("Total machines: %d\n", scaleConfig.Hardware+scaleConfig.VMs+scaleConfig.Containers)
+			fmt.Printf("Output directory: %s\n", outputDir)
+
+			return nil
+		},
+	}
+
+	// Add flags
+	rootCmd.Flags().StringVarP(&scale, "scale", "s", "medium", "Scale configuration (small, medium, large, testing, or custom)")
+	rootCmd.Flags().IntVarP(&hardware, "hardware", "w", 0, "Number of hardware machines (for custom scale)")
+	rootCmd.Flags().IntVarP(&vms, "vms", "v", 0, "Number of VM machines (for custom scale)")
+	rootCmd.Flags().IntVarP(&containers, "containers", "c", 0, "Number of container machines (for custom scale)")
+	rootCmd.Flags().StringVarP(&outputDir, "output", "o", "./test-projects", "Output directory for generated projects")
+
+	// Mark hardware, vms, and containers as required when scale is custom
+	rootCmd.MarkFlagsRequiredTogether("hardware", "vms", "containers")
+
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-
-	scaleArg := os.Args[1]
-	outputDir := "./test-projects"
-	if len(os.Args) > 2 {
-		outputDir = os.Args[2]
-	}
-
-	// Create output directory if it doesn't exist
-	if err := os.MkdirAll(outputDir, 0o755); err != nil {
-		fmt.Printf("Error creating output directory: %v\n", err)
-		os.Exit(1)
-	}
-
-	var scale ScaleConfig
-
-	// Parse scale argument
-	if strings.HasPrefix(scaleArg, "custom:") {
-		// Custom scale format: custom:hardware:vms
-		parts := strings.Split(scaleArg, ":")
-		if len(parts) != 3 {
-			fmt.Println("Custom scale format: custom:hardware:vms")
-			fmt.Println("Example: custom:50:150")
-			os.Exit(1)
-		}
-
-		hardware, err := strconv.Atoi(parts[1])
-		if err != nil {
-			fmt.Printf("Invalid hardware count: %s\n", parts[1])
-			os.Exit(1)
-		}
-
-		vms, err := strconv.Atoi(parts[2])
-		if err != nil {
-			fmt.Printf("Invalid VM count: %s\n", parts[2])
-			os.Exit(1)
-		}
-
-		scale = ScaleConfig{
-			Name:        "custom",
-			Hardware:    hardware,
-			VMs:         vms,
-			Description: fmt.Sprintf("Custom scale with %d hardware + %d VMs", hardware, vms),
-		}
-	} else {
-		// Predefined scales
-		switch scaleArg {
-		case "small":
-			scale = ScaleConfig{
-				Name:        "small",
-				Hardware:    10,
-				VMs:         30,
-				Description: "Small hosting provider with 40 servers (10 hardware + 30 VMs)",
-			}
-		case "medium":
-			scale = ScaleConfig{
-				Name:        "medium",
-				Hardware:    100,
-				VMs:         300,
-				Description: "Medium hosting provider with 400 servers (100 hardware + 300 VMs)",
-			}
-		case "large":
-			scale = ScaleConfig{
-				Name:        "large",
-				Hardware:    2500,
-				VMs:         7500,
-				Description: "Large hosting provider with 10,000 servers (2,500 hardware + 7,500 VMs)",
-			}
-		default:
-			fmt.Printf("Unknown scale: %s\n", scaleArg)
-			fmt.Println("Available scales: small, medium, large, or custom:hardware:vms")
-			os.Exit(1)
-		}
-	}
-
-	// Generate the test project
-	if err := generateTestProject(scale, outputDir); err != nil {
-		fmt.Printf("Error generating test project: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("\n=== Test project generated successfully ===\n")
-	fmt.Printf("Scale: %s\n", scale.Name)
-	fmt.Printf("Hardware machines: %d\n", scale.Hardware)
-	fmt.Printf("VM machines: %d\n", scale.VMs)
-	fmt.Printf("Total machines: %d\n", scale.Hardware+scale.VMs)
-	fmt.Printf("Output directory: %s\n", outputDir)
 }

@@ -475,14 +475,16 @@ func initProject(logger logging.Logger, projectName, path string) error {
 	inventoryConfig := fmt.Sprintf(`# Inventory for %s project
 # Add your machine definitions here
 
-machine "example-server" {
-  host     = "192.168.1.100"
-  port     = 22
-  user     = "debian"
-  password = "your-password"
-  tags = {
-    environment = "development"
-    role = "web"
+inventory {
+  machine "example-server" {
+    host     = "192.168.1.100"
+    port     = 22
+    user     = "debian"
+    password = "your-password"
+    tags = {
+      environment = "development"
+      role = "web"
+    }
   }
 }`, projectName)
 
@@ -497,20 +499,22 @@ machine "example-server" {
 	actionsConfig := fmt.Sprintf(`# Actions for %s project
 # Add your action definitions here
 
-action "check-status" {
-  description = "Check server status"
-  command     = "uptime && df -h"
-  tags        = ["role=web"]
-  parallel    = true
-  timeout     = 300
-}
+actions {
+  action "check-status" {
+    description = "Check server status"
+    command     = "uptime && df -h"
+    tags        = ["role=web"]
+    parallel    = true
+    timeout     = 300
+  }
 
-action "update-system" {
-  description = "Update system packages"
-  command     = "apt update && apt upgrade -y"
-  tags        = ["environment=development"]
-  parallel    = true
-  timeout     = 600
+  action "update-system" {
+    description = "Update system packages"
+    command     = "apt update && apt upgrade -y"
+    tags        = ["environment=development"]
+    parallel    = true
+    timeout     = 600
+  }
 }`, projectName)
 
 	actionsFile := filepath.Join(projectDir, "actions.hcl")
