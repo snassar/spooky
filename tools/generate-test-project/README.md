@@ -14,39 +14,55 @@ This tool replaces the old `@/generate-config` approach by leveraging the new se
 ## Usage
 
 ```bash
-./build/generate-test-project <scale> [output-dir]
+./build/generate-test-project [flags]
 ```
+
+### Flags
+
+- `-s, --scale string`: Scale configuration (small, medium, large, testing, or custom) (default "medium")
+- `-w, --hardware int`: Number of hardware machines (for custom scale)
+- `-v, --vms int`: Number of VM machines (for custom scale)
+- `-c, --containers int`: Number of container machines (for custom scale)
+- `-o, --output string`: Output directory for generated projects (default "./test-projects")
+- `-h, --help`: Show help information
 
 ### Scales
 
 #### Predefined Scales
 
-- **small**: 40 machines (10 hardware + 30 VMs)
-- **medium**: 400 machines (100 hardware + 300 VMs)  
-- **large**: 10,000 machines (2,500 hardware + 7,500 VMs)
+- **small**: 25 machines (2-5 hardware, rest random mix of VMs and containers)
+- **medium**: 250 machines (20-40 hardware, rest random mix of VMs and containers)
+- **large**: 1500 machines (150-250 hardware, rest random mix of VMs and containers)
+- **testing**: 10000 machines (completely random distribution of hardware, VMs, and containers)
 
 #### Custom Scale
 
-Use the format `custom:hardware:vms` to specify exact counts:
+Use the `--scale custom` flag along with `--hardware`, `--vms`, and `--containers` flags to specify exact counts:
 
 ```bash
-./build/generate-test-project custom:50:150 ./test-projects
+./build/generate-test-project --scale custom --hardware 50 --vms 150 --containers 100 --output ./test-projects
 ```
 
 ### Examples
 
 ```bash
 # Generate a small test project
-./build/generate-test-project small ./test-projects
+./build/generate-test-project --scale small --output ./test-projects
 
-# Generate a medium test project
-./build/generate-test-project medium ./test-projects
+# Generate a medium test project (default)
+./build/generate-test-project
 
-# Generate a custom test project with 20 hardware and 80 VMs
-./build/generate-test-project custom:20:80 ./test-projects
+# Generate a large test project
+./build/generate-test-project --scale large --output ./test-projects
+
+# Generate a custom test project with 20 hardware, 80 VMs, and 50 containers
+./build/generate-test-project --scale custom --hardware 20 --vms 80 --containers 50 --output ./test-projects
 
 # Generate in current directory
-./build/generate-test-project small .
+./build/generate-test-project --scale small --output .
+
+# Show help
+./build/generate-test-project --help
 ```
 
 ## Generated Project Structure
@@ -83,6 +99,15 @@ The tool generates realistic machine configurations:
   - Databases: 10.1.20.x, 10.2.20.x
   - Cache: 10.1.30.x, 10.2.30.x
   - Monitoring: 10.1.40.x, 10.2.40.x
+
+### Container Machines
+- **Types**: app-server, api-gateway, worker, redis
+- **OS**: Alpine
+- **IP Ranges**: 
+  - App servers: 10.1.50.x, 10.2.50.x
+  - API gateways: 10.1.60.x, 10.2.60.x
+  - Workers: 10.1.70.x, 10.2.70.x
+  - Redis: 10.1.80.x, 10.2.80.x
 
 ## Generated Actions
 
@@ -122,10 +147,34 @@ After generating a project, you can test it with spooky:
 ./build/spooky project validate ./test-projects/project-name --debug
 ```
 
+## Testing the Tool
+
+```bash
+# Test help functionality
+./build/generate-test-project --help
+
+# Test different scales
+./build/generate-test-project --scale small --output ./test-small
+./build/generate-test-project --scale medium --output ./test-medium
+./build/generate-test-project --scale large --output ./test-large
+
+# Test custom scale
+./build/generate-test-project --scale custom --hardware 10 --vms 30 --containers 20 --output ./test-custom
+
+# Test error handling
+./build/generate-test-project --scale invalid
+./build/generate-test-project --scale custom  # Should fail without hardware/vms/containers
+```
+
 ## Building
 
 ```bash
+# Build from the project root
 go build -o build/generate-test-project tools/generate-test-project/main.go
+
+# Or build from the tool directory
+cd tools/generate-test-project
+go build -o generate-test-project main.go
 ```
 
 ## Testing
