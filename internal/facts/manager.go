@@ -392,14 +392,35 @@ func (m *Manager) isEnvironmentFact(key string) bool {
 }
 
 // isHCLFact checks if a fact key is an HCL fact
-func (m *Manager) isHCLFact(_ string) bool {
-	// TODO: Implement HCL fact detection
+func (m *Manager) isHCLFact(key string) bool {
+	// HCL facts have prefixes that match the patterns used in HCLCollector
+	hclPrefixes := []string{
+		"machine.", // machine.name, machine.host, machine.port, etc.
+		"config.",  // config.machine_count, config.unique_tags, etc.
+		"action.",  // action.name, action.description, etc.
+		"hcl.",     // hcl.config, hcl.variables, etc.
+	}
+
+	for _, prefix := range hclPrefixes {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
 	return false
 }
 
 // isOpenTofuFact checks if a fact key is an OpenTofu fact
-func (m *Manager) isOpenTofuFact(_ string) bool {
-	// TODO: Implement OpenTofu fact detection
+func (m *Manager) isOpenTofuFact(key string) bool {
+	// OpenTofu facts have prefixes that match the patterns used in OpenTofuCollector
+	opentofuPrefixes := []string{
+		"opentofu.", // opentofu.version, opentofu.terraform_version, etc.
+	}
+
+	for _, prefix := range opentofuPrefixes {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
 	return false
 }
 
