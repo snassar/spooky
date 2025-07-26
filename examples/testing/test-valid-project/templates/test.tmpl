@@ -1,0 +1,14 @@
+# Test Template
+
+Project: {{ .Project.Name }}
+Description: {{ .Project.Description }}
+
+Machines:
+{{- range .Machines }}
+- {{ .Name }} ({{ .User }}@{{ .Host }}:{{ .Port }})
+{{- end }}
+
+Actions:
+{{- range .Actions }}
+- {{ .Name }}: {{ .Description }}
+{{- end }} 

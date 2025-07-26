@@ -1,6 +1,6 @@
 {
-  "machines": {
-    "example-server": {
+  "example-server": {
+    "custom": {
       "os": {
         "name": "linux",
         "version": "20.04"
