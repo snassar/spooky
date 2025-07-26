@@ -3,7 +3,9 @@ package config
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"sort"
 
 	"spooky/internal/logging"
 
@@ -237,6 +239,83 @@ func ParseInventoryConfig(filename string) (*InventoryConfig, error) {
 // ParseActionsConfig parses an actions configuration file
 func ParseActionsConfig(filename string) (*ActionsConfig, error) {
 	return parseActionsWithWrapper(filename)
+}
+
+// LoadActionsConfig loads actions from multiple sources and merges them
+// 1. Load actions.hcl from project root (if exists)
+// 2. Load all .hcl files from actions/ directory (if exists)
+// 3. Merge all actions into a single ActionsConfig
+func LoadActionsConfig(projectPath string) (*ActionsConfig, error) {
+	logger := logging.GetLogger()
+
+	// Initialize merged config
+	mergedConfig := &ActionsConfig{
+		Actions: []Action{},
+	}
+
+	// 1. Try to load actions.hcl from project root
+	rootActionsFile := filepath.Join(projectPath, "actions.hcl")
+	if _, err := os.Stat(rootActionsFile); err == nil {
+		logger.Info("Loading actions from root file", logging.String("file", rootActionsFile))
+		rootConfig, err := ParseActionsConfig(rootActionsFile)
+		if err != nil {
+			logger.Error("Failed to parse root actions file", err, logging.String("file", rootActionsFile))
+			return nil, fmt.Errorf("failed to parse root actions file: %w", err)
+		}
+		mergedConfig.Actions = append(mergedConfig.Actions, rootConfig.Actions...)
+		logger.Info("Loaded actions from root file", logging.Int("actions", len(rootConfig.Actions)))
+	}
+
+	// 2. Try to load all .hcl files from actions/ directory
+	actionsDir := filepath.Join(projectPath, "actions")
+	if _, err := os.Stat(actionsDir); err == nil {
+		logger.Info("Loading actions from directory", logging.String("dir", actionsDir))
+
+		entries, err := os.ReadDir(actionsDir)
+		if err != nil {
+			logger.Error("Failed to read actions directory", err, logging.String("dir", actionsDir))
+			return nil, fmt.Errorf("failed to read actions directory: %w", err)
+		}
+
+		// Sort entries to ensure consistent loading order
+		var actionFiles []string
+		for _, entry := range entries {
+			if !entry.IsDir() && filepath.Ext(entry.Name()) == ".hcl" {
+				actionFiles = append(actionFiles, entry.Name())
+			}
+		}
+
+		// Sort files to ensure consistent loading order (e.g., 01-dependencies.hcl comes before 02-database.hcl)
+		sort.Strings(actionFiles)
+
+		for _, fileName := range actionFiles {
+			filePath := filepath.Join(actionsDir, fileName)
+			logger.Info("Loading action file", logging.String("file", filePath))
+
+			fileConfig, err := ParseActionsConfig(filePath)
+			if err != nil {
+				logger.Error("Failed to parse action file", err, logging.String("file", filePath))
+				return nil, fmt.Errorf("failed to parse action file %s: %w", fileName, err)
+			}
+
+			mergedConfig.Actions = append(mergedConfig.Actions, fileConfig.Actions...)
+			logger.Info("Loaded actions from file",
+				logging.String("file", fileName),
+				logging.Int("actions", len(fileConfig.Actions)))
+		}
+	}
+
+	// Check if we loaded any actions
+	if len(mergedConfig.Actions) == 0 {
+		logger.Warn("No actions found in project", logging.String("project_path", projectPath))
+		return mergedConfig, nil
+	}
+
+	logger.Info("Successfully loaded all actions",
+		logging.String("project_path", projectPath),
+		logging.Int("total_actions", len(mergedConfig.Actions)))
+
+	return mergedConfig, nil
 }
 
 // parseInventoryWithWrapper parses an inventory configuration file with wrapper block

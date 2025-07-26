@@ -55,17 +55,16 @@ func buildEnterpriseIndex(machines []Machine) *CompositeIndex {
 		machineTagIndex[machine] = make(map[string]string)
 
 		for tagName, tagValue := range machine.Tags {
-			if tagValue != "" {
-				key := fmt.Sprintf("%s=%s", tagName, tagValue)
-				tagIndex[key] = append(tagIndex[key], machine)
-				machineTagIndex[machine][tagName] = tagValue
-				uniqueTagNames[tagName] = struct{}{}
+			if tagValue == "" {
+				continue
 			}
+			key := fmt.Sprintf("%s=%s", tagName, tagValue)
+			tagIndex[key] = append(tagIndex[key], machine)
+			machineTagIndex[machine][tagName] = tagValue
+			uniqueTagNames[tagName] = struct{}{}
+			// Count actual occurrences of each tag
+			tagCount[tagName]++
 		}
-	}
-	// Set tagCount to 1 for each unique tag name
-	for tagName := range uniqueTagNames {
-		tagCount[tagName] = 1
 	}
 
 	buildTime := time.Since(startTime)
@@ -79,7 +78,7 @@ func buildEnterpriseIndex(machines []Machine) *CompositeIndex {
 	metrics := &IndexMetrics{
 		BuildTime:    buildTime,
 		MachineCount: len(machines),
-		TagCount:     len(tagCount),
+		TagCount:     len(uniqueTagNames), // Number of unique tag names
 		MemoryUsage:  memoryUsage,
 		LastUpdated:  time.Now(),
 	}
@@ -107,6 +106,11 @@ func sortTagsByPopularity(tags []string, tagCount map[string]int) []string {
 // GetMachinesForActionLarge provides optimized lookup for enterprise-scale deployments
 func GetMachinesForActionLarge(config *Config, action *Action, index *CompositeIndex) ([]*Machine, error) {
 	startTime := time.Now()
+
+	// Check for nil action
+	if action == nil {
+		return nil, fmt.Errorf("action cannot be nil")
+	}
 
 	if len(action.Machines) > 0 {
 		machines, err := findMachinesByName(config.Machines, action.Machines)
