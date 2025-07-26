@@ -24,6 +24,10 @@ func NewTemplateActionExecutor() *TemplateActionExecutor {
 func (tae *TemplateActionExecutor) ExecuteAction(action *config.Action, machines []*config.Machine) error {
 	logger := logging.GetLogger()
 
+	if action == nil {
+		return fmt.Errorf("action cannot be nil")
+	}
+
 	if action.Template == nil {
 		return fmt.Errorf("template configuration is required for template actions")
 	}
@@ -449,19 +453,7 @@ func (tae *TemplateActionExecutor) validateRemoteTemplate(sshClient *SSHClient, 
 	}
 
 	// Try to parse template (without executing)
-	funcMap := template.FuncMap{
-		"machineID":   func() string { return "" },
-		"osVersion":   func() string { return "" },
-		"hostname":    func() string { return "" },
-		"ipAddress":   func() string { return "" },
-		"diskSpace":   func() string { return "" },
-		"memoryInfo":  func() string { return "" },
-		"fileExists":  func(_ string) bool { return false },
-		"fileContent": func(_ string) string { return "" },
-		"fileSize":    func(_ string) string { return "0" },
-		"fileOwner":   func(_ string) string { return "" },
-	}
-
+	funcMap := tae.createValidationFuncMap(false)
 	_, err = template.New("validation").Funcs(funcMap).Parse(templateContent)
 	return err
 }
@@ -496,21 +488,39 @@ func (tae *TemplateActionExecutor) hasContentChanged(sshClient *SSHClient, path 
 	return string(localContent) != remoteContent, nil
 }
 
+// createValidationFuncMap creates a function map for template validation
+func (tae *TemplateActionExecutor) createValidationFuncMap(useTestValues bool) template.FuncMap {
+	return createFuncMap(useTestValues)
+}
+
+// createFuncMap creates a function map with either test values or empty values
+func createFuncMap(useTestValues bool) template.FuncMap {
+	if useTestValues {
+		return createFuncMapWithValues("test", "test", "test", "test", "test", "test", true, "test", "test", "test")
+	}
+	return createFuncMapWithValues("", "", "", "", "", "", false, "", "0", "")
+}
+
+// createFuncMapWithValues creates a function map with specified values
+func createFuncMapWithValues(machineID, osVersion, hostname, ipAddress, diskSpace, memoryInfo string, fileExists bool, fileContent, fileSize, fileOwner string) template.FuncMap {
+	return template.FuncMap{
+		"machineID":   func() string { return machineID },
+		"osVersion":   func() string { return osVersion },
+		"hostname":    func() string { return hostname },
+		"ipAddress":   func() string { return ipAddress },
+		"diskSpace":   func() string { return diskSpace },
+		"memoryInfo":  func() string { return memoryInfo },
+		"fileExists":  func(_ string) bool { return fileExists },
+		"fileContent": func(_ string) string { return fileContent },
+		"fileSize":    func(_ string) string { return fileSize },
+		"fileOwner":   func(_ string) string { return fileOwner },
+	}
+}
+
 // validateTemplateSyntax validates the syntax of a template file
 func (tae *TemplateActionExecutor) validateTemplateSyntax(templateContent []byte) error {
 	// Create a minimal template with basic functions for validation
-	funcMap := template.FuncMap{
-		"machineID":   func() string { return "test" },
-		"osVersion":   func() string { return "test" },
-		"hostname":    func() string { return "test" },
-		"ipAddress":   func() string { return "test" },
-		"diskSpace":   func() string { return "test" },
-		"memoryInfo":  func() string { return "test" },
-		"fileExists":  func(path string) bool { return true },
-		"fileContent": func(path string) string { return "test" },
-		"fileSize":    func(path string) string { return "test" },
-		"fileOwner":   func(path string) string { return "test" },
-	}
+	funcMap := tae.createValidationFuncMap(true)
 
 	// Try to parse the template
 	_, err := template.New("validation").Funcs(funcMap).Parse(string(templateContent))
