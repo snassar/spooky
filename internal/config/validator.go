@@ -169,6 +169,9 @@ func (v *Validator) validateConfigStruct(sl validator.StructLevel) {
 
 // validateConfig validates the entire configuration
 func (v *Validator) validateConfig(config *Config) error {
+	if config == nil {
+		return fmt.Errorf("configuration is nil")
+	}
 	logger := logging.GetLogger()
 
 	// Set defaults before validation
@@ -253,6 +256,9 @@ func (v *Validator) formatMinValidation(e validator.FieldError) string {
 
 // ValidateMachine validates a single machine configuration
 func (v *Validator) ValidateMachine(machine *Machine) error {
+	if machine == nil {
+		return fmt.Errorf("machine is nil")
+	}
 	logger := logging.GetLogger()
 
 	// Perform validation
@@ -272,6 +278,9 @@ func (v *Validator) ValidateMachine(machine *Machine) error {
 
 // ValidateAction validates a single action configuration
 func (v *Validator) ValidateAction(action *Action) error {
+	if action == nil {
+		return fmt.Errorf("action is nil")
+	}
 	logger := logging.GetLogger()
 
 	if err := v.validate.Struct(action); err != nil {
