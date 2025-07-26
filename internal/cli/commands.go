@@ -74,13 +74,10 @@ var InitCmd = &cobra.Command{
 			return fmt.Errorf("project name is required (use positional argument or --project flag)")
 		}
 
-		// Get path from positional args or flag, with flag taking precedence only if explicitly set
+		// Get path from positional args only
 		path := "."
 		if len(args) > 1 {
 			path = args[1]
-		}
-		if flagPath, _ := cmd.Flags().GetString("path"); flagPath != "" && cmd.Flags().Changed("path") {
-			path = flagPath
 		}
 
 		return initProject(logger, projectName, path)
@@ -253,7 +250,6 @@ func InitCommands() {
 
 	// Project command flags
 	InitCmd.Flags().String("project", "", "Name of the project (alternative to positional argument)")
-	InitCmd.Flags().String("path", ".", "Path to the project directory (alternative to positional argument)")
 
 	// Initialize facts commands
 	initFactsCommands()
