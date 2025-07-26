@@ -1,1 +1,0 @@
-actions { action "test" { description = "Test action" command = "echo test" 
