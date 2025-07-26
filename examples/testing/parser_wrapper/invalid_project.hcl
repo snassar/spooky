@@ -1,1 +1,0 @@
-project "invalid-project" { description = "Invalid project" version = "1.0.0" 
