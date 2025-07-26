@@ -72,6 +72,15 @@ func NewSSHClient(machine *config.Machine, timeout int) (*SSHClient, error) {
 
 // NewSSHClientWithHostKeyCallback creates a new SSH client with custom host key verification
 func NewSSHClientWithHostKeyCallback(machine *config.Machine, timeout int, hostKeyType HostKeyCallbackType, knownHostsPath string) (*SSHClient, error) {
+	if machine == nil {
+		return nil, fmt.Errorf("machine configuration cannot be nil")
+	}
+
+	// Validate timeout value
+	if timeout <= 0 {
+		return nil, fmt.Errorf("timeout must be positive, got %d", timeout)
+	}
+
 	logger := logging.GetLogger()
 
 	logger.Info("Creating SSH client",
