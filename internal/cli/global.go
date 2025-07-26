@@ -9,63 +9,52 @@ import (
 
 // Global configuration variables
 var (
-	// Global flags
-	configDir  string
-	sshKeyPath string
-	logLevel   string
-	logFile    string
-	cacheDir   string
-	dryRun     bool
-	verbose    bool
-	quiet      bool
+	logLevel string
+	logFile  string
+	verbose  bool
+	quiet    bool
 )
 
-// GlobalConfig holds the global configuration
+// GlobalConfig represents the global configuration
 type GlobalConfig struct {
-	ConfigDir  string
-	SSHKeyPath string
-	LogLevel   string
-	LogFile    string
-	CacheDir   string
-	DryRun     bool
-	Verbose    bool
-	Quiet      bool
+	LogLevel string
+	LogFile  string
+	Verbose  bool
+	Quiet    bool
 }
 
 // GetGlobalConfig returns the current global configuration
 func GetGlobalConfig() GlobalConfig {
+	// Use default values if not set
+	configLogLevel := logLevel
+	if configLogLevel == "" {
+		configLogLevel = getEnvOrDefault("SPOOKY_LOG_LEVEL", "error")
+	}
+
+	configLogFile := logFile
+	if configLogFile == "" {
+		configLogFile = getEnvOrDefault("SPOOKY_LOG_FILE", getDefaultLogFile())
+	}
+
 	return GlobalConfig{
-		ConfigDir:  configDir,
-		SSHKeyPath: sshKeyPath,
-		LogLevel:   logLevel,
-		LogFile:    logFile,
-		CacheDir:   cacheDir,
-		DryRun:     dryRun,
-		Verbose:    verbose,
-		Quiet:      quiet,
+		LogLevel: configLogLevel,
+		LogFile:  configLogFile,
+		Verbose:  verbose,
+		Quiet:    quiet,
 	}
 }
 
 // AddGlobalFlags adds global flags to the root command
 func AddGlobalFlags(rootCmd *cobra.Command) {
 	// Get default values from environment variables
-	defaultConfigDir := getEnvOrDefault("SPOOKY_CONFIG_DIR", ".")
-	defaultSSHKeyPath := getEnvOrDefault("SPOOKY_SSH_KEY_PATH", "~/.ssh/")
 	defaultLogLevel := getEnvOrDefault("SPOOKY_LOG_LEVEL", "error") // Changed from "info" to "error"
 	defaultLogFile := getEnvOrDefault("SPOOKY_LOG_FILE", getDefaultLogFile())
-	defaultCacheDir := getEnvOrDefault("SPOOKY_CACHE_DIR", getDefaultCacheDir())
 
 	// Add global flags
-	rootCmd.PersistentFlags().StringVar(&configDir, "config-dir", defaultConfigDir, "Directory containing configuration files")
-	rootCmd.PersistentFlags().StringVar(&sshKeyPath, "ssh-key-path", defaultSSHKeyPath, "Path to SSH private key or directory")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", defaultLogLevel, "Log level: debug, info, warn, error")
 	rootCmd.PersistentFlags().StringVar(&logFile, "log-file", defaultLogFile, "Log file path")
-	rootCmd.PersistentFlags().StringVar(&cacheDir, "cache-dir", defaultCacheDir, "Directory for cache files")
-	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Show what would be done without making changes")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Suppress all output except errors")
-
-	// Note: config-dir is optional with a default value, so we don't mark it as required
 }
 
 // getEnvOrDefault gets an environment variable or returns a default value
@@ -90,22 +79,6 @@ func getDefaultLogFile() string {
 
 	// Final fallback
 	return "./spooky.log"
-}
-
-// getDefaultCacheDir returns the default cache directory path
-func getDefaultCacheDir() string {
-	// Try to use XDG_CACHE_HOME if available
-	if xdgCacheHome := os.Getenv("XDG_CACHE_HOME"); xdgCacheHome != "" {
-		return filepath.Join(xdgCacheHome, "spooky")
-	}
-
-	// Fallback to home directory
-	if homeDir, err := os.UserHomeDir(); err == nil {
-		return filepath.Join(homeDir, ".cache", "spooky")
-	}
-
-	// Final fallback
-	return "./.cache/spooky"
 }
 
 // getFactsDBPath returns the path to the facts database

@@ -1,12 +1,13 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
-	"spooky/internal/config"
 	"spooky/internal/facts"
 	"spooky/internal/logging"
 
@@ -15,28 +16,43 @@ import (
 
 var (
 	FactsCmd = &cobra.Command{
-		Use:   "facts",
-		Short: "Manage server facts and fact collection",
-		Long: `Manage server facts and fact collection from multiple sources.
+		Use:   "facts [PROJECT_PATH]",
+		Short: "Manage server facts and fact collection within a spooky project",
+		Long: `Manage server facts and fact collection from multiple sources within a spooky project.
 
 Facts are machine-specific information that can be collected from various sources
 including SSH connections, local system information, and external data sources.
 
-Examples:
-  # Gather facts from all machines in a configuration
-  spooky facts gather config.hcl
+This command must be run from within a spooky project directory or with a project path specified.
 
-  # List all collected facts
+Examples:
+  # Gather facts from all machines in the current project
+  spooky facts gather
+
+  # Gather facts from all machines in a specific project
+  spooky facts /path/to/project gather
+
+  # List all collected facts in the current project
   spooky facts list
 
-  # Query facts for specific information
+  # Query facts for specific information in the current project
   spooky facts query "os.name == 'linux'"
 
-  # Export facts to JSON format
+  # Export facts to JSON format from the current project
   spooky facts export --output facts.json
 
-  # Import facts from external source
+  # Import facts from external source into the current project
   spooky facts import external-facts.json`,
+		Args: cobra.MaximumNArgs(1),
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// Set the project path for all facts subcommands
+			projectPath := "."
+			if len(args) > 0 {
+				projectPath = args[0]
+			}
+			cmd.SetContext(context.WithValue(cmd.Context(), projectPathKey{}, projectPath))
+			return nil
+		},
 	}
 
 	factsGatherCmd = &cobra.Command{
@@ -77,17 +93,11 @@ Examples:
 		RunE:  runFactsQuery,
 	}
 
-	factsListCmd = &cobra.Command{
-		Use:   "list",
-		Short: "List all facts",
-		Long:  `List all collected facts in table or JSON format.`,
-		RunE:  runFactsList,
-	}
-
 	factsCacheCmd = &cobra.Command{
 		Use:   "cache",
 		Short: "Manage fact cache",
 		Long:  `Manage the fact collection cache.`,
+		RunE:  runFactsCache,
 	}
 
 	factsCacheClearCmd = &cobra.Command{
@@ -144,7 +154,6 @@ func initFactsCommands() {
 	FactsCmd.AddCommand(factsExportCmd)
 	FactsCmd.AddCommand(factsValidateCmd)
 	FactsCmd.AddCommand(factsQueryCmd)
-	FactsCmd.AddCommand(factsListCmd)
 
 	// Add cache subcommand
 	FactsCmd.AddCommand(factsCacheCmd)
@@ -155,7 +164,7 @@ func initFactsCommands() {
 
 	// Add flags for new commands
 	factsGatherCmd.Flags().StringVar(&factsInventory, "inventory", "", "Path to inventory file")
-	factsGatherCmd.Flags().StringVar(&factsConfig, "config", "", "Path to spooky config file to read hosts from")
+	// Removed legacy config file support - use project-based approach instead
 	factsGatherCmd.Flags().IntVar(&factsParallel, "parallel", 10, "Number of parallel fact gathering")
 	factsGatherCmd.Flags().IntVar(&factsTimeout, "timeout", 60, "Timeout per host in seconds")
 	factsGatherCmd.Flags().StringSliceVarP(&factsSpecificKeys, "facts", "f", nil, "Comma-separated list of fact types to gather")
@@ -216,9 +225,53 @@ func displayMachineFacts(machineFacts *facts.MachineFacts) {
 	fmt.Println()
 }
 
-func runFactsCacheClear(_ *cobra.Command, _ []string) error {
-	// Create fact manager
-	manager := facts.NewManager(nil)
+// getProjectFactsDBPath returns the project-specific facts database path from context
+func getProjectFactsDBPath(cmd *cobra.Command) string {
+	if cmd == nil || cmd.Context() == nil {
+		return getFactsDBPath() // Fallback to global path
+	}
+
+	if projectPath, ok := cmd.Context().Value(projectPathKey{}).(string); ok && projectPath != "" {
+		return filepath.Join(projectPath, ".facts.db")
+	}
+
+	return getFactsDBPath() // Fallback to global path
+}
+
+func runFactsCache(cmd *cobra.Command, _ []string) error {
+	// Try to create storage to check if database is corrupted
+	storage, err := facts.NewFactStorage(facts.StorageOptions{
+		Type: facts.StorageTypeBadger,
+		Path: getProjectFactsDBPath(cmd),
+	})
+	if err != nil {
+		return fmt.Errorf("corrupted facts database: %w", err)
+	}
+	defer storage.Close()
+
+	// Try to load facts to verify database integrity
+	manager := facts.NewManagerWithStorage(nil, storage)
+	_, err = manager.GetAllFacts()
+	if err != nil {
+		return fmt.Errorf("corrupted facts database: %w", err)
+	}
+
+	fmt.Println("Fact cache is healthy")
+	return nil
+}
+
+func runFactsCacheClear(cmd *cobra.Command, _ []string) error {
+	// Create storage and fact manager
+	storage, err := facts.NewFactStorage(facts.StorageOptions{
+		Type: facts.StorageTypeBadger,
+		Path: getProjectFactsDBPath(cmd),
+	})
+	if err != nil {
+		return fmt.Errorf("corrupted facts database: %w", err)
+	}
+	defer storage.Close()
+
+	manager := facts.NewManagerWithStorage(nil, storage)
 
 	// Clear the cache
 	manager.ClearCache()
@@ -227,9 +280,18 @@ func runFactsCacheClear(_ *cobra.Command, _ []string) error {
 	return nil
 }
 
-func runFactsCacheExpired(_ *cobra.Command, _ []string) error {
-	// Create fact manager
-	manager := facts.NewManager(nil)
+func runFactsCacheExpired(cmd *cobra.Command, _ []string) error {
+	// Create storage and fact manager
+	storage, err := facts.NewFactStorage(facts.StorageOptions{
+		Type: facts.StorageTypeBadger,
+		Path: getProjectFactsDBPath(cmd),
+	})
+	if err != nil {
+		return fmt.Errorf("corrupted facts database: %w", err)
+	}
+	defer storage.Close()
+
+	manager := facts.NewManagerWithStorage(nil, storage)
 
 	// Clear expired facts
 	manager.ClearExpiredCache()
@@ -238,13 +300,8 @@ func runFactsCacheExpired(_ *cobra.Command, _ []string) error {
 	return nil
 }
 
-func runFactsList(_ *cobra.Command, _ []string) error {
-	logger := logging.GetLogger()
-	return listFacts(logger)
-}
-
 // New fact command functions
-func runFactsGather(_ *cobra.Command, args []string) error {
+func runFactsGather(cmd *cobra.Command, args []string) error {
 	logger := logging.GetLogger()
 
 	// Determine target hosts
@@ -259,8 +316,8 @@ func runFactsGather(_ *cobra.Command, args []string) error {
 
 	// Create storage and fact manager
 	storage, err := facts.NewFactStorage(facts.StorageOptions{
-		Type: facts.StorageTypeBadger, // Default to BadgerDB
-		Path: getFactsDBPath(),        // Use configured facts database path
+		Type: facts.StorageTypeBadger,    // Default to BadgerDB
+		Path: getProjectFactsDBPath(cmd), // Use configured facts database path
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create storage: %w", err)
@@ -297,6 +354,17 @@ func runFactsGather(_ *cobra.Command, args []string) error {
 func determineTargetHosts(args []string) ([]string, error) {
 	logger := logging.GetLogger()
 
+	// Check if we're in a valid project context
+	projectPath := getProjectFactsDBPath(nil) // Pass nil to use global path
+	if projectPath == "" {
+		return nil, fmt.Errorf("invalid project: no project path found")
+	}
+
+	// Check if project directory exists and is valid
+	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("invalid project: project directory does not exist")
+	}
+
 	switch {
 	case len(args) > 0:
 		// Use provided hosts argument
@@ -307,26 +375,8 @@ func determineTargetHosts(args []string) ([]string, error) {
 		return hosts, nil
 
 	case factsConfig != "":
-		// Load hosts from spooky config file
-		logger.Info("Loading hosts from config file", logging.String("config", factsConfig))
-		config, err := config.ParseConfig(factsConfig)
-		if err != nil {
-			logger.Error("Failed to parse config file", err, logging.String("config", factsConfig))
-			return nil, fmt.Errorf("failed to parse config file %s: %w", factsConfig, err)
-		}
-
-		// Extract machine names from config
-		var hosts []string
-		for _, machine := range config.Machines {
-			hosts = append(hosts, machine.Name)
-		}
-
-		if len(hosts) == 0 {
-			return nil, fmt.Errorf("no servers found in config file %s", factsConfig)
-		}
-
-		logger.Info("Loaded hosts from config", logging.Int("host_count", len(hosts)))
-		return hosts, nil
+		// Legacy config file support removed - use project-based approach instead
+		return nil, fmt.Errorf("legacy config file support has been removed. Use project-based approach with --inventory flag")
 
 	case factsInventory != "":
 		// TODO: Load hosts from inventory file
@@ -423,7 +473,7 @@ func getTotalFactCount(collections []*facts.FactCollection) int {
 	return total
 }
 
-func runFactsImport(_ *cobra.Command, args []string) error {
+func runFactsImport(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("import source file is required")
 	}
@@ -432,8 +482,8 @@ func runFactsImport(_ *cobra.Command, args []string) error {
 
 	// Create storage and fact manager
 	storage, err := facts.NewFactStorage(facts.StorageOptions{
-		Type: facts.StorageTypeBadger, // Default to BadgerDB
-		Path: getFactsDBPath(),        // Use configured facts database path
+		Type: facts.StorageTypeBadger,    // Default to BadgerDB
+		Path: getProjectFactsDBPath(cmd), // Use configured facts database path
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create storage: %w", err)
@@ -506,30 +556,52 @@ func runFactsImport(_ *cobra.Command, args []string) error {
 
 // isCustomSource checks if the source is a custom format (JSON file or HTTPS URL)
 func isCustomSource(source string) bool {
-	// Check if it's an HTTPS URL (HTTP is not allowed for security)
+	// Empty string is not a valid source
+	if source == "" {
+		return false
+	}
+
+	// Check if it's an HTTP URL (not allowed for security)
+	if len(source) > 7 && source[:7] == "http://" {
+		return false
+	}
+
+	// Check if it's an FTP URL (not supported)
+	if len(source) > 6 && source[:6] == "ftp://" {
+		return false
+	}
+
+	// Check if it's an HTTPS URL (allowed)
 	if len(source) > 8 && source[:8] == "https://" {
 		return true
 	}
 
-	// Check if it's a JSON file
+	// Check if it's a JSON file (but not an HTTP URL)
 	if len(source) > 5 && source[len(source)-5:] == ".json" {
 		return true
 	}
 
-	// For now, assume all local files are custom sources
-	return true
+	// Only HTTPS URLs and JSON files are considered custom sources
+	return false
 }
 
-func runFactsExport(_ *cobra.Command, _ []string) error {
+func runFactsExport(cmd *cobra.Command, _ []string) error {
 	// Create storage and fact manager
 	storage, err := facts.NewFactStorage(facts.StorageOptions{
-		Type: facts.StorageTypeBadger, // Default to BadgerDB
-		Path: getFactsDBPath(),        // Use configured facts database path
+		Type: facts.StorageTypeBadger,    // Default to BadgerDB
+		Path: getProjectFactsDBPath(cmd), // Use configured facts database path
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create storage: %w", err)
+		return fmt.Errorf("corrupted facts database: %w", err)
 	}
 	defer storage.Close()
+
+	// Try to load facts to verify database integrity
+	manager := facts.NewManagerWithStorage(nil, storage)
+	_, err = manager.GetAllFacts()
+	if err != nil {
+		return fmt.Errorf("corrupted facts database: %w", err)
+	}
 
 	// Determine output destination
 	var output io.Writer = os.Stdout
@@ -551,11 +623,11 @@ func runFactsExport(_ *cobra.Command, _ []string) error {
 	return nil
 }
 
-func runFactsValidate(_ *cobra.Command, _ []string) error {
+func runFactsValidate(cmd *cobra.Command, _ []string) error {
 	// Create storage and fact manager
 	storage, err := facts.NewFactStorage(facts.StorageOptions{
-		Type: facts.StorageTypeBadger, // Default to BadgerDB
-		Path: getFactsDBPath(),        // Use configured facts database path
+		Type: facts.StorageTypeBadger,    // Default to BadgerDB
+		Path: getProjectFactsDBPath(cmd), // Use configured facts database path
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create storage: %w", err)
@@ -581,6 +653,12 @@ func runFactsValidate(_ *cobra.Command, _ []string) error {
 	var warnings []string
 
 	for _, fact := range machineFacts {
+		// Skip nil facts
+		if fact == nil {
+			errors = append(errors, "Found nil fact entry")
+			continue
+		}
+
 		// Basic validation rules
 		if fact.MachineName == "" {
 			errors = append(errors, fmt.Sprintf("Machine %s: missing machine name", fact.MachineID))
@@ -639,7 +717,7 @@ func runFactsValidate(_ *cobra.Command, _ []string) error {
 	return nil
 }
 
-func runFactsQuery(_ *cobra.Command, args []string) error {
+func runFactsQuery(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("query expression is required")
 	}
@@ -659,8 +737,8 @@ func runFactsQuery(_ *cobra.Command, args []string) error {
 
 	// Create storage and fact manager
 	storage, err := facts.NewFactStorage(facts.StorageOptions{
-		Type: facts.StorageTypeBadger, // Default to BadgerDB
-		Path: getFactsDBPath(),        // Use configured facts database path
+		Type: facts.StorageTypeBadger,    // Default to BadgerDB
+		Path: getProjectFactsDBPath(cmd), // Use configured facts database path
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create storage: %w", err)
@@ -705,7 +783,7 @@ func parseQueryExpression(expression string) (*facts.FactQuery, error) {
 
 		parts := strings.SplitN(pair, "=", 2)
 		if len(parts) != 2 {
-			return query, fmt.Errorf("invalid query pair: %s", pair)
+			return nil, fmt.Errorf("invalid query pair: %s", pair)
 		}
 
 		key := strings.TrimSpace(parts[0])
@@ -729,7 +807,7 @@ func parseQueryExpression(expression string) (*facts.FactQuery, error) {
 		case "limit":
 			// Limit is handled separately via flag
 		default:
-			return query, fmt.Errorf("unknown query field: %s", key)
+			return nil, fmt.Errorf("unknown query field: %s", key)
 		}
 	}
 

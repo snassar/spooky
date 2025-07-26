@@ -194,16 +194,7 @@ func (ctx *TemplateContext) loadFactsFromJSON(logger logging.Logger, factsDir st
 
 // loadInventory loads inventory configuration
 func (ctx *TemplateContext) loadInventory(logger logging.Logger, projectPath string) error {
-	logger.Info("Loading inventory",
-		logging.String("project_path", projectPath),
-		logging.String("inventory_file", ctx.Project.InventoryFile))
-
-	// Use the resolved path directly since it's already absolute
-	inventoryPath := ctx.Project.InventoryFile
-
-	logger.Info("Resolved inventory path", logging.String("inventory_path", inventoryPath))
-
-	return loadConfigFileWithProcessor(logger, projectPath, inventoryPath, "inventory",
+	return loadConfigWithLogging(ctx, logger, projectPath, ctx.Project.InventoryFile, "inventory",
 		func(inventoryConfig *config.InventoryConfig) {
 			ctx.Machines = make([]*config.Machine, len(inventoryConfig.Machines))
 			for i := range inventoryConfig.Machines {
@@ -215,27 +206,45 @@ func (ctx *TemplateContext) loadInventory(logger logging.Logger, projectPath str
 
 // loadActions loads actions configuration
 func (ctx *TemplateContext) loadActions(logger logging.Logger, projectPath string) error {
-	logger.Info("Loading actions",
+	logger.Info("Loading actions from project", logging.String("project_path", projectPath))
+
+	// Use the new LoadActionsConfig function that can load from multiple sources
+	actionsConfig, err := config.LoadActionsConfig(projectPath)
+	if err != nil {
+		logger.Error("Failed to load actions", err, logging.String("project_path", projectPath))
+		return fmt.Errorf("failed to load actions: %w", err)
+	}
+
+	// Convert to slice of pointers
+	ctx.Actions = make([]*config.Action, len(actionsConfig.Actions))
+	for i := range actionsConfig.Actions {
+		ctx.Actions[i] = &actionsConfig.Actions[i]
+	}
+
+	logger.Info("Actions loaded successfully",
 		logging.String("project_path", projectPath),
-		logging.String("actions_file", ctx.Project.ActionsFile))
+		logging.Int("actions", len(ctx.Actions)))
 
-	// Use the resolved path directly since it's already absolute
-	actionsPath := ctx.Project.ActionsFile
+	return nil
+}
 
-	logger.Info("Resolved actions path", logging.String("actions_path", actionsPath))
+// loadConfigWithLogging is a generic helper to load configuration files with logging
+func loadConfigWithLogging[T any](ctx *TemplateContext, logger logging.Logger, projectPath, fileName, configType string, processor func(*T)) error {
+	ctx.logConfigLoading(logger, projectPath, fileName, configType)
+	return loadConfigFileWithProcessor(logger, projectPath, fileName, configType, processor)
+}
 
-	return loadConfigFileWithProcessor(logger, projectPath, actionsPath, "actions",
-		func(actionsConfig *config.ActionsConfig) {
-			ctx.Actions = make([]*config.Action, len(actionsConfig.Actions))
-			for i := range actionsConfig.Actions {
-				ctx.Actions[i] = &actionsConfig.Actions[i]
-			}
-			logger.Info("Actions config processed", logging.Int("actions", len(ctx.Actions)))
-		})
+// logConfigLoading is a helper method to reduce duplication
+func (ctx *TemplateContext) logConfigLoading(logger logging.Logger, projectPath, filePath, configType string) {
+	logger.Info("Loading "+configType,
+		logging.String("project_path", projectPath),
+		logging.String(configType+"_file", filePath))
+
+	logger.Info("Resolved "+configType+" path", logging.String(configType+"_path", filePath))
 }
 
 // loadConfigFileWithProcessor is a generic helper to load configuration files
-func loadConfigFileWithProcessor[T any](logger logging.Logger, projectPath, fileName, configType string, processor func(*T)) error {
+func loadConfigFileWithProcessor[T any](logger logging.Logger, _, fileName, configType string, processor func(*T)) error {
 	if fileName == "" {
 		logger.Info("No file name provided for config type", logging.String("config_type", configType))
 		return nil

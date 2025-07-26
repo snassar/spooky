@@ -1,6 +1,6 @@
 {
-  "machines": {
-    "example-server": {
+  "example-server": {
+    "custom": {
       "os": {
         "name": "linux",
         "version": "20.04"
@@ -34,9 +34,5 @@
         }
       }
     }
-  },
-  "global_extra": "unexpected global field",
-  "another_global": {
-    "nested": "unexpected global nested"
   }
 } 

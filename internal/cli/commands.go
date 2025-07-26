@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,67 +16,81 @@ import (
 )
 
 var (
-	// List command flags
-	format  string
-	filter  string
-	sort    string
-	reverse bool
-
 	// Project command flags
-	projectPath   string
-	projectName   string
 	listVerbose   bool
 	validateDebug bool
 )
 
-var ProjectCmd = &cobra.Command{
-	Use:   "project",
-	Short: "Manage spooky projects",
-	Long:  `Manage spooky projects with separated inventory and actions configuration`,
-}
-
 func init() {
-	// Add subcommands to ProjectCmd
-	ProjectCmd.AddCommand(ProjectInitCmd)
-	ProjectCmd.AddCommand(ProjectValidateCmd)
-	ProjectCmd.AddCommand(ProjectListCmd)
-	ProjectCmd.AddCommand(ProjectListTemplatesCmd)
-	ProjectCmd.AddCommand(ProjectRenderTemplateCmd)
-	ProjectCmd.AddCommand(ProjectValidateTemplateCmd)
+	// Add flags to ListCmd
+	ListCmd.Flags().BoolVar(&listVerbose, "verbose", false, "Show detailed output including machine and action details")
 
-	// Add flags to ProjectListCmd
-	ProjectListCmd.Flags().BoolVar(&listVerbose, "verbose", false, "Show detailed output including machine and action details")
+	// Add flags to ValidateCmd
+	ValidateCmd.Flags().BoolVar(&validateDebug, "debug", false, "Show debug output including path resolution details")
 
-	// Add flags to ProjectValidateCmd
-	ProjectValidateCmd.Flags().BoolVar(&validateDebug, "debug", false, "Show debug output including path resolution details")
+	// Add flags to RenderTemplateCmd
+	RenderTemplateCmd.Flags().String("output", "", "Output file path (default: stdout)")
+	RenderTemplateCmd.Flags().Bool("dry-run", false, "Show what would be rendered without writing output")
+	RenderTemplateCmd.Flags().String("server", "", "Server name for fact integration (e.g., web-001)")
+	RenderTemplateCmd.Flags().String("ssh-key-path", "~/.ssh/", "Path to SSH private key or directory")
+	RenderTemplateCmd.Flags().String("templates-dir", "", "Override templates directory (default: templates/)")
+	RenderTemplateCmd.Flags().String("data-dir", "", "Override data directory (default: data/)")
 
-	// Add flags to ProjectRenderTemplateCmd
-	ProjectRenderTemplateCmd.Flags().String("output", "", "Output file path (default: stdout)")
-	ProjectRenderTemplateCmd.Flags().Bool("dry-run", false, "Show what would be rendered without writing output")
-	ProjectRenderTemplateCmd.Flags().String("server", "", "Server name for fact integration (e.g., web-001)")
+	// Add flags to ValidateTemplateCmd
+	ValidateTemplateCmd.Flags().String("templates-dir", "", "Override templates directory (default: templates/)")
+	ValidateTemplateCmd.Flags().String("data-dir", "", "Override data directory (default: data/)")
+
+	// Add flags to GatherFactsCmd
+	GatherFactsCmd.Flags().Bool("dry-run", false, "Show what facts would be collected without connecting to machines")
+	GatherFactsCmd.Flags().String("ssh-key-path", "~/.ssh/", "Path to SSH private key or directory")
+	GatherFactsCmd.Flags().String("facts-db-path", "", "Override facts database path (default: .facts.db)")
+
+	// Add flags to ListFactsCmd
+	ListFactsCmd.Flags().String("facts-db-path", "", "Override facts database path (default: .facts.db)")
+
+	// Add flags to ListTemplatesCmd
+	ListTemplatesCmd.Flags().String("templates-dir", "", "Override templates directory (default: templates/)")
 }
 
-var ProjectInitCmd = &cobra.Command{
+var InitCmd = &cobra.Command{
 	Use:   "init <PROJECT_NAME> [PATH]",
 	Short: "Initialize a new spooky project",
 	Long:  `Create a new spooky project with separated inventory and actions configuration`,
-	Args:  cobra.RangeArgs(1, 2),
-	RunE: func(_ *cobra.Command, args []string) error {
+	Args:  cobra.MaximumNArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
 		logger := logging.GetLogger()
-		projectName := args[0]
+
+		// Get project name from positional args or flag
+		var projectName string
+		if len(args) > 0 {
+			projectName = args[0]
+		}
+		if flagName, _ := cmd.Flags().GetString("project"); flagName != "" {
+			projectName = flagName
+		}
+
+		// Validate that we have a project name
+		if projectName == "" {
+			return fmt.Errorf("project name is required (use positional argument or --project flag)")
+		}
+
+		// Get path from positional args or flag, with flag taking precedence only if explicitly set
 		path := "."
 		if len(args) > 1 {
 			path = args[1]
+		}
+		if flagPath, _ := cmd.Flags().GetString("path"); flagPath != "" && cmd.Flags().Changed("path") {
+			path = flagPath
 		}
 
 		return initProject(logger, projectName, path)
 	},
 }
 
-var ProjectValidateCmd = &cobra.Command{
+var ValidateCmd = &cobra.Command{
 	Use:   "validate [PROJECT_PATH]",
 	Short: "Validate a spooky project",
-	Long:  `Validate the configuration files in a spooky project`,
+	Long:  `Validate the project files (project.hcl, inventory.hcl, actions.hcl) in a spooky project`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
 		logger := logging.GetLogger()
@@ -90,7 +103,7 @@ var ProjectValidateCmd = &cobra.Command{
 	},
 }
 
-var ProjectListCmd = &cobra.Command{
+var ListCmd = &cobra.Command{
 	Use:   "list [PROJECT_PATH]",
 	Short: "List project resources",
 	Long:  `List machines and actions from a spooky project`,
@@ -106,10 +119,10 @@ var ProjectListCmd = &cobra.Command{
 	},
 }
 
-var ProjectListTemplatesCmd = &cobra.Command{
-	Use:   "list-templates [PROJECT_PATH]",
-	Short: "List project templates",
-	Long:  `List available templates in a spooky project`,
+var ListMachinesCmd = &cobra.Command{
+	Use:   "list-machines [PROJECT_PATH]",
+	Short: "List machines in a spooky project",
+	Long:  `List all machines from a spooky project's inventory configuration`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
 		logger := logging.GetLogger()
@@ -117,15 +130,79 @@ var ProjectListTemplatesCmd = &cobra.Command{
 		if len(args) > 0 {
 			path = args[0]
 		}
-
-		return listProjectTemplates(logger, path)
+		return listProjectMachines(logger, path)
 	},
 }
 
-var ProjectRenderTemplateCmd = &cobra.Command{
-	Use:   "render-template <template> [PROJECT_PATH]",
-	Short: "Render project template",
-	Long:  `Render a template in the context of a spooky project with facts and configuration`,
+var ListActionsCmd = &cobra.Command{
+	Use:   "list-actions [PROJECT_PATH]",
+	Short: "List actions in a spooky project",
+	Long:  `List all actions from a spooky project's actions configuration`,
+	Args:  cobra.MaximumNArgs(1),
+	RunE: func(_ *cobra.Command, args []string) error {
+		logger := logging.GetLogger()
+		path := "."
+		if len(args) > 0 {
+			path = args[0]
+		}
+		return listProjectActions(logger, path)
+	},
+}
+
+var ListTemplatesCmd = &cobra.Command{
+	Use:   "list-templates [PROJECT_PATH]",
+	Short: "List templates in a spooky project",
+	Long:  `List all template files available in a spooky project`,
+	Args:  cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		logger := logging.GetLogger()
+		path := "."
+		if len(args) > 0 {
+			path = args[0]
+		}
+		templatesDir, _ := cmd.Flags().GetString("templates-dir")
+		return listProjectTemplates(logger, path, templatesDir)
+	},
+}
+
+var ListFactsCmd = &cobra.Command{
+	Use:   "list-facts [PROJECT_PATH]",
+	Short: "List facts in a spooky project",
+	Long:  `List all facts available in a spooky project`,
+	Args:  cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		logger := logging.GetLogger()
+		path := "."
+		if len(args) > 0 {
+			path = args[0]
+		}
+		factsDBPath, _ := cmd.Flags().GetString("facts-db-path")
+		return listProjectFacts(logger, path, factsDBPath)
+	},
+}
+
+var GatherFactsCmd = &cobra.Command{
+	Use:   "gather-facts [PROJECT_PATH]",
+	Short: "Gather facts for machines in a spooky project",
+	Long:  `Gather facts from all machines defined in a spooky project's inventory`,
+	Args:  cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		logger := logging.GetLogger()
+		path := "."
+		if len(args) > 0 {
+			path = args[0]
+		}
+		sshKeyPath, _ := cmd.Flags().GetString("ssh-key-path")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		factsDBPath, _ := cmd.Flags().GetString("facts-db-path")
+		return gatherProjectFacts(logger, path, sshKeyPath, dryRun, factsDBPath)
+	},
+}
+
+var RenderTemplateCmd = &cobra.Command{
+	Use:   "render-template <TEMPLATE_FILE> [PROJECT_PATH]",
+	Short: "Render a template file",
+	Long:  `Render a template file in the context of a spooky project`,
 	Args:  cobra.RangeArgs(1, 2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		logger := logging.GetLogger()
@@ -138,17 +215,20 @@ var ProjectRenderTemplateCmd = &cobra.Command{
 		output, _ := cmd.Flags().GetString("output")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		server, _ := cmd.Flags().GetString("server")
+		sshKeyPath, _ := cmd.Flags().GetString("ssh-key-path")
+		templatesDir, _ := cmd.Flags().GetString("templates-dir")
+		dataDir, _ := cmd.Flags().GetString("data-dir")
 
-		return renderProjectTemplate(logger, templateFile, path, output, dryRun, server)
+		return renderProjectTemplate(logger, templateFile, path, output, dryRun, server, sshKeyPath, templatesDir, dataDir)
 	},
 }
 
-var ProjectValidateTemplateCmd = &cobra.Command{
-	Use:   "validate-template <template> [PROJECT_PATH]",
-	Short: "Validate project template",
-	Long:  `Validate template syntax and check for available context variables`,
+var ValidateTemplateCmd = &cobra.Command{
+	Use:   "validate-template <TEMPLATE_FILE> [PROJECT_PATH]",
+	Short: "Validate a template file",
+	Long:  `Validate a template file in the context of a spooky project`,
 	Args:  cobra.RangeArgs(1, 2),
-	RunE: func(_ *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		logger := logging.GetLogger()
 		templateFile := args[0]
 		path := "."
@@ -156,253 +236,40 @@ var ProjectValidateTemplateCmd = &cobra.Command{
 			path = args[1]
 		}
 
-		return validateProjectTemplate(logger, templateFile, path)
+		templatesDir, _ := cmd.Flags().GetString("templates-dir")
+		dataDir, _ := cmd.Flags().GetString("data-dir")
+
+		return validateProjectTemplate(logger, templateFile, path, templatesDir, dataDir)
 	},
 }
 
-var ListCmd = &cobra.Command{
-	Use:   "list <resource|config-file>",
-	Short: "List resources or configurations",
-	Long:  `Display resources or configurations based on the specified resource type or from a configuration file. Use 'spooky facts list' for facts.`,
-	Args:  cobra.MaximumNArgs(1),
-	RunE: func(_ *cobra.Command, args []string) error {
-		logger := logging.GetLogger()
-
-		// If no arguments provided, show help
-		if len(args) == 0 {
-			return fmt.Errorf("resource type or config file is required. Use 'spooky list <resource|config-file>' or 'spooky facts list' for facts")
-		}
-
-		resource := args[0]
-
-		// Check if it's a config file path
-		if strings.HasSuffix(resource, ".hcl") || strings.HasSuffix(resource, ".yaml") || strings.HasSuffix(resource, ".yml") {
-			return listFromConfigFile(logger, resource)
-		}
-
-		// Otherwise treat as resource type
-		switch resource {
-		case "machines":
-			return listMachines(logger)
-		case "templates":
-			return listTemplates(logger)
-		case "configs":
-			return listConfigs(logger)
-		case "actions":
-			return listActions(logger)
-		default:
-			return fmt.Errorf("unknown resource type: %s. Supported types: machines, templates, configs, actions. Use 'spooky facts list' for facts", resource)
-		}
-	},
-}
+var commandsInitialized bool
 
 // InitCommands initializes all CLI commands and their flags
 func InitCommands() {
-	// Check if flags are already initialized to prevent redefinition
-	if ListCmd.Flags().Lookup("format") != nil {
+	if commandsInitialized {
 		return // Already initialized
 	}
 
-	// List command flags
-	ListCmd.Flags().StringVar(&format, "format", "table", "Output format: table, json, yaml")
-	ListCmd.Flags().StringVar(&filter, "filter", "", "Filter results by expression")
-	ListCmd.Flags().StringVar(&sort, "sort", "name", "Sort field")
-	ListCmd.Flags().BoolVar(&reverse, "reverse", false, "Reverse sort order")
-
 	// Project command flags
-	ProjectCmd.Flags().StringVar(&projectPath, "path", ".", "Path to the project directory")
-	ProjectCmd.Flags().StringVar(&projectName, "name", "", "Name of the project (required for init)")
+	InitCmd.Flags().String("project", "", "Name of the project (alternative to positional argument)")
+	InitCmd.Flags().String("path", ".", "Path to the project directory (alternative to positional argument)")
 
 	// Initialize facts commands
 	initFactsCommands()
-}
 
-// listFromConfigFile lists resources from a configuration file
-func listFromConfigFile(logger logging.Logger, configFile string) error {
-	// Validate config file exists
-	if _, err := os.Stat(configFile); os.IsNotExist(err) {
-		logger.Error("Config file not found", err, logging.String("config_file", configFile))
-		return fmt.Errorf("config file %s does not exist", configFile)
-	}
-
-	// Parse configuration
-	config, err := config.ParseConfig(configFile)
-	if err != nil {
-		logger.Error("Failed to parse configuration", err, logging.String("config_file", configFile))
-		return fmt.Errorf("failed to parse config: %w", err)
-	}
-
-	logger.Info("Listing resources from configuration file",
-		logging.String("config_file", configFile),
-		logging.Int("machine_count", len(config.Machines)),
-		logging.Int("action_count", len(config.Actions)))
-
-	// Display machines
-	if len(config.Machines) > 0 {
-		fmt.Printf("Machines (%d):\n", len(config.Machines))
-		for _, machine := range config.Machines {
-			fmt.Printf("  - %s (%s@%s:%d)\n", machine.Name, machine.User, machine.Host, machine.Port)
-		}
-		fmt.Println()
-	}
-
-	// Display actions
-	if len(config.Actions) > 0 {
-		fmt.Printf("Actions (%d):\n", len(config.Actions))
-		for i := range config.Actions {
-			action := &config.Actions[i]
-			desc := action.Description
-			if desc == "" {
-				desc = "No description"
-			}
-			fmt.Printf("  - %s: %s\n", action.Name, desc)
-		}
-		fmt.Println()
-	}
-
-	// Display summary
-	fmt.Printf("Configuration Summary:\n")
-	fmt.Printf("  File: %s\n", configFile)
-	fmt.Printf("  Machines: %d\n", len(config.Machines))
-	fmt.Printf("  Actions: %d\n", len(config.Actions))
-
-	return nil
-}
-
-// List functions for different resource types
-func listMachines(logger logging.Logger) error {
-	// TODO: Implement machine listing from configuration or inventory
-	logger.Info("Listing machines (not yet implemented)")
-	return fmt.Errorf("machine listing not yet implemented")
-}
-
-func listFacts(logger logging.Logger) error {
-	// Create fact manager
-	manager := facts.NewManager(nil)
-
-	// Try to get cached facts first
-	allFacts, err := manager.GetAllFacts()
-	if err != nil {
-		logger.Error("Failed to retrieve cached facts", err)
-		return fmt.Errorf("failed to retrieve cached facts: %w", err)
-	}
-
-	// If no cached facts, collect from local server
-	if len(allFacts) == 0 {
-		logger.Info("No cached facts found, collecting from local server")
-		collection, err := manager.CollectAllFacts("local")
-		if err != nil {
-			logger.Error("Failed to collect facts from local server", err)
-			return fmt.Errorf("failed to collect facts from local server: %w", err)
-		}
-
-		// Convert collection to slice of facts
-		for _, fact := range collection.Facts {
-			allFacts = append(allFacts, fact)
-		}
-	}
-
-	if len(allFacts) == 0 {
-		fmt.Println("No facts found. Use 'spooky facts collect <server>' to gather facts first.")
-		return nil
-	}
-
-	// Check output format
-	if format == "json" {
-		// Create a structured response for JSON output
-		response := map[string]interface{}{
-			"summary": map[string]interface{}{
-				"total_facts": len(allFacts),
-				"servers":     len(getUniqueServers(allFacts)),
-			},
-			"facts": allFacts,
-		}
-
-		jsonData, err := json.MarshalIndent(response, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal facts to JSON: %w", err)
-		}
-		fmt.Println(string(jsonData))
-	} else {
-		// Group facts by server
-		serverFacts := make(map[string][]*facts.Fact)
-		for _, fact := range allFacts {
-			serverFacts[fact.Server] = append(serverFacts[fact.Server], fact)
-		}
-
-		// Display facts in table format
-		fmt.Printf("Facts Summary:\n")
-		fmt.Printf("Total facts: %d\n", len(allFacts))
-		fmt.Printf("Servers: %d\n\n", len(serverFacts))
-
-		for server, facts := range serverFacts {
-			fmt.Printf("Server: %s (%d facts)\n", server, len(facts))
-			fmt.Printf("%-30s %-15s %-20s %s\n", "KEY", "SOURCE", "TTL", "VALUE")
-			fmt.Printf("%s\n", strings.Repeat("-", 80))
-
-			for _, fact := range facts {
-				// Truncate value if too long
-				valueStr := fmt.Sprintf("%v", fact.Value)
-				if len(valueStr) > 40 {
-					valueStr = valueStr[:37] + "..."
-				}
-
-				// Format TTL
-				ttlStr := "expired"
-				if fact.TTL > 0 {
-					ttlStr = fact.TTL.String()
-				}
-
-				fmt.Printf("%-30s %-15s %-20s %s\n",
-					fact.Key,
-					fact.Source,
-					ttlStr,
-					valueStr)
-			}
-			fmt.Println()
-		}
-	}
-
-	logger.Info("Facts listed successfully", logging.Int("total_facts", len(allFacts)), logging.Int("servers", len(getUniqueServers(allFacts))))
-	return nil
-}
-
-// Helper function to get unique servers from facts
-func getUniqueServers(facts []*facts.Fact) []string {
-	servers := make(map[string]bool)
-	for _, fact := range facts {
-		servers[fact.Server] = true
-	}
-
-	result := make([]string, 0, len(servers))
-	for server := range servers {
-		result = append(result, server)
-	}
-	return result
-}
-
-func listTemplates(logger logging.Logger) error {
-	// TODO: Implement template listing
-	logger.Info("Listing templates (not yet implemented)")
-	return fmt.Errorf("template listing not yet implemented")
-}
-
-func listConfigs(logger logging.Logger) error {
-	// TODO: Implement config listing
-	logger.Info("Listing configs (not yet implemented)")
-	return fmt.Errorf("config listing not yet implemented")
-}
-
-func listActions(logger logging.Logger) error {
-	// TODO: Implement actions listing from configuration
-	logger.Info("Listing actions (not yet implemented)")
-	return fmt.Errorf("actions listing not yet implemented")
+	commandsInitialized = true
 }
 
 // Project functions
 
 // initProject initializes a new spooky project
 func initProject(logger logging.Logger, projectName, path string) error {
+	// Validate project name
+	if strings.TrimSpace(projectName) == "" {
+		return fmt.Errorf("project name cannot be empty")
+	}
+
 	logger.Info("Initializing new spooky project",
 		logging.String("project_name", projectName),
 		logging.String("path", path))
@@ -416,7 +283,7 @@ func initProject(logger logging.Logger, projectName, path string) error {
 	}
 
 	// Create subdirectories
-	dirs := []string{"templates", "files", "logs"}
+	dirs := []string{"templates", "files", "logs", "actions", "data"}
 	for _, dir := range dirs {
 		dirPath := filepath.Join(projectDir, dir)
 		if err := os.MkdirAll(dirPath, 0o755); err != nil {
@@ -499,9 +366,9 @@ inventory {
 		return fmt.Errorf("failed to create inventory.hcl: %w", err)
 	}
 
-	// Create actions.hcl
-	actionsConfig := fmt.Sprintf(`# Actions for %s project
-# Add your action definitions here
+	// Create actions.hcl (main actions file)
+	actionsConfig := fmt.Sprintf(`# Main actions for %s project
+# This file can contain core actions or reference actions in the actions/ directory
 
 actions {
   action "check-status" {
@@ -511,14 +378,6 @@ actions {
     parallel    = true
     timeout     = 300
   }
-
-  action "update-system" {
-    description = "Update system packages"
-    command     = "apt update && apt upgrade -y"
-    tags        = ["environment=development"]
-    parallel    = true
-    timeout     = 600
-  }
 }`, projectName)
 
 	actionsFile := filepath.Join(projectDir, "actions.hcl")
@@ -526,6 +385,72 @@ actions {
 		logger.Error("Failed to create actions.hcl", err,
 			logging.String("file", actionsFile))
 		return fmt.Errorf("failed to create actions.hcl: %w", err)
+	}
+
+	// Create example action files in actions/ directory
+	exampleActions := []struct {
+		filename string
+		content  string
+	}{
+		{
+			"01-dependencies.hcl",
+			fmt.Sprintf(`# Dependencies setup for %s project
+
+actions {
+  action "install-dependencies" {
+    description = "Install system dependencies"
+    command     = "apt update && apt install -y curl wget git"
+    tags        = ["role=web", "setup"]
+    parallel    = true
+    timeout     = 600
+  }
+}`, projectName),
+		},
+		{
+			"02-system-update.hcl",
+			fmt.Sprintf(`# System updates for %s project
+
+actions {
+  action "update-system" {
+    description = "Update system packages"
+    command     = "apt update && apt upgrade -y"
+    tags        = ["environment=development", "maintenance"]
+    parallel    = true
+    timeout     = 600
+  }
+}`, projectName),
+		},
+		{
+			"03-monitoring.hcl",
+			fmt.Sprintf(`# Monitoring actions for %s project
+
+actions {
+  action "check-disk-space" {
+    description = "Check disk space usage"
+    command     = "df -h"
+    tags        = ["monitoring"]
+    parallel    = true
+    timeout     = 60
+  }
+
+  action "check-memory" {
+    description = "Check memory usage"
+    command     = "free -h"
+    tags        = ["monitoring"]
+    parallel    = true
+    timeout     = 60
+  }
+}`, projectName),
+		},
+	}
+
+	for _, actionFile := range exampleActions {
+		filePath := filepath.Join(projectDir, "actions", actionFile.filename)
+		if err := os.WriteFile(filePath, []byte(actionFile.content), 0o600); err != nil {
+			logger.Error("Failed to create action file", err,
+				logging.String("file", filePath))
+			return fmt.Errorf("failed to create action file %s: %w", actionFile.filename, err)
+		}
 	}
 
 	// Create .gitignore
@@ -590,13 +515,32 @@ This is a spooky project with separated inventory and actions configuration.
 %s/
 ├── project.hcl          # Project configuration and settings
 ├── inventory.hcl        # Machine definitions
-├── actions.hcl          # Action definitions for automation
-├── .gitignore          # Git ignore rules
+├── actions.hcl          # Main action definitions (optional)
+├── actions/             # Directory for organized action files
+│   ├── 01-dependencies.hcl
+│   ├── 02-system-update.hcl
+│   └── 03-monitoring.hcl
 ├── templates/           # Template files for dynamic content
+├── data/               # Data files for templates
 ├── files/              # Static files to be deployed
+├── logs/               # Log files
+├── .gitignore          # Git ignore rules
 └── README.md           # This file
 
+## Actions Organization
+
+Spooky supports flexible action organization:
+
+1. **actions.hcl** - Main actions file (optional)
+2. **actions/** directory - Organized action files
+   - Files are loaded in alphabetical order
+   - Use numbered prefixes (01-, 02-, etc.) for ordering
+   - Each file can contain multiple actions
+
 ## Usage
+
+### List all actions:
+spooky list-actions
 
 ### Execute an action:
 spooky execute actions.hcl --inventory inventory.hcl --action check-status
@@ -608,14 +552,16 @@ spooky execute actions.hcl --inventory inventory.hcl --action update-system --ta
 
 - **project.hcl**: Project settings, storage, logging, and SSH configuration
 - **inventory.hcl**: Machine definitions with tags for targeting
-- **actions.hcl**: Automation actions with tag-based targeting
+- **actions.hcl**: Main actions (optional)
+- **actions/**: Organized action files for better maintainability
 
 ## Benefits
 
 1. **Reusability**: Actions can be applied to different inventories
 2. **Maintainability**: Clear separation of concerns
 3. **Flexibility**: Mix and match actions with different machine groups
-4. **Version Control**: Better tracking of changes to machines vs actions
+4. **Organization**: Group related actions in separate files
+5. **Version Control**: Better tracking of changes to machines vs actions
 `, projectName, projectName)
 
 	readmeFile := filepath.Join(projectDir, "README.md")
@@ -638,7 +584,7 @@ spooky execute actions.hcl --inventory inventory.hcl --action update-system --ta
 	return nil
 }
 
-// validateConfigFile validates a configuration file using the provided parser function
+// validateConfigFile validates a project file (inventory.hcl or actions.hcl) using the provided parser function
 func validateConfigFile(logger logging.Logger, filePath, fileType string, parser func(string) error) error {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		logger.Warn(fileType+" file not found",
@@ -693,15 +639,13 @@ func validateProject(logger logging.Logger, path string) error {
 		}
 	}
 
-	// Validate actions file if it exists
-	if projectConfig.ActionsFile != "" {
-		if err := validateConfigFile(logger, projectConfig.ActionsFile, "Actions", func(file string) error {
-			_, err := config.ParseActionsConfig(file)
-			return err
-		}); err != nil {
-			return err
-		}
+	// Validate actions from multiple sources
+	logger.Info("Validating actions configuration")
+	if _, err := config.LoadActionsConfig(path); err != nil {
+		logger.Error("Failed to validate actions configuration", err)
+		return fmt.Errorf("failed to validate actions configuration: %w", err)
 	}
+	logger.Info("Actions configuration validated successfully")
 
 	fmt.Printf("✅ Project validation successful\n")
 	fmt.Printf("📋 Project: %s\n", projectConfig.Name)
@@ -805,9 +749,9 @@ func listProject(logger logging.Logger, path string) error {
 	return nil
 }
 
-// listProjectTemplates lists templates in a spooky project
-func listProjectTemplates(logger logging.Logger, path string) error {
-	logger.Info("Listing templates in spooky project",
+// listProjectMachines lists machines from a spooky project inventory
+func listProjectMachines(logger logging.Logger, path string) error {
+	logger.Info("Listing machines in spooky project",
 		logging.String("path", path))
 
 	// Check if project.hcl exists
@@ -818,60 +762,292 @@ func listProjectTemplates(logger logging.Logger, path string) error {
 		return fmt.Errorf("project.hcl not found in %s", path)
 	}
 
-	// Look for templates in common locations
-	templateDirs := []string{
-		filepath.Join(path, "templates"),
-		filepath.Join(path, "files"),
+	// Parse project configuration
+	projectConfig, err := config.ParseProjectConfig(projectFile)
+	if err != nil {
+		logger.Error("Failed to parse project configuration", err,
+			logging.String("file", projectFile))
+		return fmt.Errorf("failed to parse project configuration: %w", err)
 	}
 
-	// Use a map to deduplicate templates
-	templateMap := make(map[string]bool)
-	var templates []string
-
-	for _, dir := range templateDirs {
-		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			continue
-		}
-
-		err := filepath.Walk(dir, func(filePath string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if !info.IsDir() {
-				ext := filepath.Ext(filePath)
-				// Only include actual template files, not HCL config files
-				if ext == ".tmpl" || ext == ".template" {
-					// Make path relative to project root
-					relPath, _ := filepath.Rel(path, filePath)
-					if !templateMap[relPath] {
-						templateMap[relPath] = true
-						templates = append(templates, relPath)
-					}
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			logger.Error("Failed to walk directory", err,
-				logging.String("directory", dir))
-		}
+	fmt.Printf("Project: %s\n", projectConfig.Name)
+	if projectConfig.Description != "" {
+		fmt.Printf("Description: %s\n", projectConfig.Description)
 	}
+	fmt.Printf("Path: %s\n\n", path)
 
-	if len(templates) == 0 {
-		fmt.Printf("No templates found in project: %s\n", path)
+	// List machines from inventory
+	if projectConfig.InventoryFile == "" {
+		fmt.Println("No inventory file configured")
 		return nil
 	}
 
-	fmt.Printf("Templates found in %s:\n", path)
-	for _, template := range templates {
-		fmt.Printf("  %s\n", template)
+	if _, err := os.Stat(projectConfig.InventoryFile); os.IsNotExist(err) {
+		fmt.Printf("⚠️  Inventory file not found: %s\n", projectConfig.InventoryFile)
+		return nil
+	}
+
+	inventoryConfig, err := config.ParseInventoryConfig(projectConfig.InventoryFile)
+	if err != nil {
+		logger.Error("Failed to parse inventory configuration", err,
+			logging.String("file", projectConfig.InventoryFile))
+		return fmt.Errorf("failed to parse inventory configuration: %w", err)
+	}
+
+	if len(inventoryConfig.Machines) == 0 {
+		fmt.Println("No machines found in inventory")
+		return nil
+	}
+
+	fmt.Printf("Machines (%d):\n", len(inventoryConfig.Machines))
+	for _, machine := range inventoryConfig.Machines {
+		fmt.Printf("  - %s (%s@%s:%d)\n", machine.Name, machine.User, machine.Host, machine.Port)
 	}
 
 	return nil
 }
 
+// listProjectActions lists actions in a spooky project
+func listProjectActions(logger logging.Logger, path string) error {
+	logger.Info("Listing project actions",
+		logging.String("path", path))
+
+	// Check if project.hcl exists
+	projectFile := filepath.Join(path, "project.hcl")
+	if _, err := os.Stat(projectFile); os.IsNotExist(err) {
+		logger.Error("Project file not found", err,
+			logging.String("file", projectFile))
+		return fmt.Errorf("project.hcl not found in %s", path)
+	}
+
+	// Parse project configuration
+	projectConfig, err := config.ParseProjectConfig(projectFile)
+	if err != nil {
+		logger.Error("Failed to parse project configuration", err,
+			logging.String("file", projectFile))
+		return fmt.Errorf("failed to parse project configuration: %w", err)
+	}
+
+	fmt.Printf("Project: %s\n", projectConfig.Name)
+	if projectConfig.Description != "" {
+		fmt.Printf("Description: %s\n", projectConfig.Description)
+	}
+	fmt.Printf("Path: %s\n\n", path)
+
+	// Load actions from multiple sources
+	actionsConfig, err := config.LoadActionsConfig(path)
+	if err != nil {
+		logger.Error("Failed to load actions configuration", err)
+		return fmt.Errorf("failed to load actions configuration: %w", err)
+	}
+
+	if len(actionsConfig.Actions) == 0 {
+		fmt.Println("No actions found")
+		return nil
+	}
+
+	fmt.Printf("Actions (%d):\n", len(actionsConfig.Actions))
+	for i := range actionsConfig.Actions {
+		action := &actionsConfig.Actions[i]
+		desc := action.Description
+		if desc == "" {
+			desc = "No description"
+		}
+		fmt.Printf("  - %s: %s\n", action.Name, desc)
+	}
+
+	return nil
+}
+
+// listProjectTemplates lists templates in a spooky project
+func listProjectTemplates(logger logging.Logger, path, templatesDir string) error {
+	logger.Info("Listing project templates",
+		logging.String("path", path))
+
+	// Get templates directory
+	var targetTemplatesDir string
+	if templatesDir != "" {
+		targetTemplatesDir = templatesDir
+	} else {
+		targetTemplatesDir = filepath.Join(path, "templates")
+	}
+
+	if _, err := os.Stat(targetTemplatesDir); os.IsNotExist(err) {
+		fmt.Printf("No templates found in %s\n", targetTemplatesDir)
+		return nil
+	}
+
+	// List template files
+	files, err := os.ReadDir(targetTemplatesDir)
+	if err != nil {
+		logger.Error("Failed to read templates directory", err,
+			logging.String("dir", targetTemplatesDir))
+		return fmt.Errorf("failed to read templates directory: %w", err)
+	}
+
+	if len(files) == 0 {
+		fmt.Printf("No templates found in %s\n", targetTemplatesDir)
+		return nil
+	}
+
+	fmt.Printf("Templates found in %s:\n", targetTemplatesDir)
+	for _, file := range files {
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".tmpl") {
+			filePath := filepath.Join(targetTemplatesDir, file.Name())
+			info, err := os.Stat(filePath)
+			if err == nil {
+				fmt.Printf("  %s (%d bytes)\n", file.Name(), info.Size())
+			} else {
+				fmt.Printf("  %s\n", file.Name())
+			}
+		}
+	}
+
+	return nil
+}
+
+// listProjectFacts lists facts in a spooky project
+func listProjectFacts(logger logging.Logger, path, _ string) error {
+	logger.Info("Listing project facts",
+		logging.String("path", path))
+
+	// Create template context to get project info
+	ctx, err := NewTemplateContext(logger, path)
+	if err != nil {
+		return fmt.Errorf("failed to create template context: %w", err)
+	}
+
+	// Create fact manager
+	manager := facts.NewManager(nil)
+
+	// Get all facts
+	allFacts, err := manager.GetAllFacts()
+	if err != nil {
+		logger.Error("Failed to retrieve facts", err)
+		return fmt.Errorf("failed to retrieve facts: %w", err)
+	}
+
+	if len(allFacts) == 0 {
+		fmt.Printf("No facts found for project %s\n", ctx.Project.Name)
+		fmt.Printf("Use 'spooky project gather-facts %s' to collect facts first.\n", path)
+		return nil
+	}
+
+	// Group facts by server
+	serverFacts := make(map[string][]*facts.Fact)
+	for _, fact := range allFacts {
+		serverFacts[fact.Server] = append(serverFacts[fact.Server], fact)
+	}
+
+	// Display facts in table format
+	fmt.Printf("Facts for project %s:\n", ctx.Project.Name)
+	fmt.Printf("Total facts: %d\n", len(allFacts))
+	fmt.Printf("Servers: %d\n\n", len(serverFacts))
+
+	for server, facts := range serverFacts {
+		fmt.Printf("Server: %s (%d facts)\n", server, len(facts))
+		fmt.Printf("%-30s %-15s %-20s %s\n", "KEY", "SOURCE", "TTL", "VALUE")
+		fmt.Printf("%s\n", strings.Repeat("-", 80))
+
+		for _, fact := range facts {
+			// Truncate value if too long
+			valueStr := fmt.Sprintf("%v", fact.Value)
+			if len(valueStr) > 40 {
+				valueStr = valueStr[:37] + "..."
+			}
+
+			// Format TTL
+			ttlStr := "expired"
+			if fact.TTL > 0 {
+				ttlStr = fact.TTL.String()
+			}
+
+			fmt.Printf("%-30s %-15s %-20s %s\n",
+				fact.Key,
+				fact.Source,
+				ttlStr,
+				valueStr)
+		}
+		fmt.Println()
+	}
+
+	logger.Info("Project facts listed successfully",
+		logging.String("project", ctx.Project.Name),
+		logging.Int("total_facts", len(allFacts)),
+		logging.Int("servers", len(serverFacts)))
+	return nil
+}
+
+// gatherProjectFacts gathers facts for machines in a spooky project
+func gatherProjectFacts(logger logging.Logger, path, _ string, _ bool, _ string) error {
+	logger.Info("Gathering project facts",
+		logging.String("path", path))
+
+	// Create template context to get project info and machines
+	ctx, err := NewTemplateContext(logger, path)
+	if err != nil {
+		return fmt.Errorf("failed to create template context: %w", err)
+	}
+
+	// Create fact manager
+	manager := facts.NewManager(nil)
+
+	// Get all machines from the project
+	machines := ctx.Machines
+	if len(machines) == 0 {
+		fmt.Printf("No machines found in project %s\n", ctx.Project.Name)
+		return nil
+	}
+
+	fmt.Printf("Gathering facts for %d machines in project %s...\n", len(machines), ctx.Project.Name)
+
+	// Collect facts from each machine
+	var allCollections []*facts.FactCollection
+	var errors []error
+
+	for _, machine := range machines {
+		logger.Info("Collecting facts from machine",
+			logging.String("machine", machine.Name),
+			logging.String("host", machine.Host))
+
+		collection, err := manager.CollectAllFacts(machine.Host)
+		if err != nil {
+			logger.Error("Failed to collect facts from machine", err,
+				logging.String("machine", machine.Name),
+				logging.String("host", machine.Host))
+			errors = append(errors, fmt.Errorf("failed to collect facts from %s (%s): %w", machine.Name, machine.Host, err))
+			continue
+		}
+
+		allCollections = append(allCollections, collection)
+		fmt.Printf("✓ Collected %d facts from %s (%s)\n", len(collection.Facts), machine.Name, machine.Host)
+	}
+
+	// Display summary
+	fmt.Printf("\nFact Gathering Summary:\n")
+	fmt.Printf("Project: %s\n", ctx.Project.Name)
+	fmt.Printf("Machines processed: %d\n", len(allCollections))
+	fmt.Printf("Machines failed: %d\n", len(errors))
+	fmt.Printf("Total facts collected: %d\n", getTotalFactCount(allCollections))
+
+	if len(errors) > 0 {
+		fmt.Printf("\nErrors:\n")
+		for _, err := range errors {
+			fmt.Printf("  - %v\n", err)
+		}
+	}
+
+	logger.Info("Project fact gathering completed",
+		logging.String("project", ctx.Project.Name),
+		logging.Int("machines_processed", len(allCollections)),
+		logging.Int("machines_failed", len(errors)),
+		logging.Int("total_facts", getTotalFactCount(allCollections)))
+
+	return nil
+}
+
 // renderProjectTemplate renders a template in the context of a spooky project
-func renderProjectTemplate(logger logging.Logger, templateFile, path, output string, dryRun bool, server string) error {
+func renderProjectTemplate(logger logging.Logger, templateFile, path, output string, dryRun bool, server, _, templatesDir, _ string) error {
 	logger.Info("Rendering project template",
 		logging.String("template", templateFile),
 		logging.String("path", path),
@@ -895,7 +1071,13 @@ func renderProjectTemplate(logger logging.Logger, templateFile, path, output str
 	}
 
 	// Check if template file exists
-	templatePath := filepath.Join(path, templateFile)
+	var templatePath string
+	if templatesDir != "" {
+		templatePath = filepath.Join(templatesDir, templateFile)
+	} else {
+		templatePath = filepath.Join(path, templateFile)
+	}
+
 	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
 		logger.Error("Template file not found", err,
 			logging.String("file", templatePath))
@@ -919,37 +1101,42 @@ func renderProjectTemplate(logger logging.Logger, templateFile, path, output str
 	}
 
 	// Execute template
-	var result bytes.Buffer
-	if err := tmpl.Execute(&result, ctx); err != nil {
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, nil); err != nil {
 		logger.Error("Failed to execute template", err,
 			logging.String("file", templatePath))
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
 
-	// Output result
-	switch {
-	case dryRun:
-		fmt.Printf("=== DRY RUN: Template would be rendered as ===\n")
-		fmt.Printf("%s\n", result.String())
-		fmt.Printf("=== END DRY RUN ===\n")
-	case output != "":
-		// Write to file
-		if err := os.WriteFile(output, result.Bytes(), 0o600); err != nil {
+	// Handle output
+	if dryRun {
+		fmt.Printf("DRY RUN - Would render template '%s' to:\n", templateFile)
+		fmt.Println("---")
+		fmt.Print(buf.String())
+		fmt.Println("---")
+		return nil
+	}
+
+	if output == "" {
+		// Output to stdout
+		fmt.Print(buf.String())
+	} else {
+		// Output to file
+		if err := os.WriteFile(output, buf.Bytes(), 0o600); err != nil {
 			logger.Error("Failed to write output file", err,
-				logging.String("file", output))
+				logging.String("output", output))
 			return fmt.Errorf("failed to write output file: %w", err)
 		}
-		fmt.Printf("Template rendered successfully to: %s\n", output)
-	default:
-		// Write to stdout
-		fmt.Printf("%s", result.String())
+		logger.Info("Template rendered successfully",
+			logging.String("template", templateFile),
+			logging.String("output", output))
 	}
 
 	return nil
 }
 
 // validateProjectTemplate validates a template in the context of a spooky project
-func validateProjectTemplate(logger logging.Logger, templateFile, path string) error {
+func validateProjectTemplate(logger logging.Logger, templateFile, path, templatesDir, _ string) error {
 	logger.Info("Validating project template",
 		logging.String("template", templateFile),
 		logging.String("path", path))
@@ -961,7 +1148,13 @@ func validateProjectTemplate(logger logging.Logger, templateFile, path string) e
 	}
 
 	// Check if template file exists
-	templatePath := filepath.Join(path, templateFile)
+	var templatePath string
+	if templatesDir != "" {
+		templatePath = filepath.Join(templatesDir, templateFile)
+	} else {
+		templatePath = filepath.Join(path, templateFile)
+	}
+
 	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
 		logger.Error("Template file not found", err,
 			logging.String("file", templatePath))
@@ -976,36 +1169,25 @@ func validateProjectTemplate(logger logging.Logger, templateFile, path string) e
 		return fmt.Errorf("failed to read template file: %w", err)
 	}
 
-	// Parse template to check syntax
-	tmpl, err := template.New("validation-template").Funcs(ctx.GetTemplateFunctions()).Parse(string(templateContent))
+	// Create template engine with context
+	tmpl, err := template.New("project-template").Funcs(ctx.GetTemplateFunctions()).Parse(string(templateContent))
 	if err != nil {
-		logger.Error("Template syntax error", err,
+		logger.Error("Failed to parse template", err,
 			logging.String("file", templatePath))
-		return fmt.Errorf("template syntax error: %w", err)
+		return fmt.Errorf("failed to parse template: %w", err)
 	}
 
-	// Get template information
-	_ = tmpl.DefinedTemplates()
-
-	fmt.Printf("✅ Template validation successful\n")
-	fmt.Printf("📄 Template: %s\n", templateFile)
-	fmt.Printf("📁 Project: %s\n", ctx.Project.Name)
-	fmt.Printf("🔧 Template functions available: %d\n", len(ctx.GetTemplateFunctions()))
-
-	// Show available context
-	fmt.Printf("\n📋 Available Context:\n")
-	fmt.Printf("  • Project: %s (%s)\n", ctx.Project.Name, ctx.Project.Description)
-	fmt.Printf("  • Machines: %d\n", len(ctx.Machines))
-	fmt.Printf("  • Actions: %d\n", len(ctx.Actions))
-	fmt.Printf("  • Facts: %d\n", len(ctx.Facts))
-	fmt.Printf("  • Environment variables: %d\n", len(ctx.Environment))
-	fmt.Printf("  • Custom data files: %d\n", len(ctx.CustomData))
-
-	// Show template functions
-	fmt.Printf("\n🔧 Template Functions:\n")
-	for funcName := range ctx.GetTemplateFunctions() {
-		fmt.Printf("  • {{%s}}\n", funcName)
+	// Try to execute with empty data to validate syntax
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, nil); err != nil {
+		logger.Error("Template validation failed", err,
+			logging.String("file", templatePath))
+		return fmt.Errorf("template validation failed: %w", err)
 	}
+
+	logger.Info("Template validation successful",
+		logging.String("file", templatePath))
+	fmt.Printf("✓ Template '%s' is valid\n", templateFile)
 
 	return nil
 }
