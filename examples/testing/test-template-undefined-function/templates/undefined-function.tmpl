@@ -1,0 +1,22 @@
+# Template with undefined function
+
+server {
+  hostname = "{{.hostname}}"
+  ip = "{{.ip}}"
+  
+  # Use undefined function
+  result = "{{undefined_function "test"}}"
+  
+  # Use undefined function with parameters
+  custom_value = "{{custom_function .hostname .ip}}"
+  
+  # Use undefined function in range
+  {{range .interfaces}}
+  interface {
+    name = "{{.name}}"
+    ip = "{{.ip}}"
+    # Use undefined function in range
+    status = "{{check_interface_status .name}}"
+  }
+  {{end}}
+} 

@@ -1,0 +1,2 @@
+This is an extra text file that should be ignored by spooky.
+It contains no configuration data and should not cause any issues. 

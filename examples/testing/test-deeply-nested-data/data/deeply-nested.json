@@ -1,0 +1,82 @@
+{
+  "machines": {
+    "deep-server": {
+      "level1": {
+        "level2": {
+          "level3": {
+            "level4": {
+              "level5": {
+                "level6": {
+                  "level7": {
+                    "level8": {
+                      "level9": {
+                        "level10": {
+                          "value": "deeply nested value",
+                          "array": [
+                            {
+                              "nested": {
+                                "deeper": {
+                                  "deepest": {
+                                    "data": "very deep data"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "large_array": [
+        {
+          "id": 1,
+          "data": "item 1",
+          "nested": {
+            "sub": {
+              "items": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+            }
+          }
+        },
+        {
+          "id": 2,
+          "data": "item 2",
+          "nested": {
+            "sub": {
+              "items": [11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+            }
+          }
+        }
+      ],
+      "complex_object": {
+        "servers": {
+          "web": {
+            "instances": [
+              {
+                "name": "web-1",
+                "config": {
+                  "nginx": {
+                    "sites": [
+                      {
+                        "name": "site1",
+                        "ssl": {
+                          "cert": "path/to/cert",
+                          "key": "path/to/key"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+} 

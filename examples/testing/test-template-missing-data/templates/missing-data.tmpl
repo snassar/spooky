@@ -1,0 +1,29 @@
+# Template with missing data references
+# This template uses variables that won't be available in the context
+
+server {
+  hostname = "{{.hostname}}"
+  ip = "{{.ip}}"
+  port = "{{.port}}"
+  
+  # Missing variable - should cause rendering error
+  missing_var = "{{.missing_variable}}"
+  
+  # Nested missing variable
+  nested = {
+    value = "{{.nested.missing_field}}"
+  }
+  
+  # Array access to missing variable
+  interfaces = [
+    {{range .missing_interfaces}}
+    {
+      name = "{{.name}}"
+      ip = "{{.ip}}"
+    }
+    {{end}}
+  ]
+  
+  # Function call with missing data
+  result = "{{data "missing_key"}}"
+} 
