@@ -1,0 +1,25 @@
+# Template with unbalanced braces
+
+server {
+  hostname = "{{.hostname}}"
+  ip = "{{.ip}}"
+  
+  # Missing closing brace
+  port = "{{.port"
+  
+  # Extra closing brace
+  user = "{{.user}}}"
+  
+  # Unbalanced in range
+  {{range .interfaces}}
+  interface {
+    name = "{{.name}}"
+    ip = "{{.ip}}"
+    # Missing closing brace in range
+    status = "{{.status"
+  }
+  {{end}}
+  
+  # Extra opening brace
+  extra = "{{{{.extra}}"
+} 

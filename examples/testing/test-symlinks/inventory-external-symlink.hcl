@@ -1,0 +1,1 @@
+../test-valid-project/inventory.hcl

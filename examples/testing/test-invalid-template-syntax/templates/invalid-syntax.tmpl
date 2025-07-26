@@ -1,0 +1,23 @@
+# Invalid template syntax
+# This template has syntax errors
+
+server {
+  hostname = "{{.hostname}}"
+  ip = "{{.ip}}"
+  
+  # Invalid syntax - unclosed action
+  port = "{{.port"
+  
+  # Invalid syntax - missing closing brace
+  user = "{{.user"
+  
+  # Invalid syntax - malformed range
+  interfaces = [
+    {{range .interfaces}}
+    {
+      name = "{{.name}}"
+      ip = "{{.ip}}"
+    }
+    {{end
+  ]
+} 
