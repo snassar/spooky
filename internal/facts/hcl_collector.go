@@ -66,7 +66,29 @@ func (c *HCLCollector) parseHCLFile() (interface{}, error) {
 		return nil, fmt.Errorf("HCL parsing errors: %s", diags.Error())
 	}
 
-	// Decode the configuration
+	// Try to decode as inventory wrapper first
+	var inventoryWrapper config.InventoryWrapper
+	diags = gohcl.DecodeBody(file.Body, nil, &inventoryWrapper)
+	if !diags.HasErrors() && inventoryWrapper.Inventory != nil {
+		// Convert to legacy Config format for compatibility
+		cfg := &config.Config{
+			Machines: inventoryWrapper.Inventory.Machines,
+		}
+		return cfg, nil
+	}
+
+	// Try to decode as actions wrapper
+	var actionsWrapper config.ActionsWrapper
+	diags = gohcl.DecodeBody(file.Body, nil, &actionsWrapper)
+	if !diags.HasErrors() && actionsWrapper.Actions != nil {
+		// Convert to legacy Config format for compatibility
+		cfg := &config.Config{
+			Actions: actionsWrapper.Actions.Actions,
+		}
+		return cfg, nil
+	}
+
+	// Try legacy format as fallback
 	var cfg config.Config
 	diags = gohcl.DecodeBody(file.Body, nil, &cfg)
 	if diags.HasErrors() {
@@ -91,8 +113,10 @@ func (c *HCLCollector) extractFactsFromConfig(cfg *config.Config, server string)
 	// Extract global configuration facts
 	c.extractGlobalFacts(cfg, facts)
 
-	// Extract action facts
-	c.extractActionFacts(cfg, facts, server)
+	// Extract action facts (if actions are present)
+	if len(cfg.Actions) > 0 {
+		c.extractActionFacts(cfg, facts, server)
+	}
 
 	return facts
 }
@@ -124,14 +148,8 @@ func (c *HCLCollector) extractMachineFacts(machine *config.Machine, facts map[st
 		Source: string(SourceHCL),
 	}
 
-	// Authentication facts
-	if machine.Password != "" {
-		facts["machine.auth_type"] = &Fact{
-			Key:    "machine.auth_type",
-			Value:  "password",
-			Source: string(SourceHCL),
-		}
-	} else if machine.KeyFile != "" {
+	// Authentication facts - key file takes precedence over password
+	if machine.KeyFile != "" {
 		facts["machine.auth_type"] = &Fact{
 			Key:    "machine.auth_type",
 			Value:  "key_file",
@@ -140,6 +158,12 @@ func (c *HCLCollector) extractMachineFacts(machine *config.Machine, facts map[st
 		facts["machine.key_file"] = &Fact{
 			Key:    "machine.key_file",
 			Value:  machine.KeyFile,
+			Source: string(SourceHCL),
+		}
+	} else if machine.Password != "" {
+		facts["machine.auth_type"] = &Fact{
+			Key:    "machine.auth_type",
+			Value:  "password",
 			Source: string(SourceHCL),
 		}
 	}
@@ -157,35 +181,50 @@ func (c *HCLCollector) extractMachineFacts(machine *config.Machine, facts map[st
 
 // extractGlobalFacts extracts global configuration facts
 func (c *HCLCollector) extractGlobalFacts(cfg *config.Config, facts map[string]*Fact) {
-	facts["config.machine_count"] = &Fact{
-		Key:    "config.machine_count",
-		Value:  len(cfg.Machines),
-		Source: string(SourceHCL),
-	}
+	// Always extract machine count if machines are present
+	if len(cfg.Machines) > 0 {
+		facts["config.machine_count"] = &Fact{
+			Key:    "config.machine_count",
+			Value:  len(cfg.Machines),
+			Source: string(SourceHCL),
+		}
 
-	facts["config.action_count"] = &Fact{
-		Key:    "config.action_count",
-		Value:  len(cfg.Actions),
-		Source: string(SourceHCL),
-	}
+		// Extract unique tags across all machines
+		tagSet := make(map[string]bool)
+		for _, machine := range cfg.Machines {
+			for tag := range machine.Tags {
+				tagSet[tag] = true
+			}
+		}
 
-	// Extract unique tags across all machines
-	tagSet := make(map[string]bool)
-	for _, machine := range cfg.Machines {
-		for tag := range machine.Tags {
-			tagSet[tag] = true
+		facts["config.unique_tags"] = &Fact{
+			Key:    "config.unique_tags",
+			Value:  len(tagSet),
+			Source: string(SourceHCL),
 		}
 	}
 
-	facts["config.unique_tags"] = &Fact{
-		Key:    "config.unique_tags",
-		Value:  len(tagSet),
-		Source: string(SourceHCL),
+	// Always extract action count if actions are present
+	if len(cfg.Actions) > 0 {
+		facts["config.action_count"] = &Fact{
+			Key:    "config.action_count",
+			Value:  len(cfg.Actions),
+			Source: string(SourceHCL),
+		}
 	}
 }
 
 // extractActionFacts extracts facts from actions that apply to the server
 func (c *HCLCollector) extractActionFacts(cfg *config.Config, facts map[string]*Fact, server string) {
+	// If no machines are present, include all actions (actions-only file)
+	if len(cfg.Machines) == 0 {
+		for i := range cfg.Actions {
+			action := &cfg.Actions[i]
+			c.addActionFacts(action, facts)
+		}
+		return
+	}
+
 	actionCount := 0
 	applicableActions := make([]string, 0)
 
@@ -222,71 +261,76 @@ func (c *HCLCollector) extractActionFacts(cfg *config.Config, facts map[string]*
 		if applies {
 			actionCount++
 			applicableActions = append(applicableActions, action.Name)
-
-			// Add action-specific facts
-			factKey := fmt.Sprintf("action.%s.name", action.Name)
-			facts[factKey] = &Fact{
-				Key:    factKey,
-				Value:  action.Name,
-				Source: string(SourceHCL),
-			}
-
-			if action.Description != "" {
-				factKey = fmt.Sprintf("action.%s.description", action.Name)
-				facts[factKey] = &Fact{
-					Key:    factKey,
-					Value:  action.Description,
-					Source: string(SourceHCL),
-				}
-			}
-
-			if action.Command != "" {
-				factKey = fmt.Sprintf("action.%s.command", action.Name)
-				facts[factKey] = &Fact{
-					Key:    factKey,
-					Value:  action.Command,
-					Source: string(SourceHCL),
-				}
-			}
-
-			if action.Script != "" {
-				factKey = fmt.Sprintf("action.%s.script", action.Name)
-				facts[factKey] = &Fact{
-					Key:    factKey,
-					Value:  action.Script,
-					Source: string(SourceHCL),
-				}
-			}
-
-			if action.Timeout > 0 {
-				factKey = fmt.Sprintf("action.%s.timeout", action.Name)
-				facts[factKey] = &Fact{
-					Key:    factKey,
-					Value:  action.Timeout,
-					Source: string(SourceHCL),
-				}
-			}
-
-			factKey = fmt.Sprintf("action.%s.parallel", action.Name)
-			facts[factKey] = &Fact{
-				Key:    factKey,
-				Value:  action.Parallel,
-				Source: string(SourceHCL),
-			}
+			c.addActionFacts(action, facts)
 		}
 	}
 
-	facts["server.applicable_actions"] = &Fact{
-		Key:    "server.applicable_actions",
-		Value:  actionCount,
+	// Add server-specific action facts
+	if actionCount > 0 {
+		facts["server.applicable_actions"] = &Fact{
+			Key:    "server.applicable_actions",
+			Value:  actionCount,
+			Source: string(SourceHCL),
+		}
+
+		facts["server.action_names"] = &Fact{
+			Key:    "server.action_names",
+			Value:  strings.Join(applicableActions, ", "),
+			Source: string(SourceHCL),
+		}
+	}
+}
+
+// addActionFacts adds facts for a specific action
+func (c *HCLCollector) addActionFacts(action *config.Action, facts map[string]*Fact) {
+	// Add action-specific facts
+	factKey := fmt.Sprintf("action.%s.name", action.Name)
+	facts[factKey] = &Fact{
+		Key:    factKey,
+		Value:  action.Name,
 		Source: string(SourceHCL),
 	}
 
-	if len(applicableActions) > 0 {
-		facts["server.action_names"] = &Fact{
-			Key:    "server.action_names",
-			Value:  strings.Join(applicableActions, ","),
+	if action.Description != "" {
+		factKey = fmt.Sprintf("action.%s.description", action.Name)
+		facts[factKey] = &Fact{
+			Key:    factKey,
+			Value:  action.Description,
 			Source: string(SourceHCL),
 		}
+	}
+
+	if action.Command != "" {
+		factKey = fmt.Sprintf("action.%s.command", action.Name)
+		facts[factKey] = &Fact{
+			Key:    factKey,
+			Value:  action.Command,
+			Source: string(SourceHCL),
+		}
+	}
+
+	if action.Script != "" {
+		factKey = fmt.Sprintf("action.%s.script", action.Name)
+		facts[factKey] = &Fact{
+			Key:    factKey,
+			Value:  action.Script,
+			Source: string(SourceHCL),
+		}
+	}
+
+	if action.Timeout > 0 {
+		factKey = fmt.Sprintf("action.%s.timeout", action.Name)
+		facts[factKey] = &Fact{
+			Key:    factKey,
+			Value:  action.Timeout,
+			Source: string(SourceHCL),
+		}
+	}
+
+	factKey = fmt.Sprintf("action.%s.parallel", action.Name)
+	facts[factKey] = &Fact{
+		Key:    factKey,
+		Value:  action.Parallel,
+		Source: string(SourceHCL),
 	}
 }
