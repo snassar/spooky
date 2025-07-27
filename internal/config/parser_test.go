@@ -405,17 +405,17 @@ func TestResolvePath(t *testing.T) {
 			{
 				name:     "Subdirectory",
 				relative: "actions/deploy.sh",
-				expected: filepath.Join(configDir, "actions/deploy.sh"),
+				expected: filepath.Join(configDir, "actions", "deploy.sh"),
 			},
 			{
 				name:     "ParentDirectory",
 				relative: "../config/app.conf",
-				expected: filepath.Join(configDir, "../config/app.conf"),
+				expected: filepath.Join(configDir, "..", "config", "app.conf"),
 			},
 			{
 				name:     "CurrentDirectory",
 				relative: "./scripts/setup.sh",
-				expected: filepath.Join(configDir, "./scripts/setup.sh"),
+				expected: filepath.Join(configDir, ".", "scripts", "setup.sh"),
 			},
 		}
 
@@ -437,7 +437,7 @@ func TestResolvePath(t *testing.T) {
 
 		// Test with whitespace-only string - should be joined with config directory
 		result = resolvePath(configFile, "   ", false)
-		assert.Equal(t, filepath.Join("/path/to/project", "   "), result, "Whitespace-only path should be joined with config directory")
+		assert.Equal(t, filepath.Join("/path", "to", "project", "   "), result, "Whitespace-only path should be joined with config directory") //nolint:gocritic
 	})
 
 	t.Run("SpecialCharacters", func(t *testing.T) {
@@ -453,22 +453,22 @@ func TestResolvePath(t *testing.T) {
 			{
 				name:     "SpacesInPath",
 				relative: "config files/app config.conf",
-				expected: filepath.Join(configDir, "config files/app config.conf"),
+				expected: filepath.Join(configDir, "config files", "app config.conf"),
 			},
 			{
 				name:     "DashesAndUnderscores",
 				relative: "scripts/deploy-script_v2.sh",
-				expected: filepath.Join(configDir, "scripts/deploy-script_v2.sh"),
+				expected: filepath.Join(configDir, "scripts", "deploy-script_v2.sh"),
 			},
 			{
 				name:     "DotsInPath",
 				relative: "config/app.config.conf",
-				expected: filepath.Join(configDir, "config/app.config.conf"),
+				expected: filepath.Join(configDir, "config", "app.config.conf"),
 			},
 			{
 				name:     "UnicodeCharacters",
 				relative: "config/测试.conf",
-				expected: filepath.Join(configDir, "config/测试.conf"),
+				expected: filepath.Join(configDir, "config", "测试.conf"),
 			},
 		}
 
@@ -570,7 +570,7 @@ func TestResolveMachinePaths(t *testing.T) {
 		resolveMachinePaths(configFile, machine)
 
 		// Verify the key file path is resolved correctly
-		expected := filepath.Join(configDir, "keys/id_rsa")
+		expected := filepath.Join(configDir, "keys", "id_rsa")
 		assert.Equal(t, expected, machine.KeyFile, "Key file path should be resolved correctly")
 
 		// Verify other fields remain unchanged
@@ -623,7 +623,7 @@ func TestResolveMachinePaths(t *testing.T) {
 		resolveMachinePaths(configFile, machine)
 
 		// Verify the key file path is resolved correctly
-		expected := filepath.Join(configDir, "keys/id_rsa")
+		expected := filepath.Join(configDir, "keys", "id_rsa")
 		assert.Equal(t, expected, machine.KeyFile, "Key file path should be resolved correctly")
 
 		// Verify other fields remain unchanged
@@ -667,22 +667,22 @@ func TestResolveMachinePaths(t *testing.T) {
 			{
 				name:     "ParentDirectoryTraversal",
 				keyFile:  "../../../etc/passwd",
-				expected: filepath.Join(configDir, "../../../etc/passwd"),
+				expected: filepath.Join(configDir, "..", "..", "..", "etc", "passwd"),
 			},
 			{
 				name:     "SpecialCharacters",
 				keyFile:  "keys/my key with spaces",
-				expected: filepath.Join(configDir, "keys/my key with spaces"),
+				expected: filepath.Join(configDir, "keys", "my key with spaces"),
 			},
 			{
 				name:     "UnicodeCharacters",
 				keyFile:  "keys/测试密钥",
-				expected: filepath.Join(configDir, "keys/测试密钥"),
+				expected: filepath.Join(configDir, "keys", "测试密钥"),
 			},
 			{
 				name:     "MultipleDots",
 				keyFile:  "keys/../config/../keys/id_rsa",
-				expected: filepath.Join(configDir, "keys/../config/../keys/id_rsa"),
+				expected: filepath.Join(configDir, "keys", "..", "config", "..", "keys", "id_rsa"),
 			},
 		}
 
@@ -759,7 +759,7 @@ func TestResolveMachinePaths(t *testing.T) {
 				resolveMachinePaths(configFile, machine)
 
 				// Verify the path is resolved relative to the inventory file
-				expected := filepath.Join(filepath.Dir(configFile), "keys/id_rsa")
+				expected := filepath.Join(filepath.Dir(configFile), "keys", "id_rsa")
 				assert.Equal(t, expected, machine.KeyFile, "Path should be resolved relative to inventory file")
 
 				// Verify the result contains the expected components
@@ -785,7 +785,7 @@ func TestResolveActionPaths(t *testing.T) {
 		resolveActionPaths(configFile, action)
 
 		// Verify the script path is resolved correctly
-		expected := filepath.Join(configDir, "scripts/deploy.sh")
+		expected := filepath.Join(configDir, "scripts", "deploy.sh")
 		assert.Equal(t, expected, action.Script, "Script path should be resolved correctly")
 
 		// Verify other fields remain unchanged
@@ -838,7 +838,7 @@ func TestResolveActionPaths(t *testing.T) {
 		resolveActionPaths(configFile, action)
 
 		// Verify script path is resolved correctly
-		expectedScript := filepath.Join(configDir, "scripts/setup.sh")
+		expectedScript := filepath.Join(configDir, "scripts", "setup.sh")
 		assert.Equal(t, expectedScript, action.Script, "Script path should be resolved correctly")
 
 		// Verify template destination is NOT modified (function only processes Script)
@@ -879,22 +879,22 @@ func TestResolveActionPaths(t *testing.T) {
 			{
 				name:     "ParentDirectoryTraversal",
 				script:   "../../../etc/passwd",
-				expected: filepath.Join(configDir, "../../../etc/passwd"),
+				expected: filepath.Join(configDir, "..", "..", "..", "etc", "passwd"),
 			},
 			{
 				name:     "SpecialCharacters",
 				script:   "scripts/my script with spaces.sh",
-				expected: filepath.Join(configDir, "scripts/my script with spaces.sh"),
+				expected: filepath.Join(configDir, "scripts", "my script with spaces.sh"),
 			},
 			{
 				name:     "UnicodeCharacters",
 				script:   "scripts/测试脚本.sh",
-				expected: filepath.Join(configDir, "scripts/测试脚本.sh"),
+				expected: filepath.Join(configDir, "scripts", "测试脚本.sh"),
 			},
 			{
 				name:     "MultipleDots",
 				script:   "scripts/../config/../scripts/setup.sh",
-				expected: filepath.Join(configDir, "scripts/../config/../scripts/setup.sh"),
+				expected: filepath.Join(configDir, "scripts", "..", "config", "..", "scripts", "setup.sh"),
 			},
 		}
 
@@ -979,7 +979,7 @@ func TestResolveActionPaths(t *testing.T) {
 				resolveActionPaths(configFile, action)
 
 				// Verify the path is resolved relative to the actions file
-				expected := filepath.Join(filepath.Dir(configFile), "scripts/deploy.sh")
+				expected := filepath.Join(filepath.Dir(configFile), "scripts", "deploy.sh")
 				assert.Equal(t, expected, action.Script, "Path should be resolved relative to actions file")
 
 				// Verify the result contains the expected components
