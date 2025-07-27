@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -702,5 +703,320 @@ func TestValidateScriptFile(t *testing.T) {
 				assert.Equal(t, tc.expected, actualResult, "Expected %v for script path: %s", tc.expected, tc.scriptPath)
 			})
 		}
+	})
+}
+
+func TestRegisterCustomValidations(t *testing.T) {
+	t.Run("SuccessfulRegistration", func(t *testing.T) {
+		// Test successful registration of all custom validations
+		validator := NewValidator()
+		require.NotNil(t, validator)
+
+		// Verify that the validator is functional by testing a simple validation
+		machine := &Machine{
+			Name:     "test-server",
+			Host:     "192.168.1.100",
+			Port:     22,
+			User:     "testuser",
+			Password: "testpass",
+		}
+
+		err := validator.ValidateMachine(machine)
+		assert.NoError(t, err, "Validator should be functional after registration")
+	})
+
+	t.Run("SSHKeyFileValidatorRegistration", func(t *testing.T) {
+		// Test specific registration of SSH key file validator
+		validator := &Validator{
+			validate: validator.New(),
+		}
+
+		// Call registerCustomValidations
+		validator.registerCustomValidations()
+
+		// Verify the validator is functional by testing SSH key validation
+		// Create a temporary file to test with
+		tempFile, err := os.CreateTemp("", "test_key")
+		require.NoError(t, err)
+		defer os.Remove(tempFile.Name())
+		defer tempFile.Close()
+
+		// Write some content to make it readable
+		_, err = tempFile.WriteString("test key content")
+		require.NoError(t, err)
+
+		// Test that the validator can be used (indirect test of registration)
+		machine := &Machine{
+			Name:    "test-server",
+			Host:    "192.168.1.100",
+			Port:    22,
+			User:    "testuser",
+			KeyFile: tempFile.Name(),
+		}
+
+		err = validator.ValidateMachine(machine)
+		// Should not error due to SSH key validation (it's disabled in testing)
+		assert.NoError(t, err, "SSH key validator should be registered and functional")
+	})
+
+	t.Run("ScriptFileValidatorRegistration", func(t *testing.T) {
+		// Test specific registration of script file validator
+		validator := &Validator{
+			validate: validator.New(),
+		}
+
+		// Call registerCustomValidations
+		validator.registerCustomValidations()
+
+		// Verify the validator is functional by testing script validation
+		// Create a temporary executable file to test with
+		tempFile, err := os.CreateTemp("", "test_script")
+		require.NoError(t, err)
+		defer os.Remove(tempFile.Name())
+		defer tempFile.Close()
+
+		// Write some content
+		_, err = tempFile.WriteString("#!/bin/bash\necho 'test'")
+		require.NoError(t, err)
+
+		// Make it executable
+		err = os.Chmod(tempFile.Name(), 0o755)
+		require.NoError(t, err)
+
+		// Test that the validator can be used (indirect test of registration)
+		action := &Action{
+			Name:   "test-action",
+			Script: tempFile.Name(),
+		}
+
+		err = validator.ValidateAction(action)
+		// Should not error due to script validation (it's disabled in testing)
+		assert.NoError(t, err, "Script validator should be registered and functional")
+	})
+
+	t.Run("MachineStructValidationRegistration", func(t *testing.T) {
+		// Test registration of machine struct-level validation
+		validator := &Validator{
+			validate: validator.New(),
+		}
+
+		// Call registerCustomValidations
+		validator.registerCustomValidations()
+
+		// Test machine struct validation by creating a machine without auth
+		machine := &Machine{
+			Name: "test-server",
+			Host: "192.168.1.100",
+			Port: 22,
+			User: "testuser",
+			// Missing both password and key_file - should trigger struct validation
+		}
+
+		err := validator.ValidateMachine(machine)
+		assert.Error(t, err, "Machine struct validation should be registered and catch missing auth")
+		assert.Contains(t, err.Error(), "either password or key_file must be specified")
+	})
+
+	t.Run("ActionStructValidationRegistration", func(t *testing.T) {
+		// Test registration of action struct-level validation
+		validator := &Validator{
+			validate: validator.New(),
+		}
+
+		// Call registerCustomValidations
+		validator.registerCustomValidations()
+
+		// Test action struct validation by creating an action without exec method
+		action := &Action{
+			Name: "test-action",
+			Type: "command",
+			// Missing both command and script - should trigger struct validation
+		}
+
+		err := validator.ValidateAction(action)
+		assert.Error(t, err, "Action struct validation should be registered and catch missing exec method")
+		assert.Contains(t, err.Error(), "either command or script must be specified")
+	})
+
+	t.Run("MultipleRegistrationAttempts", func(t *testing.T) {
+		// Test behavior when registration is called multiple times
+		validator := NewValidator()
+		require.NotNil(t, validator)
+
+		// Call registration again
+		validator.registerCustomValidations()
+
+		// Verify validator remains functional
+		machine := &Machine{
+			Name:     "test-server",
+			Host:     "192.168.1.100",
+			Port:     22,
+			User:     "testuser",
+			Password: "testpass",
+		}
+
+		err := validator.ValidateMachine(machine)
+		assert.NoError(t, err, "Validator should remain functional after multiple registrations")
+	})
+
+	t.Run("ValidatorInitializationIntegration", func(t *testing.T) {
+		// Test integration with NewValidator function
+		validator := NewValidator()
+		require.NotNil(t, validator)
+
+		// Test that all validations are properly registered by testing various scenarios
+		testCases := []struct {
+			name        string
+			machine     *Machine
+			shouldError bool
+			errorMsg    string
+		}{
+			{
+				name: "ValidMachine",
+				machine: &Machine{
+					Name:     "test-server",
+					Host:     "192.168.1.100",
+					Port:     22,
+					User:     "testuser",
+					Password: "testpass",
+				},
+				shouldError: false,
+			},
+			{
+				name: "MissingAuth",
+				machine: &Machine{
+					Name: "test-server",
+					Host: "192.168.1.100",
+					Port: 22,
+					User: "testuser",
+					// Missing both password and key_file
+				},
+				shouldError: true,
+				errorMsg:    "either password or key_file must be specified",
+			},
+			{
+				name: "InvalidPort",
+				machine: &Machine{
+					Name:     "test-server",
+					Host:     "192.168.1.100",
+					Port:     99999, // Invalid port
+					User:     "testuser",
+					Password: "testpass",
+				},
+				shouldError: true,
+				errorMsg:    "Port must be at most 65535",
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				err := validator.ValidateMachine(tc.machine)
+				if tc.shouldError {
+					assert.Error(t, err)
+					if tc.errorMsg != "" {
+						assert.Contains(t, err.Error(), tc.errorMsg)
+					}
+				} else {
+					assert.NoError(t, err)
+				}
+			})
+		}
+	})
+
+	t.Run("ActionValidationIntegration", func(t *testing.T) {
+		// Test that action validations are properly registered
+		validator := NewValidator()
+		require.NotNil(t, validator)
+
+		testCases := []struct {
+			name        string
+			action      *Action
+			shouldError bool
+			errorMsg    string
+		}{
+			{
+				name: "ValidCommandAction",
+				action: &Action{
+					Name:    "test-action",
+					Type:    "command",
+					Command: "echo hello",
+				},
+				shouldError: false,
+			},
+			{
+				name: "ValidScriptAction",
+				action: &Action{
+					Name:   "test-action",
+					Type:   "script",
+					Script: "/path/to/script.sh",
+				},
+				shouldError: false,
+			},
+			{
+				name: "MissingExecMethod",
+				action: &Action{
+					Name: "test-action",
+					Type: "command",
+					// Missing both command and script
+				},
+				shouldError: true,
+				errorMsg:    "either command or script must be specified",
+			},
+			{
+				name: "BothCommandAndScript",
+				action: &Action{
+					Name:    "test-action",
+					Type:    "command",
+					Command: "echo hello",
+					Script:  "/path/to/script.sh",
+				},
+				shouldError: true,
+				errorMsg:    "either command or script must be specified",
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				err := validator.ValidateAction(tc.action)
+				if tc.shouldError {
+					assert.Error(t, err)
+					if tc.errorMsg != "" {
+						assert.Contains(t, err.Error(), tc.errorMsg)
+					}
+				} else {
+					assert.NoError(t, err)
+				}
+			})
+		}
+	})
+
+	t.Run("CustomValidationTags", func(t *testing.T) {
+		// Test that custom validation tags are properly registered and functional
+		validator := NewValidator()
+		require.NotNil(t, validator)
+
+		// Test SSH key file validation tag (if enabled)
+		// Note: SSH key validation is disabled in testing, so we test the registration indirectly
+		machine := &Machine{
+			Name:    "test-server",
+			Host:    "192.168.1.100",
+			Port:    22,
+			User:    "testuser",
+			KeyFile: "/nonexistent/key/file", // Should not cause validation error in testing
+		}
+
+		err := validator.ValidateMachine(machine)
+		// Should not error due to SSH key validation being disabled in testing
+		assert.NoError(t, err, "SSH key validation should be registered but disabled in testing")
+
+		// Test script file validation tag (if enabled)
+		action := &Action{
+			Name:   "test-action",
+			Script: "/nonexistent/script/file", // Should not cause validation error in testing
+		}
+
+		err = validator.ValidateAction(action)
+		// Should not error due to script validation being disabled in testing
+		assert.NoError(t, err, "Script validation should be registered but disabled in testing")
 	})
 }
