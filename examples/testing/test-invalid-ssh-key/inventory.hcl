@@ -18,7 +18,7 @@ inventory {
     host     = "192.168.1.101"
     port     = 22
     user     = "debian"
-    ssh_key  = "/path/to/non/existent/key"
+    key_file = "/path/to/non/existent/key"
     tags = {
       environment = "development"
       role = "web"
@@ -30,7 +30,7 @@ inventory {
     host     = "192.168.1.102"
     port     = 22
     user     = "debian"
-    ssh_key  = "/tmp"
+    key_file = "/tmp"
     tags = {
       environment = "development"
       role = "web"
