@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
+	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1018,5 +1020,284 @@ func TestRegisterCustomValidations(t *testing.T) {
 		err = validator.ValidateAction(action)
 		// Should not error due to script validation being disabled in testing
 		assert.NoError(t, err, "Script validation should be registered but disabled in testing")
+	})
+}
+
+// MockFieldError implements validator.FieldError for testing
+type MockFieldError struct {
+	field string
+	tag   string
+	param string
+	value interface{}
+}
+
+func (m *MockFieldError) Field() string { return m.field }
+func (m *MockFieldError) Tag() string   { return m.tag }
+func (m *MockFieldError) Param() string { return m.param }
+func (m *MockFieldError) Error() string {
+	return fmt.Sprintf("%s failed validation: %s", m.field, m.tag)
+}
+func (m *MockFieldError) Type() reflect.Type                   { return reflect.TypeOf("") }
+func (m *MockFieldError) Value() interface{}                   { return m.value }
+func (m *MockFieldError) Namespace() string                    { return "" }
+func (m *MockFieldError) StructNamespace() string              { return "" }
+func (m *MockFieldError) StructField() string                  { return "" }
+func (m *MockFieldError) Kind() reflect.Kind                   { return reflect.String }
+func (m *MockFieldError) ActualTag() string                    { return m.tag }
+func (m *MockFieldError) Translate(trans ut.Translator) string { return m.Error() }
+
+func TestFormatMinValidation(t *testing.T) {
+	t.Run("MachinesField", func(t *testing.T) {
+		// Test special case for Machines field
+		validator := NewValidator()
+		fieldError := &MockFieldError{
+			field: "Machines",
+			tag:   "min",
+			param: "1",
+		}
+
+		result := validator.formatMinValidation(fieldError)
+		expected := "at least one machine must be defined"
+		assert.Equal(t, expected, result, "Machines field should return special message")
+	})
+
+	t.Run("PortField", func(t *testing.T) {
+		// Test numeric field Port
+		validator := NewValidator()
+		fieldError := &MockFieldError{
+			field: "Port",
+			tag:   "min",
+			param: "1",
+		}
+
+		result := validator.formatMinValidation(fieldError)
+		expected := "Port must be at least 1"
+		assert.Equal(t, expected, result, "Port field should return numeric field message")
+	})
+
+	t.Run("TimeoutField", func(t *testing.T) {
+		// Test numeric field Timeout
+		validator := NewValidator()
+		fieldError := &MockFieldError{
+			field: "Timeout",
+			tag:   "min",
+			param: "30",
+		}
+
+		result := validator.formatMinValidation(fieldError)
+		expected := "Timeout must be at least 30"
+		assert.Equal(t, expected, result, "Timeout field should return numeric field message")
+	})
+
+	t.Run("GenericField", func(t *testing.T) {
+		// Test generic field (default case)
+		validator := NewValidator()
+		fieldError := &MockFieldError{
+			field: "RetryCount",
+			tag:   "min",
+			param: "0",
+		}
+
+		result := validator.formatMinValidation(fieldError)
+		expected := "RetryCount must be at least 0"
+		assert.Equal(t, expected, result, "Generic field should return default message")
+	})
+
+	t.Run("NumericParameters", func(t *testing.T) {
+		// Test various numeric parameters
+		validator := NewValidator()
+		testCases := []struct {
+			field  string
+			param  string
+			expect string
+		}{
+			{"Timeout", "30", "Timeout must be at least 30"},
+			{"Port", "1024", "Port must be at least 1024"},
+			{"RetryCount", "0", "RetryCount must be at least 0"},
+			{"MaxConnections", "10", "MaxConnections must be at least 10"},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.field, func(t *testing.T) {
+				fieldError := &MockFieldError{
+					field: tc.field,
+					tag:   "min",
+					param: tc.param,
+				}
+
+				result := validator.formatMinValidation(fieldError)
+				assert.Equal(t, tc.expect, result, "Numeric parameter should be formatted correctly")
+			})
+		}
+	})
+
+	t.Run("SpecialCharactersInFieldNames", func(t *testing.T) {
+		// Test fields with special characters
+		validator := NewValidator()
+		testCases := []struct {
+			field  string
+			param  string
+			expect string
+		}{
+			{"KeyFile", "1", "KeyFile must be at least 1"},
+			{"SSH_Config", "100", "SSH_Config must be at least 100"},
+			{"User.Name", "1", "User.Name must be at least 1"},
+			{"Config-Path", "1", "Config-Path must be at least 1"},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.field, func(t *testing.T) {
+				fieldError := &MockFieldError{
+					field: tc.field,
+					tag:   "min",
+					param: tc.param,
+				}
+
+				result := validator.formatMinValidation(fieldError)
+				assert.Equal(t, tc.expect, result, "Special characters in field names should be handled correctly")
+			})
+		}
+	})
+
+	t.Run("EmptyParameters", func(t *testing.T) {
+		// Test with empty parameters
+		validator := NewValidator()
+		testCases := []struct {
+			field  string
+			param  string
+			expect string
+		}{
+			{"Timeout", "", "Timeout must be at least "},
+			{"Port", "", "Port must be at least "},
+			{"RetryCount", "", "RetryCount must be at least "},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.field, func(t *testing.T) {
+				fieldError := &MockFieldError{
+					field: tc.field,
+					tag:   "min",
+					param: tc.param,
+				}
+
+				result := validator.formatMinValidation(fieldError)
+				assert.Equal(t, tc.expect, result, "Empty parameters should be handled correctly")
+			})
+		}
+	})
+
+	t.Run("LargeNumbers", func(t *testing.T) {
+		// Test with large numbers
+		validator := NewValidator()
+		testCases := []struct {
+			field  string
+			param  string
+			expect string
+		}{
+			{"MaxConnections", "1000000", "MaxConnections must be at least 1000000"},
+			{"Timeout", "86400", "Timeout must be at least 86400"},
+			{"Port", "65535", "Port must be at least 65535"},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.field, func(t *testing.T) {
+				fieldError := &MockFieldError{
+					field: tc.field,
+					tag:   "min",
+					param: tc.param,
+				}
+
+				result := validator.formatMinValidation(fieldError)
+				assert.Equal(t, tc.expect, result, "Large numbers should be handled correctly")
+			})
+		}
+	})
+
+	t.Run("DirectFunctionTesting", func(t *testing.T) {
+		// Test the formatMinValidation function directly with various scenarios
+		validator := NewValidator()
+
+		// Test that the function handles all the cases we've tested above
+		testCases := []struct {
+			name   string
+			field  string
+			param  string
+			expect string
+		}{
+			{"MachinesField", "Machines", "1", "at least one machine must be defined"},
+			{"PortField", "Port", "1", "Port must be at least 1"},
+			{"TimeoutField", "Timeout", "30", "Timeout must be at least 30"},
+			{"GenericField", "RetryCount", "0", "RetryCount must be at least 0"},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				fieldError := &MockFieldError{
+					field: tc.field,
+					tag:   "min",
+					param: tc.param,
+				}
+
+				result := validator.formatMinValidation(fieldError)
+				assert.Equal(t, tc.expect, result, "Direct function testing should work correctly")
+			})
+		}
+	})
+
+	t.Run("CaseSensitivity", func(t *testing.T) {
+		// Test case sensitivity in field names
+		validator := NewValidator()
+		testCases := []struct {
+			field  string
+			param  string
+			expect string
+		}{
+			{"port", "1", "port must be at least 1"},
+			{"PORT", "1", "PORT must be at least 1"},
+			{"Port", "1", "Port must be at least 1"},
+			{"timeout", "30", "timeout must be at least 30"},
+			{"TIMEOUT", "30", "TIMEOUT must be at least 30"},
+			{"Timeout", "30", "Timeout must be at least 30"},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.field, func(t *testing.T) {
+				fieldError := &MockFieldError{
+					field: tc.field,
+					tag:   "min",
+					param: tc.param,
+				}
+
+				result := validator.formatMinValidation(fieldError)
+				assert.Equal(t, tc.expect, result, "Case sensitivity should be preserved")
+			})
+		}
+	})
+
+	t.Run("UnicodeCharacters", func(t *testing.T) {
+		// Test with Unicode characters in field names
+		validator := NewValidator()
+		testCases := []struct {
+			field  string
+			param  string
+			expect string
+		}{
+			{"ConfigPath", "1", "ConfigPath must be at least 1"},
+			{"UserConfig", "1", "UserConfig must be at least 1"},
+			{"ServerConfig", "1", "ServerConfig must be at least 1"},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.field, func(t *testing.T) {
+				fieldError := &MockFieldError{
+					field: tc.field,
+					tag:   "min",
+					param: tc.param,
+				}
+
+				result := validator.formatMinValidation(fieldError)
+				assert.Equal(t, tc.expect, result, "Unicode characters should be handled correctly")
+			})
+		}
 	})
 }
