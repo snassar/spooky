@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -987,5 +989,473 @@ func TestResolveActionPaths(t *testing.T) {
 				assert.Contains(t, action.Script, "scripts/deploy.sh", "Result should contain the relative path")
 			})
 		}
+	})
+}
+
+func TestParserErrorHandling(t *testing.T) {
+	t.Run("HCLParsingErrors", func(t *testing.T) {
+		// Create temporary file with malformed HCL
+		tmpDir := t.TempDir()
+		malformedFile := filepath.Join(tmpDir, "malformed.hcl")
+
+		malformedHCL := `
+project "test" {
+    description = "test project"
+    invalid_syntax = {
+        missing_closing_brace
+    }
+}
+`
+		err := os.WriteFile(malformedFile, []byte(malformedHCL), 0o644)
+		require.NoError(t, err)
+
+		// Test ParseProjectConfig with malformed HCL
+		_, err = ParseProjectConfig(malformedFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse project HCL file")
+		assert.Contains(t, err.Error(), "Missing attribute value")
+
+		// Test ParseProjectConfigWithDebug with malformed HCL
+		_, err = ParseProjectConfigWithDebug(malformedFile, true)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse project HCL file")
+	})
+
+	t.Run("FileReadErrors", func(t *testing.T) {
+		// Test with non-existent file
+		nonexistentFile := "/nonexistent/path/project.hcl"
+
+		_, err := ParseProjectConfig(nonexistentFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse project HCL file")
+		assert.Contains(t, err.Error(), "could not be read")
+
+		_, err = ParseProjectConfigWithDebug(nonexistentFile, false)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse project HCL file")
+
+		_, err = ParseInventoryConfig(nonexistentFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse inventory HCL file")
+
+		_, err = ParseActionsConfig(nonexistentFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse actions HCL file")
+	})
+
+	t.Run("DecodingErrors", func(t *testing.T) {
+		// Create temporary file with type mismatches
+		tmpDir := t.TempDir()
+		invalidFile := filepath.Join(tmpDir, "invalid.hcl")
+
+		invalidHCL := `
+project "test" {
+    default_timeout = "not_a_number"
+    default_parallel = "not_a_boolean"
+    storage {
+        type = "badgerdb"
+        path = "test.db"
+    }
+}
+`
+		err := os.WriteFile(invalidFile, []byte(invalidHCL), 0o644)
+		require.NoError(t, err)
+
+		_, err = ParseProjectConfig(invalidFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to decode project configuration")
+		assert.Contains(t, err.Error(), "Unsuitable value")
+	})
+
+	t.Run("ValidationErrors", func(t *testing.T) {
+		// Create temporary file with invalid values that should trigger validation
+		tmpDir := t.TempDir()
+		invalidFile := filepath.Join(tmpDir, "validation.hcl")
+
+		// Use empty project name to trigger validation error
+		invalidHCL := `
+project "" {
+    storage {
+        type = "badgerdb"
+        path = "test.db"
+    }
+}
+`
+		err := os.WriteFile(invalidFile, []byte(invalidHCL), 0o644)
+		require.NoError(t, err)
+
+		_, err = ParseProjectConfig(invalidFile)
+		assert.Error(t, err)
+		// Should fail validation for empty project name
+	})
+
+	t.Run("PathResolutionErrors", func(t *testing.T) {
+		// Create temporary file with invalid file references
+		tmpDir := t.TempDir()
+		invalidFile := filepath.Join(tmpDir, "paths.hcl")
+
+		invalidHCL := `
+project "test" {
+    inventory_file = "/nonexistent/inventory.hcl"
+    actions_file = "/nonexistent/actions.hcl"
+    storage {
+        type = "badgerdb"
+        path = "test.db"
+    }
+}
+`
+		err := os.WriteFile(invalidFile, []byte(invalidHCL), 0o644)
+		require.NoError(t, err)
+
+		// Should parse successfully but with resolved paths
+		config, err := ParseProjectConfig(invalidFile)
+		assert.NoError(t, err)
+		assert.NotNil(t, config)
+		assert.Equal(t, "/nonexistent/inventory.hcl", config.InventoryFile)
+		assert.Equal(t, "/nonexistent/actions.hcl", config.ActionsFile)
+	})
+
+	t.Run("MultipleBlocks", func(t *testing.T) {
+		// Create temporary file with multiple project blocks
+		tmpDir := t.TempDir()
+		invalidFile := filepath.Join(tmpDir, "multiple.hcl")
+
+		invalidHCL := `
+project "first" {
+    storage {
+        type = "badgerdb"
+        path = "test.db"
+    }
+}
+
+project "second" {
+    storage {
+        type = "badgerdb"
+        path = "test2.db"
+    }
+}
+`
+		err := os.WriteFile(invalidFile, []byte(invalidHCL), 0o644)
+		require.NoError(t, err)
+
+		_, err = ParseProjectConfig(invalidFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to decode project configuration")
+	})
+
+	t.Run("MissingBlocks", func(t *testing.T) {
+		// Create temporary file without required blocks
+		tmpDir := t.TempDir()
+		invalidFile := filepath.Join(tmpDir, "missing.hcl")
+
+		invalidHCL := `
+# No project block
+name = "test"
+description = "test project"
+`
+		err := os.WriteFile(invalidFile, []byte(invalidHCL), 0o644)
+		require.NoError(t, err)
+
+		_, err = ParseProjectConfig(invalidFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to decode project configuration")
+		assert.Contains(t, err.Error(), "Unsupported argument")
+	})
+
+	t.Run("EmptyFile", func(t *testing.T) {
+		// Create empty file
+		tmpDir := t.TempDir()
+		emptyFile := filepath.Join(tmpDir, "empty.hcl")
+
+		err := os.WriteFile(emptyFile, []byte(""), 0o644)
+		require.NoError(t, err)
+
+		_, err = ParseProjectConfig(emptyFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no project block found in configuration")
+	})
+
+	t.Run("LargeFile", func(t *testing.T) {
+		// Create large file
+		tmpDir := t.TempDir()
+		largeFile := filepath.Join(tmpDir, "large.hcl")
+
+		// Create large HCL content
+		largeHCL := `project "test" { 
+    storage {
+        type = "badgerdb"
+        path = "test.db"
+    }
+}` + strings.Repeat("\n# comment", 1000)
+
+		err := os.WriteFile(largeFile, []byte(largeHCL), 0o644)
+		require.NoError(t, err)
+
+		// Should handle large files gracefully
+		config, err := ParseProjectConfig(largeFile)
+		assert.NoError(t, err)
+		assert.NotNil(t, config)
+		assert.Equal(t, "test", config.Name)
+	})
+
+	t.Run("ConcurrentParsing", func(t *testing.T) {
+		// Create valid file for concurrent testing
+		tmpDir := t.TempDir()
+		validFile := filepath.Join(tmpDir, "valid.hcl")
+
+		validHCL := `
+project "test" {
+    storage {
+        type = "badgerdb"
+        path = "test.db"
+    }
+}
+`
+		err := os.WriteFile(validFile, []byte(validHCL), 0o644)
+		require.NoError(t, err)
+
+		// Test concurrent parsing
+		var wg sync.WaitGroup
+		results := make([]*ProjectConfig, 10)
+		errors := make([]error, 10)
+
+		for i := 0; i < 10; i++ {
+			wg.Add(1)
+			go func(index int) {
+				defer wg.Done()
+				results[index], errors[index] = ParseProjectConfig(validFile)
+			}(i)
+		}
+		wg.Wait()
+
+		// All should succeed
+		for i := 0; i < 10; i++ {
+			assert.NoError(t, errors[i])
+			assert.NotNil(t, results[i])
+			assert.Equal(t, "test", results[i].Name)
+		}
+	})
+
+	t.Run("InventoryConfigErrors", func(t *testing.T) {
+		// Test inventory config parsing errors
+		tmpDir := t.TempDir()
+
+		// Test with malformed inventory HCL
+		malformedFile := filepath.Join(tmpDir, "inventory.hcl")
+		malformedHCL := `
+inventory {
+    machine "test" {
+        host = "192.168.1.1"
+        user = "test"
+        invalid_syntax = {
+            missing_brace
+        }
+    }
+}
+`
+		err := os.WriteFile(malformedFile, []byte(malformedHCL), 0o644)
+		require.NoError(t, err)
+
+		_, err = ParseInventoryConfig(malformedFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse inventory HCL file")
+
+		// Test with missing inventory block
+		missingFile := filepath.Join(tmpDir, "missing-inventory.hcl")
+		missingHCL := `
+# No inventory block
+machine "test" {
+    host = "192.168.1.1"
+    user = "test"
+}
+`
+		err = os.WriteFile(missingFile, []byte(missingHCL), 0o644)
+		require.NoError(t, err)
+
+		_, err = ParseInventoryConfig(missingFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to decode inventory configuration")
+		assert.Contains(t, err.Error(), "Unsupported block type")
+	})
+
+	t.Run("ActionsConfigErrors", func(t *testing.T) {
+		// Test actions config parsing errors
+		tmpDir := t.TempDir()
+
+		// Test with malformed actions HCL
+		malformedFile := filepath.Join(tmpDir, "actions.hcl")
+		malformedHCL := `
+actions {
+    action "test" {
+        type = "command"
+        command = "echo hello"
+        invalid_syntax = {
+            missing_brace
+        }
+    }
+}
+`
+		err := os.WriteFile(malformedFile, []byte(malformedHCL), 0o644)
+		require.NoError(t, err)
+
+		_, err = ParseActionsConfig(malformedFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse actions HCL file")
+
+		// Test with missing actions block
+		missingFile := filepath.Join(tmpDir, "missing-actions.hcl")
+		missingHCL := `
+# No actions block
+action "test" {
+    type = "command"
+    command = "echo hello"
+}
+`
+		err = os.WriteFile(missingFile, []byte(missingHCL), 0o644)
+		require.NoError(t, err)
+
+		_, err = ParseActionsConfig(missingFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to decode actions configuration")
+		assert.Contains(t, err.Error(), "Unsupported block type")
+	})
+
+	t.Run("LoadActionsConfigErrors", func(t *testing.T) {
+		// Test LoadActionsConfig with various error scenarios
+		tmpDir := t.TempDir()
+
+		// Test with project path that has no actions files
+		emptyProject := filepath.Join(tmpDir, "empty-project")
+		err := os.MkdirAll(emptyProject, 0o755)
+		require.NoError(t, err)
+
+		config, err := LoadActionsConfig(emptyProject)
+		assert.NoError(t, err)
+		assert.NotNil(t, config)
+		assert.Empty(t, config.Actions)
+
+		// Test with invalid actions file
+		invalidActionsFile := filepath.Join(emptyProject, "actions.hcl")
+		invalidHCL := `
+actions {
+    action "test" {
+        type = "command"
+        command = "echo hello"
+        invalid_syntax = {
+            missing_brace
+        }
+    }
+}
+`
+		err = os.WriteFile(invalidActionsFile, []byte(invalidHCL), 0o644)
+		require.NoError(t, err)
+
+		_, err = LoadActionsConfig(emptyProject)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse root actions file")
+	})
+
+	t.Run("WrapperBlockValidation", func(t *testing.T) {
+		// Test wrapper block validation errors
+		tmpDir := t.TempDir()
+
+		// Test with multiple wrapper blocks
+		multipleFile := filepath.Join(tmpDir, "multiple-wrappers.hcl")
+		multipleHCL := `
+project "first" {
+    storage {
+        type = "badgerdb"
+        path = "test.db"
+    }
+}
+
+project "second" {
+    storage {
+        type = "badgerdb"
+        path = "test2.db"
+    }
+}
+`
+		err := os.WriteFile(multipleFile, []byte(multipleHCL), 0o644)
+		require.NoError(t, err)
+
+		_, err = ParseProjectConfig(multipleFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to decode project configuration")
+	})
+
+	t.Run("RecoveryFromErrors", func(t *testing.T) {
+		// Test that system can recover from errors
+		tmpDir := t.TempDir()
+
+		// First, try to parse invalid file
+		invalidFile := filepath.Join(tmpDir, "invalid.hcl")
+		invalidHCL := `
+project "test" {
+    invalid_syntax = {
+        missing_brace
+    }
+}
+`
+		err := os.WriteFile(invalidFile, []byte(invalidHCL), 0o644)
+		require.NoError(t, err)
+
+		_, err = ParseProjectConfig(invalidFile)
+		assert.Error(t, err)
+
+		// Then, try to parse valid file
+		validFile := filepath.Join(tmpDir, "valid.hcl")
+		validHCL := `
+project "test" {
+    storage {
+        type = "badgerdb"
+        path = "test.db"
+    }
+}
+`
+		err = os.WriteFile(validFile, []byte(validHCL), 0o644)
+		require.NoError(t, err)
+
+		config, err := ParseProjectConfig(validFile)
+		assert.NoError(t, err)
+		assert.NotNil(t, config)
+		assert.Equal(t, "test", config.Name)
+	})
+
+	t.Run("UTF8Errors", func(t *testing.T) {
+		// Test handling of invalid UTF-8
+		tmpDir := t.TempDir()
+		utf8File := filepath.Join(tmpDir, "utf8.hcl")
+
+		// Create file with invalid UTF-8 bytes
+		invalidUTF8 := []byte{0xFF, 0xFE, 0x00, 0x00} // Invalid UTF-8 sequence
+		err := os.WriteFile(utf8File, invalidUTF8, 0o644)
+		require.NoError(t, err)
+
+		_, err = ParseProjectConfig(utf8File)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse project HCL file")
+	})
+
+	t.Run("PermissionErrors", func(t *testing.T) {
+		// Test handling of permission errors
+		tmpDir := t.TempDir()
+		permissionFile := filepath.Join(tmpDir, "permission.hcl")
+
+		// Create file with no read permissions
+		validHCL := `
+project "test" {
+    storage {
+        type = "badgerdb"
+        path = "test.db"
+    }
+}
+`
+		err := os.WriteFile(permissionFile, []byte(validHCL), 0o000) // No permissions
+		require.NoError(t, err)
+
+		_, err = ParseProjectConfig(permissionFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse project HCL file")
 	})
 }
