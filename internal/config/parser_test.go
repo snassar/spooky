@@ -146,7 +146,7 @@ storage {
   path = "/tmp/facts"
 }`
 
-		err := os.WriteFile(configFile, []byte(configContent), 0644)
+		err := os.WriteFile(configFile, []byte(configContent), 0o600)
 		require.NoError(t, err)
 
 		// Call ParseProjectConfigWithDebug with debug=true
