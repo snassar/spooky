@@ -1037,14 +1037,14 @@ func (m *MockFieldError) Param() string { return m.param }
 func (m *MockFieldError) Error() string {
 	return fmt.Sprintf("%s failed validation: %s", m.field, m.tag)
 }
-func (m *MockFieldError) Type() reflect.Type                   { return reflect.TypeOf("") }
-func (m *MockFieldError) Value() interface{}                   { return m.value }
-func (m *MockFieldError) Namespace() string                    { return "" }
-func (m *MockFieldError) StructNamespace() string              { return "" }
-func (m *MockFieldError) StructField() string                  { return "" }
-func (m *MockFieldError) Kind() reflect.Kind                   { return reflect.String }
-func (m *MockFieldError) ActualTag() string                    { return m.tag }
-func (m *MockFieldError) Translate(trans ut.Translator) string { return m.Error() }
+func (m *MockFieldError) Type() reflect.Type               { return reflect.TypeOf("") }
+func (m *MockFieldError) Value() interface{}               { return m.value }
+func (m *MockFieldError) Namespace() string                { return "" }
+func (m *MockFieldError) StructNamespace() string          { return "" }
+func (m *MockFieldError) StructField() string              { return "" }
+func (m *MockFieldError) Kind() reflect.Kind               { return reflect.String }
+func (m *MockFieldError) ActualTag() string                { return m.tag }
+func (m *MockFieldError) Translate(_ ut.Translator) string { return m.Error() }
 
 func TestFormatMinValidation(t *testing.T) {
 	t.Run("MachinesField", func(t *testing.T) {
