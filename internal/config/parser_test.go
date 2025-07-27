@@ -769,3 +769,223 @@ func TestResolveMachinePaths(t *testing.T) {
 		}
 	})
 }
+
+func TestResolveActionPaths(t *testing.T) {
+	t.Run("ScriptPathResolution", func(t *testing.T) {
+		// Test resolution of relative script paths in actions
+		configFile := "/path/to/project/project.hcl"
+		configDir := filepath.Dir(configFile)
+
+		action := &Action{
+			Name:   "test-action",
+			Script: "scripts/deploy.sh",
+		}
+
+		// Call resolveActionPaths
+		resolveActionPaths(configFile, action)
+
+		// Verify the script path is resolved correctly
+		expected := filepath.Join(configDir, "scripts/deploy.sh")
+		assert.Equal(t, expected, action.Script, "Script path should be resolved correctly")
+
+		// Verify other fields remain unchanged
+		assert.Equal(t, "test-action", action.Name, "Action name should remain unchanged")
+	})
+
+	t.Run("TemplatePathResolution", func(t *testing.T) {
+		// Note: resolveActionPaths only processes Script field, not Template.Destination
+		// This test verifies that Template.Destination is not modified
+		configFile := "/path/to/project/project.hcl"
+
+		action := &Action{
+			Name: "template-action",
+			Template: &TemplateConfig{
+				Source:      "templates/app.conf.tmpl",
+				Destination: "config/app.conf",
+			},
+		}
+
+		// Store original template destination
+		originalDestination := action.Template.Destination
+
+		// Call resolveActionPaths
+		resolveActionPaths(configFile, action)
+
+		// Verify template destination is NOT modified (function only processes Script)
+		assert.Equal(t, originalDestination, action.Template.Destination, "Template destination should remain unchanged")
+		assert.Equal(t, "template-action", action.Name, "Action name should remain unchanged")
+		assert.Equal(t, "templates/app.conf.tmpl", action.Template.Source, "Template source should remain unchanged")
+	})
+
+	t.Run("BothPathsPresent", func(t *testing.T) {
+		// Test resolution when both script and template paths are present
+		configFile := "/path/to/project/project.hcl"
+		configDir := filepath.Dir(configFile)
+
+		action := &Action{
+			Name:   "complex-action",
+			Script: "scripts/setup.sh",
+			Template: &TemplateConfig{
+				Source:      "templates/settings.conf.tmpl",
+				Destination: "config/settings.conf",
+			},
+		}
+
+		// Store original template destination
+		originalDestination := action.Template.Destination
+
+		// Call resolveActionPaths
+		resolveActionPaths(configFile, action)
+
+		// Verify script path is resolved correctly
+		expectedScript := filepath.Join(configDir, "scripts/setup.sh")
+		assert.Equal(t, expectedScript, action.Script, "Script path should be resolved correctly")
+
+		// Verify template destination is NOT modified (function only processes Script)
+		assert.Equal(t, originalDestination, action.Template.Destination, "Template destination should remain unchanged")
+		assert.Equal(t, "templates/settings.conf.tmpl", action.Template.Source, "Template source should remain unchanged")
+	})
+
+	t.Run("NoPathsPresent", func(t *testing.T) {
+		// Test behavior when no script path is specified
+		configFile := "/path/to/project/project.hcl"
+
+		action := &Action{
+			Name:    "command-action",
+			Type:    "command",
+			Command: "echo 'hello'",
+		}
+
+		// Call resolveActionPaths
+		resolveActionPaths(configFile, action)
+
+		// Verify action remains unchanged
+		assert.Equal(t, "", action.Script, "Empty script should remain empty")
+		assert.Equal(t, "command-action", action.Name, "Action name should remain unchanged")
+		assert.Equal(t, "command", action.Type, "Action type should remain unchanged")
+		assert.Equal(t, "echo 'hello'", action.Command, "Command should remain unchanged")
+	})
+
+	t.Run("InvalidPaths", func(t *testing.T) {
+		// Test handling of invalid or malformed paths
+		configFile := "/path/to/project/project.hcl"
+		configDir := filepath.Dir(configFile)
+
+		testCases := []struct {
+			name     string
+			script   string
+			expected string
+		}{
+			{
+				name:     "ParentDirectoryTraversal",
+				script:   "../../../etc/passwd",
+				expected: filepath.Join(configDir, "../../../etc/passwd"),
+			},
+			{
+				name:     "SpecialCharacters",
+				script:   "scripts/my script with spaces.sh",
+				expected: filepath.Join(configDir, "scripts/my script with spaces.sh"),
+			},
+			{
+				name:     "UnicodeCharacters",
+				script:   "scripts/测试脚本.sh",
+				expected: filepath.Join(configDir, "scripts/测试脚本.sh"),
+			},
+			{
+				name:     "MultipleDots",
+				script:   "scripts/../config/../scripts/setup.sh",
+				expected: filepath.Join(configDir, "scripts/../config/../scripts/setup.sh"),
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				action := &Action{
+					Name:   "invalid-action",
+					Script: tc.script,
+				}
+
+				// Call resolveActionPaths
+				resolveActionPaths(configFile, action)
+
+				// Verify the path is resolved (no security filtering)
+				assert.Equal(t, tc.expected, action.Script, "Invalid path should be resolved as-is")
+			})
+		}
+	})
+
+	t.Run("AbsolutePaths", func(t *testing.T) {
+		// Test that absolute paths are not modified
+		configFile := "/path/to/project/project.hcl"
+
+		absolutePaths := []string{
+			"/usr/local/bin/deploy.sh",
+			"/etc/scripts/setup.sh",
+			"/home/user/scripts/custom.sh",
+		}
+
+		for _, absolutePath := range absolutePaths {
+			t.Run(filepath.Base(absolutePath), func(t *testing.T) {
+				action := &Action{
+					Name:   "absolute-action",
+					Script: absolutePath,
+				}
+
+				// Call resolveActionPaths
+				resolveActionPaths(configFile, action)
+
+				// Verify absolute paths are not modified
+				assert.Equal(t, absolutePath, action.Script, "Absolute path should remain unchanged")
+			})
+		}
+	})
+
+	t.Run("EmptyScriptPath", func(t *testing.T) {
+		// Test behavior when script path is empty
+		configFile := "/path/to/project/project.hcl"
+
+		action := &Action{
+			Name:   "empty-script-action",
+			Script: "", // Empty script
+		}
+
+		// Call resolveActionPaths
+		resolveActionPaths(configFile, action)
+
+		// Verify empty script remains empty
+		assert.Equal(t, "", action.Script, "Empty script should remain empty")
+		assert.Equal(t, "empty-script-action", action.Name, "Action name should remain unchanged")
+	})
+
+	t.Run("RealProjectPaths", func(t *testing.T) {
+		// Test with paths from actual test projects
+		projectRoot := "../../examples/testing"
+		testProjects := []string{
+			"test-valid-project",
+			"test-special-characters",
+		}
+
+		for _, project := range testProjects {
+			t.Run(project, func(t *testing.T) {
+				configFile := filepath.Join(projectRoot, project, "actions.hcl")
+
+				// Create an action with a relative script path
+				action := &Action{
+					Name:   "test-action",
+					Script: "scripts/deploy.sh",
+				}
+
+				// Call resolveActionPaths
+				resolveActionPaths(configFile, action)
+
+				// Verify the path is resolved relative to the actions file
+				expected := filepath.Join(filepath.Dir(configFile), "scripts/deploy.sh")
+				assert.Equal(t, expected, action.Script, "Path should be resolved relative to actions file")
+
+				// Verify the result contains the expected components
+				assert.Contains(t, action.Script, project, "Result should contain project name")
+				assert.Contains(t, action.Script, "scripts/deploy.sh", "Result should contain the relative path")
+			})
+		}
+	})
+}
