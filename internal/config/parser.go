@@ -92,6 +92,12 @@ func ParseProjectConfig(filename string) (*ProjectConfig, error) {
 	// Resolve relative paths
 	resolveProjectPaths(filename, config)
 
+	// Validate the project config
+	validator := NewValidator()
+	if err := validator.validate.Struct(config); err != nil {
+		return nil, fmt.Errorf("project validation failed: %w", err)
+	}
+
 	logger.Info("Project configuration parsed successfully",
 		logging.String("config_file", filename),
 		logging.String("project_name", config.Name),
