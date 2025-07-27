@@ -62,8 +62,8 @@ func buildEnterpriseIndex(machines []Machine) *CompositeIndex {
 			tagIndex[key] = append(tagIndex[key], machine)
 			machineTagIndex[machine][tagName] = tagValue
 			uniqueTagNames[tagName] = struct{}{}
-			// Count actual occurrences of each tag
-			tagCount[tagName]++
+			// Count actual occurrences of each tag value
+			tagCount[key]++
 		}
 	}
 
@@ -78,7 +78,7 @@ func buildEnterpriseIndex(machines []Machine) *CompositeIndex {
 	metrics := &IndexMetrics{
 		BuildTime:    buildTime,
 		MachineCount: len(machines),
-		TagCount:     len(uniqueTagNames), // Number of unique tag names
+		TagCount:     len(tagIndex), // Number of unique tag values
 		MemoryUsage:  memoryUsage,
 		LastUpdated:  time.Now(),
 	}
@@ -104,7 +104,7 @@ func sortTagsByPopularity(tags []string, tagCount map[string]int) []string {
 }
 
 // GetMachinesForActionLarge provides optimized lookup for enterprise-scale deployments
-func GetMachinesForActionLarge(config *Config, action *Action, index *CompositeIndex) ([]*Machine, error) {
+func GetMachinesForActionLarge(machines []Machine, action *Action, index *CompositeIndex) ([]*Machine, error) {
 	startTime := time.Now()
 
 	// Check for nil action
@@ -113,9 +113,9 @@ func GetMachinesForActionLarge(config *Config, action *Action, index *CompositeI
 	}
 
 	if len(action.Machines) > 0 {
-		machines, err := findMachinesByName(config.Machines, action.Machines)
+		machinePtrs, err := findMachinesByName(machines, action.Machines)
 		updateLookupMetrics(index, time.Since(startTime))
-		return machines, err
+		return machinePtrs, err
 	}
 
 	if len(action.Tags) > 0 {
@@ -162,9 +162,9 @@ func GetMachinesForActionLarge(config *Config, action *Action, index *CompositeI
 		return targetMachines, nil
 	}
 
-	machines := getAllMachines(config.Machines)
+	machinePtrs := getAllMachines(machines)
 	updateLookupMetrics(index, time.Since(startTime))
-	return machines, nil
+	return machinePtrs, nil
 }
 
 // updateLookupMetrics updates the lookup time metrics for the index
@@ -176,9 +176,9 @@ func updateLookupMetrics(index *CompositeIndex, lookupTime time.Duration) {
 }
 
 // GetIndex provides thread-safe access to cached index
-func (ic *IndexCache) GetIndex(config *Config) *CompositeIndex {
+func (ic *IndexCache) GetIndex(machines []Machine) *CompositeIndex {
 	ic.mutex.RLock()
-	if ic.isValid(config) {
+	if ic.isValid(machines) {
 		defer ic.mutex.RUnlock()
 		return ic.index
 	}
@@ -188,27 +188,27 @@ func (ic *IndexCache) GetIndex(config *Config) *CompositeIndex {
 	defer ic.mutex.Unlock()
 
 	// Rebuild if needed
-	if !ic.isValid(config) {
-		ic.index = buildEnterpriseIndex(config.Machines)
+	if !ic.isValid(machines) {
+		ic.index = buildEnterpriseIndex(machines)
 		ic.lastBuilt = time.Now()
-		ic.configHash = computeConfigHash(config)
+		ic.configHash = computeConfigHash(machines)
 		ic.metrics = ic.index.Metrics // Set cache metrics
 	}
 	return ic.index
 }
 
 // isValid checks if the cached index is still valid
-func (ic *IndexCache) isValid(config *Config) bool {
+func (ic *IndexCache) isValid(machines []Machine) bool {
 	return ic.index != nil &&
-		ic.configHash == computeConfigHash(config) &&
+		ic.configHash == computeConfigHash(machines) &&
 		time.Since(ic.lastBuilt) < 5*time.Minute // Cache for 5 minutes
 }
 
 // computeConfigHash creates a hash of the config for cache invalidation
-func computeConfigHash(config *Config) string {
+func computeConfigHash(machines []Machine) string {
 	// Simple hash implementation - could be improved with proper hashing
-	hash := fmt.Sprintf("%d-%d", len(config.Machines), len(config.Actions))
-	for _, machine := range config.Machines {
+	hash := fmt.Sprintf("%d", len(machines))
+	for _, machine := range machines {
 		hash += fmt.Sprintf("-%s-%s", machine.Name, machine.Host)
 	}
 	return hash
@@ -242,14 +242,14 @@ func getAllMachines(machines []Machine) []*Machine {
 }
 
 // GetMachinesForAction returns the list of machines that should execute an action
-func GetMachinesForAction(action *Action, config *Config) ([]*Machine, error) {
+func GetMachinesForAction(action *Action, machines []Machine) ([]*Machine, error) {
 	var targetMachines []*Machine
 
 	// If specific machines are specified, use those
 	if len(action.Machines) > 0 {
 		machineMap := make(map[string]*Machine)
-		for i := range config.Machines {
-			machineMap[config.Machines[i].Name] = &config.Machines[i]
+		for i := range machines {
+			machineMap[machines[i].Name] = &machines[i]
 		}
 
 		for _, machineName := range action.Machines {
@@ -264,8 +264,8 @@ func GetMachinesForAction(action *Action, config *Config) ([]*Machine, error) {
 
 	// If tags are specified, find machines matching those tags
 	if len(action.Tags) > 0 {
-		for i := range config.Machines {
-			machine := &config.Machines[i]
+		for i := range machines {
+			machine := &machines[i]
 			matchesAllTags := true
 
 			for _, tag := range action.Tags {
@@ -291,8 +291,8 @@ func GetMachinesForAction(action *Action, config *Config) ([]*Machine, error) {
 	}
 
 	// If no machines or tags specified, return all machines
-	for i := range config.Machines {
-		targetMachines = append(targetMachines, &config.Machines[i])
+	for i := range machines {
+		targetMachines = append(targetMachines, &machines[i])
 	}
 
 	return targetMachines, nil
