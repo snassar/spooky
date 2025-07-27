@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -540,6 +541,204 @@ func TestResolvePath(t *testing.T) {
 				}
 			})
 		}
+	})
+}
+
+func TestPathResolutionEdgeCases(t *testing.T) {
+	t.Run("ParentDirectory", func(t *testing.T) {
+		// Test resolution of paths with parent directory references
+		configFile := "/path/to/project/project.hcl"
+		relativePath := "../../../etc/config.conf"
+
+		result := resolvePath(configFile, relativePath, false)
+
+		// Should resolve to absolute path with parent directory traversal
+		expected := "/path/to/project/../../../etc/config.conf"
+		assert.Equal(t, expected, result, "Parent directory traversal should work correctly")
+
+		// Verify the path is resolved to absolute
+		assert.True(t, filepath.IsAbs(result), "Result should be absolute path")
+	})
+
+	t.Run("CurrentDirectory", func(t *testing.T) {
+		// Test resolution of paths with current directory references
+		configFile := "/path/to/project/project.hcl"
+		relativePath := "./config/app.conf"
+
+		result := resolvePath(configFile, relativePath, false)
+
+		// Should resolve to absolute path with current directory references
+		expected := "/path/to/project/./config/app.conf"
+		assert.Equal(t, expected, result, "Current directory references should be handled correctly")
+
+		// Verify the path is resolved to absolute
+		assert.True(t, filepath.IsAbs(result), "Result should be absolute path")
+	})
+
+	t.Run("CrossPlatform", func(t *testing.T) {
+		// Test path resolution across different operating systems
+
+		// Test Unix-style paths
+		configFile := "/path/to/project/project.hcl"
+		relativePath := "config/app.conf"
+
+		result := resolvePath(configFile, relativePath, false)
+		expected := "/path/to/project/config/app.conf"
+		assert.Equal(t, expected, result, "Unix-style paths should be handled correctly")
+
+		// Test Windows-style paths (only if running on Windows)
+		if filepath.IsAbs("C:\\Windows\\System32\\cmd.exe") {
+			configFile = "C:\\path\\to\\project\\project.hcl"
+			relativePath = "config\\app.conf"
+
+			result = resolvePath(configFile, relativePath, false)
+			expected = "C:\\path\\to\\project\\config\\app.conf"
+			assert.Equal(t, expected, result, "Windows-style paths should be handled correctly")
+		}
+	})
+
+	t.Run("SpecialCharacters", func(t *testing.T) {
+		// Test resolution of paths with spaces and special characters
+		configFile := "/path/to/project/project.hcl"
+		relativePath := "config files/app config.conf"
+
+		result := resolvePath(configFile, relativePath, false)
+
+		// Should resolve to absolute path preserving spaces and special characters
+		expected := "/path/to/project/config files/app config.conf"
+		assert.Equal(t, expected, result, "Spaces in paths should be preserved")
+
+		// Test with more special characters
+		relativePath = "config/测试.conf"
+		result = resolvePath(configFile, relativePath, false)
+		expected = "/path/to/project/config/测试.conf"
+		assert.Equal(t, expected, result, "Unicode characters should be handled correctly")
+	})
+
+	t.Run("Symlinks", func(t *testing.T) {
+		// Test resolution of paths that involve symlinks
+		// Create a temporary directory structure with symlinks
+		tempDir, err := os.MkdirTemp("", "path-test")
+		require.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+
+		// Create directory structure
+		projectDir := filepath.Join(tempDir, "project")
+		err = os.MkdirAll(projectDir, 0o755)
+		require.NoError(t, err)
+
+		configFile := filepath.Join(projectDir, "project.hcl")
+
+		// Create a symlink to a file
+		targetFile := filepath.Join(tempDir, "target.txt")
+		err = os.WriteFile(targetFile, []byte("test"), 0o600)
+		require.NoError(t, err)
+
+		symlinkPath := filepath.Join(projectDir, "symlink.txt")
+		err = os.Symlink(targetFile, symlinkPath)
+		require.NoError(t, err)
+
+		// Test resolving path through symlink
+		relativePath := "symlink.txt"
+		result := resolvePath(configFile, relativePath, false)
+
+		// Should resolve to the symlink path (not the target)
+		expected := filepath.Join(projectDir, "symlink.txt")
+		assert.Equal(t, expected, result, "Symlink path should be resolved correctly")
+
+		// Verify the result is absolute
+		assert.True(t, filepath.IsAbs(result), "Result should be absolute path")
+	})
+
+	t.Run("LongPaths", func(t *testing.T) {
+		// Test resolution of very long paths
+		configFile := "/path/to/project/project.hcl"
+		deepPath := strings.Repeat("very/deep/nested/", 20) + "file.conf"
+
+		result := resolvePath(configFile, deepPath, false)
+
+		// Should handle long paths gracefully
+		assert.True(t, filepath.IsAbs(result), "Long path should be resolved to absolute")
+		assert.Contains(t, result, "very/deep/nested", "Long path should contain expected components")
+
+		// Verify the path is not truncated
+		assert.Greater(t, len(result), len(configFile), "Resolved path should be longer than config file path")
+	})
+
+	t.Run("EmptyPaths", func(t *testing.T) {
+		// Test handling of empty and null paths
+		configFile := "/path/to/project/project.hcl"
+
+		// Test with empty string
+		result := resolvePath(configFile, "", false)
+		expected := "/path/to/project"
+		assert.Equal(t, expected, result, "Empty path should return config directory")
+
+		// Test with whitespace-only string
+		result = resolvePath(configFile, "   ", false)
+		expected = "/path/to/project/   "
+		assert.Equal(t, expected, result, "Whitespace-only path should be joined with config directory")
+
+		// Test with just dots
+		result = resolvePath(configFile, ".", false)
+		expected = "/path/to/project/."
+		assert.Equal(t, expected, result, "Single dot should be joined with config directory")
+	})
+
+	t.Run("MachinePathsEdgeCases", func(t *testing.T) {
+		// Test edge cases in machine path resolution
+		configFile := "/path/to/project/project.hcl"
+
+		machine := &Machine{
+			Name:    "test-server",
+			Host:    "192.168.1.100",
+			Port:    22,
+			User:    "testuser",
+			KeyFile: "../../../etc/ssh/id_rsa", // Path with parent directory traversal
+		}
+
+		// Test that machine paths are resolved correctly
+		resolveMachinePaths(configFile, machine)
+
+		expected := "/path/to/project/../../../etc/ssh/id_rsa"
+		assert.Equal(t, expected, machine.KeyFile, "Machine key file should be resolved with parent directory traversal")
+	})
+
+	t.Run("ActionPathsEdgeCases", func(t *testing.T) {
+		// Test edge cases in action path resolution
+		configFile := "/path/to/project/project.hcl"
+
+		action := &Action{
+			Name:   "test-action",
+			Type:   "script",
+			Script: "./scripts/deploy.sh", // Path with current directory reference
+		}
+
+		// Test that action paths are resolved correctly
+		resolveActionPaths(configFile, action)
+
+		expected := "/path/to/project/./scripts/deploy.sh"
+		assert.Equal(t, expected, action.Script, "Action script should be resolved with current directory reference")
+	})
+
+	t.Run("ProjectPathsEdgeCases", func(t *testing.T) {
+		// Test edge cases in project path resolution
+		configFile := "/path/to/project/project.hcl"
+
+		project := &ProjectConfig{
+			Name:          "test-project",
+			InventoryFile: "../config/inventory.hcl", // Path with parent directory
+			ActionsFile:   "./actions/actions.hcl",   // Path with current directory
+		}
+
+		// Test that project paths are resolved correctly
+		resolveProjectPaths(configFile, project)
+
+		expectedInventory := "/path/to/project/../config/inventory.hcl"
+		expectedActions := "/path/to/project/./actions/actions.hcl"
+
+		assert.Equal(t, expectedInventory, project.InventoryFile, "Project inventory file should be resolved with parent directory")
+		assert.Equal(t, expectedActions, project.ActionsFile, "Project actions file should be resolved with current directory")
 	})
 }
 
