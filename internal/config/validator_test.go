@@ -179,7 +179,7 @@ func TestValidateScriptFile_ValidFile(t *testing.T) {
 	tempFile.Close()
 
 	// Make it executable
-	err = os.Chmod(tempFile.Name(), 0755)
+	err = os.Chmod(tempFile.Name(), 0o755)
 	require.NoError(t, err)
 
 	validator := NewValidator()
@@ -206,7 +206,7 @@ func TestValidateScriptFile_NonExecutableFile(t *testing.T) {
 	tempFile.Close()
 
 	// Make it non-executable
-	err = os.Chmod(tempFile.Name(), 0644)
+	err = os.Chmod(tempFile.Name(), 0o644)
 	require.NoError(t, err)
 
 	validator := NewValidator()
@@ -435,7 +435,7 @@ func TestValidateSSHKeyFile(t *testing.T) {
 		tempFile.Close()
 
 		// Remove all permissions
-		err = os.Chmod(tempFile.Name(), 0000)
+		err = os.Chmod(tempFile.Name(), 0o000)
 		require.NoError(t, err, "Should be able to remove permissions")
 
 		// Verify the file exists but is unreadable
@@ -544,7 +544,7 @@ func TestValidateScriptFile(t *testing.T) {
 		tempFile.Close()
 
 		// Make it executable
-		err = os.Chmod(tempFile.Name(), 0755)
+		err = os.Chmod(tempFile.Name(), 0o755)
 		require.NoError(t, err)
 
 		// Test the validateScriptFile function logic indirectly
@@ -591,7 +591,7 @@ func TestValidateScriptFile(t *testing.T) {
 		tempFile.Close()
 
 		// Make it non-executable
-		err = os.Chmod(tempFile.Name(), 0644)
+		err = os.Chmod(tempFile.Name(), 0o644)
 		require.NoError(t, err)
 
 		// Verify the file exists but is not executable
@@ -616,7 +616,7 @@ func TestValidateScriptFile(t *testing.T) {
 		defer os.Remove(tempFile.Name())
 
 		// Make it executable
-		err = os.Chmod(tempFile.Name(), 0755)
+		err = os.Chmod(tempFile.Name(), 0o755)
 		require.NoError(t, err)
 		tempFile.Close()
 

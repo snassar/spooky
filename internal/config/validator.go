@@ -15,13 +15,6 @@ type Validator struct {
 	validate *validator.Validate
 }
 
-// Global validator instance
-var globalValidator *Validator
-
-func init() {
-	globalValidator = NewValidator()
-}
-
 // NewValidator creates a new validator with all custom validation functions registered
 func NewValidator() *Validator {
 	v := &Validator{
