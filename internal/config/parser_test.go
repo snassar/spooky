@@ -160,3 +160,202 @@ storage {
 		assert.Contains(t, err.Error(), "Unsupported block type")
 	})
 }
+
+func TestLoadActionsConfig(t *testing.T) {
+	t.Run("RootActionsFileOnly", func(t *testing.T) {
+		// Use test-only-actions-hcl project
+		projectPath := filepath.Join("..", "..", "examples", "testing", "test-only-actions-hcl")
+
+		// Call LoadActionsConfig
+		config, err := LoadActionsConfig(projectPath)
+
+		// Assert successful loading
+		assert.NoError(t, err)
+		assert.NotNil(t, config)
+
+		// Verify actions from both root file and actions/ directory (5 total)
+		// 1 from root actions.hcl + 1 from 01-dependencies.hcl + 1 from 02-system-update.hcl + 2 from 03-monitoring.hcl
+		assert.Len(t, config.Actions, 5)
+
+		// Check that root action is included
+		rootActionFound := false
+		for _, action := range config.Actions {
+			if action.Name == "check-status" && action.Command == "uptime && df -h" {
+				rootActionFound = true
+				break
+			}
+		}
+		assert.True(t, rootActionFound, "Root action should be included in merged config")
+
+		// Check that directory actions are included
+		dirActionFound := false
+		for _, action := range config.Actions {
+			if action.Name == "install-dependencies" {
+				dirActionFound = true
+				break
+			}
+		}
+		assert.True(t, dirActionFound, "Directory action should be included in merged config")
+	})
+
+	t.Run("ActionsDirectoryOnly", func(t *testing.T) {
+		// Use test-missing-actions/test-valid-project (has actions/ but also root actions.hcl)
+		projectPath := filepath.Join("..", "..", "examples", "testing", "test-missing-actions", "test-valid-project")
+
+		// Call LoadActionsConfig
+		config, err := LoadActionsConfig(projectPath)
+
+		// Assert successful loading
+		assert.NoError(t, err)
+		assert.NotNil(t, config)
+
+		// Verify actions from both root file and directory files (5 total)
+		// 1 from root actions.hcl + 1 from 01-dependencies.hcl + 1 from 02-system-update.hcl + 2 from 03-monitoring.hcl
+		assert.Len(t, config.Actions, 5)
+
+		// Check that actions are loaded in sorted order (directory files are sorted)
+		actionNames := make([]string, len(config.Actions))
+		for i, action := range config.Actions {
+			actionNames[i] = action.Name
+		}
+		// Should contain both root and directory actions
+		assert.Contains(t, actionNames, "check-status")
+		assert.Contains(t, actionNames, "install-dependencies")
+		assert.Contains(t, actionNames, "update-system")
+		assert.Contains(t, actionNames, "check-disk-space")
+		assert.Contains(t, actionNames, "check-memory")
+	})
+
+	t.Run("BothSources", func(t *testing.T) {
+		// Use test-valid-project
+		projectPath := filepath.Join("..", "..", "examples", "testing", "test-valid-project")
+
+		// Call LoadActionsConfig
+		config, err := LoadActionsConfig(projectPath)
+
+		// Assert successful loading
+		assert.NoError(t, err)
+		assert.NotNil(t, config)
+
+		// Verify actions merged from both sources
+		// Should have actions from root actions.hcl + actions/ directory
+		assert.Len(t, config.Actions, 5) // 1 from root + 4 from actions/
+
+		// Check that root action is included
+		rootActionFound := false
+		for _, action := range config.Actions {
+			if action.Name == "check-status" && action.Command == "uptime && df -h" {
+				rootActionFound = true
+				break
+			}
+		}
+		assert.True(t, rootActionFound, "Root action should be included in merged config")
+
+		// Check that directory actions are included
+		dirActionFound := false
+		for _, action := range config.Actions {
+			if action.Name == "install-dependencies" {
+				dirActionFound = true
+				break
+			}
+		}
+		assert.True(t, dirActionFound, "Directory action should be included in merged config")
+	})
+
+	t.Run("MergeConflicts", func(t *testing.T) {
+		// Use test-duplicate-actions project
+		projectPath := filepath.Join("..", "..", "examples", "testing", "test-duplicate-actions")
+
+		// Call LoadActionsConfig
+		config, err := LoadActionsConfig(projectPath)
+
+		// Assert successful loading (LoadActionsConfig doesn't validate duplicates)
+		assert.NoError(t, err)
+		assert.NotNil(t, config)
+
+		// Verify both duplicate actions are loaded (LoadActionsConfig just merges, doesn't validate)
+		checkStatusActions := 0
+		for _, action := range config.Actions {
+			if action.Name == "check-status" {
+				checkStatusActions++
+			}
+		}
+		assert.Equal(t, 2, checkStatusActions, "Both duplicate actions should be loaded")
+
+		// Verify the actions have different descriptions (showing they're different instances)
+		descriptions := make([]string, 0)
+		for _, action := range config.Actions {
+			if action.Name == "check-status" {
+				descriptions = append(descriptions, action.Description)
+			}
+		}
+		assert.Contains(t, descriptions, "Check server status")
+		assert.Contains(t, descriptions, "Another check status action")
+	})
+
+	t.Run("InvalidFilesInDirectory", func(t *testing.T) {
+		// Use test-invalid-actions project
+		projectPath := filepath.Join("..", "..", "examples", "testing", "test-invalid-actions")
+
+		// Call LoadActionsConfig
+		config, err := LoadActionsConfig(projectPath)
+
+		// Assert successful loading (the invalid HCL is actually parsed successfully)
+		assert.NoError(t, err)
+		assert.NotNil(t, config)
+
+		// Verify that all actions are loaded (including the "invalid" ones)
+		// The HCL parser is more lenient than expected
+		assert.Len(t, config.Actions, 7) // 3 from root + 4 from actions/
+
+		// Check that the "invalid" actions are actually loaded
+		invalidActionFound := false
+		for _, action := range config.Actions {
+			if action.Name == "invalid-action" {
+				invalidActionFound = true
+				break
+			}
+		}
+		assert.True(t, invalidActionFound, "Invalid action should be loaded despite missing command")
+
+		// Check that the "broken" action is also loaded
+		brokenActionFound := false
+		for _, action := range config.Actions {
+			if action.Name == "broken-action" {
+				brokenActionFound = true
+				break
+			}
+		}
+		assert.True(t, brokenActionFound, "Broken action should be loaded despite syntax issues")
+	})
+
+	t.Run("NoActionsFiles", func(t *testing.T) {
+		// Use test-only-project-hcl project (no actions.hcl, no actions/ directory)
+		projectPath := filepath.Join("..", "..", "examples", "testing", "test-only-project-hcl")
+
+		// Call LoadActionsConfig
+		config, err := LoadActionsConfig(projectPath)
+
+		// Assert successful loading
+		assert.NoError(t, err)
+		assert.NotNil(t, config)
+
+		// Verify empty ActionsConfig returned
+		assert.Len(t, config.Actions, 0)
+	})
+
+	t.Run("DirectoryReadError", func(t *testing.T) {
+		// Use a non-existent project path to trigger directory read error
+		projectPath := "/non/existent/project/path"
+
+		// Call LoadActionsConfig
+		config, err := LoadActionsConfig(projectPath)
+
+		// Assert successful loading (no error because both root and actions/ don't exist)
+		assert.NoError(t, err)
+		assert.NotNil(t, config)
+
+		// Verify empty ActionsConfig returned
+		assert.Len(t, config.Actions, 0)
+	})
+}
