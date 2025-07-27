@@ -14,20 +14,42 @@ const (
 	MaxKeyDirectories = 1000
 )
 
-// SetDefaults applies default values to a configuration
-func SetDefaults(config *Config) {
-	if config == nil {
+// SetMachineDefaults applies default values to a machine
+func SetMachineDefaults(machine *Machine) {
+	if machine == nil {
 		return
 	}
-	for i := range config.Machines {
-		if config.Machines[i].Port == 0 {
-			config.Machines[i].Port = DefaultSSHPort
-		}
+	if machine.Port == 0 {
+		machine.Port = DefaultSSHPort
 	}
+}
 
-	for i := range config.Actions {
-		if config.Actions[i].Timeout == 0 {
-			config.Actions[i].Timeout = DefaultTimeout
-		}
+// SetActionDefaults applies default values to an action
+func SetActionDefaults(action *Action) {
+	if action == nil {
+		return
+	}
+	if action.Timeout == 0 {
+		action.Timeout = DefaultTimeout
+	}
+}
+
+// SetInventoryDefaults applies default values to an inventory configuration
+func SetInventoryDefaults(inventory *InventoryConfig) {
+	if inventory == nil {
+		return
+	}
+	for i := range inventory.Machines {
+		SetMachineDefaults(&inventory.Machines[i])
+	}
+}
+
+// SetActionsDefaults applies default values to an actions configuration
+func SetActionsDefaults(actions *ActionsConfig) {
+	if actions == nil {
+		return
+	}
+	for i := range actions.Actions {
+		SetActionDefaults(&actions.Actions[i])
 	}
 }

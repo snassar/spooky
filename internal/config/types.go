@@ -1,11 +1,5 @@
 package config
 
-// Config represents the main configuration structure (legacy combined format)
-type Config struct {
-	Machines []Machine `hcl:"machine,block" validate:"required,min=1,dive"`
-	Actions  []Action  `hcl:"action,block" validate:"dive"`
-}
-
 // ProjectConfig represents a project configuration
 type ProjectConfig struct {
 	Name        string `hcl:"name,label" validate:"required"`

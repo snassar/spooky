@@ -31,11 +31,6 @@ func NewValidator() *Validator {
 	return v
 }
 
-// ValidateConfig validates the configuration structure
-func ValidateConfig(config *Config) error {
-	return globalValidator.validateConfig(config)
-}
-
 // registerCustomValidations registers all custom validation functions
 func (v *Validator) registerCustomValidations() {
 	// Register custom field validators
@@ -49,7 +44,6 @@ func (v *Validator) registerCustomValidations() {
 	// Register struct-level validations for cross-field validation
 	v.validate.RegisterStructValidation(v.validateMachineStruct, Machine{})
 	v.validate.RegisterStructValidation(v.validateActionStruct, Action{})
-	v.validate.RegisterStructValidation(v.validateConfigStruct, Config{})
 }
 
 // validateSSHKeyFile validates that the SSH key file exists and is readable
@@ -131,67 +125,6 @@ func (v *Validator) validateActionStruct(sl validator.StructLevel) {
 	// 		sl.ReportError(action.Script, "Script", "script", "scriptfile", action.Name)
 	// 	}
 	// }
-}
-
-// validateConfigStruct performs struct-level validation for Config
-func (v *Validator) validateConfigStruct(sl validator.StructLevel) {
-	config := sl.Current().Interface().(Config)
-
-	// Validate unique machine names
-	machineNames := make(map[string]bool)
-	for _, machine := range config.Machines {
-		if machineNames[machine.Name] {
-			sl.ReportError(machine.Name, "Name", "name", "unique_machine", machine.Name)
-		}
-		machineNames[machine.Name] = true
-	}
-
-	// Validate unique action names
-	actionNames := make(map[string]bool)
-	for i := range config.Actions {
-		action := &config.Actions[i]
-		if actionNames[action.Name] {
-			sl.ReportError(action.Name, "Name", "name", "unique_action", action.Name)
-		}
-		actionNames[action.Name] = true
-	}
-
-	// Validate machine references in actions
-	for i := range config.Actions {
-		action := &config.Actions[i]
-		for _, machineRef := range action.Machines {
-			if !machineNames[machineRef] {
-				sl.ReportError(machineRef, "Machines", "machines", "valid_machines", action.Name)
-			}
-		}
-	}
-}
-
-// validateConfig validates the entire configuration
-func (v *Validator) validateConfig(config *Config) error {
-	if config == nil {
-		return fmt.Errorf("configuration is nil")
-	}
-	logger := logging.GetLogger()
-
-	// Set defaults before validation
-	SetDefaults(config)
-
-	// Perform validation
-	if err := v.validate.Struct(config); err != nil {
-		logger.Error("Configuration validation failed", err,
-			logging.Int("machine_count", len(config.Machines)),
-			logging.Int("action_count", len(config.Actions)),
-		)
-		return v.formatValidationErrors(err)
-	}
-
-	logger.Info("Configuration validation successful",
-		logging.Int("machine_count", len(config.Machines)),
-		logging.Int("action_count", len(config.Actions)),
-	)
-
-	return nil
 }
 
 // formatValidationErrors converts validator errors to user-friendly messages
