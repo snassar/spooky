@@ -70,7 +70,9 @@ graph TD
     A --> D[project-system]
     A --> E[facts-system]
     A --> F[variables-system]
-    D --> G[actions-system]
+    C --> B
+    C --> G[actions-system]
+    D --> G
     E --> G
     F --> G
     B --> G
