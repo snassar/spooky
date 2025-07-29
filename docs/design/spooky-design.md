@@ -49,7 +49,7 @@ Spooky is a modern, Go-based infrastructure automation tool designed for simplic
 ## System Dependencies
 
 ### **Foundation Layer**
-- **Schema System**: Provides schema validation, type safety, and validation infrastructure for all other systems
+- **Schemas**: Provides schema validation, type safety, and validation infrastructure for all other systems
 
 ### **Core Layer**
 - **CLI System**: Defines command patterns and user interface (depends on Schema System)
@@ -65,12 +65,12 @@ Spooky is a modern, Go-based infrastructure automation tool designed for simplic
 
 ```mermaid
 graph TD
-    A[schema-system.md<br/>FOUNDATION] --> B[cli-system.md<br/>CORE]
-    A --> C[configuration-system.md<br/>CORE]
-    A --> D[project-system.md<br/>PROJECT]
-    A --> E[facts-system.md<br/>PROJECT]
-    A --> F[variables-system.md<br/>PROJECT]
-    D --> G[actions-system.md<br/>PROJECT]
+    A[schemas --> B[cli]
+    A --> C[configuration-system]
+    A --> D[project-system]
+    A --> E[facts-system]
+    A --> F[variables-system]
+    D --> G[actions-system]
     E --> G
     F --> G
     B --> G
