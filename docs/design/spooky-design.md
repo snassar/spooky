@@ -19,80 +19,54 @@ Spooky is a modern, Go-based infrastructure automation tool designed for simplic
 
 ```mermaid
 graph TD
-    subgraph "CLI Layer"
-        CLI[spooky noun verb]
+    subgraph "Foundation Layer"
+        SCHEMAS[Schema System<br/>Validation & Type Safety]
+    end
+    
+    subgraph "Core Layer"
+        CLI[CLI System<br/>spooky noun verb]
+        CONFIG[Configuration System<br/>Global Settings]
     end
     
     subgraph "Project Layer"
-        PC[Project Config]
-        VARS[Variables]
-        FACTS[Facts]
+        PROJECT[Project System<br/>Project Structure]
+        FACTS[Facts System<br/>Data Collection]
+        VARS[Variables System<br/>Configuration]
     end
     
-    subgraph "Execution Layer"
-        SSH[SSH Execution]
-        LOCAL[Local Execution]
-        TEMPLATE[Template Render]
+    subgraph "Integration Layer"
+        ACTIONS[Actions System<br/>Execution & Templating]
     end
     
-    subgraph "Global Config"
-        GC[~/.config/spooky]
-        GS[~/.local/state]
-    end
+    %% Foundation dependencies
+    SCHEMAS --> CLI
+    SCHEMAS --> CONFIG
+    SCHEMAS --> PROJECT
+    SCHEMAS --> FACTS
+    SCHEMAS --> VARS
     
-    subgraph "Storage Layer"
-        BADGER[BadgerDB]
-        JSON[JSON Files]
-        HCL[HCL Files]
-    end
+    %% Core dependencies
+    CONFIG --> CLI
     
-    subgraph "Schema System"
-        SCHEMA[HCL Schemas]
-        VALID[Validation]
-        TYPE[Type Safety]
-    end
+    %% Project layer dependencies
+    PROJECT --> ACTIONS
+    FACTS --> ACTIONS
+    VARS --> ACTIONS
+    CLI --> ACTIONS
     
-    CLI --> PC
-    CLI --> VARS
-    CLI --> FACTS
-    PC --> SSH
-    PC --> LOCAL
-    PC --> TEMPLATE
-    VARS --> TEMPLATE
-    FACTS --> TEMPLATE
+    %% Data flow
+    CONFIG -.->|provides defaults| CLI
+    FACTS -.->|provides data| ACTIONS
+    VARS -.->|provides config| ACTIONS
+    PROJECT -.->|provides context| ACTIONS
     
-    GC --> CLI
-    GS --> CLI
-    BADGER --> FACTS
-    JSON --> FACTS
-    HCL --> PC
-    HCL --> VARS
-    
-    SCHEMA --> PC
-    SCHEMA --> VARS
-    SCHEMA --> FACTS
-    VALID --> PC
-    VALID --> VARS
-    VALID --> FACTS
-    TYPE --> PC
-    TYPE --> VARS
-    TYPE --> FACTS
-    
-    style CLI fill:#e3f2fd
-    style PC fill:#f3e5f5
-    style VARS fill:#f3e5f5
-    style FACTS fill:#f3e5f5
-    style SSH fill:#e8f5e8
-    style LOCAL fill:#e8f5e8
-    style TEMPLATE fill:#e8f5e8
-    style GC fill:#fff3e0
-    style GS fill:#fff3e0
-    style BADGER fill:#fce4ec
-    style JSON fill:#fce4ec
-    style HCL fill:#fce4ec
-    style SCHEMA fill:#e1f5fe
-    style VALID fill:#e1f5fe
-    style TYPE fill:#e1f5fe
+    style SCHEMAS fill:#e1f5fe
+    style CLI fill:#f3e5f5
+    style CONFIG fill:#f3e5f5
+    style PROJECT fill:#e8f5e8
+    style FACTS fill:#e8f5e8
+    style VARS fill:#e8f5e8
+    style ACTIONS fill:#fff3e0
 ```
 
 ### **Core Components**
