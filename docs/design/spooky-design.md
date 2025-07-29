@@ -65,7 +65,7 @@ Spooky is a modern, Go-based infrastructure automation tool designed for simplic
 
 ```mermaid
 graph TD
-    A[schemas --> B[cli]]
+    A[schemas] --> B[cli]
     A --> C[configuration-system]
     A --> D[project-system]
     A --> E[facts-system]
