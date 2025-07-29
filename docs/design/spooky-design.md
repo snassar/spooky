@@ -17,23 +17,82 @@ Spooky is a modern, Go-based infrastructure automation tool designed for simplic
 
 ### **High-Level Architecture**
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   CLI Layer     │    │  Project Layer  │    │  Execution Layer │
-│                 │    │                 │    │                 │
-│ spooky noun verb│───▶│  Project Config │───▶│  SSH Execution  │
-│                 │    │  Variables      │    │  Local Execution │
-│                 │    │  Facts          │    │  Template Render │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  Global Config  │    │  Storage Layer  │    │  Schema System  │
-│                 │    │                 │    │                 │
-│ ~/.config/spooky│    │  BadgerDB       │    │  HCL Schemas    │
-│ ~/.local/state  │    │  JSON Files     │    │  Validation     │
-│                 │    │  HCL Files      │    │  Type Safety    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+```mermaid
+graph TD
+    subgraph "CLI Layer"
+        CLI[spooky noun verb]
+    end
+    
+    subgraph "Project Layer"
+        PC[Project Config]
+        VARS[Variables]
+        FACTS[Facts]
+    end
+    
+    subgraph "Execution Layer"
+        SSH[SSH Execution]
+        LOCAL[Local Execution]
+        TEMPLATE[Template Render]
+    end
+    
+    subgraph "Global Config"
+        GC[~/.config/spooky]
+        GS[~/.local/state]
+    end
+    
+    subgraph "Storage Layer"
+        BADGER[BadgerDB]
+        JSON[JSON Files]
+        HCL[HCL Files]
+    end
+    
+    subgraph "Schema System"
+        SCHEMA[HCL Schemas]
+        VALID[Validation]
+        TYPE[Type Safety]
+    end
+    
+    CLI --> PC
+    CLI --> VARS
+    CLI --> FACTS
+    PC --> SSH
+    PC --> LOCAL
+    PC --> TEMPLATE
+    VARS --> TEMPLATE
+    FACTS --> TEMPLATE
+    
+    GC --> CLI
+    GS --> CLI
+    BADGER --> FACTS
+    JSON --> FACTS
+    HCL --> PC
+    HCL --> VARS
+    
+    SCHEMA --> PC
+    SCHEMA --> VARS
+    SCHEMA --> FACTS
+    VALID --> PC
+    VALID --> VARS
+    VALID --> FACTS
+    TYPE --> PC
+    TYPE --> VARS
+    TYPE --> FACTS
+    
+    style CLI fill:#e3f2fd
+    style PC fill:#f3e5f5
+    style VARS fill:#f3e5f5
+    style FACTS fill:#f3e5f5
+    style SSH fill:#e8f5e8
+    style LOCAL fill:#e8f5e8
+    style TEMPLATE fill:#e8f5e8
+    style GC fill:#fff3e0
+    style GS fill:#fff3e0
+    style BADGER fill:#fce4ec
+    style JSON fill:#fce4ec
+    style HCL fill:#fce4ec
+    style SCHEMA fill:#e1f5fe
+    style VALID fill:#e1f5fe
+    style TYPE fill:#e1f5fe
 ```
 
 ### **Core Components**
