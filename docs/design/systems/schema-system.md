@@ -2,13 +2,99 @@
 
 ## Overview
 
-This document outlines the current state of spooky's configuration schema system and provides a roadmap for enhancing it with formal schema documentation, validation tools, and IDE integration. The schema system needs to cover not just configuration files, but also the facts system, project structure, and dynamic fact sources.
+This document outlines the current state of spooky's configuration schema system and provides a roadmap for enhancing it with formal schema documentation, validation tools, and IDE integration. The schema system covers configuration files, facts system, project structure, and dynamic fact sources with embedded runtime composition.
 
 ## Current Schema Status
 
 ### ✅ **What's Already Implemented**
 
-#### 1. **Comprehensive Go Structs with HCL Tags** (`internal/config/types.go`)
+#### 1. **Embedded Schema Composition System** (`internal/schemas/embedded.go`)
+
+**Runtime Schema Composition:**
+- Uses Go's `embed` directive to embed source schema files
+- Composes schemas at runtime using template processing
+- No separate build tools or build steps required
+- Self-contained binary distribution
+
+**Composed Schema Types:**
+- `global-facts-hcl-composed.hcl` - HCL format global facts schema
+- `global-facts-json-composed.hcl` - JSON format global facts schema  
+- `global-facts-badger-composed.hcl` - BadgerDB format global facts schema
+
+**API Functions:**
+- `ComposeSchemas()` - Compose all schema combinations
+- `GetComposedSchema(name)` - Get a specific composed schema
+- `ListComposedSchemas()` - List available composed schemas
+- `GetSchema(schemaType)` - Get embedded schema by type
+
+## Build Process and Schema Composition
+
+### **Embedded Runtime Composition**
+- **Location**: `internal/schemas/embedded.go`
+- **Process**: Runtime composition using Go's `embed` directive
+- **Output**: Composed schemas generated on-demand
+- **Status**: Current implementation
+
+### Current Build Process
+
+#### **Schema File Structure**
+```
+internal/schemas/schemas/
+├── facts-structure.hcl          # Base fact structure (all gopsutil data)
+├── storage/
+│   ├── hcl.hcl                  # HCL-specific validation rules
+│   ├── json.hcl                 # JSON-specific validation rules
+│   └── badger.hcl               # BadgerDB-specific validation rules
+├── global-facts-hcl.hcl         # Composed schema (includes base + format)
+├── global-facts-json.hcl        # Composed schema (includes base + format)
+└── global-facts-badger.hcl      # Composed schema (includes base + format)
+```
+
+#### **Build Integration**
+```bash
+# Build spooky with embedded schema composition
+make build
+
+# No additional steps required - schemas are composed at runtime
+```
+
+#### **Runtime Composition Process**
+1. **Source Embedding**: Source schema files embedded using `go:embed`
+2. **Template Processing**: Schemas composed using `text/template`
+3. **On-Demand Generation**: Composed schemas generated when requested
+4. **Caching**: Composed schemas cached for performance
+
+### Benefits of Embedded Approach
+
+- **DRY Principle**: Single source of truth for fact structure
+- **Consistency**: All storage formats use identical fact definitions
+- **Maintainability**: Changes to fact structure update all formats automatically
+- **Extensibility**: Easy to add new storage formats
+- **Performance**: No build-time overhead, runtime composition only when needed
+- **Simplicity**: No separate build tools or build steps required
+- **Reliability**: Self-contained binary with embedded schemas
+
+#### 2. **Facts System Schema** (`internal/schemas/schemas/facts-structure.hcl`)
+
+**Comprehensive Fact Structure:**
+- Complete gopsutil data coverage (OS, hardware, network, processes)
+- Single source of truth for all fact definitions
+- Extensible structure for custom facts
+- TTL and metadata support
+
+**Fact Categories:**
+- **System Facts**: OS information, kernel version, architecture
+- **Hardware Facts**: CPU, memory, storage, disk I/O
+- **Network Facts**: Interfaces, IP addresses, connections
+- **Process Facts**: Process counts, top processes by resource usage
+- **Enhanced Facts**: Virtualization, package managers, services
+
+**Storage Format Schemas:**
+- `storage/hcl.hcl` - HCL-specific validation rules
+- `storage/json.hcl` - JSON-specific validation rules
+- `storage/badger.hcl` - BadgerDB-specific validation rules
+
+#### 3. **Comprehensive Go Structs with HCL Tags** (`internal/config/types.go`)
 
 **Project Configuration Schema:**
 - `ProjectConfig` - Complete project configuration with all required and optional fields
@@ -25,26 +111,7 @@ This document outlines the current state of spooky's configuration schema system
 - `Action` - Individual action configuration with execution options
 - `TemplateConfig` - Template-specific configuration for file operations
 
-#### 2. **Facts System Schema** (`internal/facts/types.go`)
-
-**Core Facts Schema:**
-- `Fact` - Individual fact with key, value, metadata, and TTL
-- `FactCollection` - Collection of facts with machine ID and timestamp
-- `SystemFacts` - System information (OS, hardware, network)
-- `CustomFacts` - User-defined custom facts
-
-**Fact Types Schema:**
-- `OSInfo` - Operating system information
-- `HardwareInfo` - Hardware details (CPU, memory, storage)
-- `NetworkInfo` - Network interfaces and configuration
-- `DNSInfo` - DNS configuration and resolution
-
-**Fact Storage Schema:**
-- `MachineFacts` - Machine-specific fact storage
-- `FactQuery` - Query interface for fact retrieval
-- `StorageOptions` - Storage backend configuration
-
-#### 3. **Validation System** (`internal/config/validator.go`)
+#### 4. **Validation System** (`internal/config/validator.go`)
 
 **Core Validation Features:**
 - Uses `go-playground/validator` for struct validation
@@ -59,7 +126,7 @@ This document outlines the current state of spooky's configuration schema system
 - File existence and permissions validation
 - Mutual exclusivity validation (password vs key_file, command vs script)
 
-#### 4. **HCL Integration**
+#### 5. **HCL Integration**
 
 **Wrapper Block System:**
 - `ProjectConfigWrapper` - Explicit project block declaration
@@ -130,7 +197,9 @@ This document outlines the current state of spooky's configuration schema system
 ### Validation Rules
 
 ## Facts System Schema
-### Fact Structure
+### Fact Structure (facts-structure.hcl)
+### Storage Formats (storage/*.hcl)
+### Composed Schemas (embedded composition)
 ### Dynamic Facts
 ### Fact Storage
 ### Fact Validation
@@ -157,7 +226,7 @@ This document outlines the current state of spooky's configuration schema system
 - `project-schema.json` - Project configuration schema
 - `inventory-schema.json` - Inventory configuration schema
 - `actions-schema.json` - Actions configuration schema
-- `facts-schema.json` - Facts system schema
+- `facts-schema.json` - Facts system schema (composed)
 - `global-config-schema.json` - Global configuration schema
 - Schema validation utilities
 
@@ -237,7 +306,7 @@ This document outlines the current state of spooky's configuration schema system
 }
 ```
 
-**Facts Schema:**
+**Facts Schema (Composed):**
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
@@ -259,7 +328,9 @@ This document outlines the current state of spooky's configuration schema system
                 "name": {"type": "string"},
                 "version": {"type": "string"},
                 "arch": {"type": "string"},
-                "kernel": {"type": "string"}
+                "kernel": {"type": "string"},
+                "platform": {"type": "string"},
+                "family": {"type": "string"}
               }
             },
             "hardware": {
@@ -268,24 +339,88 @@ This document outlines the current state of spooky's configuration schema system
                 "cpu": {
                   "type": "object",
                   "properties": {
-                    "cores": {"type": "integer"},
+                    "cores": {"type": "integer", "minimum": 1},
                     "model": {"type": "string"},
-                    "frequency": {"type": "number"}
+                    "frequency": {"type": "number"},
+                    "architecture": {"type": "string"},
+                    "vendor": {"type": "string"},
+                    "percent": {"type": "number"}
                   }
                 },
                 "memory": {
                   "type": "object",
                   "properties": {
-                    "total": {"type": "integer"},
+                    "total": {"type": "integer", "minimum": 1},
                     "available": {"type": "integer"},
-                    "used": {"type": "integer"}
+                    "used": {"type": "integer"},
+                    "free": {"type": "integer"},
+                    "percent": {"type": "number"}
+                  }
+                },
+                "disks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "device": {"type": "string"},
+                      "mount_point": {"type": "string"},
+                      "total": {"type": "integer"},
+                      "used": {"type": "integer"},
+                      "free": {"type": "integer"},
+                      "filesystem": {"type": "string"}
+                    }
                   }
                 }
+              }
+            },
+            "network": {
+              "type": "object",
+              "properties": {
+                "hostname": {"type": "string"},
+                "interfaces": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {"type": "string"},
+                      "mac_address": {"type": "string"},
+                      "ip_addresses": {"type": "array", "items": {"type": "string"}},
+                      "mtu": {"type": "integer"}
+                    }
+                  }
+                },
+                "ip_addresses": {"type": "array", "items": {"type": "string"}},
+                "primary_ip": {"type": "string"}
               }
             }
           }
         },
-        "custom": {"type": "object"}
+        "enhanced": {
+          "type": "object",
+          "properties": {
+            "virtualization": {
+              "type": "object",
+              "properties": {
+                "system": {"type": "string"},
+                "role": {"type": "string"}
+              }
+            },
+            "package_manager": {
+              "type": "object",
+              "properties": {
+                "type": {"type": "string", "enum": ["apt", "yum", "dnf", "zypper", "pacman", "apk", "unknown"]},
+                "version": {"type": "string"}
+              }
+            },
+            "service_manager": {
+              "type": "object",
+              "properties": {
+                "type": {"type": "string", "enum": ["systemd", "upstart", "init", "runit", "openrc", "unknown"]},
+                "version": {"type": "string"}
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -299,40 +434,30 @@ This document outlines the current state of spooky's configuration schema system
 - Schema-aware editors
 - Automated documentation generation
 
-### 3. **Enhanced CLI Schema Commands**
+### 3. **Internal Schema Management**
 
 #### **Priority: Medium**
-**Goal:** Provide schema validation and generation tools for all spooky components
+**Goal:** Provide robust internal schema validation and management for all spooky components
 
-**New Commands:**
-```bash
-# Validate against schema
-spooky validate --schema project-schema.json project.hcl
-spooky validate --schema facts-schema.json facts.json
+**Internal Schema Usage:**
+- **Configuration Validation**: All HCL files validated against embedded schemas
+- **Facts Validation**: Facts data validated against composed schemas
+- **Project Validation**: Project structure validated against project schemas
+- **Template Validation**: Templates validated against variable and facts schemas
 
-# Generate schema from existing config
-spooky schema generate project.hcl
-spooky schema generate facts.json
-
-# Validate schema compatibility
-spooky schema validate project-schema.json
-spooky schema validate facts-schema.json
-
-# Export current schema
-spooky schema export --format json
-spooky schema export --format markdown
-
-# Facts schema commands
-spooky facts schema export --format json
-spooky facts schema validate facts.json
-```
+**Schema Integration Points:**
+- **`spooky validate`**: Uses embedded schemas for all validation operations
+- **`spooky facts validate`**: Uses composed facts schemas for data validation
+- **`spooky project validate`**: Uses project schemas for structure validation
+- **`spooky variables validate`**: Uses variable schemas for configuration validation
+- **`spooky templates validate`**: Uses template schemas for syntax validation
 
 **Features:**
-- Schema validation against JSON Schema
-- Schema generation from Go structs
-- Schema compatibility checking
-- Multiple export formats
-- Facts-specific schema validation
+- Automatic schema loading from embedded sources
+- Runtime schema composition for facts system
+- Schema validation for all configuration files
+- Facts data validation against composed schemas
+- Template syntax validation against variable schemas
 
 ### 4. **IDE Integration**
 
@@ -345,6 +470,7 @@ spooky facts schema validate facts.json
 - Real-time validation and error highlighting
 - Snippets for common configurations
 - Facts schema validation and autocomplete
+- Embedded schema support
 
 **JetBrains Plugin:**
 - IntelliJ IDEA/GoLand plugin for spooky configs
@@ -392,7 +518,7 @@ facts {
    - Project configuration schema reference
    - Inventory configuration schema reference
    - Actions configuration schema reference
-   - Facts system schema reference
+   - Facts system schema reference (including embedded composition)
    - Global configuration schema reference
    - Validation rules and error messages
    - Best practices and examples
@@ -408,7 +534,7 @@ facts {
    - Create schema generation tool
    - Export current Go structs to JSON Schema
    - Validate schema accuracy against existing configs
-   - Generate facts system schemas
+   - Generate facts system schemas (including composed schemas)
 
 2. **Enhance validation system**
    - Add JSON Schema validation support
@@ -416,18 +542,19 @@ facts {
    - Add schema export functionality
    - Facts schema validation
 
-### Phase 3: Tooling Integration (Week 5-6)
-1. **CLI schema commands**
-   - Implement `spooky schema` subcommands
-   - Add schema validation to existing `validate` command
-   - Create schema generation utilities
-   - Facts-specific schema commands
+### Phase 3: Internal Schema Integration (Week 5-6)
+1. **Schema validation integration**
+   - Integrate embedded schemas into existing `spooky validate` command
+   - Add facts schema validation to `spooky facts validate`
+   - Add project schema validation to `spooky project validate`
+   - Add variable schema validation to `spooky variables validate`
+   - Add template schema validation to `spooky templates validate`
 
 2. **Testing and validation**
-   - Test schema validation with existing projects
-   - Validate generated schemas against test cases
+   - Test embedded schema validation with existing projects
+   - Validate composed schemas against test cases
    - Performance testing for large configurations
-   - Facts schema testing
+   - Facts schema testing with real data
 
 ### Phase 4: IDE Support (Week 7-8)
 1. **VSCode extension development**
@@ -435,6 +562,7 @@ facts {
    - Schema-aware autocomplete
    - Error highlighting and validation
    - Facts schema support
+   - Embedded schema support
 
 2. **Documentation and examples**
    - IDE setup guides
@@ -466,6 +594,7 @@ facts {
 **Current Performance:**
 - Go struct validation: ~1ms per configuration file
 - HCL parsing: ~5-10ms per file
+- Embedded schema composition: ~1-2ms per schema
 - Total validation time: <50ms for typical projects
 
 **Expected Performance with JSON Schema:**
@@ -482,6 +611,7 @@ facts {
 3. Field type changes require major version bump
 4. Validation rule changes must be backward compatible
 5. Facts schema changes must maintain data compatibility
+6. Embedded schema composition must remain backward compatible
 
 ## Success Metrics
 
@@ -491,13 +621,15 @@ facts {
 - [ ] Validation error messages documented
 - [ ] Best practices and examples provided
 - [ ] Facts system documentation complete
+- [ ] Embedded schema composition documented
 
 ### Tooling Integration
 - [ ] JSON Schema files generated and validated
-- [ ] CLI schema commands implemented
+- [ ] Embedded schemas integrated into existing CLI commands
 - [ ] Schema validation working with existing projects
 - [ ] Performance impact <100ms for typical projects
 - [ ] Facts schema validation working
+- [ ] Internal schema validation working across all commands
 
 ### Developer Experience
 - [ ] IDE autocomplete working with schemas
@@ -505,6 +637,7 @@ facts {
 - [ ] Error highlighting and suggestions
 - [ ] Configuration snippets available
 - [ ] Facts schema IDE support
+- [ ] Embedded schema IDE support
 
 ### Community Adoption
 - [ ] Schema documentation referenced in tutorials
@@ -512,6 +645,7 @@ facts {
 - [ ] IDE extensions published and maintained
 - [ ] Community feedback and contributions
 - [ ] Facts system widely adopted
+- [ ] Internal schema validation approach adopted
 
 ## Risk Assessment
 
@@ -524,6 +658,8 @@ facts {
   - **Mitigation:** Start simple, iterate based on user feedback
 - **Facts Schema Complexity:** Risk of facts schema being too complex
   - **Mitigation:** Modular schema design with clear separation
+- **Embedded Schema Maintenance:** Risk of embedded schemas becoming difficult to maintain
+  - **Mitigation:** Automated composition and validation
 
 ### Adoption Risks
 - **Tool Support:** Risk of limited IDE support for custom schemas
@@ -534,18 +670,20 @@ facts {
   - **Mitigation:** Automated generation and validation
 - **Facts Integration:** Risk of facts schema not integrating well
   - **Mitigation:** Thorough testing with existing facts data
+- **Embedded Approach:** Risk of embedded approach being too complex
+  - **Mitigation:** Clear documentation and examples
 
 ## Conclusion
 
-The current spooky schema system provides a solid foundation with comprehensive Go structs, validation, and HCL integration. However, it needs to be expanded to cover the facts system, project system, and dynamic fact sources.
+The current spooky schema system provides a solid foundation with comprehensive Go structs, validation, HCL integration, and embedded schema composition. The facts system is well-integrated with runtime schema composition that eliminates build complexity.
 
-The proposed enhancements will significantly improve the developer experience through better documentation, tooling integration, and IDE support across all spooky components.
+The proposed enhancements will significantly improve the developer experience through better documentation, tooling integration, and IDE support across all spooky components, including the embedded schema composition system.
 
 The phased approach allows for incremental delivery of value while managing complexity and risk. Starting with documentation provides immediate benefits, while JSON Schema and IDE integration deliver long-term developer experience improvements.
 
 **Next Steps:**
-1. Begin Phase 1: Create comprehensive schema documentation including facts system
+1. Begin Phase 1: Create comprehensive schema documentation including facts system and embedded composition
 2. Validate approach with existing configuration files and facts data
 3. Gather feedback from users and contributors
 4. Proceed with JSON Schema implementation based on feedback
-5. Ensure facts system schema integration is prioritized 
+5. Ensure facts system schema integration and embedded composition are prioritized 
