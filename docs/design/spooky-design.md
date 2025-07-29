@@ -19,54 +19,68 @@ Spooky is a modern, Go-based infrastructure automation tool designed for simplic
 
 ```mermaid
 graph TD
-    subgraph "Foundation Layer"
-        SCHEMAS[Schema System<br/>Validation & Type Safety]
+    subgraph "Schema Foundation"
+        SCHEMAS[Schema System<br/>internal/schemas/schemas/<br/>Defines all configuration formats]
     end
     
-    subgraph "Core Layer"
-        CLI[CLI System<br/>spooky noun verb]
-        CONFIG[Configuration System<br/>Global Settings]
+    subgraph "Global Configuration"
+        GLOBAL[Global Spooky Config<br/>~/.config/spooky/spooky.hcl<br/>Must conform to schema]
+        GLOBAL_FACTS[Global Facts Database<br/>~/.local/state/spooky/global-facts.db<br/>Shared across projects]
     end
     
-    subgraph "Project Layer"
-        PROJECT[Project System<br/>Project Structure]
-        FACTS[Facts System<br/>Data Collection]
-        VARS[Variables System<br/>Configuration]
+    subgraph "Project Structure"
+        PROJECT[Project Configuration<br/>project.hcl<br/>Defines project metadata]
+        
+        subgraph "Project Data"
+            MACHINES[machines.hcl<br/>Machine inventory]
+            ACTIONS[actions.hcl + actions/<br/>Action definitions]
+            VARIABLES[variables.hcl + variables/<br/>Project variables]
+            FACTS[facts.db/facts.hcl/facts.json<br/>Project-specific facts]
+        end
+        
+        subgraph "Project Assets"
+            TEMPLATES[templates/<br/>Template files]
+            FILES[files/<br/>Non-templated files]
+        end
     end
     
-    subgraph "Integration Layer"
-        ACTIONS[Actions System<br/>Execution & Templating]
-    end
-    
-    %% Foundation dependencies
-    SCHEMAS --> CLI
-    SCHEMAS --> CONFIG
+    %% Schema validation relationships
+    SCHEMAS --> GLOBAL
     SCHEMAS --> PROJECT
+    SCHEMAS --> MACHINES
+    SCHEMAS --> ACTIONS
+    SCHEMAS --> VARIABLES
     SCHEMAS --> FACTS
-    SCHEMAS --> VARS
     
-    %% Core dependencies
-    CONFIG --> CLI
+    %% Configuration relationships
+    GLOBAL --> PROJECT
+    GLOBAL_FACTS --> FACTS
     
-    %% Project layer dependencies
+    %% Project data relationships
+    PROJECT --> MACHINES
     PROJECT --> ACTIONS
-    FACTS --> ACTIONS
-    VARS --> ACTIONS
-    CLI --> ACTIONS
+    PROJECT --> VARIABLES
+    PROJECT --> FACTS
+    PROJECT --> TEMPLATES
+    PROJECT --> FILES
     
-    %% Data flow
-    CONFIG -.->|provides defaults| CLI
+    %% Data flow for execution
+    MACHINES -.->|provides targets| ACTIONS
+    VARIABLES -.->|provides config| ACTIONS
     FACTS -.->|provides data| ACTIONS
-    VARS -.->|provides config| ACTIONS
-    PROJECT -.->|provides context| ACTIONS
+    TEMPLATES -.->|provides templates| ACTIONS
+    FILES -.->|provides files| ACTIONS
     
     style SCHEMAS fill:#e1f5fe
-    style CLI fill:#f3e5f5
-    style CONFIG fill:#f3e5f5
+    style GLOBAL fill:#f3e5f5
+    style GLOBAL_FACTS fill:#f3e5f5
     style PROJECT fill:#e8f5e8
-    style FACTS fill:#e8f5e8
-    style VARS fill:#e8f5e8
+    style MACHINES fill:#fff3e0
     style ACTIONS fill:#fff3e0
+    style VARIABLES fill:#fff3e0
+    style FACTS fill:#fff3e0
+    style TEMPLATES fill:#fce4ec
+    style FILES fill:#fce4ec
 ```
 
 ### **Core Components**
