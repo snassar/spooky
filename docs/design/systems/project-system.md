@@ -1,4 +1,4 @@
-# Project System: Implementation Plan
+# Project System: Comprehensive Implementation Plan
 
 ## Overview
 
@@ -6,11 +6,69 @@ This document outlines the implementation of the spooky project system, which pr
 
 **Schema Integration**: This project system implements the schema validation patterns and project structure definitions defined in [Schema System](../schema-system.md) for comprehensive project validation, metadata schema enforcement, and schema-based project lifecycle management.
 
+## System Integration
+
+This project system integrates with other core Spooky systems to provide isolated, portable, and configurable project environments:
+
+### **Facts System Integration**
+- **Project Facts**: Project-specific facts database and collection settings (see [Facts System](../facts-system.md))
+- **Project Isolation**: Each project maintains its own facts database
+- **Project Context**: Facts collection within project context and configuration
+- **Project Validation**: Facts validation integrated with project validation
+- **Facts Storage**: Project-specific facts storage and caching
+
+### **Variables System Integration**
+- **Variables Management**: Project variables stored in `variables.hcl` and `variables/` directory (see [Variables System](../variables-system.md))
+- **Variable Resolution**: Project variables resolved in project context
+- **Template Integration**: Variables available in project templates
+- **Configuration Precedence**: Project variables override global defaults
+
+### **Schema System Integration**
+- **Project Schema**: Project configuration validated against embedded schemas (see [Schema System](../schema-system.md))
+- **Structure Validation**: Project directory structure validated against schema
+- **Metadata Schema**: Project metadata enforced through schema validation
+- **Schema Evolution**: Project schemas evolve with system changes
+
+### **CLI System Integration**
+- **Project Commands**: Project management through `spooky project` commands (see [CLI System](../cli-system.md))
+- **Project Initialization**: `spooky project init` for project creation
+- **Project Validation**: `spooky project validate` for project structure validation
+- **Project Information**: `spooky project show` for project information display
+- **Project Discovery**: Project discovery using standard Unix tools
+
+### **Configuration System Integration**
+- **Project Configuration**: Project-specific configuration overrides (see [Configuration System](../configuration-system.md))
+- **Project Isolation**: Project configuration isolation from global settings
+- **Project Defaults**: Default configuration values for new projects
+- **Project Validation**: Configuration validation for project settings
+- **Project Context**: Configuration resolution within project context
+
+### **Machines System Integration**
+- **Project Inventory**: Machine inventory stored in project-specific `machines.hcl` files (see [Machines System](../machines-system.md))
+- **Project Isolation**: Each project maintains its own machine inventory
+- **Project Context**: Machine operations execute within project context
+- **Project Validation**: Machine inventory validation integrated with project validation
+- **Enterprise Scale**: Project supports large machine inventories with efficient indexing
+
+### **Actions System Integration**
+- **Project Actions**: Actions stored in project-specific `actions.hcl` and `actions/` directory (see [Actions System](../actions-system.md))
+- **Project Context**: Actions executed within project execution context
+- **Project Configuration**: Action settings configured in project context
+- **Project Isolation**: Project actions isolated from global actions
+- **Dependency Management**: Project-level action dependency tracking
+
+### **Template System Integration**
+- **Project Templates**: Templates stored in project-specific `templates/` directories (see [Template System](../template-system.md))
+- **Project Context**: Templates execute within project context and configuration
+- **Project Data**: Templates have access to project-specific data and configuration
+- **Project Validation**: Template validation integrated with project validation
+- **Template Deployment**: Project supports template deployment workflows
+
 ## Current State Analysis
 
 ### **What We Have**
 - ✅ **Project initialization** with `spooky project init`
-- ✅ **Basic project structure** (project.hcl, inventory.hcl, actions.hcl)
+- ✅ **Basic project structure** (project.hcl, machines.hcl, actions.hcl)
 - ✅ **Template system** with facts integration
 - ✅ **SSH client** for remote execution
 - ✅ **HCL parsing** for configuration files
@@ -33,8 +91,8 @@ project-name/
 ├── project.hcl                    # Project configuration and metadata
 ├── machines.hcl                  # Machine inventory (optional) / (machines/ is also optional)
 ├── actions.hcl                    # Action definitions (optional) / (actions/ is also optional)
-├── variables.hcl                  # Variable definitions (optional) / (variables/ is also optional)
-├── facts.db/                       # Dynamic facts database (badger)
+├── variables.hcl                  # Variable definitions (see [Variables System](../variables-system.md))
+├── facts.db/                       # Dynamic facts database (see [Facts System](../facts-system.md))
 ├── templates/                     # Template files
 ├── files/                         # Static files for distribution
 ├── logs/                          # Project execution logs
@@ -166,7 +224,7 @@ type ProjectSecurity struct {
 
 1. **CLI flags** - `--ssh-timeout 60s`
 2. **Project configuration** - `project.hcl`
-3. **Global configuration** - `~/.config/spooky/spooky.hcl`
+3. **Global configuration** - `$XDG_CONFIG_HOME/spooky/spooky.hcl`
 4. **Environment variables** - `SPOOKY_SSH_TIMEOUT=45s`
 5. **Default values** - Built-in defaults
 
@@ -260,6 +318,7 @@ type ProjectFactsManager struct {
     config      *ProjectFactsStorage
 }
 
+// Integrates with the facts system (see [Facts System](../facts-system.md)) for project-specific fact storage
 func (p *ProjectFactsManager) GetFacts(machine string) (*FactCollection, error) {
     // Get facts from project-specific facts.db
     key := fmt.Sprintf("facts:%s", machine)

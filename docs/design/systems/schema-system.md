@@ -1,8 +1,67 @@
-# Schema Framework Plan
+# Schema System: Comprehensive Implementation Plan
 
 ## Overview
 
-This document outlines the current state of spooky's configuration schema system and provides a roadmap for enhancing it with formal schema documentation, validation tools, and IDE integration. The schema system covers configuration files, facts system, project structure, and dynamic fact sources with embedded runtime composition.
+This document is the authoritative source for all schema system implementation details in spooky. It covers schema validation, embedded composition, runtime validation, and integration with all other spooky systems.
+
+**Schema Integration**: This schema system provides the foundation for all other Spooky systems through embedded validation and schema composition.
+
+**Architecture Integration**: Schema system integrates with the overall spooky architecture as described in [Spooky Design](../spooky-design.md), providing validation and type safety for all system components.
+
+## System Integration
+
+This schema system provides the foundation for all other Spooky systems through embedded validation and schema composition:
+
+### **Facts System Integration**
+- **Facts Schema**: Comprehensive schema validation for facts storage and structure (see [Facts System](../facts-system.md))
+- **Storage Validation**: BadgerDB, JSON, and HCL storage format validation
+- **Fact Collection**: Schema validation for fact collection and processing
+- **Schema Composition**: Runtime schema composition for facts validation
+
+### **Project System Integration**
+- **Project Schema**: Project configuration and structure validation (see [Project System](../project-system.md))
+- **Directory Validation**: Project directory structure schema enforcement
+- **Metadata Schema**: Project metadata and configuration validation
+- **Schema Evolution**: Project schemas evolve with system changes
+
+### **Variables System Integration**
+- **Variable Schema**: Variable definition and type validation (see [Variables System](../variables-system.md))
+- **File Merging**: Schema validation for variable file merging and conflict resolution
+- **Template Integration**: Schema validation for variable usage in templates
+- **Export Schema**: Variable export format and metadata validation
+
+### **Actions System Integration**
+- **Action Schema**: Action definition and dependency validation (see [Actions System](../actions-system.md))
+- **Dependency Schema**: Action dependency graph validation and circular reference detection
+- **Execution Schema**: Action execution parameters and validation
+- **File Merging**: Schema validation for action file merging and conflict resolution
+
+### **CLI System Integration**
+- **Command Schema**: CLI command structure and parameter validation (see [CLI System](../cli-system.md))
+- **Validation Schema**: CLI validation command schema enforcement
+- **Export Schema**: CLI export command format validation
+- **Configuration Schema**: CLI configuration integration validation
+
+### **Configuration System Integration**
+- **Configuration Schema**: Schema validation for global configuration structure (see [Configuration System](../configuration-system.md))
+- **Configuration Validation**: Configuration file validation against embedded schemas
+- **Configuration Evolution**: Configuration schema versioning and migration
+- **Configuration Composition**: Runtime schema composition for configuration validation
+- **Configuration Integration**: Configuration integration with all system schemas
+
+### **Machines System Integration**
+- **Machine Schema**: Machine inventory validation against embedded schemas (see [Machines System](../machines-system.md))
+- **Machine Validation**: Machine configuration validation using schema system
+- **Machine Evolution**: Machine schema versioning and migration support
+- **Machine Composition**: Runtime schema composition for machine validation
+- **Machine Integration**: Machine system integration with all system schemas
+
+### **Template System Integration**
+- **Template Schema**: Template validation against embedded schemas (see [Template System](../template-system.md))
+- **Template Validation**: Template configuration validation using schema system
+- **Template Evolution**: Template schema versioning and migration support
+- **Template Composition**: Runtime schema composition for template validation
+- **Template Integration**: Template system integration with all system schemas
 
 ## Current Schema Status
 
@@ -76,6 +135,8 @@ make build
 
 #### 2. **Facts System Schema** (`internal/schemas/schemas/facts-structure.hcl`)
 
+Validates facts system data structures and storage formats (see [Facts System](../facts-system.md) for implementation details):
+
 **Comprehensive Fact Structure:**
 - Complete gopsutil data coverage (OS, hardware, network, processes)
 - Single source of truth for all fact definitions
@@ -142,10 +203,27 @@ make build
 ### 🔄 **What Needs Schema Definition**
 
 #### 1. **Project System Schema**
-- Project metadata and versioning
-- Project-specific configuration overrides
-- Project dependencies and imports
-- Project isolation rules
+
+Validates project configuration and directory structure (see [Project System](../project-system.md) for implementation details):
+
+**Project Metadata:**
+- Project name, description, version
+- Environment and cost center
+- SLA tier and maintenance window
+- Contact information
+
+**Project Configuration:**
+- Storage, logging, SSH, and template configurations
+- Default timeouts and parallel execution
+- Inventory file and actions file paths
+
+**Project Dependencies:**
+- External dependencies and their versions
+- Import paths for external libraries
+
+**Project Isolation:**
+- Namespace isolation for different projects
+- Resource limits and quotas
 
 #### 2. **Dynamic Facts Schema**
 - Dynamic fact source definitions
@@ -153,7 +231,29 @@ make build
 - Fact TTL configuration
 - Fact change detection rules
 
-#### 3. **Global Configuration Schema**
+#### 3. **Variables System Schema** (`internal/schemas/schemas/variables-structure.hcl`)
+
+Validates variable definitions and file merging (see [Variables System](../variables-system.md) for implementation details):
+
+**Variable Definition Schema:**
+- Variable name and type validation
+- Default value and description fields
+- Variable scope and visibility rules
+- Variable dependency resolution
+
+**File Merging Schema:**
+- Multiple file merging rules
+- Conflict detection and resolution
+- Variable precedence hierarchy
+- File loading order validation
+
+**Template Integration Schema:**
+- Variable usage in templates
+- Variable interpolation rules
+- Variable context validation
+- Template function integration
+
+#### 4. **Global Configuration Schema**
 - XDG Base Directory configuration
 - Global facts database configuration
 - Global SSH defaults
@@ -185,8 +285,8 @@ make build
 ### SSH Block
 ### Tags Block
 
-## Inventory Configuration Schema (`inventory.hcl`)
-### Root Block: `inventory`
+## Machines Configuration Schema (`machines.hcl`)
+### Root Block: `machines`
 ### Machine Block
 ### Validation Rules
 
@@ -224,7 +324,7 @@ make build
 
 **Deliverables:**
 - `project-schema.json` - Project configuration schema
-- `inventory-schema.json` - Inventory configuration schema
+- `machines-schema.json` - Machines configuration schema
 - `actions-schema.json` - Actions configuration schema
 - `facts-schema.json` - Facts system schema (composed)
 - `global-config-schema.json` - Global configuration schema
@@ -446,7 +546,7 @@ make build
 - **Template Validation**: Templates validated against variable and facts schemas
 
 **Schema Integration Points:**
-- **`spooky validate`**: Uses embedded schemas for all validation operations
+- **`spooky project validate`**: Uses embedded schemas for all validation operations
 - **`spooky facts validate`**: Uses composed facts schemas for data validation
 - **`spooky project validate`**: Uses project schemas for structure validation
 - **`spooky variables validate`**: Uses variable schemas for configuration validation
@@ -544,7 +644,7 @@ facts {
 
 ### Phase 3: Internal Schema Integration (Week 5-6)
 1. **Schema validation integration**
-   - Integrate embedded schemas into existing `spooky validate` command
+   - Integrate embedded schemas into existing `spooky project validate` command
    - Add facts schema validation to `spooky facts validate`
    - Add project schema validation to `spooky project validate`
    - Add variable schema validation to `spooky variables validate`
