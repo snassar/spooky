@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"spooky/internal/logging/types"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -12,7 +13,7 @@ import (
 // zapLogger wraps Zap's logger to implement our Logger interface
 type zapLogger struct {
 	logger *zap.Logger
-	fields []Field
+	fields []types.Field
 }
 
 // Global logger instance
@@ -37,25 +38,25 @@ func ensureLogDirectory(logFile string) error {
 // ConfigureLogger configures the global logger based on the provided settings
 func ConfigureLogger(level, format, output string, quiet, verbose bool) {
 	// Determine log level based on flags
-	var logLevel LogLevel
+	var logLevel types.LogLevel
 	switch level {
 	case "debug":
-		logLevel = DebugLevel
+		logLevel = types.DebugLevel
 	case "info":
-		logLevel = InfoLevel
+		logLevel = types.InfoLevel
 	case "warn":
-		logLevel = WarnLevel
+		logLevel = types.WarnLevel
 	case "error":
-		logLevel = ErrorLevel
+		logLevel = types.ErrorLevel
 	default:
-		logLevel = InfoLevel
+		logLevel = types.InfoLevel
 	}
 
 	// Override level based on verbose/quiet flags
 	if quiet {
-		logLevel = ErrorLevel // Only show errors when quiet
+		logLevel = types.ErrorLevel // Only show errors when quiet
 	} else if verbose {
-		logLevel = DebugLevel // Show debug when verbose
+		logLevel = types.DebugLevel // Show debug when verbose
 	}
 
 	// Determine format
@@ -77,7 +78,7 @@ func ConfigureLogger(level, format, output string, quiet, verbose bool) {
 	}
 
 	// Create and set the logger
-	globalLogger = NewLogger(Config{
+	globalLogger = NewLogger(types.Config{
 		Level:     logLevel,
 		Format:    logFormat,
 		Output:    logOutput,
@@ -88,8 +89,8 @@ func ConfigureLogger(level, format, output string, quiet, verbose bool) {
 func init() {
 	// Initialize with a default logger for tests and other cases
 	// This will be overridden when ConfigureLogger is called
-	globalLogger = NewLogger(Config{
-		Level:     InfoLevel,
+	globalLogger = NewLogger(types.Config{
+		Level:     types.InfoLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
@@ -97,19 +98,19 @@ func init() {
 }
 
 // NewLogger creates a new logger with the given configuration
-func NewLogger(config Config) Logger {
+func NewLogger(config types.Config) Logger {
 	var zapConfig zap.Config
 
 	// Set log level
 	level := zap.NewAtomicLevel()
 	switch config.Level {
-	case DebugLevel:
+	case types.DebugLevel:
 		level.SetLevel(zapcore.DebugLevel)
-	case InfoLevel:
+	case types.InfoLevel:
 		level.SetLevel(zapcore.InfoLevel)
-	case WarnLevel:
+	case types.WarnLevel:
 		level.SetLevel(zapcore.WarnLevel)
-	case ErrorLevel:
+	case types.ErrorLevel:
 		level.SetLevel(zapcore.ErrorLevel)
 	default:
 		level.SetLevel(zapcore.InfoLevel)
@@ -143,7 +144,7 @@ func NewLogger(config Config) Logger {
 
 	return &zapLogger{
 		logger: zapLoggerInstance,
-		fields: []Field{},
+		fields: []types.Field{},
 	}
 }
 
@@ -171,7 +172,7 @@ func WithContext(ctx context.Context, logger Logger) context.Context {
 }
 
 // convertFields converts our Field type to Zap fields
-func (l *zapLogger) convertFields(fields []Field) []zap.Field {
+func (l *zapLogger) convertFields(fields []types.Field) []zap.Field {
 	zapFields := make([]zap.Field, 0, len(fields))
 
 	for _, field := range fields {
@@ -187,25 +188,25 @@ func (l *zapLogger) convertFields(fields []Field) []zap.Field {
 }
 
 // Debug logs a debug message
-func (l *zapLogger) Debug(msg string, fields ...Field) {
+func (l *zapLogger) Debug(msg string, fields ...types.Field) {
 	l.logger.Debug(msg, l.convertFields(fields)...)
 }
 
 // Info logs an info message
-func (l *zapLogger) Info(msg string, fields ...Field) {
+func (l *zapLogger) Info(msg string, fields ...types.Field) {
 	l.logger.Info(msg, l.convertFields(fields)...)
 }
 
 // Warn logs a warning message
-func (l *zapLogger) Warn(msg string, fields ...Field) {
+func (l *zapLogger) Warn(msg string, fields ...types.Field) {
 	l.logger.Warn(msg, l.convertFields(fields)...)
 }
 
 // Error logs an error message
-func (l *zapLogger) Error(msg string, err error, fields ...Field) {
+func (l *zapLogger) Error(msg string, err error, fields ...types.Field) {
 	// Add error field if provided
 	if err != nil {
-		fields = append(fields, Error(err))
+		fields = append(fields, types.Field{Key: "error", Value: err.Error()})
 	}
 	l.logger.Error(msg, l.convertFields(fields)...)
 }
@@ -218,7 +219,7 @@ func (l *zapLogger) WithContext(_ context.Context) Logger {
 }
 
 // WithFields returns a logger with additional fields
-func (l *zapLogger) WithFields(fields ...Field) Logger {
+func (l *zapLogger) WithFields(fields ...types.Field) Logger {
 	return &zapLogger{
 		logger: l.logger,
 		fields: append(l.fields, fields...),

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	spookyloggingtypes "spooky/internal/logging/types"
 	"testing"
 	"time"
 
@@ -13,12 +14,12 @@ import (
 func TestNewLogger(t *testing.T) {
 	tests := []struct {
 		name   string
-		config Config
+		config spookyloggingtypes.Config
 	}{
 		{
 			name: "default json logger",
-			config: Config{
-				Level:     InfoLevel,
+			config: spookyloggingtypes.Config{
+				Level:     spookyloggingtypes.InfoLevel,
 				Format:    "json",
 				Output:    "stdout",
 				Timestamp: true,
@@ -26,8 +27,8 @@ func TestNewLogger(t *testing.T) {
 		},
 		{
 			name: "debug level logger",
-			config: Config{
-				Level:     DebugLevel,
+			config: spookyloggingtypes.Config{
+				Level:     spookyloggingtypes.DebugLevel,
 				Format:    "json",
 				Output:    "stdout",
 				Timestamp: true,
@@ -35,8 +36,8 @@ func TestNewLogger(t *testing.T) {
 		},
 		{
 			name: "warn level logger",
-			config: Config{
-				Level:     WarnLevel,
+			config: spookyloggingtypes.Config{
+				Level:     spookyloggingtypes.WarnLevel,
 				Format:    "json",
 				Output:    "stdout",
 				Timestamp: true,
@@ -44,8 +45,8 @@ func TestNewLogger(t *testing.T) {
 		},
 		{
 			name: "error level logger",
-			config: Config{
-				Level:     ErrorLevel,
+			config: spookyloggingtypes.Config{
+				Level:     spookyloggingtypes.ErrorLevel,
 				Format:    "json",
 				Output:    "stdout",
 				Timestamp: true,
@@ -53,8 +54,8 @@ func TestNewLogger(t *testing.T) {
 		},
 		{
 			name: "text format logger",
-			config: Config{
-				Level:     InfoLevel,
+			config: spookyloggingtypes.Config{
+				Level:     spookyloggingtypes.InfoLevel,
 				Format:    "text",
 				Output:    "stdout",
 				Timestamp: true,
@@ -62,8 +63,8 @@ func TestNewLogger(t *testing.T) {
 		},
 		{
 			name: "no timestamp logger",
-			config: Config{
-				Level:     InfoLevel,
+			config: spookyloggingtypes.Config{
+				Level:     spookyloggingtypes.InfoLevel,
 				Format:    "json",
 				Output:    "stdout",
 				Timestamp: false,
@@ -150,8 +151,8 @@ func TestConfigureLogger(t *testing.T) {
 }
 
 func TestLoggerWithFields(_ *testing.T) {
-	logger := NewLogger(Config{
-		Level:     DebugLevel,
+	logger := NewLogger(spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.DebugLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
@@ -176,8 +177,8 @@ func TestLoggerWithFields(_ *testing.T) {
 }
 
 func TestLoggerWithContext(t *testing.T) {
-	logger := NewLogger(Config{
-		Level:     InfoLevel,
+	logger := NewLogger(spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.InfoLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
@@ -199,8 +200,8 @@ func TestGlobalLoggerFunctions(t *testing.T) {
 	assert.NotNil(t, logger)
 
 	// Test SetLogger
-	newLogger := NewLogger(Config{
-		Level:     DebugLevel,
+	newLogger := NewLogger(spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.DebugLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
@@ -214,8 +215,8 @@ func TestGlobalLoggerFunctions(t *testing.T) {
 }
 
 func TestContextLoggerFunctions(t *testing.T) {
-	logger := NewLogger(Config{
-		Level:     InfoLevel,
+	logger := NewLogger(spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.InfoLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
@@ -274,8 +275,8 @@ func TestLoggerWithTestDataFromExamples(t *testing.T) {
 	}
 
 	// Create logger similar to what would be used in a valid project
-	logger := NewLogger(Config{
-		Level:     InfoLevel,
+	logger := NewLogger(spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.InfoLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
@@ -299,8 +300,8 @@ func TestLoggerWithTestDataFromExamples(t *testing.T) {
 }
 
 func TestLoggerLevels(_ *testing.T) {
-	logger := NewLogger(Config{
-		Level:     DebugLevel,
+	logger := NewLogger(spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.DebugLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
@@ -314,8 +315,8 @@ func TestLoggerLevels(_ *testing.T) {
 }
 
 func TestLoggerErrorHandling(_ *testing.T) {
-	logger := NewLogger(Config{
-		Level:     ErrorLevel,
+	logger := NewLogger(spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.ErrorLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
@@ -330,8 +331,8 @@ func TestLoggerErrorHandling(_ *testing.T) {
 }
 
 func TestLoggerFieldConversion(_ *testing.T) {
-	logger := NewLogger(Config{
-		Level:     DebugLevel,
+	logger := NewLogger(spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.DebugLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
@@ -354,8 +355,8 @@ func TestLoggerFieldConversion(_ *testing.T) {
 }
 
 func TestLoggerSync(t *testing.T) {
-	logger := NewLogger(Config{
-		Level:     InfoLevel,
+	logger := NewLogger(spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.InfoLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
@@ -372,11 +373,11 @@ func TestLoggerSync(t *testing.T) {
 func TestLoggerInvalidConfigurations(t *testing.T) {
 	tests := []struct {
 		name   string
-		config Config
+		config spookyloggingtypes.Config
 	}{
 		{
 			name: "invalid level",
-			config: Config{
+			config: spookyloggingtypes.Config{
 				Level:     "invalid",
 				Format:    "json",
 				Output:    "stdout",
@@ -385,8 +386,8 @@ func TestLoggerInvalidConfigurations(t *testing.T) {
 		},
 		{
 			name: "invalid format",
-			config: Config{
-				Level:     InfoLevel,
+			config: spookyloggingtypes.Config{
+				Level:     spookyloggingtypes.InfoLevel,
 				Format:    "invalid",
 				Output:    "stdout",
 				Timestamp: true,
@@ -407,8 +408,8 @@ func TestLoggerInvalidConfigurations(t *testing.T) {
 }
 
 func TestLoggerPerformance(t *testing.T) {
-	logger := NewLogger(Config{
-		Level:     InfoLevel,
+	logger := NewLogger(spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.InfoLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
@@ -430,8 +431,8 @@ func TestLoggerPerformance(t *testing.T) {
 }
 
 func TestLoggerConcurrency(_ *testing.T) {
-	logger := NewLogger(Config{
-		Level:     InfoLevel,
+	logger := NewLogger(spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.InfoLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,

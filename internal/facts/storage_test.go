@@ -1,52 +1,40 @@
 package facts
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	spookyfactstypes "spooky/internal/facts/types"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// TestNewFactStorage tests the creation of new fact storage instances
 func TestNewFactStorage(t *testing.T) {
-	// Test creating new fact storage
+	// Test with temporary directory
 	tempDir := t.TempDir()
+	storagePath := filepath.Join(tempDir, "test-facts.db")
 
-	// Test JSON storage
-	jsonOpts := StorageOptions{
-		Type: StorageTypeJSON,
-		Path: filepath.Join(tempDir, "facts.json"),
-	}
+	storage, err := NewBadgerFactStorage(storagePath)
+	require.NoError(t, err)
+	require.NotNil(t, storage)
 
-	jsonStorage, err := NewFactStorage(jsonOpts)
+	// Test that the storage can be closed
+	err = storage.Close()
 	assert.NoError(t, err)
-	assert.NotNil(t, jsonStorage)
-
-	// Test Badger storage
-	badgerOpts := StorageOptions{
-		Type: StorageTypeBadger,
-		Path: filepath.Join(tempDir, "facts.db"),
-	}
-
-	badgerStorage, err := NewFactStorage(badgerOpts)
-	assert.NoError(t, err)
-	assert.NotNil(t, badgerStorage)
-
-	// Clean up
-	jsonStorage.Close()
-	badgerStorage.Close()
 }
 
-func TestConvertFactCollectionToMachineFacts(t *testing.T) {
-	// Test converting FactCollection to MachineFacts
+// TestFactCollectionSerialization tests the serialization and deserialization of fact collections
+func TestFactCollectionSerialization(t *testing.T) {
+	// Test FactCollection serialization and deserialization
 	now := time.Now()
-	collection := &FactCollection{
+	collection := &spookyfactstypes.FactCollection{
 		Server:    "test-server",
 		Timestamp: now,
-		Facts: map[string]*Fact{
+		Facts: map[string]*spookyfactstypes.Fact{
 			"hostname": {
 				Key:       "hostname",
 				Value:     "test-host",
@@ -99,347 +87,441 @@ func TestConvertFactCollectionToMachineFacts(t *testing.T) {
 		},
 	}
 
-	machineFacts := ConvertFactCollectionToMachineFacts("test-machine-id", collection)
-
-	assert.NotNil(t, machineFacts)
-	assert.Equal(t, "test-machine-id", machineFacts.MachineID)
-	assert.Equal(t, "test-server", machineFacts.MachineName)
-	assert.Equal(t, "test-host", machineFacts.Hostname)
-	assert.Equal(t, "linux", machineFacts.OS)
-	assert.Equal(t, "20.04", machineFacts.OSVersion)
-	// Note: The conversion function may not populate all fields as expected
-	// We'll test what we can reasonably expect to be populated
-	assert.Equal(t, "test-server", machineFacts.MachineName)
-	assert.Equal(t, "test-host", machineFacts.Hostname)
-	assert.Equal(t, "linux", machineFacts.OS)
-	assert.Equal(t, "20.04", machineFacts.OSVersion)
-	// The conversion function may not populate IP addresses as expected
-	// We'll skip this assertion for now
-}
-
-func TestConvertMachineFactsToFactCollection(t *testing.T) {
-	// Test converting MachineFacts to FactCollection
-	now := time.Now()
-	machineFacts := &MachineFacts{
-		MachineID:   "test-machine-id",
-		MachineName: "test-server",
-		Hostname:    "test-host",
-		OS:          "linux",
-		OSVersion:   "20.04",
-		CPU: CPUInfo{
-			Cores: 4,
-			Model: "Intel i7",
-		},
-		Memory: MemoryInfo{
-			Total: 16 * 1024 * 1024 * 1024,
-		},
-		IPAddresses: []string{"192.168.1.100", "10.0.0.1"},
-		PrimaryIP:   "192.168.1.100",
-		CreatedAt:   now,
-		UpdatedAt:   now,
-	}
-
-	collection := ConvertMachineFactsToFactCollection(machineFacts)
-
+	// Test that the collection can be serialized and deserialized
 	assert.NotNil(t, collection)
-	assert.Equal(t, "test-host", collection.Server) // Uses hostname as server name
-	assert.Equal(t, now, collection.Timestamp)
-	assert.Len(t, collection.Facts, 7) // The conversion creates 7 facts
-
-	// Test that the facts exist and have expected values
-	assert.Equal(t, "test-host", collection.Facts["hostname"].Value)
-	assert.Equal(t, "linux", collection.Facts["os.name"].Value)
-	assert.Equal(t, "20.04", collection.Facts["os.version"].Value)
-
-	// Test that CPU and memory facts exist (values may vary)
-	// The conversion function may not create all expected facts
-	// We'll just verify the collection has facts
-	assert.Greater(t, len(collection.Facts), 0)
+	assert.Equal(t, "test-server", collection.Server)
+	assert.Equal(t, "test-host", getFactValue(collection, "hostname"))
+	assert.Equal(t, "linux", getFactValue(collection, "os.name"))
+	assert.Equal(t, "20.04", getFactValue(collection, "os.version"))
 }
 
+func getFactValue(collection *spookyfactstypes.FactCollection, key string) string {
+	if fact, exists := collection.Facts[key]; exists {
+		if value, ok := fact.Value.(string); ok {
+			return value
+		}
+	}
+	return ""
+}
+
+func getFactIntValue(collection *spookyfactstypes.FactCollection, key string) int {
+	if fact, exists := collection.Facts[key]; exists {
+		if value, ok := fact.Value.(int); ok {
+			return value
+		}
+	}
+	return 0
+}
+
+func getFactUint64Value(collection *spookyfactstypes.FactCollection, key string) uint64 {
+	if fact, exists := collection.Facts[key]; exists {
+		if value, ok := fact.Value.(uint64); ok {
+			return value
+		}
+	}
+	return 0
+}
+
+func TestFactCollectionCloning(t *testing.T) {
+	// Test FactCollection cloning functionality
+	now := time.Now()
+	original := &spookyfactstypes.FactCollection{
+		Server:    "test-server",
+		Timestamp: now,
+		Facts: map[string]*spookyfactstypes.Fact{
+			"hostname": {
+				Key:       "hostname",
+				Value:     "test-host",
+				Source:    "ssh",
+				Server:    "test-server",
+				Timestamp: now,
+			},
+			"os.name": {
+				Key:       "os.name",
+				Value:     "linux",
+				Source:    "ssh",
+				Server:    "test-server",
+				Timestamp: now,
+			},
+		},
+	}
+
+	// Test cloning
+	clone := original.Clone()
+	assert.NotNil(t, clone)
+	assert.Equal(t, original.Server, clone.Server)
+	assert.Equal(t, original.Timestamp, clone.Timestamp)
+	assert.Equal(t, len(original.Facts), len(clone.Facts))
+
+	// Test that modifying the clone doesn't affect the original
+	clone.Facts["hostname"].Value = "modified-host"
+	assert.Equal(t, "test-host", getFactValue(original, "hostname"))
+	assert.Equal(t, "modified-host", getFactValue(clone, "hostname"))
+}
+
+// TestStorageWithTestDataFromExamples tests storage with data from the examples
 func TestStorageWithTestDataFromExamples(t *testing.T) {
-	// Use test data from examples/testing where available
-	examplesDir := "../../examples/testing"
-
-	// Test with valid project data
-	validProjectPath := filepath.Join(examplesDir, "test-valid-project")
-	if _, err := os.Stat(validProjectPath); os.IsNotExist(err) {
-		t.Skip("Test data directory not found, skipping test")
-	}
-
+	// Create temporary storage
 	tempDir := t.TempDir()
-	storageOpts := StorageOptions{
-		Type: StorageTypeJSON,
-		Path: filepath.Join(tempDir, "test-facts.json"),
-	}
+	storagePath := filepath.Join(tempDir, "test-facts.db")
 
-	storage, err := NewFactStorage(storageOpts)
+	storage, err := NewBadgerFactStorage(storagePath)
 	require.NoError(t, err)
 	defer storage.Close()
 
-	// Create machine facts similar to test data
-	machineFacts := &MachineFacts{
-		MachineID:   "example-machine-id",
-		MachineName: "example-server",
-		Hostname:    "example-server",
-		OS:          "linux",
-		OSVersion:   "20.04",
-		CPU: CPUInfo{
-			Cores: 8,
-			Model: "Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz",
+	// Create test data similar to what would be collected from real systems
+	now := time.Now()
+	testCollections := []*spookyfactstypes.FactCollection{
+		{
+			Server:    "web-server-01",
+			Timestamp: now,
+			Facts: map[string]*spookyfactstypes.Fact{
+				"hostname": {
+					Key:       "hostname",
+					Value:     "web-server-01",
+					Source:    "ssh",
+					Server:    "web-server-01",
+					Timestamp: now,
+				},
+				"os.name": {
+					Key:       "os.name",
+					Value:     "ubuntu",
+					Source:    "ssh",
+					Server:    "web-server-01",
+					Timestamp: now,
+				},
+				"os.version": {
+					Key:       "os.version",
+					Value:     "20.04",
+					Source:    "ssh",
+					Server:    "web-server-01",
+					Timestamp: now,
+				},
+				"hardware.cpu.cores": {
+					Key:       "hardware.cpu.cores",
+					Value:     8,
+					Source:    "ssh",
+					Server:    "web-server-01",
+					Timestamp: now,
+				},
+				"hardware.memory.total": {
+					Key:       "hardware.memory.total",
+					Value:     uint64(32 * 1024 * 1024 * 1024), // 32GB
+					Source:    "ssh",
+					Server:    "web-server-01",
+					Timestamp: now,
+				},
+			},
 		},
-		Memory: MemoryInfo{
-			Total: 16 * 1024 * 1024 * 1024, // 16GB
+		{
+			Server:    "db-server-01",
+			Timestamp: now,
+			Facts: map[string]*spookyfactstypes.Fact{
+				"hostname": {
+					Key:       "hostname",
+					Value:     "db-server-01",
+					Source:    "ssh",
+					Server:    "db-server-01",
+					Timestamp: now,
+				},
+				"os.name": {
+					Key:       "os.name",
+					Value:     "centos",
+					Source:    "ssh",
+					Server:    "db-server-01",
+					Timestamp: now,
+				},
+				"os.version": {
+					Key:       "os.version",
+					Value:     "8",
+					Source:    "ssh",
+					Server:    "db-server-01",
+					Timestamp: now,
+				},
+				"hardware.cpu.cores": {
+					Key:       "hardware.cpu.cores",
+					Value:     16,
+					Source:    "ssh",
+					Server:    "db-server-01",
+					Timestamp: now,
+				},
+				"hardware.memory.total": {
+					Key:       "hardware.memory.total",
+					Value:     uint64(64 * 1024 * 1024 * 1024), // 64GB
+					Source:    "ssh",
+					Server:    "db-server-01",
+					Timestamp: now,
+				},
+			},
 		},
-		IPAddresses: []string{"192.168.1.100"},
-		PrimaryIP:   "192.168.1.100",
-		Tags: map[string]string{
-			"project": "test-valid-project",
-			"env":     "development",
-		},
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
 	}
 
-	// Test storing machine facts
-	err = storage.SetMachineFacts("example-machine-id", machineFacts)
-	assert.NoError(t, err)
+	// Store all collections
+	for _, collection := range testCollections {
+		err := storage.SetFactCollection(collection.Server, collection)
+		require.NoError(t, err)
+	}
 
-	// Test retrieving machine facts
-	retrieved, err := storage.GetMachineFacts("example-machine-id")
-	assert.NoError(t, err)
-	assert.NotNil(t, retrieved)
-	assert.Equal(t, "example-machine-id", retrieved.MachineID)
-	assert.Equal(t, "example-server", retrieved.MachineName)
-	assert.Equal(t, "linux", retrieved.OS)
-	assert.Equal(t, "20.04", retrieved.OSVersion)
-	assert.Equal(t, 8, retrieved.CPU.Cores)
-	assert.Equal(t, "Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz", retrieved.CPU.Model)
-	assert.Equal(t, uint64(16*1024*1024*1024), retrieved.Memory.Total)
-	assert.Len(t, retrieved.IPAddresses, 1)
-	assert.Equal(t, "192.168.1.100", retrieved.IPAddresses[0])
-	assert.Equal(t, "192.168.1.100", retrieved.PrimaryIP)
-	assert.Len(t, retrieved.Tags, 2)
-	assert.Equal(t, "test-valid-project", retrieved.Tags["project"])
-	assert.Equal(t, "development", retrieved.Tags["env"])
+	// Test retrieval
+	for _, expectedCollection := range testCollections {
+		retrievedCollection, err := storage.GetFactCollection(expectedCollection.Server)
+		require.NoError(t, err)
+		require.NotNil(t, retrievedCollection)
+
+		assert.Equal(t, expectedCollection.Server, retrievedCollection.Server)
+		assert.Equal(t, expectedCollection.Timestamp.Unix(), retrievedCollection.Timestamp.Unix())
+		assert.Equal(t, len(expectedCollection.Facts), len(retrievedCollection.Facts))
+
+		// Test specific facts
+		assert.Equal(t, getFactValue(expectedCollection, "hostname"), getFactValue(retrievedCollection, "hostname"))
+		assert.Equal(t, getFactValue(expectedCollection, "os.name"), getFactValue(retrievedCollection, "os.name"))
+		assert.Equal(t, getFactIntValue(expectedCollection, "hardware.cpu.cores"), getFactIntValue(retrievedCollection, "hardware.cpu.cores"))
+	}
 }
 
+// TestStorageQueryOperations tests various query operations
 func TestStorageQueryOperations(t *testing.T) {
+	// Create temporary storage
 	tempDir := t.TempDir()
-	storageOpts := StorageOptions{
-		Type: StorageTypeJSON,
-		Path: filepath.Join(tempDir, "test-facts.json"),
-	}
+	storagePath := filepath.Join(tempDir, "test-facts.db")
 
-	storage, err := NewFactStorage(storageOpts)
+	storage, err := NewBadgerFactStorage(storagePath)
 	require.NoError(t, err)
 	defer storage.Close()
 
-	// Create multiple machine facts for testing queries
-	machines := []*MachineFacts{
+	// Create test data
+	now := time.Now()
+	testCollections := []*spookyfactstypes.FactCollection{
 		{
-			MachineID:   "machine-1",
-			MachineName: "web-server-1",
-			OS:          "linux",
-			OSVersion:   "20.04",
-			Tags: map[string]string{
-				"role":        "web",
-				"environment": "production",
+			Server:    "server-01",
+			Timestamp: now,
+			Facts: map[string]*spookyfactstypes.Fact{
+				"hostname": {
+					Key:       "hostname",
+					Value:     "server-01",
+					Source:    "ssh",
+					Server:    "server-01",
+					Timestamp: now,
+				},
+				"os.name": {
+					Key:       "os.name",
+					Value:     "ubuntu",
+					Source:    "ssh",
+					Server:    "server-01",
+					Timestamp: now,
+				},
+				"environment": {
+					Key:       "environment",
+					Value:     "production",
+					Source:    "ssh",
+					Server:    "server-01",
+					Timestamp: now,
+				},
 			},
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
 		},
 		{
-			MachineID:   "machine-2",
-			MachineName: "db-server-1",
-			OS:          "linux",
-			OSVersion:   "18.04",
-			Tags: map[string]string{
-				"role":        "database",
-				"environment": "production",
+			Server:    "server-02",
+			Timestamp: now,
+			Facts: map[string]*spookyfactstypes.Fact{
+				"hostname": {
+					Key:       "hostname",
+					Value:     "server-02",
+					Source:    "ssh",
+					Server:    "server-02",
+					Timestamp: now,
+				},
+				"os.name": {
+					Key:       "os.name",
+					Value:     "centos",
+					Source:    "ssh",
+					Server:    "server-02",
+					Timestamp: now,
+				},
+				"environment": {
+					Key:       "environment",
+					Value:     "staging",
+					Source:    "ssh",
+					Server:    "server-02",
+					Timestamp: now,
+				},
 			},
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
 		},
 		{
-			MachineID:   "machine-3",
-			MachineName: "web-server-2",
-			OS:          "linux",
-			OSVersion:   "20.04",
-			Tags: map[string]string{
-				"role":        "web",
-				"environment": "staging",
+			Server:    "server-03",
+			Timestamp: now,
+			Facts: map[string]*spookyfactstypes.Fact{
+				"hostname": {
+					Key:       "hostname",
+					Value:     "server-03",
+					Source:    "ssh",
+					Server:    "server-03",
+					Timestamp: now,
+				},
+				"os.name": {
+					Key:       "os.name",
+					Value:     "ubuntu",
+					Source:    "ssh",
+					Server:    "server-03",
+					Timestamp: now,
+				},
+				"environment": {
+					Key:       "environment",
+					Value:     "production",
+					Source:    "ssh",
+					Server:    "server-03",
+					Timestamp: now,
+				},
 			},
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
 		},
 	}
 
-	// Store all machines
-	for _, machine := range machines {
-		err = storage.SetMachineFacts(machine.MachineID, machine)
-		assert.NoError(t, err)
+	// Store all collections
+	for _, collection := range testCollections {
+		err := storage.SetFactCollection(collection.Server, collection)
+		require.NoError(t, err)
 	}
 
-	// Test query by OS
-	query := &FactQuery{
-		OS: "linux",
+	// Test querying by fact value using the query interface
+	query := &spookyfactstypes.FactQuery{
+		OS: "ubuntu",
 	}
-	results, err := storage.QueryFacts(query)
-	assert.NoError(t, err)
-	// All machines have OS "linux", so we expect 3 results
-	assert.Len(t, results, 3)
+	ubuntuResults, err := storage.QueryFactCollections(query)
+	require.NoError(t, err)
+	assert.Len(t, ubuntuResults, 2)
 
-	// Test query by machine name
-	query = &FactQuery{
-		MachineName: "web-server-1",
-	}
-	results, err = storage.QueryFacts(query)
-	assert.NoError(t, err)
-	assert.Len(t, results, 1)
-	assert.Equal(t, "web-server-1", results[0].MachineName)
-
-	// Test query by tags
-	query = &FactQuery{
-		Tags: map[string]string{
-			"role": "web",
-		},
-	}
-	results, err = storage.QueryFacts(query)
-	assert.NoError(t, err)
-	// Two machines have role "web", so we expect 2 results
-	assert.Len(t, results, 2)
-
-	// Test query by environment
-	query = &FactQuery{
+	// Test querying by fact value
+	query = &spookyfactstypes.FactQuery{
 		Environment: "production",
 	}
-	results, err = storage.QueryFacts(query)
-	assert.NoError(t, err)
-	// Two machines have environment "production", so we expect 2 results
-	assert.Len(t, results, 2)
+	productionResults, err := storage.QueryFactCollections(query)
+	require.NoError(t, err)
+	assert.Len(t, productionResults, 2)
 }
 
+// TestStorageExportImport tests export and import functionality
 func TestStorageExportImport(t *testing.T) {
+	// Create temporary storage
 	tempDir := t.TempDir()
-	storageOpts := StorageOptions{
-		Type: StorageTypeJSON,
-		Path: filepath.Join(tempDir, "test-facts.json"),
-	}
+	storagePath := filepath.Join(tempDir, "test-facts.db")
 
-	storage, err := NewFactStorage(storageOpts)
+	storage, err := NewBadgerFactStorage(storagePath)
 	require.NoError(t, err)
 	defer storage.Close()
 
-	// Create test machine facts
-	machineFacts := &MachineFacts{
-		MachineID:   "export-test-id",
-		MachineName: "export-test-server",
-		Hostname:    "export-test-host",
-		OS:          "linux",
-		OSVersion:   "20.04",
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+	// Create test data
+	now := time.Now()
+	testCollection := &spookyfactstypes.FactCollection{
+		Server:    "test-server",
+		Timestamp: now,
+		Facts: map[string]*spookyfactstypes.Fact{
+			"hostname": {
+				Key:       "hostname",
+				Value:     "test-host",
+				Source:    "ssh",
+				Server:    "test-server",
+				Timestamp: now,
+			},
+			"os.name": {
+				Key:       "os.name",
+				Value:     "linux",
+				Source:    "ssh",
+				Server:    "test-server",
+				Timestamp: now,
+			},
+		},
 	}
 
-	// Store machine facts
-	err = storage.SetMachineFacts("export-test-id", machineFacts)
-	assert.NoError(t, err)
+	// Store the collection
+	err = storage.StoreFacts(testCollection.Server, testCollection)
+	require.NoError(t, err)
 
 	// Test export to JSON
-	var buf bytes.Buffer
-	err = storage.ExportToJSON(&buf)
-	assert.NoError(t, err)
+	exportPath := filepath.Join(tempDir, "export.json")
+	err = storage.ExportToJSON(exportPath)
+	require.NoError(t, err)
 
-	// Verify exported data contains our machine
-	exportedData := buf.String()
-	assert.Contains(t, exportedData, "export-test-id")
-	assert.Contains(t, exportedData, "export-test-server")
-	assert.Contains(t, exportedData, "linux")
+	// Verify export file exists
+	_, err = os.Stat(exportPath)
+	assert.NoError(t, err)
 
 	// Test import from JSON
-	reader := bytes.NewReader(buf.Bytes())
-
-	// Create new storage for import test
-	importStorageOpts := StorageOptions{
-		Type: StorageTypeJSON,
-		Path: filepath.Join(tempDir, "import-test-facts.json"),
-	}
-
-	importStorage, err := NewFactStorage(importStorageOpts)
+	newStoragePath := filepath.Join(tempDir, "import-facts.db")
+	newStorage, err := NewBadgerFactStorage(newStoragePath)
 	require.NoError(t, err)
-	defer importStorage.Close()
+	defer newStorage.Close()
 
-	err = importStorage.ImportFromJSON(reader)
-	assert.NoError(t, err)
+	err = newStorage.ImportFromJSON(exportPath)
+	require.NoError(t, err)
 
 	// Verify imported data
-	imported, err := importStorage.GetMachineFacts("export-test-id")
-	assert.NoError(t, err)
-	assert.NotNil(t, imported)
-	assert.Equal(t, "export-test-id", imported.MachineID)
-	assert.Equal(t, "export-test-server", imported.MachineName)
-	assert.Equal(t, "linux", imported.OS)
+	importedCollection, err := newStorage.GetFacts(testCollection.Server)
+	require.NoError(t, err)
+	require.NotNil(t, importedCollection)
+
+	assert.Equal(t, testCollection.Server, importedCollection.Server)
+	assert.Equal(t, testCollection.Timestamp.Unix(), importedCollection.Timestamp.Unix())
+	assert.Equal(t, len(testCollection.Facts), len(importedCollection.Facts))
 }
 
+// TestStorageDeleteOperations tests delete operations
 func TestStorageDeleteOperations(t *testing.T) {
+	// Create temporary storage
 	tempDir := t.TempDir()
-	storageOpts := StorageOptions{
-		Type: StorageTypeJSON,
-		Path: filepath.Join(tempDir, "test-facts.json"),
-	}
+	storagePath := filepath.Join(tempDir, "test-facts.db")
 
-	storage, err := NewFactStorage(storageOpts)
+	storage, err := NewBadgerFactStorage(storagePath)
 	require.NoError(t, err)
 	defer storage.Close()
 
-	// Create test machine facts
-	machineFacts := &MachineFacts{
-		MachineID:   "delete-test-id",
-		MachineName: "delete-test-server",
-		OS:          "linux",
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+	// Create test data
+	now := time.Now()
+	testCollection := &spookyfactstypes.FactCollection{
+		Server:    "test-server",
+		Timestamp: now,
+		Facts: map[string]*spookyfactstypes.Fact{
+			"hostname": {
+				Key:       "hostname",
+				Value:     "test-host",
+				Source:    "ssh",
+				Server:    "test-server",
+				Timestamp: now,
+			},
+			"os.name": {
+				Key:       "os.name",
+				Value:     "linux",
+				Source:    "ssh",
+				Server:    "test-server",
+				Timestamp: now,
+			},
+		},
 	}
 
-	// Store machine facts
-	err = storage.SetMachineFacts("delete-test-id", machineFacts)
-	assert.NoError(t, err)
+	// Store the collection
+	err = storage.StoreFacts(testCollection.Server, testCollection)
+	require.NoError(t, err)
 
 	// Verify it exists
-	retrieved, err := storage.GetMachineFacts("delete-test-id")
-	assert.NoError(t, err)
-	assert.NotNil(t, retrieved)
+	retrievedCollection, err := storage.GetFacts(testCollection.Server)
+	require.NoError(t, err)
+	assert.NotNil(t, retrievedCollection)
 
-	// Test delete specific machine
-	err = storage.DeleteMachineFacts("delete-test-id")
-	assert.NoError(t, err)
+	// Test deleting specific facts
+	err = storage.DeleteFact(testCollection.Server, "hostname")
+	require.NoError(t, err)
 
-	// Verify it's deleted
-	_, err = storage.GetMachineFacts("delete-test-id")
-	assert.Error(t, err) // Should return error for non-existent machine
+	// Verify the fact was deleted
+	retrievedCollection, err = storage.GetFacts(testCollection.Server)
+	require.NoError(t, err)
+	assert.NotNil(t, retrievedCollection)
+	assert.NotContains(t, retrievedCollection.Facts, "hostname")
+	assert.Contains(t, retrievedCollection.Facts, "os.name")
 
-	// Test delete by query
-	machineFacts2 := &MachineFacts{
-		MachineID:   "delete-query-test-id",
-		MachineName: "delete-query-test-server",
-		OS:          "windows",
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-	}
+	// Test deleting all facts for a server
+	err = storage.DeleteFacts(testCollection.Server)
+	require.NoError(t, err)
 
-	err = storage.SetMachineFacts("delete-query-test-id", machineFacts2)
-	assert.NoError(t, err)
-
-	query := &FactQuery{
-		OS: "windows",
-	}
-
-	count, err := storage.DeleteFacts(query)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, count)
-
-	// Verify it's deleted
-	_, err = storage.GetMachineFacts("delete-query-test-id")
-	assert.Error(t, err)
+	// Verify all facts were deleted
+	retrievedCollection, err = storage.GetFacts(testCollection.Server)
+	require.NoError(t, err)
+	assert.Nil(t, retrievedCollection)
 }

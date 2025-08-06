@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	spookyloggingtypes "spooky/internal/logging/types"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -194,7 +196,7 @@ func TestFieldHelpersConcurrency(t *testing.T) {
 
 func TestFieldHelpersCombinedUsage(t *testing.T) {
 	// Test combining multiple field helpers in a realistic scenario
-	fields := []Field{
+	fields := []spookyloggingtypes.Field{
 		Server("web-server-01"),
 		Action("deploy-config"),
 		Host("192.168.1.100"),

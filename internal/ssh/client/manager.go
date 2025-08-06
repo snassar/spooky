@@ -1,0 +1,211 @@
+package client
+
+import (
+	"fmt"
+	"time"
+
+	"spooky/internal/logging"
+	"spooky/internal/ssh/types"
+)
+
+// Manager implements ClientManager interface
+type Manager struct {
+	config            *types.ClientConfig
+	connectionManager ConnectionManager
+	executionManager  ExecutionManager
+	hostKeyManager    HostKeyManager
+	logger            logging.Logger
+}
+
+// NewManager creates a new client manager
+func NewManager(
+	config *types.ClientConfig,
+	connectionManager ConnectionManager,
+	executionManager ExecutionManager,
+	hostKeyManager HostKeyManager,
+	logger logging.Logger,
+) *Manager {
+	return &Manager{
+		config:            config,
+		connectionManager: connectionManager,
+		executionManager:  executionManager,
+		hostKeyManager:    hostKeyManager,
+		logger:            logger,
+	}
+}
+
+// Connect establishes an SSH connection
+func (m *Manager) Connect(host string, config *types.SSHConfig) (*types.SSHConnection, error) {
+	// 1. Validate host and config
+	if err := m.validateConnectionParams(host, config); err != nil {
+		return nil, fmt.Errorf("connection validation failed: %w", err)
+	}
+
+	// 2. Set default timeout if not specified
+	if config.Timeout == 0 {
+		config.Timeout = m.config.DefaultTimeout
+	}
+
+	// 3. Establish connection
+	connection, err := m.connectionManager.Connect(host, config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to %s: %w", host, err)
+	}
+
+	// 4. Test connection
+	if err := m.connectionManager.TestConnection(connection); err != nil {
+		m.connectionManager.CloseConnection(connection)
+		return nil, fmt.Errorf("connection test failed: %w", err)
+	}
+
+	m.logger.Info("SSH connection established", logging.String("host", host))
+	return connection, nil
+}
+
+// ExecuteCommand executes a command on the SSH connection
+func (m *Manager) ExecuteCommand(connection *types.SSHConnection, command string) (*types.CommandResult, error) {
+	// 1. Validate connection and command
+	if err := m.validateExecutionParams(connection, command); err != nil {
+		return nil, fmt.Errorf("execution validation failed: %w", err)
+	}
+
+	// 2. Execute command
+	result, err := m.executionManager.ExecuteCommand(connection, command)
+	if err != nil {
+		return nil, fmt.Errorf("command execution failed: %w", err)
+	}
+
+	m.logger.Info("Command executed successfully",
+		logging.String("host", connection.Host),
+		logging.String("command", command),
+		logging.Int("exit_code", result.ExitCode))
+
+	return result, nil
+}
+
+// ExecuteScript executes a script on the SSH connection
+func (m *Manager) ExecuteScript(connection *types.SSHConnection, script string) (*types.CommandResult, error) {
+	// 1. Validate connection and script
+	if err := m.validateExecutionParams(connection, script); err != nil {
+		return nil, fmt.Errorf("execution validation failed: %w", err)
+	}
+
+	// 2. Execute script
+	result, err := m.executionManager.ExecuteScript(connection, script)
+	if err != nil {
+		return nil, fmt.Errorf("script execution failed: %w", err)
+	}
+
+	m.logger.Info("Script executed successfully",
+		logging.String("host", connection.Host),
+		logging.Int("exit_code", result.ExitCode))
+
+	return result, nil
+}
+
+// CloseConnection closes an SSH connection
+func (m *Manager) CloseConnection(connection *types.SSHConnection) error {
+	if connection == nil {
+		return nil
+	}
+
+	if err := m.connectionManager.CloseConnection(connection); err != nil {
+		return fmt.Errorf("failed to close connection: %w", err)
+	}
+
+	m.logger.Info("SSH connection closed", logging.String("host", connection.Host))
+	return nil
+}
+
+// SetDefaultTimeout sets the default timeout for connections
+func (m *Manager) SetDefaultTimeout(timeout time.Duration) error {
+	if timeout <= 0 {
+		return fmt.Errorf("timeout must be positive")
+	}
+	m.config.DefaultTimeout = timeout
+	return nil
+}
+
+// SetMaxRetries sets the maximum number of retries
+func (m *Manager) SetMaxRetries(max int) error {
+	if max < 0 {
+		return fmt.Errorf("max retries cannot be negative")
+	}
+	m.config.MaxRetries = max
+	return nil
+}
+
+// EnableHostKeyChecking enables or disables host key checking
+func (m *Manager) EnableHostKeyChecking(enabled bool) error {
+	m.config.HostKeyChecking = enabled
+	return nil
+}
+
+// TestConnection tests SSH connectivity
+func (m *Manager) TestConnection(host string) error {
+	// Create a temporary config for testing
+	config := &types.SSHConfig{
+		Host:    host,
+		Port:    22,
+		Timeout: m.config.DefaultTimeout,
+	}
+
+	// Try to connect
+	connection, err := m.Connect(host, config)
+	if err != nil {
+		return fmt.Errorf("connection test failed: %w", err)
+	}
+
+	// Close the test connection
+	defer m.CloseConnection(connection)
+
+	m.logger.Info("Connection test successful", logging.String("host", host))
+	return nil
+}
+
+// GetConnectionInfo gets connection information
+func (m *Manager) GetConnectionInfo(connection *types.SSHConnection) *types.ConnectionInfo {
+	if connection == nil {
+		return nil
+	}
+
+	return &types.ConnectionInfo{
+		Host:      connection.Host,
+		Port:      connection.Port,
+		Username:  connection.Username,
+		Connected: connection.Connected,
+		CreatedAt: connection.CreatedAt,
+		LastUsed:  connection.LastUsed,
+	}
+}
+
+// Close closes the client manager
+func (m *Manager) Close() error {
+	m.logger.Info("SSH client manager closed")
+	return nil
+}
+
+// Helper methods
+func (m *Manager) validateConnectionParams(host string, config *types.SSHConfig) error {
+	if host == "" {
+		return fmt.Errorf("host cannot be empty")
+	}
+
+	if config == nil {
+		return fmt.Errorf("SSH config cannot be nil")
+	}
+
+	return nil
+}
+
+func (m *Manager) validateExecutionParams(connection *types.SSHConnection, command string) error {
+	if connection == nil {
+		return fmt.Errorf("connection cannot be nil")
+	}
+
+	if command == "" {
+		return fmt.Errorf("command cannot be empty")
+	}
+
+	return nil
+}

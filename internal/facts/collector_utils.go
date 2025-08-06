@@ -7,21 +7,22 @@ import (
 	"os"
 	"time"
 
+	"spooky/internal/facts/types"
 	"spooky/internal/logging"
 )
 
 // parseJSONFromReader handles JSON parsing with shared logic
-func parseJSONFromReader(r io.Reader, server string, sourceInfo map[string]interface{}) (*FactCollection, error) {
+func parseJSONFromReader(r io.Reader, server string, sourceInfo map[string]interface{}) (*types.FactCollection, error) {
 	// Try to parse as different JSON formats
 	var data interface{}
 	if err := json.NewDecoder(r).Decode(&data); err != nil {
 		return nil, fmt.Errorf("failed to decode JSON: %w", err)
 	}
 
-	collection := &FactCollection{
+	collection := &types.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*Fact),
+		Facts:     make(map[string]*types.Fact),
 	}
 
 	// Handle different JSON formats
@@ -38,20 +39,20 @@ func parseJSONFromReader(r io.Reader, server string, sourceInfo map[string]inter
 }
 
 // parseArrayJSON handles array-based JSON format with shared logic
-func parseArrayJSON(data []interface{}, collection *FactCollection, sourceInfo map[string]interface{}) (*FactCollection, error) {
+func parseArrayJSON(data []interface{}, collection *types.FactCollection, sourceInfo map[string]interface{}) (*types.FactCollection, error) {
 	for _, item := range data {
 		if factObj, ok := item.(map[string]interface{}); ok {
 			key, keyOk := factObj["key"].(string)
 			value, valueOk := factObj["value"]
 
 			if keyOk && valueOk {
-				fact := &Fact{
+				fact := &types.Fact{
 					Key:       key,
 					Value:     value,
-					Source:    string(SourceCustom),
+					Source:    string(types.SourceCustom),
 					Server:    collection.Server,
 					Timestamp: collection.Timestamp,
-					TTL:       DefaultTTL,
+					TTL:       types.DefaultTTL,
 					Metadata:  make(map[string]interface{}),
 				}
 
@@ -81,15 +82,15 @@ func parseArrayJSON(data []interface{}, collection *FactCollection, sourceInfo m
 }
 
 // parseFlatJSON handles flat key-value JSON format with shared logic
-func parseFlatJSON(data map[string]interface{}, collection *FactCollection, sourceInfo map[string]interface{}) (*FactCollection, error) {
+func parseFlatJSON(data map[string]interface{}, collection *types.FactCollection, sourceInfo map[string]interface{}) (*types.FactCollection, error) {
 	for key, value := range data {
-		fact := &Fact{
+		fact := &types.Fact{
 			Key:       key,
 			Value:     value,
-			Source:    string(SourceCustom),
+			Source:    string(types.SourceCustom),
 			Server:    collection.Server,
 			Timestamp: collection.Timestamp,
-			TTL:       DefaultTTL,
+			TTL:       types.DefaultTTL,
 			Metadata:  make(map[string]interface{}),
 		}
 
@@ -104,11 +105,11 @@ func parseFlatJSON(data map[string]interface{}, collection *FactCollection, sour
 }
 
 // filterFactCollection filters a fact collection to only include specified keys
-func filterFactCollection(collection *FactCollection, keys []string, logger logging.Logger, source string) *FactCollection {
-	filtered := &FactCollection{
+func filterFactCollection(collection *types.FactCollection, keys []string, logger logging.Logger, source string) *types.FactCollection {
+	filtered := &types.FactCollection{
 		Server:    collection.Server,
 		Timestamp: collection.Timestamp,
-		Facts:     make(map[string]*Fact),
+		Facts:     make(map[string]*types.Fact),
 	}
 
 	for _, key := range keys {
@@ -116,16 +117,16 @@ func filterFactCollection(collection *FactCollection, keys []string, logger logg
 			filtered.Facts[key] = fact
 		} else {
 			logger.Warn("Requested fact not found",
-				logging.Field{Key: "key", Value: key},
-				logging.Field{Key: "source", Value: source})
+				logging.String("key", key),
+				logging.String("source", source))
 		}
 	}
 
 	logger.Debug("Completed fact filtering",
-		logging.Field{Key: "source", Value: source},
-		logging.Field{Key: "server", Value: collection.Server},
-		logging.Field{Key: "requested_count", Value: len(keys)},
-		logging.Field{Key: "found_count", Value: len(filtered.Facts)})
+		logging.String("source", source),
+		logging.String("server", collection.Server),
+		logging.Int("requested_count", len(keys)),
+		logging.Int("found_count", len(filtered.Facts)))
 
 	return filtered
 }
@@ -160,11 +161,11 @@ func validateKeys(keys []string) error {
 }
 
 // collectSpecificFacts is a common implementation for CollectSpecific
-func collectSpecificFacts(collector FactCollector, server string, keys []string, logger logging.Logger, source string) (*FactCollection, error) {
+func collectSpecificFacts(collector types.FactCollector, server string, keys []string, logger logging.Logger, source string) (*types.FactCollection, error) {
 	logger.Debug("Starting specific fact collection",
-		logging.Field{Key: "server", Value: server},
-		logging.Field{Key: "requested_keys", Value: keys},
-		logging.Field{Key: "source", Value: source})
+		logging.String("server", server),
+		logging.String("requested_keys", fmt.Sprintf("%v", keys)),
+		logging.String("source", source))
 
 	// Validate inputs
 	if err := validateServer(server); err != nil {
@@ -183,11 +184,11 @@ func collectSpecificFacts(collector FactCollector, server string, keys []string,
 }
 
 // getSpecificFact is a common implementation for GetFact
-func getSpecificFact(collector FactCollector, server, key string, logger logging.Logger, source string) (*Fact, error) {
+func getSpecificFact(collector types.FactCollector, server, key string, logger logging.Logger, source string) (*types.Fact, error) {
 	logger.Debug("Getting specific fact",
-		logging.Field{Key: "server", Value: server},
-		logging.Field{Key: "key", Value: key},
-		logging.Field{Key: "source", Value: source})
+		logging.String("server", server),
+		logging.String("key", key),
+		logging.String("source", source))
 
 	// Validate inputs
 	if err := validateServer(server); err != nil {
@@ -204,38 +205,39 @@ func getSpecificFact(collector FactCollector, server, key string, logger logging
 
 	if fact, exists := collection.Facts[key]; exists {
 		logger.Debug("Successfully retrieved fact",
-			logging.Field{Key: "server", Value: server},
-			logging.Field{Key: "key", Value: key},
-			logging.Field{Key: "source", Value: source})
+			logging.String("server", server),
+			logging.String("key", key),
+			logging.String("source", source))
 		return fact, nil
 	}
 
 	logger.Warn("Fact not found",
-		logging.Field{Key: "server", Value: server},
-		logging.Field{Key: "key", Value: key},
-		logging.Field{Key: "source", Value: source})
+		logging.String("server", server),
+		logging.String("key", key),
+		logging.String("source", source))
 
 	return nil, ErrFactNotFoundInSource(key, server, source)
 }
 
 // buildStandardMetadata creates standardized metadata for a collector
 func buildStandardMetadata(collectorType, source, format string) map[string]interface{} {
-	return NewMetadataBuilder().
-		WithCollectorType(collectorType).
-		WithSourcePath(source).
-		WithFormat(format).
-		Build()
+	return map[string]interface{}{
+		"source":       collectorType,
+		"source_path":  source,
+		"format":       format,
+		"collected_at": time.Now().UTC().Format(time.RFC3339),
+	}
 }
 
 // collectFromFile is a common implementation for file-based collectors
 func collectFromFile(filePath, server, sourceType string, logger logging.Logger,
 	parseFunc func() (interface{}, error),
-	extractFunc func(interface{}, string) map[string]*Fact) (*FactCollection, error) {
+	extractFunc func(interface{}, string) map[string]*types.Fact) (*types.FactCollection, error) {
 
 	logger.Debug("Starting file-based fact collection",
-		logging.Field{Key: "file", Value: filePath},
-		logging.Field{Key: "server", Value: server},
-		logging.Field{Key: "source_type", Value: sourceType})
+		logging.String("file", filePath),
+		logging.String("server", server),
+		logging.String("source_type", sourceType))
 
 	// Validate inputs
 	if err := validateServer(server); err != nil {
@@ -245,32 +247,32 @@ func collectFromFile(filePath, server, sourceType string, logger logging.Logger,
 	// Check if file exists
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		logger.Error("File not found", err,
-			logging.Field{Key: "file", Value: filePath})
-		return nil, ErrInvalidSource(filePath, "file not found")
+			logging.String("file", filePath))
+		return nil, fmt.Errorf("invalid source %s: file not found", filePath)
 	}
 
 	// Parse file
 	data, err := parseFunc()
 	if err != nil {
 		logger.Error("Failed to parse file", err,
-			logging.Field{Key: "file", Value: filePath})
+			logging.String("file", filePath))
 		return nil, fmt.Errorf("failed to parse %s file: %w", sourceType, err)
 	}
 
 	// Extract facts from data
 	facts := extractFunc(data, server)
 
-	collection := &FactCollection{
+	collection := &types.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
 		Facts:     facts,
 	}
 
 	logger.Info("Successfully collected facts from file",
-		logging.Field{Key: "file", Value: filePath},
-		logging.Field{Key: "server", Value: server},
-		logging.Field{Key: "fact_count", Value: len(facts)},
-		logging.Field{Key: "source_type", Value: sourceType})
+		logging.String("file", filePath),
+		logging.String("server", server),
+		logging.Int("fact_count", len(facts)),
+		logging.String("source_type", sourceType))
 
 	return collection, nil
 }

@@ -4,22 +4,26 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"spooky/internal/facts/types"
+	"spooky/internal/logging"
 )
 
-// FactMerger handles merging of facts from different sources
+// FactMerger handles merging of fact collections
 type FactMerger struct {
-	policy MergePolicy
+	logger      logging.Logger
+	mergePolicy types.MergePolicy
 }
 
 // NewFactMerger creates a new fact merger with the specified policy
-func NewFactMerger(policy MergePolicy) *FactMerger {
+func NewFactMerger(policy types.MergePolicy) *FactMerger {
 	return &FactMerger{
-		policy: policy,
+		mergePolicy: policy,
 	}
 }
 
 // MergeCollections merges multiple fact collections according to the merge policy
-func (m *FactMerger) MergeCollections(existing, incoming *FactCollection) (*FactCollection, error) {
+func (m *FactMerger) MergeCollections(existing, incoming *types.FactCollection) (*types.FactCollection, error) {
 	if existing == nil {
 		return incoming, nil
 	}
@@ -27,26 +31,26 @@ func (m *FactMerger) MergeCollections(existing, incoming *FactCollection) (*Fact
 		return existing, nil
 	}
 
-	switch m.policy {
-	case MergePolicyReplace:
+	switch m.mergePolicy {
+	case types.MergePolicyReplace:
 		return m.mergeReplace(existing, incoming)
-	case MergePolicyMerge:
+	case types.MergePolicyMerge:
 		return m.mergeCombine(existing, incoming)
-	case MergePolicySkip:
+	case types.MergePolicySkip:
 		return m.mergeSkip(existing, incoming)
-	case MergePolicyAppend:
+	case types.MergePolicyAppend:
 		return m.mergeAppend(existing, incoming)
 	default:
-		return nil, fmt.Errorf("unknown merge policy: %s", m.policy)
+		return nil, fmt.Errorf("unknown merge policy: %s", m.mergePolicy)
 	}
 }
 
 // mergeReplace replaces existing facts with new ones
-func (m *FactMerger) mergeReplace(existing, incoming *FactCollection) (*FactCollection, error) {
-	merged := &FactCollection{
+func (m *FactMerger) mergeReplace(existing, incoming *types.FactCollection) (*types.FactCollection, error) {
+	merged := &types.FactCollection{
 		Server:    existing.Server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*Fact),
+		Facts:     make(map[string]*types.Fact),
 	}
 
 	// Start with existing facts
@@ -63,11 +67,11 @@ func (m *FactMerger) mergeReplace(existing, incoming *FactCollection) (*FactColl
 }
 
 // mergeCombine combines facts, preferring newer ones on conflicts
-func (m *FactMerger) mergeCombine(existing, incoming *FactCollection) (*FactCollection, error) {
-	merged := &FactCollection{
+func (m *FactMerger) mergeCombine(existing, incoming *types.FactCollection) (*types.FactCollection, error) {
+	merged := &types.FactCollection{
 		Server:    existing.Server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*Fact),
+		Facts:     make(map[string]*types.Fact),
 	}
 
 	// Start with existing facts
@@ -95,11 +99,11 @@ func (m *FactMerger) mergeCombine(existing, incoming *FactCollection) (*FactColl
 }
 
 // mergeSkip skips facts that already exist
-func (m *FactMerger) mergeSkip(existing, incoming *FactCollection) (*FactCollection, error) {
-	merged := &FactCollection{
+func (m *FactMerger) mergeSkip(existing, incoming *types.FactCollection) (*types.FactCollection, error) {
+	merged := &types.FactCollection{
 		Server:    existing.Server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*Fact),
+		Facts:     make(map[string]*types.Fact),
 	}
 
 	// Start with existing facts
@@ -118,11 +122,11 @@ func (m *FactMerger) mergeSkip(existing, incoming *FactCollection) (*FactCollect
 }
 
 // mergeAppend appends new facts with suffixes to avoid conflicts
-func (m *FactMerger) mergeAppend(existing, incoming *FactCollection) (*FactCollection, error) {
-	merged := &FactCollection{
+func (m *FactMerger) mergeAppend(existing, incoming *types.FactCollection) (*types.FactCollection, error) {
+	merged := &types.FactCollection{
 		Server:    existing.Server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*Fact),
+		Facts:     make(map[string]*types.Fact),
 	}
 
 	// Start with existing facts
@@ -145,7 +149,7 @@ func (m *FactMerger) mergeAppend(existing, incoming *FactCollection) (*FactColle
 		}
 
 		// Create a copy of the fact with the new key
-		appendedFact := &Fact{
+		appendedFact := &types.Fact{
 			Key:       newKey,
 			Value:     fact.Value,
 			Source:    fact.Source,
@@ -170,7 +174,7 @@ func (m *FactMerger) mergeAppend(existing, incoming *FactCollection) (*FactColle
 }
 
 // MergeFacts merges individual facts according to the merge policy
-func (m *FactMerger) MergeFacts(existing, incoming *Fact) (*Fact, error) {
+func (m *FactMerger) MergeFacts(existing, incoming *types.Fact) (*types.Fact, error) {
 	if existing == nil {
 		return incoming, nil
 	}
@@ -178,22 +182,22 @@ func (m *FactMerger) MergeFacts(existing, incoming *Fact) (*Fact, error) {
 		return existing, nil
 	}
 
-	switch m.policy {
-	case MergePolicyReplace:
+	switch m.mergePolicy {
+	case types.MergePolicyReplace:
 		return incoming, nil
-	case MergePolicyMerge:
+	case types.MergePolicyMerge:
 		return m.mergeFactCombine(existing, incoming)
-	case MergePolicySkip:
+	case types.MergePolicySkip:
 		return existing, nil // Skip incoming fact
-	case MergePolicyAppend:
+	case types.MergePolicyAppend:
 		return m.mergeFactAppend(existing, incoming)
 	default:
-		return nil, fmt.Errorf("unknown merge policy: %s", m.policy)
+		return nil, fmt.Errorf("unknown merge policy: %s", m.mergePolicy)
 	}
 }
 
 // mergeFactCombine combines two facts, preferring the newer one
-func (m *FactMerger) mergeFactCombine(existing, incoming *Fact) (*Fact, error) {
+func (m *FactMerger) mergeFactCombine(existing, incoming *types.Fact) (*types.Fact, error) {
 	// Prefer newer fact
 	if incoming.Timestamp.After(existing.Timestamp) {
 		return incoming, nil
@@ -208,9 +212,9 @@ func (m *FactMerger) mergeFactCombine(existing, incoming *Fact) (*Fact, error) {
 }
 
 // mergeFactAppend creates a new fact with an appended key
-func (m *FactMerger) mergeFactAppend(_, incoming *Fact) (*Fact, error) {
+func (m *FactMerger) mergeFactAppend(_, incoming *types.Fact) (*types.Fact, error) {
 	// Create a new fact with appended key
-	appendedFact := &Fact{
+	appendedFact := &types.Fact{
 		Key:       fmt.Sprintf("%s_appended", incoming.Key),
 		Value:     incoming.Value,
 		Source:    incoming.Source,
@@ -231,7 +235,7 @@ func (m *FactMerger) mergeFactAppend(_, incoming *Fact) (*Fact, error) {
 }
 
 // DetectConflicts detects conflicts between existing and incoming facts
-func (m *FactMerger) DetectConflicts(existing, incoming *FactCollection) []string {
+func (m *FactMerger) DetectConflicts(existing, incoming *types.FactCollection) []string {
 	var conflicts []string
 
 	for key := range incoming.Facts {
@@ -244,12 +248,12 @@ func (m *FactMerger) DetectConflicts(existing, incoming *FactCollection) []strin
 }
 
 // ValidateMergePolicy validates that a merge policy is supported
-func ValidateMergePolicy(policy MergePolicy) error {
-	validPolicies := []MergePolicy{
-		MergePolicyReplace,
-		MergePolicyMerge,
-		MergePolicySkip,
-		MergePolicyAppend,
+func ValidateMergePolicy(policy types.MergePolicy) error {
+	validPolicies := []types.MergePolicy{
+		types.MergePolicyReplace,
+		types.MergePolicyMerge,
+		types.MergePolicySkip,
+		types.MergePolicyAppend,
 	}
 
 	for _, valid := range validPolicies {
@@ -260,10 +264,10 @@ func ValidateMergePolicy(policy MergePolicy) error {
 
 	return fmt.Errorf("invalid merge policy: %s. Valid policies are: %s",
 		policy, strings.Join([]string{
-			string(MergePolicyReplace),
-			string(MergePolicyMerge),
-			string(MergePolicySkip),
-			string(MergePolicyAppend),
+			string(types.MergePolicyReplace),
+			string(types.MergePolicyMerge),
+			string(types.MergePolicySkip),
+			string(types.MergePolicyAppend),
 		}, ", "))
 }
 
@@ -309,7 +313,7 @@ func DeepMerge(existing, custom interface{}) interface{} {
 }
 
 // ApplyOverrides applies overrides to existing facts
-func ApplyOverrides(facts *FactCollection, overrides map[string]interface{}) *FactCollection {
+func ApplyOverrides(facts *types.FactCollection, overrides map[string]interface{}) *types.FactCollection {
 	if overrides == nil {
 		return facts
 	}
@@ -320,13 +324,13 @@ func ApplyOverrides(facts *FactCollection, overrides map[string]interface{}) *Fa
 		if categoryMap, ok := categoryOverrides.(map[string]interface{}); ok {
 			for key, value := range categoryMap {
 				factKey := fmt.Sprintf("%s.%s", category, key)
-				merged.Facts[factKey] = &Fact{
+				merged.Facts[factKey] = &types.Fact{
 					Key:       factKey,
 					Value:     value,
-					Source:    string(SourceCustom),
+					Source:    string(types.SourceCustom),
 					Server:    facts.Server,
 					Timestamp: time.Now(),
-					TTL:       DefaultTTL,
+					TTL:       types.DefaultTTL,
 					Metadata:  map[string]interface{}{"override": true, "category": category},
 				}
 			}

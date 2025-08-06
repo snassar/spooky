@@ -1,0 +1,163 @@
+package acting
+
+import (
+	"context"
+	"time"
+
+	"spooky/internal/actions/types"
+)
+
+// ActingManager defines the interface for action execution operations
+type ActingManager interface {
+	// Core acting operations
+	ExecuteAction(ctx context.Context, action *types.Action, context *types.ActionContext) (*types.ActingSession, error)
+	ExecuteActionCollection(ctx context.Context, collection *types.ActionCollection, context *types.ActionContext) (*types.ActingSession, error)
+	PrepareAction(action *types.Action, context *types.ActionContext) error
+
+	// Actor management
+	CreateActor(action *types.Action, context *types.ActionContext) (Actor, error)
+	GetActor(action *types.Action) (Actor, error)
+
+	// Session management
+	GetSession(sessionID string) (*types.ActingSession, error)
+	ListSessions() ([]*types.ActingSession, error)
+	CancelSession(sessionID string) error
+
+	// Configuration
+	SetDefaultTimeout(timeout time.Duration)
+	SetDefaultParallel(parallel bool)
+	SetMaxConcurrent(maxConcurrent int)
+}
+
+// Actor defines the interface for individual action execution
+type Actor interface {
+	// Core acting operations
+	Execute(ctx context.Context, context *types.ActionContext) (*types.ActingResult, error)
+	Prepare(context *types.ActionContext) error
+	Cancel() error
+
+	// State management
+	GetState() types.ActingState
+	GetProgress() float64
+	GetStatus() types.ActingStatus
+
+	// Configuration
+	SetTimeout(timeout time.Duration)
+	SetParallel(parallel bool)
+}
+
+// ActingExecutor defines the interface for executing actions on machines
+type ActingExecutor interface {
+	// Core execution operations
+	ExecuteCommand(ctx context.Context, command string, context *types.ActionContext) (*types.ActingResult, error)
+	ExecuteScript(ctx context.Context, script string, context *types.ActionContext) (*types.ActingResult, error)
+	ExecuteTemplate(ctx context.Context, template *types.TemplateConfig, context *types.ActionContext) (*types.ActingResult, error)
+
+	// Machine management
+	GetMachine(machineID string) (Machine, error)
+	ListMachines() ([]Machine, error)
+	ConnectMachine(machineID string) error
+	DisconnectMachine(machineID string) error
+
+	// Configuration
+	SetConnectionTimeout(timeout time.Duration)
+	SetCommandTimeout(timeout time.Duration)
+	SetRetryAttempts(attempts int)
+	SetRetryDelay(delay time.Duration)
+}
+
+// Machine defines the interface for machine operations
+type Machine interface {
+	// Machine information
+	GetID() string
+	GetName() string
+	GetHost() string
+	GetUser() string
+	GetPort() int
+
+	// Connection management
+	Connect() error
+	Disconnect() error
+	IsConnected() bool
+
+	// Execution operations
+	ExecuteCommand(ctx context.Context, command string) (*types.ActingResult, error)
+	ExecuteScript(ctx context.Context, script string) (*types.ActingResult, error)
+	UploadFile(ctx context.Context, localPath, remotePath string) error
+	DownloadFile(ctx context.Context, remotePath, localPath string) error
+
+	// Configuration
+	SetTimeout(timeout time.Duration)
+	SetSudo(sudo bool)
+	SetWorkingDirectory(dir string)
+	SetEnvironment(env map[string]string)
+}
+
+// ActingSessionManager defines the interface for managing acting sessions
+type ActingSessionManager interface {
+	// Session management
+	CreateSession(actionName string) (*types.ActingSession, error)
+	GetSession(sessionID string) (*types.ActingSession, error)
+	ListSessions() ([]*types.ActingSession, error)
+	UpdateSession(session *types.ActingSession) error
+	DeleteSession(sessionID string) error
+
+	// Session state management
+	StartSession(sessionID string) error
+	CompleteSession(sessionID string) error
+	FailSession(sessionID string, err error) error
+	CancelSession(sessionID string) error
+
+	// Session cleanup
+	CleanupExpiredSessions(maxAge time.Duration) error
+	CleanupAllSessions() error
+}
+
+// ActingResultProcessor defines the interface for processing acting results
+type ActingResultProcessor interface {
+	// Result processing
+	ProcessResult(result *types.ActingResult) error
+	ProcessResults(results []*types.ActingResult) error
+
+	// Result aggregation
+	AggregateResults(results []*types.ActingResult) (*types.ActingSession, error)
+	CalculateSuccessRate(results []*types.ActingResult) float64
+
+	// Result validation
+	ValidateResult(result *types.ActingResult) error
+	ValidateResults(results []*types.ActingResult) error
+
+	// Result transformation
+	TransformResult(result *types.ActingResult, format string) (interface{}, error)
+	TransformResults(results []*types.ActingResult, format string) (interface{}, error)
+}
+
+// ActingProgressTracker defines the interface for tracking acting progress
+type ActingProgressTracker interface {
+	// Progress tracking
+	StartTracking(sessionID string, totalSteps int) error
+	UpdateProgress(sessionID string, completedSteps int) error
+	GetProgress(sessionID string) (float64, error)
+	CompleteTracking(sessionID string) error
+
+	// Progress reporting
+	GetProgressReport(sessionID string) (*ProgressReport, error)
+	ListProgressReports() ([]*ProgressReport, error)
+
+	// Progress cleanup
+	CleanupProgress(sessionID string) error
+	CleanupAllProgress() error
+}
+
+// ProgressReport represents a progress report for acting operations
+type ProgressReport struct {
+	SessionID      string    `json:"session_id"`
+	ActionName     string    `json:"action_name"`
+	TotalSteps     int       `json:"total_steps"`
+	CompletedSteps int       `json:"completed_steps"`
+	Progress       float64   `json:"progress"`
+	StartTime      time.Time `json:"start_time"`
+	LastUpdate     time.Time `json:"last_update"`
+	EstimatedEnd   time.Time `json:"estimated_end,omitempty"`
+	Status         string    `json:"status"`
+}

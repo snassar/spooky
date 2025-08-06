@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"spooky/internal/facts/types"
 	"spooky/internal/logging"
 )
 
@@ -17,7 +18,6 @@ const (
 	CollectorTypeHTTP     CollectorType = "http"
 	CollectorTypeHCL      CollectorType = "hcl"
 	CollectorTypeOpenTofu CollectorType = "opentofu"
-	CollectorTypeStub     CollectorType = "stub"
 )
 
 // CollectorConfig holds configuration for any fact collector
@@ -26,7 +26,7 @@ type CollectorConfig struct {
 	Source      string                 // File path, URL, etc.
 	Headers     map[string]string      // HTTP headers
 	Timeout     time.Duration          // Timeout for operations
-	MergePolicy MergePolicy            // How to merge facts
+	MergePolicy types.MergePolicy      // How to merge facts
 	Logger      logging.Logger         // Logger instance
 	Metadata    map[string]interface{} // Additional metadata
 	Parameters  map[string]interface{} // Parameters for specific collectors
@@ -39,7 +39,7 @@ func NewCollectorConfig(collectorType CollectorType, source string) *CollectorCo
 		Source:      source,
 		Headers:     make(map[string]string),
 		Timeout:     30 * time.Second,
-		MergePolicy: MergePolicyReplace,
+		MergePolicy: types.MergePolicyReplace,
 		Logger:      logging.GetLogger(),
 		Metadata:    make(map[string]interface{}),
 		Parameters:  make(map[string]interface{}),
@@ -59,7 +59,7 @@ func (c *CollectorConfig) WithTimeout(timeout time.Duration) *CollectorConfig {
 }
 
 // WithMergePolicy sets the merge policy for the collector
-func (c *CollectorConfig) WithMergePolicy(policy MergePolicy) *CollectorConfig {
+func (c *CollectorConfig) WithMergePolicy(policy types.MergePolicy) *CollectorConfig {
 	c.MergePolicy = policy
 	return c
 }
@@ -100,7 +100,7 @@ func (c *CollectorConfig) Validate() error {
 }
 
 // NewCollector creates a new fact collector based on the configuration
-func NewCollector(config *CollectorConfig) (FactCollector, error) {
+func NewCollector(config *CollectorConfig) (types.FactCollector, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
@@ -127,8 +127,6 @@ func NewCollector(config *CollectorConfig) (FactCollector, error) {
 			return nil, fmt.Errorf("OpenTofu collector requires 'state_path' parameter")
 		}
 		return NewOpenTofuCollector(statePath, config.Logger, config.MergePolicy), nil
-	case CollectorTypeStub:
-		return NewStubCollector("stub"), nil
 	default:
 		return nil, ErrInvalidSource(string(config.Type), "unknown collector type")
 	}

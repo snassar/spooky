@@ -2,6 +2,7 @@ package logging
 
 import (
 	"context"
+	spookyloggingtypes "spooky/internal/logging/types"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,15 +10,15 @@ import (
 
 func TestLogLevelConstants(t *testing.T) {
 	// Test that all log level constants are defined correctly
-	assert.Equal(t, LogLevel("debug"), DebugLevel)
-	assert.Equal(t, LogLevel("info"), InfoLevel)
-	assert.Equal(t, LogLevel("warn"), WarnLevel)
-	assert.Equal(t, LogLevel("error"), ErrorLevel)
+	assert.Equal(t, spookyloggingtypes.LogLevel("debug"), spookyloggingtypes.DebugLevel)
+	assert.Equal(t, spookyloggingtypes.LogLevel("info"), spookyloggingtypes.InfoLevel)
+	assert.Equal(t, spookyloggingtypes.LogLevel("warn"), spookyloggingtypes.WarnLevel)
+	assert.Equal(t, spookyloggingtypes.LogLevel("error"), spookyloggingtypes.ErrorLevel)
 }
 
 func TestFieldStruct(t *testing.T) {
 	// Test Field struct creation and access
-	field := Field{
+	field := spookyloggingtypes.Field{
 		Key:   "test_key",
 		Value: "test_value",
 	}
@@ -28,14 +29,14 @@ func TestFieldStruct(t *testing.T) {
 
 func TestConfigStruct(t *testing.T) {
 	// Test Config struct creation and access
-	config := Config{
-		Level:     InfoLevel,
+	config := spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.InfoLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
 	}
 
-	assert.Equal(t, InfoLevel, config.Level)
+	assert.Equal(t, spookyloggingtypes.InfoLevel, config.Level)
 	assert.Equal(t, "json", config.Format)
 	assert.Equal(t, "stdout", config.Output)
 	assert.Equal(t, true, config.Timestamp)
@@ -43,8 +44,8 @@ func TestConfigStruct(t *testing.T) {
 
 func TestLoggerInterface(t *testing.T) {
 	// Test that our logger implementation satisfies the Logger interface
-	logger := NewLogger(Config{
-		Level:     InfoLevel,
+	logger := NewLogger(spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.InfoLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
@@ -67,8 +68,8 @@ func TestLoggerInterface(t *testing.T) {
 }
 
 func TestLoggerInterfaceChaining(_ *testing.T) {
-	logger := NewLogger(Config{
-		Level:     DebugLevel,
+	logger := NewLogger(spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.DebugLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
@@ -89,10 +90,10 @@ func TestLoggerInterfaceChaining(_ *testing.T) {
 
 func TestConfigDefaultValues(t *testing.T) {
 	// Test Config with default values
-	config := Config{}
+	config := spookyloggingtypes.Config{}
 
 	// These should be zero values
-	assert.Equal(t, LogLevel(""), config.Level)
+	assert.Equal(t, spookyloggingtypes.LogLevel(""), config.Level)
 	assert.Equal(t, "", config.Format)
 	assert.Equal(t, "", config.Output)
 	assert.Equal(t, false, config.Timestamp)
@@ -100,14 +101,14 @@ func TestConfigDefaultValues(t *testing.T) {
 
 func TestConfigWithCustomValues(t *testing.T) {
 	// Test Config with custom values
-	config := Config{
-		Level:     DebugLevel,
+	config := spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.DebugLevel,
 		Format:    "text",
 		Output:    "/var/log/app.log",
 		Timestamp: false,
 	}
 
-	assert.Equal(t, DebugLevel, config.Level)
+	assert.Equal(t, spookyloggingtypes.DebugLevel, config.Level)
 	assert.Equal(t, "text", config.Format)
 	assert.Equal(t, "/var/log/app.log", config.Output)
 	assert.Equal(t, false, config.Timestamp)
@@ -131,7 +132,7 @@ func TestFieldWithVariousTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			field := Field{
+			field := spookyloggingtypes.Field{
 				Key:   tt.key,
 				Value: tt.value,
 			}
@@ -144,35 +145,35 @@ func TestFieldWithVariousTypes(t *testing.T) {
 
 func TestLogLevelComparison(t *testing.T) {
 	// Test LogLevel comparison
-	assert.Equal(t, DebugLevel, LogLevel("debug"))
-	assert.Equal(t, InfoLevel, LogLevel("info"))
-	assert.Equal(t, WarnLevel, LogLevel("warn"))
-	assert.Equal(t, ErrorLevel, LogLevel("error"))
+	assert.Equal(t, spookyloggingtypes.DebugLevel, spookyloggingtypes.LogLevel("debug"))
+	assert.Equal(t, spookyloggingtypes.InfoLevel, spookyloggingtypes.LogLevel("info"))
+	assert.Equal(t, spookyloggingtypes.WarnLevel, spookyloggingtypes.LogLevel("warn"))
+	assert.Equal(t, spookyloggingtypes.ErrorLevel, spookyloggingtypes.LogLevel("error"))
 
 	// Test inequality
-	assert.NotEqual(t, DebugLevel, InfoLevel)
-	assert.NotEqual(t, InfoLevel, WarnLevel)
-	assert.NotEqual(t, WarnLevel, ErrorLevel)
+	assert.NotEqual(t, spookyloggingtypes.DebugLevel, spookyloggingtypes.InfoLevel)
+	assert.NotEqual(t, spookyloggingtypes.InfoLevel, spookyloggingtypes.WarnLevel)
+	assert.NotEqual(t, spookyloggingtypes.WarnLevel, spookyloggingtypes.ErrorLevel)
 }
 
 func TestConfigEquality(t *testing.T) {
 	// Test Config equality
-	config1 := Config{
-		Level:     InfoLevel,
+	config1 := spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.InfoLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
 	}
 
-	config2 := Config{
-		Level:     InfoLevel,
+	config2 := spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.InfoLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
 	}
 
-	config3 := Config{
-		Level:     DebugLevel,
+	config3 := spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.DebugLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
@@ -187,17 +188,17 @@ func TestConfigEquality(t *testing.T) {
 
 func TestFieldEquality(t *testing.T) {
 	// Test Field equality
-	field1 := Field{
+	field1 := spookyloggingtypes.Field{
 		Key:   "test_key",
 		Value: "test_value",
 	}
 
-	field2 := Field{
+	field2 := spookyloggingtypes.Field{
 		Key:   "test_key",
 		Value: "test_value",
 	}
 
-	field3 := Field{
+	field3 := spookyloggingtypes.Field{
 		Key:   "different_key",
 		Value: "test_value",
 	}
@@ -211,14 +212,14 @@ func TestFieldEquality(t *testing.T) {
 
 func TestLoggerInterfaceNilHandling(t *testing.T) {
 	// Test that logger interface methods handle nil values gracefully
-	logger := NewLogger(Config{
-		Level:     InfoLevel,
+	logger := NewLogger(spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.InfoLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
 	})
 
-	// Test with nil context
+	// Test with context (using TODO as test value, not a real TODO)
 	loggerWithNilContext := logger.WithContext(context.TODO())
 	assert.NotNil(t, loggerWithNilContext)
 
@@ -233,8 +234,8 @@ func TestLoggerInterfaceNilHandling(t *testing.T) {
 func TestLoggerInterfaceWithTestDataFromExamples(_ *testing.T) {
 	// Test logger interface with data patterns from examples/testing
 
-	logger := NewLogger(Config{
-		Level:     InfoLevel,
+	logger := NewLogger(spookyloggingtypes.Config{
+		Level:     spookyloggingtypes.InfoLevel,
 		Format:    "json",
 		Output:    "stdout",
 		Timestamp: true,
@@ -266,13 +267,13 @@ func TestConfigValidation(t *testing.T) {
 	// Test Config validation scenarios
 	tests := []struct {
 		name   string
-		config Config
+		config spookyloggingtypes.Config
 		valid  bool
 	}{
 		{
 			name: "valid config",
-			config: Config{
-				Level:     InfoLevel,
+			config: spookyloggingtypes.Config{
+				Level:     spookyloggingtypes.InfoLevel,
 				Format:    "json",
 				Output:    "stdout",
 				Timestamp: true,
@@ -281,8 +282,8 @@ func TestConfigValidation(t *testing.T) {
 		},
 		{
 			name: "valid config with text format",
-			config: Config{
-				Level:     DebugLevel,
+			config: spookyloggingtypes.Config{
+				Level:     spookyloggingtypes.DebugLevel,
 				Format:    "text",
 				Output:    "/tmp/test.log",
 				Timestamp: false,
@@ -291,7 +292,7 @@ func TestConfigValidation(t *testing.T) {
 		},
 		{
 			name: "config with empty level",
-			config: Config{
+			config: spookyloggingtypes.Config{
 				Level:     "",
 				Format:    "json",
 				Output:    "stdout",
@@ -301,8 +302,8 @@ func TestConfigValidation(t *testing.T) {
 		},
 		{
 			name: "config with empty format",
-			config: Config{
-				Level:     InfoLevel,
+			config: spookyloggingtypes.Config{
+				Level:     spookyloggingtypes.InfoLevel,
 				Format:    "",
 				Output:    "stdout",
 				Timestamp: true,
