@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"spooky/internal/facts"
-	"spooky/internal/logging"
+	spookyfacts "spooky/internal/facts"
+	spookylogging "spooky/internal/logging"
 
 	"github.com/spf13/cobra"
 )
@@ -39,10 +39,10 @@ Examples:
   spooky facts query "os.name == 'linux'"
 
   # Export facts to JSON format from the current project
-  spooky facts export --output facts.json
+  spooky facts export --output spookyfacts.json
 
   # Import facts from external source into the current project
-  spooky facts import external-facts.json`,
+  spooky facts import external-spookyfacts.json`,
 		Args: cobra.MaximumNArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Set the project path for all facts subcommands
@@ -103,7 +103,7 @@ Examples:
 	factsCacheClearCmd = &cobra.Command{
 		Use:   "clear",
 		Short: "Clear the fact cache",
-		Long:  `Clear all cached facts.`,
+		Long:  `Clear all cached spookyfacts.`,
 		RunE:  runFactsCacheClear,
 	}
 
@@ -207,7 +207,7 @@ func initFactsCommands() {
 }
 
 // displayMachineFacts displays facts for a single machine
-func displayMachineFacts(machineFacts *facts.MachineFacts) {
+func displayMachineFacts(machineFacts *spookyfacts.MachineFacts) {
 	fmt.Printf("Machine: %s\n", machineFacts.MachineName)
 	fmt.Printf("  System ID: %s\n", machineFacts.SystemID)
 	fmt.Printf("  Action File: %s\n", machineFacts.ActionFile)
@@ -232,7 +232,7 @@ func getProjectFactsDBPath(cmd *cobra.Command) string {
 	}
 
 	if projectPath, ok := cmd.Context().Value(projectPathKey{}).(string); ok && projectPath != "" {
-		return filepath.Join(projectPath, ".facts.db")
+		return filepath.Join(projectPath, ".spookyfacts.db")
 	}
 
 	return getFactsDBPath() // Fallback to global path
@@ -240,8 +240,8 @@ func getProjectFactsDBPath(cmd *cobra.Command) string {
 
 func runFactsCache(cmd *cobra.Command, _ []string) error {
 	// Try to create storage to check if database is corrupted
-	storage, err := facts.NewFactStorage(facts.StorageOptions{
-		Type: facts.StorageTypeBadger,
+	storage, err := spookyfacts.NewFactStorage(spookyfacts.StorageOptions{
+		Type: spookyfacts.StorageTypeBadger,
 		Path: getProjectFactsDBPath(cmd),
 	})
 	if err != nil {
@@ -250,7 +250,7 @@ func runFactsCache(cmd *cobra.Command, _ []string) error {
 	defer storage.Close()
 
 	// Try to load facts to verify database integrity
-	manager := facts.NewManagerWithStorage(nil, storage)
+	manager := spookyfacts.NewManagerWithStorage(nil, storage)
 	_, err = manager.GetAllFacts()
 	if err != nil {
 		return fmt.Errorf("corrupted facts database: %w", err)
@@ -262,8 +262,8 @@ func runFactsCache(cmd *cobra.Command, _ []string) error {
 
 func runFactsCacheClear(cmd *cobra.Command, _ []string) error {
 	// Create storage and fact manager
-	storage, err := facts.NewFactStorage(facts.StorageOptions{
-		Type: facts.StorageTypeBadger,
+	storage, err := spookyfacts.NewFactStorage(spookyfacts.StorageOptions{
+		Type: spookyfacts.StorageTypeBadger,
 		Path: getProjectFactsDBPath(cmd),
 	})
 	if err != nil {
@@ -271,7 +271,7 @@ func runFactsCacheClear(cmd *cobra.Command, _ []string) error {
 	}
 	defer storage.Close()
 
-	manager := facts.NewManagerWithStorage(nil, storage)
+	manager := spookyfacts.NewManagerWithStorage(nil, storage)
 
 	// Clear the cache
 	manager.ClearCache()
@@ -282,8 +282,8 @@ func runFactsCacheClear(cmd *cobra.Command, _ []string) error {
 
 func runFactsCacheExpired(cmd *cobra.Command, _ []string) error {
 	// Create storage and fact manager
-	storage, err := facts.NewFactStorage(facts.StorageOptions{
-		Type: facts.StorageTypeBadger,
+	storage, err := spookyfacts.NewFactStorage(spookyfacts.StorageOptions{
+		Type: spookyfacts.StorageTypeBadger,
 		Path: getProjectFactsDBPath(cmd),
 	})
 	if err != nil {
@@ -291,7 +291,7 @@ func runFactsCacheExpired(cmd *cobra.Command, _ []string) error {
 	}
 	defer storage.Close()
 
-	manager := facts.NewManagerWithStorage(nil, storage)
+	manager := spookyfacts.NewManagerWithStorage(nil, storage)
 
 	// Clear expired facts
 	manager.ClearExpiredCache()
@@ -302,7 +302,7 @@ func runFactsCacheExpired(cmd *cobra.Command, _ []string) error {
 
 // New fact command functions
 func runFactsGather(cmd *cobra.Command, args []string) error {
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 
 	// Determine target hosts
 	hosts, err := determineTargetHosts(args)
@@ -311,12 +311,12 @@ func runFactsGather(cmd *cobra.Command, args []string) error {
 	}
 
 	logger.Info("Starting fact gathering",
-		logging.Int("parallel", factsParallel),
-		logging.Int("timeout", factsTimeout))
+		spookylogging.Int("parallel", factsParallel),
+		spookylogging.Int("timeout", factsTimeout))
 
 	// Create storage and fact manager
-	storage, err := facts.NewFactStorage(facts.StorageOptions{
-		Type: facts.StorageTypeBadger,    // Default to BadgerDB
+	storage, err := spookyfacts.NewFactStorage(spookyfacts.StorageOptions{
+		Type: spookyfacts.StorageTypeBadger,    // Default to BadgerDB
 		Path: getProjectFactsDBPath(cmd), // Use configured facts database path
 	})
 	if err != nil {
@@ -324,12 +324,12 @@ func runFactsGather(cmd *cobra.Command, args []string) error {
 	}
 	defer storage.Close()
 
-	manager := facts.NewManagerWithStorage(nil, storage)
+	manager := spookyfacts.NewManagerWithStorage(nil, storage)
 	allCollections, errors := collectFactsFromHosts(manager, hosts, logger)
 
 	// Report results
 	if len(errors) > 0 {
-		logger.Warn("Some hosts failed fact collection", logging.Int("error_count", len(errors)))
+		logger.Warn("Some hosts failed fact collection", spookylogging.Int("error_count", len(errors)))
 		for _, err := range errors {
 			fmt.Printf("Error: %v\n", err)
 		}
@@ -343,16 +343,16 @@ func runFactsGather(cmd *cobra.Command, args []string) error {
 	displayFactGatheringResults(allCollections, errors)
 
 	logger.Info("Fact gathering completed successfully",
-		logging.Int("hosts_processed", len(allCollections)),
-		logging.Int("hosts_failed", len(errors)),
-		logging.Int("total_facts", getTotalFactCount(allCollections)))
+		spookylogging.Int("hosts_processed", len(allCollections)),
+		spookylogging.Int("hosts_failed", len(errors)),
+		spookylogging.Int("total_facts", getTotalFactCount(allCollections)))
 
 	return nil
 }
 
 // determineTargetHosts determines which hosts to collect facts from
 func determineTargetHosts(args []string) ([]string, error) {
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 
 	// Check if we're in a valid project context
 	projectPath := getProjectFactsDBPath(nil) // Pass nil to use global path
@@ -380,7 +380,7 @@ func determineTargetHosts(args []string) ([]string, error) {
 
 	case factsInventory != "":
 		// TODO: Load hosts from inventory file
-		logger.Info("Inventory file support not yet implemented", logging.String("inventory", factsInventory))
+		logger.Info("Inventory file support not yet implemented", spookylogging.String("inventory", factsInventory))
 		return nil, fmt.Errorf("inventory file support not yet implemented")
 
 	default:
@@ -390,32 +390,32 @@ func determineTargetHosts(args []string) ([]string, error) {
 }
 
 // collectFactsFromHosts collects facts from all specified hosts
-func collectFactsFromHosts(manager *facts.Manager, hosts []string, logger logging.Logger) ([]*facts.FactCollection, []error) {
-	var allCollections []*facts.FactCollection
+func collectFactsFromHosts(manager *spookyfacts.Manager, hosts []string, logger spookylogging.Logger) ([]*spookyfacts.FactCollection, []error) {
+	var allCollections []*spookyfacts.FactCollection
 	var errors []error
 
 	// For now, collect sequentially (parallel implementation would require goroutines and channels)
 	for _, host := range hosts {
-		logger.Info("Collecting facts from host", logging.String("host", host))
+		logger.Info("Collecting facts from host", spookylogging.String("host", host))
 
 		collection, err := collectFactsFromHost(manager, host)
 		if err != nil {
-			logger.Error("Failed to collect facts from host", err, logging.String("host", host))
+			logger.Error("Failed to collect facts from host", err, spookylogging.String("host", host))
 			errors = append(errors, fmt.Errorf("host %s: %w", host, err))
 			continue
 		}
 
 		allCollections = append(allCollections, collection)
 		logger.Info("Successfully collected facts from host",
-			logging.String("host", host),
-			logging.Int("fact_count", len(collection.Facts)))
+			spookylogging.String("host", host),
+			spookylogging.Int("fact_count", len(collection.Facts)))
 	}
 
 	return allCollections, errors
 }
 
 // collectFactsFromHost collects facts from a single host
-func collectFactsFromHost(manager *facts.Manager, host string) (*facts.FactCollection, error) {
+func collectFactsFromHost(manager *spookyfacts.Manager, host string) (*spookyfacts.FactCollection, error) {
 	if len(factsSpecificKeys) > 0 {
 		// Collect specific facts
 		return manager.CollectSpecificFacts(host, factsSpecificKeys)
@@ -425,7 +425,7 @@ func collectFactsFromHost(manager *facts.Manager, host string) (*facts.FactColle
 }
 
 // displayFactGatheringResults displays the results of fact gathering
-func displayFactGatheringResults(allCollections []*facts.FactCollection, errors []error) {
+func displayFactGatheringResults(allCollections []*spookyfacts.FactCollection, errors []error) {
 	// Display summary
 	fmt.Printf("Fact Gathering Summary:\n")
 	fmt.Printf("Hosts processed: %d\n", len(allCollections))
@@ -440,7 +440,7 @@ func displayFactGatheringResults(allCollections []*facts.FactCollection, errors 
 }
 
 // displayHostFacts displays facts for a single host
-func displayHostFacts(collection *facts.FactCollection) {
+func displayHostFacts(collection *spookyfacts.FactCollection) {
 	fmt.Printf("Host: %s (%d facts)\n", collection.Server, len(collection.Facts))
 	fmt.Printf("Collected at: %s\n", collection.Timestamp.Format("2006-01-02 15:04:05"))
 	fmt.Println()
@@ -465,7 +465,7 @@ func displayHostFacts(collection *facts.FactCollection) {
 }
 
 // Helper function to get total fact count from collections
-func getTotalFactCount(collections []*facts.FactCollection) int {
+func getTotalFactCount(collections []*spookyfacts.FactCollection) int {
 	total := 0
 	for _, collection := range collections {
 		total += len(collection.Facts)
@@ -481,8 +481,8 @@ func runFactsImport(cmd *cobra.Command, args []string) error {
 	source := args[0]
 
 	// Create storage and fact manager
-	storage, err := facts.NewFactStorage(facts.StorageOptions{
-		Type: facts.StorageTypeBadger,    // Default to BadgerDB
+	storage, err := spookyfacts.NewFactStorage(spookyfacts.StorageOptions{
+		Type: spookyfacts.StorageTypeBadger,    // Default to BadgerDB
 		Path: getProjectFactsDBPath(cmd), // Use configured facts database path
 	})
 	if err != nil {
@@ -490,7 +490,7 @@ func runFactsImport(cmd *cobra.Command, args []string) error {
 	}
 	defer storage.Close()
 
-	manager := facts.NewManagerWithStorage(nil, storage)
+	manager := spookyfacts.NewManagerWithStorage(nil, storage)
 
 	// Determine source path based on flags
 	var sourcePath string
@@ -512,10 +512,10 @@ func runFactsImport(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create import options
-	options := &facts.ImportOptions{
+	options := &spookyfacts.ImportOptions{
 		Source:      importSource,
 		Path:        sourcePath,
-		MergeMode:   facts.MergeMode(importMergeMode),
+		MergeMode:   spookyfacts.MergeMode(importMergeMode),
 		SelectFacts: importSelectFacts,
 		Override:    importOverride,
 		Validate:    factsValidate || importOverride, // Validate if override is enabled
@@ -587,8 +587,8 @@ func isCustomSource(source string) bool {
 
 func runFactsExport(cmd *cobra.Command, _ []string) error {
 	// Create storage and fact manager
-	storage, err := facts.NewFactStorage(facts.StorageOptions{
-		Type: facts.StorageTypeBadger,    // Default to BadgerDB
+	storage, err := spookyfacts.NewFactStorage(spookyfacts.StorageOptions{
+		Type: spookyfacts.StorageTypeBadger,    // Default to BadgerDB
 		Path: getProjectFactsDBPath(cmd), // Use configured facts database path
 	})
 	if err != nil {
@@ -597,7 +597,7 @@ func runFactsExport(cmd *cobra.Command, _ []string) error {
 	defer storage.Close()
 
 	// Try to load facts to verify database integrity
-	manager := facts.NewManagerWithStorage(nil, storage)
+	manager := spookyfacts.NewManagerWithStorage(nil, storage)
 	_, err = manager.GetAllFacts()
 	if err != nil {
 		return fmt.Errorf("corrupted facts database: %w", err)
@@ -625,8 +625,8 @@ func runFactsExport(cmd *cobra.Command, _ []string) error {
 
 func runFactsValidate(cmd *cobra.Command, _ []string) error {
 	// Create storage and fact manager
-	storage, err := facts.NewFactStorage(facts.StorageOptions{
-		Type: facts.StorageTypeBadger,    // Default to BadgerDB
+	storage, err := spookyfacts.NewFactStorage(spookyfacts.StorageOptions{
+		Type: spookyfacts.StorageTypeBadger,    // Default to BadgerDB
 		Path: getProjectFactsDBPath(cmd), // Use configured facts database path
 	})
 	if err != nil {
@@ -634,10 +634,10 @@ func runFactsValidate(cmd *cobra.Command, _ []string) error {
 	}
 	defer storage.Close()
 
-	manager := facts.NewManagerWithStorage(nil, storage)
+	manager := spookyfacts.NewManagerWithStorage(nil, storage)
 
 	// Query all facts for validation
-	query := &facts.FactQuery{}
+	query := &spookyfacts.FactQuery{}
 	machineFacts, err := manager.QueryMachineFacts(query)
 	if err != nil {
 		return fmt.Errorf("failed to query facts: %w", err)
@@ -736,8 +736,8 @@ func runFactsQuery(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create storage and fact manager
-	storage, err := facts.NewFactStorage(facts.StorageOptions{
-		Type: facts.StorageTypeBadger,    // Default to BadgerDB
+	storage, err := spookyfacts.NewFactStorage(spookyfacts.StorageOptions{
+		Type: spookyfacts.StorageTypeBadger,    // Default to BadgerDB
 		Path: getProjectFactsDBPath(cmd), // Use configured facts database path
 	})
 	if err != nil {
@@ -745,7 +745,7 @@ func runFactsQuery(cmd *cobra.Command, args []string) error {
 	}
 	defer storage.Close()
 
-	manager := facts.NewManagerWithStorage(nil, storage)
+	manager := spookyfacts.NewManagerWithStorage(nil, storage)
 
 	// Query facts
 	machineFacts, err := manager.QueryMachineFacts(query)
@@ -768,8 +768,8 @@ func runFactsQuery(cmd *cobra.Command, args []string) error {
 }
 
 // parseQueryExpression parses a query expression string into a FactQuery
-func parseQueryExpression(expression string) (*facts.FactQuery, error) {
-	query := &facts.FactQuery{
+func parseQueryExpression(expression string) (*spookyfacts.FactQuery, error) {
+	query := &spookyfacts.FactQuery{
 		Tags: make(map[string]string),
 	}
 

@@ -10,19 +10,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"spooky/internal/config"
+	spookyconfig "spooky/internal/config"
 )
 
 func TestNewSSHClient(t *testing.T) {
 	tests := []struct {
 		name        string
-		machine     *config.Machine
+		machine     *spookyconfig.Machine
 		timeout     int
 		expectError bool
 	}{
 		{
 			name: "valid machine configuration",
-			machine: &config.Machine{
+			machine: &spookyconfig.Machine{
 				Name:     "test-server",
 				Host:     "192.168.1.100",
 				Port:     22,
@@ -34,7 +34,7 @@ func TestNewSSHClient(t *testing.T) {
 		},
 		{
 			name: "machine with key file",
-			machine: &config.Machine{
+			machine: &spookyconfig.Machine{
 				Name:    "test-server",
 				Host:    "192.168.1.100",
 				Port:    22,
@@ -46,7 +46,7 @@ func TestNewSSHClient(t *testing.T) {
 		},
 		{
 			name: "machine with no authentication",
-			machine: &config.Machine{
+			machine: &spookyconfig.Machine{
 				Name: "test-server",
 				Host: "192.168.1.100",
 				Port: 22,
@@ -63,7 +63,7 @@ func TestNewSSHClient(t *testing.T) {
 		},
 		{
 			name: "invalid port",
-			machine: &config.Machine{
+			machine: &spookyconfig.Machine{
 				Name: "test-server",
 				Host: "192.168.1.100",
 				Port: 99999, // Invalid port
@@ -102,7 +102,7 @@ func TestNewSSHClient(t *testing.T) {
 }
 
 func TestNewSSHClientWithHostKeyCallback(t *testing.T) {
-	machine := &config.Machine{
+	machine := &spookyconfig.Machine{
 		Name:     "test-server",
 		Host:     "192.168.1.100",
 		Port:     22,
@@ -168,7 +168,7 @@ func TestNewSSHClientWithHostKeyCallback(t *testing.T) {
 }
 
 func TestSSHClient_GetMachine(t *testing.T) {
-	machine := &config.Machine{
+	machine := &spookyconfig.Machine{
 		Name:     "test-server",
 		Host:     "192.168.1.100",
 		Port:     22,
@@ -197,7 +197,7 @@ func TestSSHClient_GetMachine(t *testing.T) {
 func TestSSHClient_ConnectAndClose(t *testing.T) {
 	// This test requires a real SSH server or mock
 	// For now, we'll test the basic structure without actual connection
-	machine := &config.Machine{
+	machine := &spookyconfig.Machine{
 		Name:     "test-server",
 		Host:     "192.168.1.100",
 		Port:     22,
@@ -225,7 +225,7 @@ func TestSSHClient_ConnectAndClose(t *testing.T) {
 }
 
 func TestSSHClient_ExecuteCommand_NotConnected(t *testing.T) {
-	machine := &config.Machine{
+	machine := &spookyconfig.Machine{
 		Name:     "test-server",
 		Host:     "192.168.1.100",
 		Port:     22,
@@ -255,7 +255,7 @@ func TestSSHClient_ExecuteCommand_NotConnected(t *testing.T) {
 }
 
 func TestSSHClient_ExecuteScript_NotConnected(t *testing.T) {
-	machine := &config.Machine{
+	machine := &spookyconfig.Machine{
 		Name:     "test-server",
 		Host:     "192.168.1.100",
 		Port:     22,
@@ -356,7 +356,7 @@ func TestSSHClient_WithTestDataFromExamples(t *testing.T) {
 	}
 
 	// Create a machine configuration similar to what would be in test data
-	machine := &config.Machine{
+	machine := &spookyconfig.Machine{
 		Name:     "example-server",
 		Host:     "192.168.1.100",
 		Port:     22,
@@ -393,7 +393,7 @@ func TestSSHClient_WithTestDataFromExamples(t *testing.T) {
 }
 
 func TestSSHClient_TimeoutConfiguration(t *testing.T) {
-	machine := &config.Machine{
+	machine := &spookyconfig.Machine{
 		Name:     "test-server",
 		Host:     "192.168.1.100",
 		Port:     22,
@@ -434,7 +434,7 @@ func TestSSHClient_TimeoutConfiguration(t *testing.T) {
 }
 
 func TestSSHClient_InvalidTimeout(t *testing.T) {
-	machine := &config.Machine{
+	machine := &spookyconfig.Machine{
 		Name:     "test-server",
 		Host:     "192.168.1.100",
 		Port:     22,
@@ -460,12 +460,12 @@ func TestSSHClient_InvalidTimeout(t *testing.T) {
 func TestSSHClient_AuthenticationMethods(t *testing.T) {
 	tests := []struct {
 		name        string
-		machine     *config.Machine
+		machine     *spookyconfig.Machine
 		description string
 	}{
 		{
 			name: "password only",
-			machine: &config.Machine{
+			machine: &spookyconfig.Machine{
 				Name:     "test-server",
 				Host:     "192.168.1.100",
 				Port:     22,
@@ -476,7 +476,7 @@ func TestSSHClient_AuthenticationMethods(t *testing.T) {
 		},
 		{
 			name: "key file only",
-			machine: &config.Machine{
+			machine: &spookyconfig.Machine{
 				Name:    "test-server",
 				Host:    "192.168.1.100",
 				Port:    22,
@@ -487,7 +487,7 @@ func TestSSHClient_AuthenticationMethods(t *testing.T) {
 		},
 		{
 			name: "both password and key",
-			machine: &config.Machine{
+			machine: &spookyconfig.Machine{
 				Name:     "test-server",
 				Host:     "192.168.1.100",
 				Port:     22,
@@ -499,7 +499,7 @@ func TestSSHClient_AuthenticationMethods(t *testing.T) {
 		},
 		{
 			name: "no authentication",
-			machine: &config.Machine{
+			machine: &spookyconfig.Machine{
 				Name: "test-server",
 				Host: "192.168.1.100",
 				Port: 22,

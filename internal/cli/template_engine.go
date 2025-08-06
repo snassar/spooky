@@ -8,16 +8,16 @@ import (
 	"strings"
 	"text/template"
 
-	"spooky/internal/facts"
+	spookyfacts "spooky/internal/facts"
 )
 
 // TemplateEngine handles template rendering with fact integration
 type TemplateEngine struct {
-	manager *facts.Manager
+	manager *spookyfacts.Manager
 }
 
 // NewTemplateEngine creates a new template engine
-func NewTemplateEngine(manager *facts.Manager) *TemplateEngine {
+func NewTemplateEngine(manager *spookyfacts.Manager) *TemplateEngine {
 	return &TemplateEngine{
 		manager: manager,
 	}

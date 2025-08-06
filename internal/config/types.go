@@ -107,6 +107,12 @@ type TemplateConfig struct {
 	Group       string `hcl:"group,optional"`
 }
 
+// Config represents a complete configuration with both machines and actions
+type Config struct {
+	Machines []Machine `json:"machines"`
+	Actions  []Action  `json:"actions"`
+}
+
 // Custom validation tags for mutual exclusivity and authentication requirements
 const (
 	// Custom validation tags

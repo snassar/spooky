@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"spooky/internal/facts"
-	"spooky/internal/logging"
+	spookyfacts "spooky/internal/facts"
+	spookylogging "spooky/internal/logging"
 )
 
 func TestFactsCmd(t *testing.T) {
@@ -121,7 +121,7 @@ func newFactsImportCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE:  runFactsImport,
 	}
-	// Add necessary flags (copy from facts.go)
+	// Add necessary flags (copy from spookyfacts.go)
 	cmd.Flags().BoolVar(&factsMerge, "merge", false, "Merge with existing facts instead of replacing")
 	cmd.Flags().BoolVar(&factsValidate, "validate", false, "Validate facts before importing")
 	cmd.Flags().StringVar(&factsFormat, "format", "", "Source format: json, yaml, csv (default: auto-detect)")
@@ -171,20 +171,20 @@ func TestFactsImportCmd(t *testing.T) {
 		{
 			name:        "invalid json facts",
 			projectPath: filepath.Join(projectRoot, "examples", "testing", "test-valid-project"),
-			source:      filepath.Join(projectRoot, "examples", "testing", "test-invalid-json-facts", "data", "malformed-facts.json"),
+			source:      filepath.Join(projectRoot, "examples", "testing", "test-invalid-json-facts", "data", "malformed-spookyfacts.json"),
 			expectError: true,
 			errorMsg:    "failed to parse JSON",
 		},
 		{
 			name:        "missing required fields",
 			projectPath: filepath.Join(projectRoot, "examples", "testing", "test-valid-project"),
-			source:      filepath.Join(projectRoot, "examples", "testing", "test-missing-required-facts", "data", "missing-fields-facts.json"),
+			source:      filepath.Join(projectRoot, "examples", "testing", "test-missing-required-facts", "data", "missing-fields-spookyfacts.json"),
 			expectError: false, // Should succeed since JSON is now valid
 		},
 		{
 			name:        "extra facts fields",
 			projectPath: filepath.Join(projectRoot, "examples", "testing", "test-valid-project"),
-			source:      filepath.Join(projectRoot, "examples", "testing", "test-extra-facts-fields", "data", "extra-fields-facts.json"),
+			source:      filepath.Join(projectRoot, "examples", "testing", "test-extra-facts-fields", "data", "extra-fields-spookyfacts.json"),
 			expectError: false, // Should succeed since JSON is now valid
 		},
 		{
@@ -532,20 +532,20 @@ func TestRunFactsImport(t *testing.T) {
 		{
 			name:        "valid json facts",
 			projectPath: filepath.Join(projectRoot, "examples", "testing", "test-valid-project"),
-			source:      filepath.Join(projectRoot, "examples", "testing", "test-valid-project", "data", "valid-facts.json"),
+			source:      filepath.Join(projectRoot, "examples", "testing", "test-valid-project", "data", "valid-spookyfacts.json"),
 			expectError: false,
 		},
 		{
 			name:        "invalid json facts",
 			projectPath: filepath.Join(projectRoot, "examples", "testing", "test-valid-project"),
-			source:      filepath.Join(projectRoot, "examples", "testing", "test-invalid-json-facts", "data", "malformed-facts.json"),
+			source:      filepath.Join(projectRoot, "examples", "testing", "test-invalid-json-facts", "data", "malformed-spookyfacts.json"),
 			expectError: true,
 			errorMsg:    "failed to parse JSON",
 		},
 		{
 			name:        "missing required fields",
 			projectPath: filepath.Join(projectRoot, "examples", "testing", "test-valid-project"),
-			source:      filepath.Join(projectRoot, "examples", "testing", "test-missing-required-facts", "data", "missing-fields-facts.json"),
+			source:      filepath.Join(projectRoot, "examples", "testing", "test-missing-required-facts", "data", "missing-fields-spookyfacts.json"),
 			expectError: false, // Should succeed since JSON is now valid
 		},
 		{
@@ -920,11 +920,11 @@ func TestCollectFactsFromHosts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := logging.GetLogger()
+			logger := spookylogging.GetLogger()
 
 			// Create a properly initialized manager with storage
-			storage, err := facts.NewFactStorage(facts.StorageOptions{
-				Type: facts.StorageTypeBadger,
+			storage, err := spookyfacts.NewFactStorage(spookyfacts.StorageOptions{
+				Type: spookyfacts.StorageTypeBadger,
 				Path: getFactsDBPath(),
 			})
 			if err != nil {
@@ -933,7 +933,7 @@ func TestCollectFactsFromHosts(t *testing.T) {
 			}
 			defer storage.Close()
 
-			manager := facts.NewManagerWithStorage(nil, storage)
+			manager := spookyfacts.NewManagerWithStorage(nil, storage)
 
 			collections, errors := collectFactsFromHosts(manager, tt.hosts, logger)
 
@@ -969,8 +969,8 @@ func TestCollectFactsFromHost(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a properly initialized manager with storage
-			storage, err := facts.NewFactStorage(facts.StorageOptions{
-				Type: facts.StorageTypeBadger,
+			storage, err := spookyfacts.NewFactStorage(spookyfacts.StorageOptions{
+				Type: spookyfacts.StorageTypeBadger,
 				Path: getFactsDBPath(),
 			})
 			if err != nil {
@@ -979,7 +979,7 @@ func TestCollectFactsFromHost(t *testing.T) {
 			}
 			defer storage.Close()
 
-			manager := facts.NewManagerWithStorage(nil, storage)
+			manager := spookyfacts.NewManagerWithStorage(nil, storage)
 
 			collection, err := collectFactsFromHost(manager, tt.host)
 
@@ -998,19 +998,19 @@ func TestCollectFactsFromHost(t *testing.T) {
 func TestDisplayFactGatheringResults(t *testing.T) {
 	tests := []struct {
 		name        string
-		collections []*facts.FactCollection
+		collections []*spookyfacts.FactCollection
 		errors      []error
 		expectPanic bool
 	}{
 		{
 			name:        "successful collections",
-			collections: []*facts.FactCollection{},
+			collections: []*spookyfacts.FactCollection{},
 			errors:      []error{},
 			expectPanic: false,
 		},
 		{
 			name:        "with errors",
-			collections: []*facts.FactCollection{},
+			collections: []*spookyfacts.FactCollection{},
 			errors:      []error{assert.AnError},
 			expectPanic: false,
 		},
@@ -1034,12 +1034,12 @@ func TestDisplayFactGatheringResults(t *testing.T) {
 func TestDisplayHostFacts(t *testing.T) {
 	tests := []struct {
 		name        string
-		collection  *facts.FactCollection
+		collection  *spookyfacts.FactCollection
 		expectPanic bool
 	}{
 		{
 			name:        "valid collection",
-			collection:  &facts.FactCollection{},
+			collection:  &spookyfacts.FactCollection{},
 			expectPanic: false,
 		},
 		{
@@ -1067,20 +1067,20 @@ func TestDisplayHostFacts(t *testing.T) {
 func TestGetTotalFactCount(t *testing.T) {
 	tests := []struct {
 		name        string
-		collections []*facts.FactCollection
+		collections []*spookyfacts.FactCollection
 		expected    int
 	}{
 		{
 			name:        "empty collections",
-			collections: []*facts.FactCollection{},
+			collections: []*spookyfacts.FactCollection{},
 			expected:    0,
 		},
 		{
 			name: "single collection",
-			collections: []*facts.FactCollection{
+			collections: []*spookyfacts.FactCollection{
 				{
 					Server: "test-machine",
-					Facts: map[string]*facts.Fact{
+					Facts: map[string]*spookyfacts.Fact{
 						"os": {
 							Key:   "os",
 							Value: map[string]interface{}{"name": "linux"},
@@ -1092,10 +1092,10 @@ func TestGetTotalFactCount(t *testing.T) {
 		},
 		{
 			name: "multiple collections",
-			collections: []*facts.FactCollection{
+			collections: []*spookyfacts.FactCollection{
 				{
 					Server: "machine1",
-					Facts: map[string]*facts.Fact{
+					Facts: map[string]*spookyfacts.Fact{
 						"os": {
 							Key:   "os",
 							Value: map[string]interface{}{"name": "linux"},
@@ -1108,7 +1108,7 @@ func TestGetTotalFactCount(t *testing.T) {
 				},
 				{
 					Server: "machine2",
-					Facts: map[string]*facts.Fact{
+					Facts: map[string]*spookyfacts.Fact{
 						"memory": {
 							Key:   "memory",
 							Value: map[string]interface{}{"total": "8GB"},
@@ -1140,22 +1140,22 @@ func TestIsCustomSource(t *testing.T) {
 	}{
 		{
 			name:     "local file",
-			source:   "./facts.json",
+			source:   "./spookyfacts.json",
 			expected: true,
 		},
 		{
 			name:     "https url",
-			source:   "https://example.com/facts.json",
+			source:   "https://example.com/spookyfacts.json",
 			expected: true,
 		},
 		{
 			name:     "http url",
-			source:   "http://example.com/facts.json",
+			source:   "http://example.com/spookyfacts.json",
 			expected: false,
 		},
 		{
 			name:     "ftp url",
-			source:   "ftp://example.com/facts.json",
+			source:   "ftp://example.com/spookyfacts.json",
 			expected: false,
 		},
 		{

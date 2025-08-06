@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"spooky/internal/logging"
+	spookylogging "spooky/internal/logging"
 )
 
 // parseJSONFromReader handles JSON parsing with shared logic
@@ -104,7 +104,7 @@ func parseFlatJSON(data map[string]interface{}, collection *FactCollection, sour
 }
 
 // filterFactCollection filters a fact collection to only include specified keys
-func filterFactCollection(collection *FactCollection, keys []string, logger logging.Logger, source string) *FactCollection {
+func filterFactCollection(collection *FactCollection, keys []string, logger spookylogging.Logger, source string) *FactCollection {
 	filtered := &FactCollection{
 		Server:    collection.Server,
 		Timestamp: collection.Timestamp,
@@ -116,16 +116,16 @@ func filterFactCollection(collection *FactCollection, keys []string, logger logg
 			filtered.Facts[key] = fact
 		} else {
 			logger.Warn("Requested fact not found",
-				logging.Field{Key: "key", Value: key},
-				logging.Field{Key: "source", Value: source})
+				spookylogging.Field{Key: "key", Value: key},
+				spookylogging.Field{Key: "source", Value: source})
 		}
 	}
 
 	logger.Debug("Completed fact filtering",
-		logging.Field{Key: "source", Value: source},
-		logging.Field{Key: "server", Value: collection.Server},
-		logging.Field{Key: "requested_count", Value: len(keys)},
-		logging.Field{Key: "found_count", Value: len(filtered.Facts)})
+		spookylogging.Field{Key: "source", Value: source},
+		spookylogging.Field{Key: "server", Value: collection.Server},
+		spookylogging.Field{Key: "requested_count", Value: len(keys)},
+		spookylogging.Field{Key: "found_count", Value: len(filtered.Facts)})
 
 	return filtered
 }
@@ -160,11 +160,11 @@ func validateKeys(keys []string) error {
 }
 
 // collectSpecificFacts is a common implementation for CollectSpecific
-func collectSpecificFacts(collector FactCollector, server string, keys []string, logger logging.Logger, source string) (*FactCollection, error) {
+func collectSpecificFacts(collector FactCollector, server string, keys []string, logger spookylogging.Logger, source string) (*FactCollection, error) {
 	logger.Debug("Starting specific fact collection",
-		logging.Field{Key: "server", Value: server},
-		logging.Field{Key: "requested_keys", Value: keys},
-		logging.Field{Key: "source", Value: source})
+		spookylogging.Field{Key: "server", Value: server},
+		spookylogging.Field{Key: "requested_keys", Value: keys},
+		spookylogging.Field{Key: "source", Value: source})
 
 	// Validate inputs
 	if err := validateServer(server); err != nil {
@@ -183,11 +183,11 @@ func collectSpecificFacts(collector FactCollector, server string, keys []string,
 }
 
 // getSpecificFact is a common implementation for GetFact
-func getSpecificFact(collector FactCollector, server, key string, logger logging.Logger, source string) (*Fact, error) {
+func getSpecificFact(collector FactCollector, server, key string, logger spookylogging.Logger, source string) (*Fact, error) {
 	logger.Debug("Getting specific fact",
-		logging.Field{Key: "server", Value: server},
-		logging.Field{Key: "key", Value: key},
-		logging.Field{Key: "source", Value: source})
+		spookylogging.Field{Key: "server", Value: server},
+		spookylogging.Field{Key: "key", Value: key},
+		spookylogging.Field{Key: "source", Value: source})
 
 	// Validate inputs
 	if err := validateServer(server); err != nil {
@@ -204,16 +204,16 @@ func getSpecificFact(collector FactCollector, server, key string, logger logging
 
 	if fact, exists := collection.Facts[key]; exists {
 		logger.Debug("Successfully retrieved fact",
-			logging.Field{Key: "server", Value: server},
-			logging.Field{Key: "key", Value: key},
-			logging.Field{Key: "source", Value: source})
+			spookylogging.Field{Key: "server", Value: server},
+			spookylogging.Field{Key: "key", Value: key},
+			spookylogging.Field{Key: "source", Value: source})
 		return fact, nil
 	}
 
 	logger.Warn("Fact not found",
-		logging.Field{Key: "server", Value: server},
-		logging.Field{Key: "key", Value: key},
-		logging.Field{Key: "source", Value: source})
+		spookylogging.Field{Key: "server", Value: server},
+		spookylogging.Field{Key: "key", Value: key},
+		spookylogging.Field{Key: "source", Value: source})
 
 	return nil, ErrFactNotFoundInSource(key, server, source)
 }
@@ -228,14 +228,14 @@ func buildStandardMetadata(collectorType, source, format string) map[string]inte
 }
 
 // collectFromFile is a common implementation for file-based collectors
-func collectFromFile(filePath, server, sourceType string, logger logging.Logger,
+func collectFromFile(filePath, server, sourceType string, logger spookylogging.Logger,
 	parseFunc func() (interface{}, error),
 	extractFunc func(interface{}, string) map[string]*Fact) (*FactCollection, error) {
 
 	logger.Debug("Starting file-based fact collection",
-		logging.Field{Key: "file", Value: filePath},
-		logging.Field{Key: "server", Value: server},
-		logging.Field{Key: "source_type", Value: sourceType})
+		spookylogging.Field{Key: "file", Value: filePath},
+		spookylogging.Field{Key: "server", Value: server},
+		spookylogging.Field{Key: "source_type", Value: sourceType})
 
 	// Validate inputs
 	if err := validateServer(server); err != nil {
@@ -245,7 +245,7 @@ func collectFromFile(filePath, server, sourceType string, logger logging.Logger,
 	// Check if file exists
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		logger.Error("File not found", err,
-			logging.Field{Key: "file", Value: filePath})
+			spookylogging.Field{Key: "file", Value: filePath})
 		return nil, ErrInvalidSource(filePath, "file not found")
 	}
 
@@ -253,7 +253,7 @@ func collectFromFile(filePath, server, sourceType string, logger logging.Logger,
 	data, err := parseFunc()
 	if err != nil {
 		logger.Error("Failed to parse file", err,
-			logging.Field{Key: "file", Value: filePath})
+			spookylogging.Field{Key: "file", Value: filePath})
 		return nil, fmt.Errorf("failed to parse %s file: %w", sourceType, err)
 	}
 
@@ -267,10 +267,10 @@ func collectFromFile(filePath, server, sourceType string, logger logging.Logger,
 	}
 
 	logger.Info("Successfully collected facts from file",
-		logging.Field{Key: "file", Value: filePath},
-		logging.Field{Key: "server", Value: server},
-		logging.Field{Key: "fact_count", Value: len(facts)},
-		logging.Field{Key: "source_type", Value: sourceType})
+		spookylogging.Field{Key: "file", Value: filePath},
+		spookylogging.Field{Key: "server", Value: server},
+		spookylogging.Field{Key: "fact_count", Value: len(facts)},
+		spookylogging.Field{Key: "source_type", Value: sourceType})
 
 	return collection, nil
 }

@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"spooky/internal/config"
-	"spooky/internal/facts"
-	"spooky/internal/logging"
+	spookyconfig "spooky/internal/config"
+	spookyfacts "spooky/internal/facts"
+	spookylogging "spooky/internal/logging"
 )
 
 var (
@@ -43,10 +43,10 @@ func init() {
 	// Add flags to GatherFactsCmd
 	GatherFactsCmd.Flags().Bool("dry-run", false, "Show what facts would be collected without connecting to machines")
 	GatherFactsCmd.Flags().String("ssh-key-path", "~/.ssh/", "Path to SSH private key or directory")
-	GatherFactsCmd.Flags().String("facts-db-path", "", "Override facts database path (default: .facts.db)")
+	GatherFactsCmd.Flags().String("facts-db-path", "", "Override facts database path (default: .spookyfacts.db)")
 
 	// Add flags to ListFactsCmd
-	ListFactsCmd.Flags().String("facts-db-path", "", "Override facts database path (default: .facts.db)")
+	ListFactsCmd.Flags().String("facts-db-path", "", "Override facts database path (default: .spookyfacts.db)")
 
 	// Add flags to ListTemplatesCmd
 	ListTemplatesCmd.Flags().String("templates-dir", "", "Override templates directory (default: templates/)")
@@ -58,7 +58,7 @@ var InitCmd = &cobra.Command{
 	Long:  `Create a new spooky project with separated inventory and actions configuration`,
 	Args:  cobra.MaximumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		logger := logging.GetLogger()
+		logger := spookylogging.GetLogger()
 
 		// Get project name from positional args or flag
 		var projectName string
@@ -90,7 +90,7 @@ var ValidateCmd = &cobra.Command{
 	Long:  `Validate the project files (project.hcl, inventory.hcl, actions.hcl) in a spooky project`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
-		logger := logging.GetLogger()
+		logger := spookylogging.GetLogger()
 		path := "."
 		if len(args) > 0 {
 			path = args[0]
@@ -106,7 +106,7 @@ var ListCmd = &cobra.Command{
 	Long:  `List machines and actions from a spooky project`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
-		logger := logging.GetLogger()
+		logger := spookylogging.GetLogger()
 		path := "."
 		if len(args) > 0 {
 			path = args[0]
@@ -122,7 +122,7 @@ var ListMachinesCmd = &cobra.Command{
 	Long:  `List all machines from a spooky project's inventory configuration`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
-		logger := logging.GetLogger()
+		logger := spookylogging.GetLogger()
 		path := "."
 		if len(args) > 0 {
 			path = args[0]
@@ -137,7 +137,7 @@ var ListActionsCmd = &cobra.Command{
 	Long:  `List all actions from a spooky project's actions configuration`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
-		logger := logging.GetLogger()
+		logger := spookylogging.GetLogger()
 		path := "."
 		if len(args) > 0 {
 			path = args[0]
@@ -152,7 +152,7 @@ var ListTemplatesCmd = &cobra.Command{
 	Long:  `List all template files available in a spooky project`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		logger := logging.GetLogger()
+		logger := spookylogging.GetLogger()
 		path := "."
 		if len(args) > 0 {
 			path = args[0]
@@ -168,7 +168,7 @@ var ListFactsCmd = &cobra.Command{
 	Long:  `List all facts available in a spooky project`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		logger := logging.GetLogger()
+		logger := spookylogging.GetLogger()
 		path := "."
 		if len(args) > 0 {
 			path = args[0]
@@ -184,7 +184,7 @@ var GatherFactsCmd = &cobra.Command{
 	Long:  `Gather facts from all machines defined in a spooky project's inventory`,
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		logger := logging.GetLogger()
+		logger := spookylogging.GetLogger()
 		path := "."
 		if len(args) > 0 {
 			path = args[0]
@@ -202,7 +202,7 @@ var RenderTemplateCmd = &cobra.Command{
 	Long:  `Render a template file in the context of a spooky project`,
 	Args:  cobra.RangeArgs(1, 2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		logger := logging.GetLogger()
+		logger := spookylogging.GetLogger()
 		templateFile := args[0]
 		path := "."
 		if len(args) > 1 {
@@ -226,7 +226,7 @@ var ValidateTemplateCmd = &cobra.Command{
 	Long:  `Validate a template file in the context of a spooky project`,
 	Args:  cobra.RangeArgs(1, 2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		logger := logging.GetLogger()
+		logger := spookylogging.GetLogger()
 		templateFile := args[0]
 		path := "."
 		if len(args) > 1 {
@@ -260,21 +260,21 @@ func InitCommands() {
 // Project functions
 
 // initProject initializes a new spooky project
-func initProject(logger logging.Logger, projectName, path string) error {
+func initProject(logger spookylogging.Logger, projectName, path string) error {
 	// Validate project name
 	if strings.TrimSpace(projectName) == "" {
 		return fmt.Errorf("project name cannot be empty")
 	}
 
 	logger.Info("Initializing new spooky project",
-		logging.String("project_name", projectName),
-		logging.String("path", path))
+		spookylogging.String("project_name", projectName),
+		spookylogging.String("path", path))
 
 	// Create project directory
 	projectDir := filepath.Join(path, projectName)
 	if err := os.MkdirAll(projectDir, 0o755); err != nil {
 		logger.Error("Failed to create project directory", err,
-			logging.String("project_dir", projectDir))
+			spookylogging.String("project_dir", projectDir))
 		return fmt.Errorf("failed to create project directory: %w", err)
 	}
 
@@ -284,7 +284,7 @@ func initProject(logger logging.Logger, projectName, path string) error {
 		dirPath := filepath.Join(projectDir, dir)
 		if err := os.MkdirAll(dirPath, 0o755); err != nil {
 			logger.Error("Failed to create subdirectory", err,
-				logging.String("dir", dirPath))
+				spookylogging.String("dir", dirPath))
 			return fmt.Errorf("failed to create subdirectory %s: %w", dir, err)
 		}
 	}
@@ -306,7 +306,7 @@ func initProject(logger logging.Logger, projectName, path string) error {
   # Storage configuration
   storage {
     type = "badgerdb"
-    path = ".facts.db"
+    path = ".spookyfacts.db"
   }
   
   # Logging configuration
@@ -334,7 +334,7 @@ func initProject(logger logging.Logger, projectName, path string) error {
 	projectFile := filepath.Join(projectDir, "project.hcl")
 	if err := os.WriteFile(projectFile, []byte(projectConfig), 0o600); err != nil {
 		logger.Error("Failed to create project.hcl", err,
-			logging.String("file", projectFile))
+			spookylogging.String("file", projectFile))
 		return fmt.Errorf("failed to create project.hcl: %w", err)
 	}
 
@@ -358,7 +358,7 @@ inventory {
 	inventoryFile := filepath.Join(projectDir, "inventory.hcl")
 	if err := os.WriteFile(inventoryFile, []byte(inventoryConfig), 0o600); err != nil {
 		logger.Error("Failed to create inventory.hcl", err,
-			logging.String("file", inventoryFile))
+			spookylogging.String("file", inventoryFile))
 		return fmt.Errorf("failed to create inventory.hcl: %w", err)
 	}
 
@@ -379,7 +379,7 @@ actions {
 	actionsFile := filepath.Join(projectDir, "actions.hcl")
 	if err := os.WriteFile(actionsFile, []byte(actionsConfig), 0o600); err != nil {
 		logger.Error("Failed to create actions.hcl", err,
-			logging.String("file", actionsFile))
+			spookylogging.String("file", actionsFile))
 		return fmt.Errorf("failed to create actions.hcl: %w", err)
 	}
 
@@ -444,7 +444,7 @@ actions {
 		filePath := filepath.Join(projectDir, "actions", actionFile.filename)
 		if err := os.WriteFile(filePath, []byte(actionFile.content), 0o600); err != nil {
 			logger.Error("Failed to create action file", err,
-				logging.String("file", filePath))
+				spookylogging.String("file", filePath))
 			return fmt.Errorf("failed to create action file %s: %w", actionFile.filename, err)
 		}
 	}
@@ -453,7 +453,7 @@ actions {
 	gitignore := `# Spooky project gitignore
 
 # Facts database
-.facts.db/
+.spookyfacts.db/
 *.db
 
 # Logs
@@ -497,7 +497,7 @@ Thumbs.db
 	gitignoreFile := filepath.Join(projectDir, ".gitignore")
 	if err := os.WriteFile(gitignoreFile, []byte(gitignore), 0o600); err != nil {
 		logger.Error("Failed to create .gitignore", err,
-			logging.String("file", gitignoreFile))
+			spookylogging.String("file", gitignoreFile))
 		return fmt.Errorf("failed to create .gitignore: %w", err)
 	}
 
@@ -563,13 +563,13 @@ spooky execute actions.hcl --inventory inventory.hcl --action update-system --ta
 	readmeFile := filepath.Join(projectDir, "README.md")
 	if err := os.WriteFile(readmeFile, []byte(readme), 0o600); err != nil {
 		logger.Error("Failed to create README.md", err,
-			logging.String("file", readmeFile))
+			spookylogging.String("file", readmeFile))
 		return fmt.Errorf("failed to create README.md: %w", err)
 	}
 
 	logger.Info("Project initialized successfully",
-		logging.String("project_name", projectName),
-		logging.String("project_dir", projectDir))
+		spookylogging.String("project_name", projectName),
+		spookylogging.String("project_dir", projectDir))
 
 	fmt.Printf("✅ Project '%s' initialized successfully at %s\n", projectName, projectDir)
 	fmt.Printf("📁 Project structure created with separated inventory and actions\n")
@@ -581,54 +581,54 @@ spooky execute actions.hcl --inventory inventory.hcl --action update-system --ta
 }
 
 // validateConfigFile validates a project file (inventory.hcl or actions.hcl) using the provided parser function
-func validateConfigFile(logger logging.Logger, filePath, fileType string, parser func(string) error) error {
+func validateConfigFile(logger spookylogging.Logger, filePath, fileType string, parser func(string) error) error {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		logger.Warn(fileType+" file not found",
-			logging.String("file", filePath))
+			spookylogging.String("file", filePath))
 		return nil
 	}
 
 	if err := parser(filePath); err != nil {
 		logger.Error("Failed to parse "+fileType+" configuration", err,
-			logging.String("file", filePath))
+			spookylogging.String("file", filePath))
 		return fmt.Errorf("failed to parse "+fileType+" configuration: %w", err)
 	}
 
 	logger.Info(fileType+" configuration validated",
-		logging.String("file", filePath))
+		spookylogging.String("file", filePath))
 	return nil
 }
 
 // validateProject validates a spooky project
-func validateProject(logger logging.Logger, path string) error {
+func validateProject(logger spookylogging.Logger, path string) error {
 	logger.Info("Validating spooky project",
-		logging.String("path", path))
+		spookylogging.String("path", path))
 
 	// Check if project.hcl exists
 	projectFile := filepath.Join(path, "project.hcl")
 	if _, err := os.Stat(projectFile); os.IsNotExist(err) {
 		logger.Error("Project file not found", err,
-			logging.String("file", projectFile))
+			spookylogging.String("file", projectFile))
 		return fmt.Errorf("project.hcl not found in %s", path)
 	}
 
 	// Parse project configuration with debug flag
-	projectConfig, err := config.ParseProjectConfigWithDebug(projectFile, validateDebug)
+	projectConfig, err := spookyconfig.ParseProjectConfigWithDebug(projectFile, validateDebug)
 	if err != nil {
 		logger.Error("Failed to parse project configuration", err,
-			logging.String("file", projectFile))
+			spookylogging.String("file", projectFile))
 		return fmt.Errorf("failed to parse project configuration: %w", err)
 	}
 
 	logger.Info("Project configuration validated",
-		logging.String("project_name", projectConfig.Name),
-		logging.String("inventory_file", projectConfig.InventoryFile),
-		logging.String("actions_file", projectConfig.ActionsFile))
+		spookylogging.String("project_name", projectConfig.Name),
+		spookylogging.String("inventory_file", projectConfig.InventoryFile),
+		spookylogging.String("actions_file", projectConfig.ActionsFile))
 
 	// Validate inventory file if it exists
 	if projectConfig.InventoryFile != "" {
 		if err := validateConfigFile(logger, projectConfig.InventoryFile, "Inventory", func(file string) error {
-			_, err := config.ParseInventoryConfig(file)
+			_, err := spookyconfig.ParseInventoryConfig(file)
 			return err
 		}); err != nil {
 			return err
@@ -637,7 +637,7 @@ func validateProject(logger logging.Logger, path string) error {
 
 	// Validate actions from multiple sources
 	logger.Info("Validating actions configuration")
-	if _, err := config.LoadActionsConfig(path); err != nil {
+	if _, err := spookyconfig.LoadActionsConfig(path); err != nil {
 		logger.Error("Failed to validate actions configuration", err)
 		return fmt.Errorf("failed to validate actions configuration: %w", err)
 	}
@@ -654,23 +654,23 @@ func validateProject(logger logging.Logger, path string) error {
 }
 
 // listProject lists resources from a spooky project
-func listProject(logger logging.Logger, path string) error {
+func listProject(logger spookylogging.Logger, path string) error {
 	logger.Info("Listing spooky project resources",
-		logging.String("path", path))
+		spookylogging.String("path", path))
 
 	// Check if project.hcl exists
 	projectFile := filepath.Join(path, "project.hcl")
 	if _, err := os.Stat(projectFile); os.IsNotExist(err) {
 		logger.Error("Project file not found", err,
-			logging.String("file", projectFile))
+			spookylogging.String("file", projectFile))
 		return fmt.Errorf("project.hcl not found in %s", path)
 	}
 
 	// Parse project configuration
-	projectConfig, err := config.ParseProjectConfig(projectFile)
+	projectConfig, err := spookyconfig.ParseProjectConfig(projectFile)
 	if err != nil {
 		logger.Error("Failed to parse project configuration", err,
-			logging.String("file", projectFile))
+			spookylogging.String("file", projectFile))
 		return fmt.Errorf("failed to parse project configuration: %w", err)
 	}
 
@@ -688,10 +688,10 @@ func listProject(logger logging.Logger, path string) error {
 		if _, err := os.Stat(projectConfig.InventoryFile); os.IsNotExist(err) {
 			fmt.Printf("⚠️  Inventory file not found: %s\n", projectConfig.InventoryFile)
 		} else {
-			inventoryConfig, err := config.ParseInventoryConfig(projectConfig.InventoryFile)
+			inventoryConfig, err := spookyconfig.ParseInventoryConfig(projectConfig.InventoryFile)
 			if err != nil {
 				logger.Error("Failed to parse inventory configuration", err,
-					logging.String("file", projectConfig.InventoryFile))
+					spookylogging.String("file", projectConfig.InventoryFile))
 				return fmt.Errorf("failed to parse inventory configuration: %w", err)
 			}
 
@@ -712,10 +712,10 @@ func listProject(logger logging.Logger, path string) error {
 		if _, err := os.Stat(projectConfig.ActionsFile); os.IsNotExist(err) {
 			fmt.Printf("⚠️  Actions file not found: %s\n", projectConfig.ActionsFile)
 		} else {
-			actionsConfig, err := config.ParseActionsConfig(projectConfig.ActionsFile)
+			actionsConfig, err := spookyconfig.ParseActionsConfig(projectConfig.ActionsFile)
 			if err != nil {
 				logger.Error("Failed to parse actions configuration", err,
-					logging.String("file", projectConfig.ActionsFile))
+					spookylogging.String("file", projectConfig.ActionsFile))
 				return fmt.Errorf("failed to parse actions configuration: %w", err)
 			}
 
@@ -746,23 +746,23 @@ func listProject(logger logging.Logger, path string) error {
 }
 
 // listProjectMachines lists machines from a spooky project inventory
-func listProjectMachines(logger logging.Logger, path string) error {
+func listProjectMachines(logger spookylogging.Logger, path string) error {
 	logger.Info("Listing machines in spooky project",
-		logging.String("path", path))
+		spookylogging.String("path", path))
 
 	// Check if project.hcl exists
 	projectFile := filepath.Join(path, "project.hcl")
 	if _, err := os.Stat(projectFile); os.IsNotExist(err) {
 		logger.Error("Project file not found", err,
-			logging.String("file", projectFile))
+			spookylogging.String("file", projectFile))
 		return fmt.Errorf("project.hcl not found in %s", path)
 	}
 
 	// Parse project configuration
-	projectConfig, err := config.ParseProjectConfig(projectFile)
+	projectConfig, err := spookyconfig.ParseProjectConfig(projectFile)
 	if err != nil {
 		logger.Error("Failed to parse project configuration", err,
-			logging.String("file", projectFile))
+			spookylogging.String("file", projectFile))
 		return fmt.Errorf("failed to parse project configuration: %w", err)
 	}
 
@@ -783,10 +783,10 @@ func listProjectMachines(logger logging.Logger, path string) error {
 		return nil
 	}
 
-	inventoryConfig, err := config.ParseInventoryConfig(projectConfig.InventoryFile)
+	inventoryConfig, err := spookyconfig.ParseInventoryConfig(projectConfig.InventoryFile)
 	if err != nil {
 		logger.Error("Failed to parse inventory configuration", err,
-			logging.String("file", projectConfig.InventoryFile))
+			spookylogging.String("file", projectConfig.InventoryFile))
 		return fmt.Errorf("failed to parse inventory configuration: %w", err)
 	}
 
@@ -804,23 +804,23 @@ func listProjectMachines(logger logging.Logger, path string) error {
 }
 
 // listProjectActions lists actions in a spooky project
-func listProjectActions(logger logging.Logger, path string) error {
+func listProjectActions(logger spookylogging.Logger, path string) error {
 	logger.Info("Listing project actions",
-		logging.String("path", path))
+		spookylogging.String("path", path))
 
 	// Check if project.hcl exists
 	projectFile := filepath.Join(path, "project.hcl")
 	if _, err := os.Stat(projectFile); os.IsNotExist(err) {
 		logger.Error("Project file not found", err,
-			logging.String("file", projectFile))
+			spookylogging.String("file", projectFile))
 		return fmt.Errorf("project.hcl not found in %s", path)
 	}
 
 	// Parse project configuration
-	projectConfig, err := config.ParseProjectConfig(projectFile)
+	projectConfig, err := spookyconfig.ParseProjectConfig(projectFile)
 	if err != nil {
 		logger.Error("Failed to parse project configuration", err,
-			logging.String("file", projectFile))
+			spookylogging.String("file", projectFile))
 		return fmt.Errorf("failed to parse project configuration: %w", err)
 	}
 
@@ -831,7 +831,7 @@ func listProjectActions(logger logging.Logger, path string) error {
 	fmt.Printf("Path: %s\n\n", path)
 
 	// Load actions from multiple sources
-	actionsConfig, err := config.LoadActionsConfig(path)
+	actionsConfig, err := spookyconfig.LoadActionsConfig(path)
 	if err != nil {
 		logger.Error("Failed to load actions configuration", err)
 		return fmt.Errorf("failed to load actions configuration: %w", err)
@@ -856,9 +856,9 @@ func listProjectActions(logger logging.Logger, path string) error {
 }
 
 // listProjectTemplates lists templates in a spooky project
-func listProjectTemplates(logger logging.Logger, path, templatesDir string) error {
+func listProjectTemplates(logger spookylogging.Logger, path, templatesDir string) error {
 	logger.Info("Listing project templates",
-		logging.String("path", path))
+		spookylogging.String("path", path))
 
 	// Get templates directory
 	var targetTemplatesDir string
@@ -877,7 +877,7 @@ func listProjectTemplates(logger logging.Logger, path, templatesDir string) erro
 	files, err := os.ReadDir(targetTemplatesDir)
 	if err != nil {
 		logger.Error("Failed to read templates directory", err,
-			logging.String("dir", targetTemplatesDir))
+			spookylogging.String("dir", targetTemplatesDir))
 		return fmt.Errorf("failed to read templates directory: %w", err)
 	}
 
@@ -903,9 +903,9 @@ func listProjectTemplates(logger logging.Logger, path, templatesDir string) erro
 }
 
 // listProjectFacts lists facts in a spooky project
-func listProjectFacts(logger logging.Logger, path, _ string) error {
+func listProjectFacts(logger spookylogging.Logger, path, _ string) error {
 	logger.Info("Listing project facts",
-		logging.String("path", path))
+		spookylogging.String("path", path))
 
 	// Create template context to get project info
 	ctx, err := NewTemplateContext(logger, path)
@@ -914,7 +914,7 @@ func listProjectFacts(logger logging.Logger, path, _ string) error {
 	}
 
 	// Create fact manager
-	manager := facts.NewManager(nil)
+	manager := spookyfacts.NewManager(nil)
 
 	// Get all facts
 	allFacts, err := manager.GetAllFacts()
@@ -930,7 +930,7 @@ func listProjectFacts(logger logging.Logger, path, _ string) error {
 	}
 
 	// Group facts by server
-	serverFacts := make(map[string][]*facts.Fact)
+	serverFacts := make(map[string][]*spookyfacts.Fact)
 	for _, fact := range allFacts {
 		serverFacts[fact.Server] = append(serverFacts[fact.Server], fact)
 	}
@@ -968,16 +968,16 @@ func listProjectFacts(logger logging.Logger, path, _ string) error {
 	}
 
 	logger.Info("Project facts listed successfully",
-		logging.String("project", ctx.Project.Name),
-		logging.Int("total_facts", len(allFacts)),
-		logging.Int("servers", len(serverFacts)))
+		spookylogging.String("project", ctx.Project.Name),
+		spookylogging.Int("total_facts", len(allFacts)),
+		spookylogging.Int("servers", len(serverFacts)))
 	return nil
 }
 
 // gatherProjectFacts gathers facts for machines in a spooky project
-func gatherProjectFacts(logger logging.Logger, path, _ string, _ bool, _ string) error {
+func gatherProjectFacts(logger spookylogging.Logger, path, _ string, _ bool, _ string) error {
 	logger.Info("Gathering project facts",
-		logging.String("path", path))
+		spookylogging.String("path", path))
 
 	// Create template context to get project info and machines
 	ctx, err := NewTemplateContext(logger, path)
@@ -986,7 +986,7 @@ func gatherProjectFacts(logger logging.Logger, path, _ string, _ bool, _ string)
 	}
 
 	// Create fact manager
-	manager := facts.NewManager(nil)
+	manager := spookyfacts.NewManager(nil)
 
 	// Get all machines from the project
 	machines := ctx.Machines
@@ -998,19 +998,19 @@ func gatherProjectFacts(logger logging.Logger, path, _ string, _ bool, _ string)
 	fmt.Printf("Gathering facts for %d machines in project %s...\n", len(machines), ctx.Project.Name)
 
 	// Collect facts from each machine
-	var allCollections []*facts.FactCollection
+	var allCollections []*spookyfacts.FactCollection
 	var errors []error
 
 	for _, machine := range machines {
 		logger.Info("Collecting facts from machine",
-			logging.String("machine", machine.Name),
-			logging.String("host", machine.Host))
+			spookylogging.String("machine", machine.Name),
+			spookylogging.String("host", machine.Host))
 
 		collection, err := manager.CollectAllFacts(machine.Host)
 		if err != nil {
 			logger.Error("Failed to collect facts from machine", err,
-				logging.String("machine", machine.Name),
-				logging.String("host", machine.Host))
+				spookylogging.String("machine", machine.Name),
+				spookylogging.String("host", machine.Host))
 			errors = append(errors, fmt.Errorf("failed to collect facts from %s (%s): %w", machine.Name, machine.Host, err))
 			continue
 		}
@@ -1034,22 +1034,22 @@ func gatherProjectFacts(logger logging.Logger, path, _ string, _ bool, _ string)
 	}
 
 	logger.Info("Project fact gathering completed",
-		logging.String("project", ctx.Project.Name),
-		logging.Int("machines_processed", len(allCollections)),
-		logging.Int("machines_failed", len(errors)),
-		logging.Int("total_facts", getTotalFactCount(allCollections)))
+		spookylogging.String("project", ctx.Project.Name),
+		spookylogging.Int("machines_processed", len(allCollections)),
+		spookylogging.Int("machines_failed", len(errors)),
+		spookylogging.Int("total_facts", getTotalFactCount(allCollections)))
 
 	return nil
 }
 
 // renderProjectTemplate renders a template in the context of a spooky project
-func renderProjectTemplate(logger logging.Logger, templateFile, path, output string, dryRun bool, server, _, templatesDir, _ string) error {
+func renderProjectTemplate(logger spookylogging.Logger, templateFile, path, output string, dryRun bool, server, _, templatesDir, _ string) error {
 	logger.Info("Rendering project template",
-		logging.String("template", templateFile),
-		logging.String("path", path),
-		logging.String("output", output),
-		logging.Bool("dry_run", dryRun),
-		logging.String("server", server))
+		spookylogging.String("template", templateFile),
+		spookylogging.String("path", path),
+		spookylogging.String("output", output),
+		spookylogging.Bool("dry_run", dryRun),
+		spookylogging.String("server", server))
 
 	// Create template context
 	ctx, err := NewTemplateContext(logger, path)
@@ -1061,8 +1061,8 @@ func renderProjectTemplate(logger logging.Logger, templateFile, path, output str
 	if server != "" {
 		if err := ctx.LoadServerFacts(logger, server); err != nil {
 			logger.Warn("Failed to load server facts",
-				logging.String("server", server),
-				logging.String("error", err.Error()))
+				spookylogging.String("server", server),
+				spookylogging.String("error", err.Error()))
 		}
 	}
 
@@ -1076,7 +1076,7 @@ func renderProjectTemplate(logger logging.Logger, templateFile, path, output str
 
 	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
 		logger.Error("Template file not found", err,
-			logging.String("file", templatePath))
+			spookylogging.String("file", templatePath))
 		return fmt.Errorf("template file not found: %s", templatePath)
 	}
 
@@ -1084,7 +1084,7 @@ func renderProjectTemplate(logger logging.Logger, templateFile, path, output str
 	templateContent, err := os.ReadFile(templatePath)
 	if err != nil {
 		logger.Error("Failed to read template file", err,
-			logging.String("file", templatePath))
+			spookylogging.String("file", templatePath))
 		return fmt.Errorf("failed to read template file: %w", err)
 	}
 
@@ -1092,7 +1092,7 @@ func renderProjectTemplate(logger logging.Logger, templateFile, path, output str
 	tmpl, err := template.New("project-template").Funcs(ctx.GetTemplateFunctions()).Parse(string(templateContent))
 	if err != nil {
 		logger.Error("Failed to parse template", err,
-			logging.String("file", templatePath))
+			spookylogging.String("file", templatePath))
 		return fmt.Errorf("failed to parse template: %w", err)
 	}
 
@@ -1100,7 +1100,7 @@ func renderProjectTemplate(logger logging.Logger, templateFile, path, output str
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, nil); err != nil {
 		logger.Error("Failed to execute template", err,
-			logging.String("file", templatePath))
+			spookylogging.String("file", templatePath))
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
 
@@ -1120,22 +1120,22 @@ func renderProjectTemplate(logger logging.Logger, templateFile, path, output str
 		// Output to file
 		if err := os.WriteFile(output, buf.Bytes(), 0o600); err != nil {
 			logger.Error("Failed to write output file", err,
-				logging.String("output", output))
+				spookylogging.String("output", output))
 			return fmt.Errorf("failed to write output file: %w", err)
 		}
 		logger.Info("Template rendered successfully",
-			logging.String("template", templateFile),
-			logging.String("output", output))
+			spookylogging.String("template", templateFile),
+			spookylogging.String("output", output))
 	}
 
 	return nil
 }
 
 // validateProjectTemplate validates a template in the context of a spooky project
-func validateProjectTemplate(logger logging.Logger, templateFile, path, templatesDir, _ string) error {
+func validateProjectTemplate(logger spookylogging.Logger, templateFile, path, templatesDir, _ string) error {
 	logger.Info("Validating project template",
-		logging.String("template", templateFile),
-		logging.String("path", path))
+		spookylogging.String("template", templateFile),
+		spookylogging.String("path", path))
 
 	// Create template context
 	ctx, err := NewTemplateContext(logger, path)
@@ -1153,7 +1153,7 @@ func validateProjectTemplate(logger logging.Logger, templateFile, path, template
 
 	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
 		logger.Error("Template file not found", err,
-			logging.String("file", templatePath))
+			spookylogging.String("file", templatePath))
 		return fmt.Errorf("template file not found: %s", templatePath)
 	}
 
@@ -1161,7 +1161,7 @@ func validateProjectTemplate(logger logging.Logger, templateFile, path, template
 	templateContent, err := os.ReadFile(templatePath)
 	if err != nil {
 		logger.Error("Failed to read template file", err,
-			logging.String("file", templatePath))
+			spookylogging.String("file", templatePath))
 		return fmt.Errorf("failed to read template file: %w", err)
 	}
 
@@ -1169,7 +1169,7 @@ func validateProjectTemplate(logger logging.Logger, templateFile, path, template
 	tmpl, err := template.New("project-template").Funcs(ctx.GetTemplateFunctions()).Parse(string(templateContent))
 	if err != nil {
 		logger.Error("Failed to parse template", err,
-			logging.String("file", templatePath))
+			spookylogging.String("file", templatePath))
 		return fmt.Errorf("failed to parse template: %w", err)
 	}
 
@@ -1177,12 +1177,12 @@ func validateProjectTemplate(logger logging.Logger, templateFile, path, template
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, nil); err != nil {
 		logger.Error("Template validation failed", err,
-			logging.String("file", templatePath))
+			spookylogging.String("file", templatePath))
 		return fmt.Errorf("template validation failed: %w", err)
 	}
 
 	logger.Info("Template validation successful",
-		logging.String("file", templatePath))
+		spookylogging.String("file", templatePath))
 	fmt.Printf("✓ Template '%s' is valid\n", templateFile)
 
 	return nil

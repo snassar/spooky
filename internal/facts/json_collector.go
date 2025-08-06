@@ -5,14 +5,14 @@ import (
 	"io"
 	"os"
 
-	"spooky/internal/logging"
+	spookylogging "spooky/internal/logging"
 )
 
 // JSONCollector collects facts from local JSON files
 type JSONCollector struct {
 	filePath    string
 	mergePolicy MergePolicy
-	logger      logging.Logger
+	logger      spookylogging.Logger
 }
 
 // NewJSONCollector creates a new JSON-based fact collector
@@ -20,7 +20,7 @@ func NewJSONCollector(filePath string, mergePolicy MergePolicy) *JSONCollector {
 	return &JSONCollector{
 		filePath:    filePath,
 		mergePolicy: mergePolicy,
-		logger:      logging.GetLogger(),
+		logger:      spookylogging.GetLogger(),
 	}
 }
 
@@ -53,14 +53,14 @@ func (c *JSONCollector) Collect(server string) (*FactCollection, error) {
 	}
 
 	c.logger.Debug("Starting JSON fact collection",
-		logging.Field{Key: "file", Value: c.filePath},
-		logging.Field{Key: "server", Value: server},
-		logging.Field{Key: "merge_policy", Value: c.mergePolicy})
+		spookylogging.Field{Key: "file", Value: c.filePath},
+		spookylogging.Field{Key: "server", Value: server},
+		spookylogging.Field{Key: "merge_policy", Value: c.mergePolicy})
 
 	file, err := os.Open(c.filePath)
 	if err != nil {
 		c.logger.Error("Failed to open JSON file", err,
-			logging.Field{Key: "file", Value: c.filePath})
+			spookylogging.Field{Key: "file", Value: c.filePath})
 		return nil, fmt.Errorf("failed to open JSON file: %w", err)
 	}
 	defer file.Close()
@@ -68,15 +68,15 @@ func (c *JSONCollector) Collect(server string) (*FactCollection, error) {
 	collection, err := c.collectFromReader(file, server)
 	if err != nil {
 		c.logger.Error("Failed to collect facts from JSON file", err,
-			logging.Field{Key: "file", Value: c.filePath},
-			logging.Field{Key: "server", Value: server})
+			spookylogging.Field{Key: "file", Value: c.filePath},
+			spookylogging.Field{Key: "server", Value: server})
 		return nil, err
 	}
 
 	c.logger.Info("Successfully collected facts from JSON file",
-		logging.Field{Key: "file", Value: c.filePath},
-		logging.Field{Key: "server", Value: server},
-		logging.Field{Key: "fact_count", Value: len(collection.Facts)})
+		spookylogging.Field{Key: "file", Value: c.filePath},
+		spookylogging.Field{Key: "server", Value: server},
+		spookylogging.Field{Key: "fact_count", Value: len(collection.Facts)})
 
 	return collection, nil
 }

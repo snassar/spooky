@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"spooky/internal/cli"
-	"spooky/internal/logging"
+	spookycli "spooky/internal/cli"
+	spookylogging "spooky/internal/logging"
 
 	"github.com/spf13/cobra"
 )
@@ -30,50 +30,50 @@ func main() {
 - Use templates for dynamic configuration`,
 		PersistentPreRun: func(_ *cobra.Command, _ []string) {
 			// Configure logger based on global flags
-			config := cli.GetGlobalConfig()
-			logging.ConfigureLogger(config.LogLevel, "json", config.LogFile, config.Quiet, config.Verbose)
+			config := spookycli.GetGlobalConfig()
+			spookylogging.ConfigureLogger(config.LogLevel, "json", config.LogFile, config.Quiet, config.Verbose)
 
-			logger := logging.GetLogger()
+			logger := spookylogging.GetLogger()
 			logger.Info("Starting spooky application",
-				logging.String("version", fmt.Sprintf("%s-%s", version, commit)),
+				spookylogging.String("version", fmt.Sprintf("%s-%s", version, commit)),
 			)
 		},
 	}
 
 	// Add global flags
-	cli.AddGlobalFlags(rootCmd)
+	spookycli.AddGlobalFlags(rootCmd)
 
 	// Initialize CLI commands
-	cli.InitCommands()
+	spookycli.InitCommands()
 
 	// Add subcommands
 
-	rootCmd.AddCommand(cli.InitCmd)
-	rootCmd.AddCommand(cli.ValidateCmd)
-	rootCmd.AddCommand(cli.ListCmd)
-	rootCmd.AddCommand(cli.ListMachinesCmd)
-	rootCmd.AddCommand(cli.ListActionsCmd)
-	rootCmd.AddCommand(cli.ListTemplatesCmd)
-	rootCmd.AddCommand(cli.ListFactsCmd)
-	rootCmd.AddCommand(cli.GatherFactsCmd)
-	rootCmd.AddCommand(cli.RenderTemplateCmd)
-	rootCmd.AddCommand(cli.ValidateTemplateCmd)
+	rootCmd.AddCommand(spookycli.InitCmd)
+	rootCmd.AddCommand(spookycli.ValidateCmd)
+	rootCmd.AddCommand(spookycli.ListCmd)
+	rootCmd.AddCommand(spookycli.ListMachinesCmd)
+	rootCmd.AddCommand(spookycli.ListActionsCmd)
+	rootCmd.AddCommand(spookycli.ListTemplatesCmd)
+	rootCmd.AddCommand(spookycli.ListFactsCmd)
+	rootCmd.AddCommand(spookycli.GatherFactsCmd)
+	rootCmd.AddCommand(spookycli.RenderTemplateCmd)
+	rootCmd.AddCommand(spookycli.ValidateTemplateCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		// Configure logger for error output if not already configured
-		config := cli.GetGlobalConfig()
-		logging.ConfigureLogger(config.LogLevel, "json", config.LogFile, config.Quiet, config.Verbose)
+		config := spookycli.GetGlobalConfig()
+		spookylogging.ConfigureLogger(config.LogLevel, "json", config.LogFile, config.Quiet, config.Verbose)
 
-		logger := logging.GetLogger()
+		logger := spookylogging.GetLogger()
 		logger.Error("Application execution failed", err)
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Configure logger for success message if not already configured
-	config := cli.GetGlobalConfig()
-	logging.ConfigureLogger(config.LogLevel, "json", config.LogFile, config.Quiet, config.Verbose)
+	config := spookycli.GetGlobalConfig()
+	spookylogging.ConfigureLogger(config.LogLevel, "json", config.LogFile, config.Quiet, config.Verbose)
 
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 	logger.Info("Application completed successfully")
 }

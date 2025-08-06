@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"spooky/internal/config"
-	"spooky/internal/logging"
+	spookyconfig "spooky/internal/config"
+	spookylogging "spooky/internal/logging"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
@@ -66,12 +66,12 @@ func getHostKeyCallback(callbackType HostKeyCallbackType, knownHostsPath string)
 }
 
 // NewSSHClient creates a new SSH client for the given machine
-func NewSSHClient(machine *config.Machine, timeout int) (*SSHClient, error) {
+func NewSSHClient(machine *spookyconfig.Machine, timeout int) (*SSHClient, error) {
 	return NewSSHClientWithHostKeyCallback(machine, timeout, InsecureHostKey, "")
 }
 
 // NewSSHClientWithHostKeyCallback creates a new SSH client with custom host key verification
-func NewSSHClientWithHostKeyCallback(machine *config.Machine, timeout int, hostKeyType HostKeyCallbackType, knownHostsPath string) (*SSHClient, error) {
+func NewSSHClientWithHostKeyCallback(machine *spookyconfig.Machine, timeout int, hostKeyType HostKeyCallbackType, knownHostsPath string) (*SSHClient, error) {
 	if machine == nil {
 		return nil, fmt.Errorf("machine configuration cannot be nil")
 	}
@@ -81,15 +81,15 @@ func NewSSHClientWithHostKeyCallback(machine *config.Machine, timeout int, hostK
 		return nil, fmt.Errorf("timeout must be positive, got %d", timeout)
 	}
 
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 
 	logger.Info("Creating SSH client",
-		logging.Server(machine.Name),
-		logging.Host(machine.Host),
-		logging.Port(machine.Port),
-		logging.String("user", machine.User),
-		logging.Int("timeout_seconds", timeout),
-		logging.String("host_key_type", string(hostKeyType)),
+		spookylogging.Server(machine.Name),
+		spookylogging.Host(machine.Host),
+		spookylogging.Port(machine.Port),
+		spookylogging.String("user", machine.User),
+		spookylogging.Int("timeout_seconds", timeout),
+		spookylogging.String("host_key_type", string(hostKeyType)),
 	)
 
 	var authMethods []ssh.AuthMethod
@@ -97,7 +97,7 @@ func NewSSHClientWithHostKeyCallback(machine *config.Machine, timeout int, hostK
 	// Add password authentication if provided
 	if machine.Password != "" {
 		logger.Debug("Adding password authentication",
-			logging.Server(machine.Name),
+			spookylogging.Server(machine.Name),
 		)
 		authMethods = append(authMethods, ssh.Password(machine.Password))
 	}
@@ -105,15 +105,15 @@ func NewSSHClientWithHostKeyCallback(machine *config.Machine, timeout int, hostK
 	// Add key-based authentication if provided
 	if machine.KeyFile != "" {
 		logger.Debug("Adding key-based authentication",
-			logging.Server(machine.Name),
-			logging.String("key_file", machine.KeyFile),
+			spookylogging.Server(machine.Name),
+			spookylogging.String("key_file", machine.KeyFile),
 		)
 
 		key, err := os.ReadFile(machine.KeyFile)
 		if err != nil {
 			logger.Error("Failed to read SSH key file", err,
-				logging.Server(machine.Name),
-				logging.String("key_file", machine.KeyFile),
+				spookylogging.Server(machine.Name),
+				spookylogging.String("key_file", machine.KeyFile),
 			)
 			return nil, fmt.Errorf("failed to read key file %s: %w", machine.KeyFile, err)
 		}
@@ -121,8 +121,8 @@ func NewSSHClientWithHostKeyCallback(machine *config.Machine, timeout int, hostK
 		signer, err := ssh.ParsePrivateKey(key)
 		if err != nil {
 			logger.Error("Failed to parse SSH private key", err,
-				logging.Server(machine.Name),
-				logging.String("key_file", machine.KeyFile),
+				spookylogging.Server(machine.Name),
+				spookylogging.String("key_file", machine.KeyFile),
 			)
 			return nil, fmt.Errorf("failed to parse private key: %w", err)
 		}
@@ -131,7 +131,7 @@ func NewSSHClientWithHostKeyCallback(machine *config.Machine, timeout int, hostK
 
 	if len(authMethods) == 0 {
 		logger.Error("No authentication method available", fmt.Errorf("no auth methods"),
-			logging.Server(machine.Name),
+			spookylogging.Server(machine.Name),
 		)
 		return nil, fmt.Errorf("no authentication method available for server %s", machine.Name)
 	}
@@ -140,8 +140,8 @@ func NewSSHClientWithHostKeyCallback(machine *config.Machine, timeout int, hostK
 	hostKeyCallback, err := getHostKeyCallback(hostKeyType, knownHostsPath)
 	if err != nil {
 		logger.Error("Failed to create host key callback", err,
-			logging.Server(machine.Name),
-			logging.String("host_key_type", string(hostKeyType)),
+			spookylogging.Server(machine.Name),
+			spookylogging.String("host_key_type", string(hostKeyType)),
 		)
 		return nil, fmt.Errorf("failed to create host key callback: %w", err)
 	}
@@ -159,22 +159,22 @@ func NewSSHClientWithHostKeyCallback(machine *config.Machine, timeout int, hostK
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", machine.Host, machine.Port), sshConfig)
 	if err != nil {
 		logger.Error("Failed to establish SSH connection", err,
-			logging.Server(machine.Name),
-			logging.Host(machine.Host),
-			logging.Port(machine.Port),
-			logging.String("user", machine.User),
-			logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+			spookylogging.Server(machine.Name),
+			spookylogging.Host(machine.Host),
+			spookylogging.Port(machine.Port),
+			spookylogging.String("user", machine.User),
+			spookylogging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
 		)
 		return nil, fmt.Errorf("failed to connect to %s@%s:%d: %w", machine.User, machine.Host, machine.Port, err)
 	}
 
 	logger.Info("SSH connection established successfully",
-		logging.Server(machine.Name),
-		logging.Host(machine.Host),
-		logging.Port(machine.Port),
-		logging.String("user", machine.User),
-		logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
-		logging.Int("auth_methods", len(authMethods)),
+		spookylogging.Server(machine.Name),
+		spookylogging.Host(machine.Host),
+		spookylogging.Port(machine.Port),
+		spookylogging.String("user", machine.User),
+		spookylogging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+		spookylogging.Int("auth_methods", len(authMethods)),
 	)
 
 	return &SSHClient{
@@ -200,30 +200,30 @@ func (c *SSHClient) Close() error {
 }
 
 // GetMachine returns the machine configuration
-func (c *SSHClient) GetMachine() *config.Machine {
+func (c *SSHClient) GetMachine() *spookyconfig.Machine {
 	return c.config
 }
 
 // ExecuteCommand executes a command on the remote server
 func (c *SSHClient) ExecuteCommand(command string) (string, error) {
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 
 	if c.client == nil {
 		logger.Error("No SSH connection available", fmt.Errorf("client is nil"),
-			logging.Server(c.config.Name),
+			spookylogging.Server(c.config.Name),
 		)
 		return "", fmt.Errorf("failed to create session: no SSH connection exists (Client is nil)")
 	}
 
 	logger.Debug("Creating SSH session",
-		logging.Server(c.config.Name),
-		logging.String("command_length", fmt.Sprintf("%d chars", len(command))),
+		spookylogging.Server(c.config.Name),
+		spookylogging.String("command_length", fmt.Sprintf("%d chars", len(command))),
 	)
 
 	session, err := c.client.NewSession()
 	if err != nil {
 		logger.Error("Failed to create SSH session", err,
-			logging.Server(c.config.Name),
+			spookylogging.Server(c.config.Name),
 		)
 		return "", fmt.Errorf("failed to create session: %w", err)
 	}
@@ -235,18 +235,18 @@ func (c *SSHClient) ExecuteCommand(command string) (string, error) {
 
 	if err := session.Run(command); err != nil {
 		logger.Error("Command execution failed", err,
-			logging.Server(c.config.Name),
-			logging.String("command_length", fmt.Sprintf("%d chars", len(command))),
-			logging.String("stderr", stderr.String()),
+			spookylogging.Server(c.config.Name),
+			spookylogging.String("command_length", fmt.Sprintf("%d chars", len(command))),
+			spookylogging.String("stderr", stderr.String()),
 		)
 		return "", fmt.Errorf("command execution failed: %w", err)
 	}
 
 	output := stdout.String()
 	logger.Debug("Command executed successfully",
-		logging.Server(c.config.Name),
-		logging.String("command_length", fmt.Sprintf("%d chars", len(command))),
-		logging.String("output_length", fmt.Sprintf("%d chars", len(output))),
+		spookylogging.Server(c.config.Name),
+		spookylogging.String("command_length", fmt.Sprintf("%d chars", len(command))),
+		spookylogging.String("output_length", fmt.Sprintf("%d chars", len(output))),
 	)
 
 	return output, nil
@@ -254,26 +254,26 @@ func (c *SSHClient) ExecuteCommand(command string) (string, error) {
 
 // ExecuteScript executes a script file on the remote server
 func (c *SSHClient) ExecuteScript(scriptPath string) (string, error) {
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 
 	logger.Info("Loading script file",
-		logging.Server(c.config.Name),
-		logging.String("script_path", scriptPath),
+		spookylogging.Server(c.config.Name),
+		spookylogging.String("script_path", scriptPath),
 	)
 
 	scriptContent, err := os.ReadFile(scriptPath)
 	if err != nil {
 		logger.Error("Failed to read script file", err,
-			logging.Server(c.config.Name),
-			logging.String("script_path", scriptPath),
+			spookylogging.Server(c.config.Name),
+			spookylogging.String("script_path", scriptPath),
 		)
 		return "", fmt.Errorf("failed to read script file %s: %w", scriptPath, err)
 	}
 
 	logger.Debug("Script file loaded successfully",
-		logging.Server(c.config.Name),
-		logging.String("script_path", scriptPath),
-		logging.String("script_size", fmt.Sprintf("%d bytes", len(scriptContent))),
+		spookylogging.Server(c.config.Name),
+		spookylogging.String("script_path", scriptPath),
+		spookylogging.String("script_size", fmt.Sprintf("%d bytes", len(scriptContent))),
 	)
 
 	// Execute the script content

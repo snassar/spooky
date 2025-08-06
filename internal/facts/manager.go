@@ -10,12 +10,12 @@ import (
 	"encoding/json"
 	"net/http" // Added for HTTP custom facts
 	"os"
-	"spooky/internal/ssh"
+	spookyssh "spooky/internal/ssh"
 )
 
 // Manager coordinates fact collection from multiple sources
 type Manager struct {
-	sshClient      *ssh.SSHClient
+	sshClient      *spookyssh.SSHClient
 	sshCollector   *SSHCollector
 	localCollector *LocalCollector
 	hclCollector   *HCLCollector
@@ -36,7 +36,7 @@ type Manager struct {
 }
 
 // NewManager creates a new fact collection manager
-func NewManager(sshClient *ssh.SSHClient) *Manager {
+func NewManager(sshClient *spookyssh.SSHClient) *Manager {
 	return &Manager{
 		sshClient:        sshClient,
 		sshCollector:     NewSSHCollector(sshClient),
@@ -50,7 +50,7 @@ func NewManager(sshClient *ssh.SSHClient) *Manager {
 }
 
 // NewManagerWithStorage creates a new fact collection manager with storage
-func NewManagerWithStorage(sshClient *ssh.SSHClient, storage FactStorage) *Manager {
+func NewManagerWithStorage(sshClient *spookyssh.SSHClient, storage FactStorage) *Manager {
 	return &Manager{
 		sshClient:        sshClient,
 		sshCollector:     NewSSHCollector(sshClient),
@@ -396,7 +396,7 @@ func (m *Manager) isHCLFact(key string) bool {
 	// HCL facts have prefixes that match the patterns used in HCLCollector
 	hclPrefixes := []string{
 		"machine.", // machine.name, machine.host, machine.port, etc.
-		"config.",  // config.machine_count, config.unique_tags, etc.
+		"spookyconfig.",  // spookyconfig.machine_count, spookyconfig.unique_tags, etc.
 		"action.",  // action.name, action.description, etc.
 		"hcl.",     // hcl.config, hcl.variables, etc.
 	}

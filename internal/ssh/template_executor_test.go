@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"spooky/internal/config"
+	spookyconfig "spooky/internal/config"
 )
 
 func TestNewTemplateActionExecutor(t *testing.T) {
@@ -18,7 +18,7 @@ func TestNewTemplateActionExecutor(t *testing.T) {
 
 func TestTemplateActionExecutor_ExecuteAction_NilAction(t *testing.T) {
 	executor := NewTemplateActionExecutor()
-	machines := []*config.Machine{
+	machines := []*spookyconfig.Machine{
 		{
 			Name:     "test-server",
 			Host:     "192.168.1.100",
@@ -35,12 +35,12 @@ func TestTemplateActionExecutor_ExecuteAction_NilAction(t *testing.T) {
 
 func TestTemplateActionExecutor_ExecuteAction_NilTemplate(t *testing.T) {
 	executor := NewTemplateActionExecutor()
-	action := &config.Action{
+	action := &spookyconfig.Action{
 		Name: "test-action",
 		Type: "template_deploy",
 		// Template is nil
 	}
-	machines := []*config.Machine{
+	machines := []*spookyconfig.Machine{
 		{
 			Name:     "test-server",
 			Host:     "192.168.1.100",
@@ -57,15 +57,15 @@ func TestTemplateActionExecutor_ExecuteAction_NilTemplate(t *testing.T) {
 
 func TestTemplateActionExecutor_ExecuteAction_UnsupportedType(t *testing.T) {
 	executor := NewTemplateActionExecutor()
-	action := &config.Action{
+	action := &spookyconfig.Action{
 		Name: "test-action",
 		Type: "unsupported_type",
-		Template: &config.TemplateConfig{
+		Template: &spookyconfig.TemplateConfig{
 			Source:      "test.tmpl",
 			Destination: "/tmp/test.conf",
 		},
 	}
-	machines := []*config.Machine{
+	machines := []*spookyconfig.Machine{
 		{
 			Name:     "test-server",
 			Host:     "192.168.1.100",
@@ -283,15 +283,15 @@ func TestTemplateActionExecutor_CreateFuncMapWithValues(t *testing.T) {
 
 func TestTemplateActionExecutor_ExecuteTemplateDeploy_FileNotExists(t *testing.T) {
 	executor := NewTemplateActionExecutor()
-	action := &config.Action{
+	action := &spookyconfig.Action{
 		Name: "test-action",
 		Type: "template_deploy",
-		Template: &config.TemplateConfig{
+		Template: &spookyconfig.TemplateConfig{
 			Source:      "/nonexistent/template.tmpl",
 			Destination: "/tmp/test.conf",
 		},
 	}
-	machines := []*config.Machine{
+	machines := []*spookyconfig.Machine{
 		{
 			Name:     "test-server",
 			Host:     "192.168.1.100",
@@ -318,15 +318,15 @@ OS: {{osVersion}}`
 	require.NoError(t, err)
 
 	executor := NewTemplateActionExecutor()
-	action := &config.Action{
+	action := &spookyconfig.Action{
 		Name: "test-action",
 		Type: "template_deploy",
-		Template: &config.TemplateConfig{
+		Template: &spookyconfig.TemplateConfig{
 			Source:      templateFile,
 			Destination: "/tmp/test.conf",
 		},
 	}
-	machines := []*config.Machine{
+	machines := []*spookyconfig.Machine{
 		{
 			Name:     "test-server",
 			Host:     "192.168.1.100",
@@ -357,15 +357,15 @@ OS: {{osVersion}`
 	require.NoError(t, err)
 
 	executor := NewTemplateActionExecutor()
-	action := &config.Action{
+	action := &spookyconfig.Action{
 		Name: "test-action",
 		Type: "template_deploy",
-		Template: &config.TemplateConfig{
+		Template: &spookyconfig.TemplateConfig{
 			Source:      templateFile,
 			Destination: "/tmp/test.conf",
 		},
 	}
-	machines := []*config.Machine{
+	machines := []*spookyconfig.Machine{
 		{
 			Name:     "test-server",
 			Host:     "192.168.1.100",
@@ -382,15 +382,15 @@ OS: {{osVersion}`
 
 func TestTemplateActionExecutor_ExecuteTemplateOperation(t *testing.T) {
 	executor := NewTemplateActionExecutor()
-	action := &config.Action{
+	action := &spookyconfig.Action{
 		Name: "test-action",
 		Type: "template_validate",
-		Template: &config.TemplateConfig{
+		Template: &spookyconfig.TemplateConfig{
 			Source:      "test.tmpl",
 			Destination: "/tmp/test.conf",
 		},
 	}
-	machines := []*config.Machine{
+	machines := []*spookyconfig.Machine{
 		{
 			Name:     "test-server",
 			Host:     "192.168.1.100",
@@ -401,7 +401,7 @@ func TestTemplateActionExecutor_ExecuteTemplateOperation(t *testing.T) {
 	}
 
 	// Test with a simple operation that always succeeds
-	operation := func(_ *SSHClient, _ *config.Action) error {
+	operation := func(_ *SSHClient, _ *spookyconfig.Action) error {
 		return nil
 	}
 
@@ -414,15 +414,15 @@ func TestTemplateActionExecutor_ExecuteTemplateOperation(t *testing.T) {
 
 func TestTemplateActionExecutor_ExecuteTemplateOperation_WithFailingSSH(t *testing.T) {
 	executor := NewTemplateActionExecutor()
-	action := &config.Action{
+	action := &spookyconfig.Action{
 		Name: "test-action",
 		Type: "template_validate",
-		Template: &config.TemplateConfig{
+		Template: &spookyconfig.TemplateConfig{
 			Source:      "test.tmpl",
 			Destination: "/tmp/test.conf",
 		},
 	}
-	machines := []*config.Machine{
+	machines := []*spookyconfig.Machine{
 		{
 			Name:     "test-server",
 			Host:     "192.168.1.100",
@@ -433,7 +433,7 @@ func TestTemplateActionExecutor_ExecuteTemplateOperation_WithFailingSSH(t *testi
 	}
 
 	// Test with an operation that would fail if SSH worked
-	operation := func(_ *SSHClient, _ *config.Action) error {
+	operation := func(_ *SSHClient, _ *spookyconfig.Action) error {
 		return assert.AnError
 	}
 
@@ -457,10 +457,10 @@ func TestTemplateActionExecutor_WithTestDataFromExamples(t *testing.T) {
 	executor := NewTemplateActionExecutor()
 
 	// Create an action similar to what would be in test data
-	action := &config.Action{
+	action := &spookyconfig.Action{
 		Name: "deploy-config",
 		Type: "template_deploy",
-		Template: &config.TemplateConfig{
+		Template: &spookyconfig.TemplateConfig{
 			Source:      filepath.Join(validProjectPath, "templates", "test.tmpl"),
 			Destination: "/tmp/test.conf",
 			Permissions: "644",
@@ -472,7 +472,7 @@ func TestTemplateActionExecutor_WithTestDataFromExamples(t *testing.T) {
 		Timeout:  300,
 	}
 
-	machines := []*config.Machine{
+	machines := []*spookyconfig.Machine{
 		{
 			Name:     "example-server",
 			Host:     "192.168.1.100",
@@ -506,7 +506,7 @@ func TestTemplateActionExecutor_TemplateActionTypes(t *testing.T) {
 	err := os.WriteFile(templateFile, []byte(templateContent), 0o600)
 	require.NoError(t, err)
 
-	machines := []*config.Machine{
+	machines := []*spookyconfig.Machine{
 		{
 			Name:     "test-server",
 			Host:     "192.168.1.100",
@@ -545,10 +545,10 @@ func TestTemplateActionExecutor_TemplateActionTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			action := &config.Action{
+			action := &spookyconfig.Action{
 				Name: tt.name,
 				Type: tt.actionType,
-				Template: &config.TemplateConfig{
+				Template: &spookyconfig.TemplateConfig{
 					Source:      templateFile,
 					Destination: "/tmp/test.conf",
 				},

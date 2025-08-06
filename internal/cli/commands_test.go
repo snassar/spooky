@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"spooky/internal/logging"
+	spookylogging "spooky/internal/logging"
 )
 
 func TestInitCmd(t *testing.T) {
@@ -405,7 +405,7 @@ func TestListFactsCmd(t *testing.T) {
 		{
 			name:        "custom facts db path",
 			projectPath: filepath.Join(projectRoot, "examples", "testing", "test-valid-project"),
-			factsDBPath: filepath.Join(projectRoot, "examples", "testing", "test-valid-project", ".facts.db"),
+			factsDBPath: filepath.Join(projectRoot, "examples", "testing", "test-valid-project", ".spookyfacts.db"),
 			expectError: false,
 		},
 		{
@@ -709,7 +709,7 @@ func TestInitProject(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := logging.GetLogger()
+			logger := spookylogging.GetLogger()
 			err := initProject(logger, tt.projectName, tt.path)
 
 			if tt.expectError {
@@ -772,7 +772,7 @@ func TestValidateProject(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := logging.GetLogger()
+			logger := spookylogging.GetLogger()
 			err := validateProject(logger, tt.path)
 
 			if tt.expectError {
@@ -818,7 +818,7 @@ func TestListProject(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := logging.GetLogger()
+			logger := spookylogging.GetLogger()
 			err := listProject(logger, tt.path)
 
 			if tt.expectError {
@@ -861,7 +861,7 @@ func TestListProjectMachines(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := logging.GetLogger()
+			logger := spookylogging.GetLogger()
 			err := listProjectMachines(logger, tt.path)
 
 			if tt.expectError {
@@ -899,7 +899,7 @@ func TestListProjectActions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := logging.GetLogger()
+			logger := spookylogging.GetLogger()
 			err := listProjectActions(logger, tt.path)
 
 			if tt.expectError {
@@ -939,7 +939,7 @@ func TestListProjectTemplates(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := logging.GetLogger()
+			logger := spookylogging.GetLogger()
 			err := listProjectTemplates(logger, tt.path, tt.templatesDir)
 
 			if tt.expectError {
@@ -967,7 +967,7 @@ func TestListProjectFacts(t *testing.T) {
 		{
 			name:        "custom facts db path",
 			path:        filepath.Join(projectRoot, "examples", "testing", "test-valid-project"),
-			factsDBPath: filepath.Join(projectRoot, "examples", "testing", "test-valid-project", ".facts.db"),
+			factsDBPath: filepath.Join(projectRoot, "examples", "testing", "test-valid-project", ".spookyfacts.db"),
 			expectError: false,
 		},
 		{
@@ -979,7 +979,7 @@ func TestListProjectFacts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := logging.GetLogger()
+			logger := spookylogging.GetLogger()
 			err := listProjectFacts(logger, tt.path, tt.factsDBPath)
 
 			if tt.expectError {
@@ -1023,7 +1023,7 @@ func TestGatherProjectFacts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := logging.GetLogger()
+			logger := spookylogging.GetLogger()
 			err := gatherProjectFacts(logger, tt.path, tt.sshKeyPath, tt.dryRun, tt.factsDBPath)
 
 			if tt.expectError {
@@ -1077,7 +1077,7 @@ func TestRenderProjectTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := logging.GetLogger()
+			logger := spookylogging.GetLogger()
 			err := renderProjectTemplate(logger, tt.templateFile, tt.path, tt.output, tt.dryRun, tt.server, tt.sshKeyPath, tt.templatesDir, tt.dataDir)
 
 			if tt.expectError {
@@ -1124,7 +1124,7 @@ func TestValidateProjectTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := logging.GetLogger()
+			logger := spookylogging.GetLogger()
 			err := validateProjectTemplate(logger, tt.templateFile, tt.path, tt.templatesDir, tt.dataDir)
 
 			if tt.expectError {
@@ -1170,7 +1170,7 @@ func TestValidateConfigFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := logging.GetLogger()
+			logger := spookylogging.GetLogger()
 			err := validateConfigFile(logger, tt.filePath, tt.fileType, tt.parser)
 
 			if tt.expectError {

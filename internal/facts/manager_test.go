@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"spooky/internal/ssh"
+	spookyssh "spooky/internal/ssh"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,7 +17,7 @@ import (
 
 func TestNewManager(t *testing.T) {
 	// Test creating a new manager without storage
-	sshClient := &ssh.SSHClient{}
+	sshClient := &spookyssh.SSHClient{}
 	manager := NewManager(sshClient)
 
 	assert.NotNil(t, manager)
@@ -33,7 +33,7 @@ func TestNewManager(t *testing.T) {
 
 func TestNewManagerWithStorage(t *testing.T) {
 	// Test creating a new manager with storage
-	sshClient := &ssh.SSHClient{}
+	sshClient := &spookyssh.SSHClient{}
 	storage := &MockFactStorage{}
 	manager := NewManagerWithStorage(sshClient, storage)
 
@@ -48,7 +48,7 @@ func TestManagerConfigureHCLCollector(t *testing.T) {
 	manager := NewManager(nil)
 
 	// Test configuring HCL collector
-	filePath := "/path/to/config.hcl"
+	filePath := "/path/to/spookyconfig.hcl"
 	manager.ConfigureHCLCollector(filePath)
 
 	assert.NotNil(t, manager.hclCollector)

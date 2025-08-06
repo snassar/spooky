@@ -8,8 +8,8 @@ import (
 	"strings"
 	"text/template"
 
-	"spooky/internal/config"
-	"spooky/internal/logging"
+	spookyconfig "spooky/internal/config"
+	spookylogging "spooky/internal/logging"
 )
 
 // TemplateActionExecutor handles template action execution
@@ -21,8 +21,8 @@ func NewTemplateActionExecutor() *TemplateActionExecutor {
 }
 
 // ExecuteAction executes a template action on target machines
-func (tae *TemplateActionExecutor) ExecuteAction(action *config.Action, machines []*config.Machine) error {
-	logger := logging.GetLogger()
+func (tae *TemplateActionExecutor) ExecuteAction(action *spookyconfig.Action, machines []*spookyconfig.Machine) error {
+	logger := spookylogging.GetLogger()
 
 	if action == nil {
 		return fmt.Errorf("action cannot be nil")
@@ -33,10 +33,10 @@ func (tae *TemplateActionExecutor) ExecuteAction(action *config.Action, machines
 	}
 
 	logger.Info("Executing template action",
-		logging.String("action_name", action.Name),
-		logging.String("action_type", action.Type),
-		logging.String("template_source", action.Template.Source),
-		logging.String("template_destination", action.Template.Destination),
+		spookylogging.String("action_name", action.Name),
+		spookylogging.String("action_type", action.Type),
+		spookylogging.String("template_source", action.Template.Source),
+		spookylogging.String("template_destination", action.Template.Destination),
 	)
 
 	switch action.Type {
@@ -54,8 +54,8 @@ func (tae *TemplateActionExecutor) ExecuteAction(action *config.Action, machines
 }
 
 // executeTemplateDeploy deploys template files to target servers
-func (tae *TemplateActionExecutor) executeTemplateDeploy(action *config.Action, machines []*config.Machine) error {
-	logger := logging.GetLogger()
+func (tae *TemplateActionExecutor) executeTemplateDeploy(action *spookyconfig.Action, machines []*spookyconfig.Machine) error {
+	logger := spookylogging.GetLogger()
 
 	// Validate template file exists
 	if _, err := os.Stat(action.Template.Source); os.IsNotExist(err) {
@@ -74,23 +74,23 @@ func (tae *TemplateActionExecutor) executeTemplateDeploy(action *config.Action, 
 	}
 
 	logger.Info("Deploying template file",
-		logging.String("source", action.Template.Source),
-		logging.Int("content_size", len(templateContent)),
-		logging.Int("target_machines", len(machines)),
+		spookylogging.String("source", action.Template.Source),
+		spookylogging.Int("content_size", len(templateContent)),
+		spookylogging.Int("target_machines", len(machines)),
 	)
 
 	// Deploy to each target machine
 	for _, machine := range machines {
 		logger.Info("Deploying template to machine",
-			logging.String("machine", machine.Name),
-			logging.String("destination", action.Template.Destination),
+			spookylogging.String("machine", machine.Name),
+			spookylogging.String("destination", action.Template.Destination),
 		)
 
 		// Create SSH client
 		sshClient, err := NewSSHClient(machine, 30)
 		if err != nil {
 			logger.Error("Failed to create SSH client", err,
-				logging.String("machine", machine.Name))
+				spookylogging.String("machine", machine.Name))
 			continue
 		}
 
@@ -102,8 +102,8 @@ func (tae *TemplateActionExecutor) executeTemplateDeploy(action *config.Action, 
 			destDir := filepath.Dir(action.Template.Destination)
 			if err := tae.createRemoteDirectory(sshClient, destDir); err != nil {
 				logger.Error("Failed to create destination directory", err,
-					logging.String("machine", machine.Name),
-					logging.String("directory", destDir))
+					spookylogging.String("machine", machine.Name),
+					spookylogging.String("directory", destDir))
 				return
 			}
 
@@ -111,9 +111,9 @@ func (tae *TemplateActionExecutor) executeTemplateDeploy(action *config.Action, 
 			fileExists, err := tae.remoteFileExists(sshClient, action.Template.Destination)
 			if err != nil {
 				logger.Warn("Failed to check if file exists, proceeding with deployment",
-					logging.String("machine", machine.Name),
-					logging.String("file", action.Template.Destination),
-					logging.String("error", err.Error()))
+					spookylogging.String("machine", machine.Name),
+					spookylogging.String("file", action.Template.Destination),
+					spookylogging.String("error", err.Error()))
 			}
 
 			if fileExists {
@@ -121,13 +121,13 @@ func (tae *TemplateActionExecutor) executeTemplateDeploy(action *config.Action, 
 				contentChanged, err := tae.hasContentChanged(sshClient, action.Template.Destination, templateContent)
 				if err != nil {
 					logger.Warn("Failed to compare file content, proceeding with deployment",
-						logging.String("machine", machine.Name),
-						logging.String("file", action.Template.Destination),
-						logging.String("error", err.Error()))
+						spookylogging.String("machine", machine.Name),
+						spookylogging.String("file", action.Template.Destination),
+						spookylogging.String("error", err.Error()))
 				} else if !contentChanged {
 					logger.Info("File content unchanged, skipping deployment",
-						logging.String("machine", machine.Name),
-						logging.String("file", action.Template.Destination))
+						spookylogging.String("machine", machine.Name),
+						spookylogging.String("file", action.Template.Destination))
 					return
 				}
 
@@ -135,29 +135,29 @@ func (tae *TemplateActionExecutor) executeTemplateDeploy(action *config.Action, 
 				if action.Template.Backup {
 					if err := tae.backupRemoteFile(sshClient, action.Template.Destination); err != nil {
 						logger.Error("Failed to create backup, aborting deployment", err,
-							logging.String("machine", machine.Name),
-							logging.String("file", action.Template.Destination))
+							spookylogging.String("machine", machine.Name),
+							spookylogging.String("file", action.Template.Destination))
 						return
 					}
 					logger.Info("Backup created successfully",
-						logging.String("machine", machine.Name),
-						logging.String("file", action.Template.Destination))
+						spookylogging.String("machine", machine.Name),
+						spookylogging.String("file", action.Template.Destination))
 				}
 			}
 
 			// Write template file to remote machine
 			if err := tae.writeRemoteFile(sshClient, action.Template.Destination, templateContent); err != nil {
 				logger.Error("Failed to write template file", err,
-					logging.String("machine", machine.Name),
-					logging.String("destination", action.Template.Destination))
+					spookylogging.String("machine", machine.Name),
+					spookylogging.String("destination", action.Template.Destination))
 				return
 			}
 
 			// Validate file was written correctly
 			if err := tae.validateRemoteFile(sshClient, action.Template.Destination); err != nil {
 				logger.Error("File validation failed after deployment", err,
-					logging.String("machine", machine.Name),
-					logging.String("file", action.Template.Destination))
+					spookylogging.String("machine", machine.Name),
+					spookylogging.String("file", action.Template.Destination))
 				return
 			}
 
@@ -165,8 +165,8 @@ func (tae *TemplateActionExecutor) executeTemplateDeploy(action *config.Action, 
 			if action.Template.Permissions != "" {
 				if err := tae.setRemoteFilePermissions(sshClient, action.Template.Destination, action.Template.Permissions); err != nil {
 					logger.Error("Failed to set file permissions", err,
-						logging.String("machine", machine.Name),
-						logging.String("permissions", action.Template.Permissions))
+						spookylogging.String("machine", machine.Name),
+						spookylogging.String("permissions", action.Template.Permissions))
 				}
 			}
 
@@ -174,15 +174,15 @@ func (tae *TemplateActionExecutor) executeTemplateDeploy(action *config.Action, 
 			if action.Template.Owner != "" || action.Template.Group != "" {
 				if err := tae.setRemoteFileOwnership(sshClient, action.Template.Destination, action.Template.Owner, action.Template.Group); err != nil {
 					logger.Error("Failed to set file ownership", err,
-						logging.String("machine", machine.Name),
-						logging.String("owner", action.Template.Owner),
-						logging.String("group", action.Template.Group))
+						spookylogging.String("machine", machine.Name),
+						spookylogging.String("owner", action.Template.Owner),
+						spookylogging.String("group", action.Template.Group))
 				}
 			}
 
 			logger.Info("Successfully deployed template to machine",
-				logging.String("machine", machine.Name),
-				logging.String("destination", action.Template.Destination),
+				spookylogging.String("machine", machine.Name),
+				spookylogging.String("destination", action.Template.Destination),
 			)
 		}()
 	}
@@ -191,22 +191,22 @@ func (tae *TemplateActionExecutor) executeTemplateDeploy(action *config.Action, 
 }
 
 // executeTemplateEvaluate evaluates templates on target servers
-func (tae *TemplateActionExecutor) executeTemplateEvaluate(action *config.Action, machines []*config.Machine) error {
-	logger := logging.GetLogger()
+func (tae *TemplateActionExecutor) executeTemplateEvaluate(action *spookyconfig.Action, machines []*spookyconfig.Machine) error {
+	logger := spookylogging.GetLogger()
 
 	// Deploy to each target machine
 	for _, machine := range machines {
 		logger.Info("Evaluating template on machine",
-			logging.String("machine", machine.Name),
-			logging.String("source", action.Template.Source),
-			logging.String("destination", action.Template.Destination),
+			spookylogging.String("machine", machine.Name),
+			spookylogging.String("source", action.Template.Source),
+			spookylogging.String("destination", action.Template.Destination),
 		)
 
 		// Create SSH client
 		sshClient, err := NewSSHClient(machine, 30)
 		if err != nil {
 			logger.Error("Failed to create SSH client", err,
-				logging.String("machine", machine.Name))
+				spookylogging.String("machine", machine.Name))
 			continue
 		}
 
@@ -218,8 +218,8 @@ func (tae *TemplateActionExecutor) executeTemplateEvaluate(action *config.Action
 			if action.Template.Backup {
 				if err := tae.backupRemoteFile(sshClient, action.Template.Destination); err != nil {
 					logger.Error("Failed to backup existing file", err,
-						logging.String("machine", machine.Name),
-						logging.String("file", action.Template.Destination))
+						spookylogging.String("machine", machine.Name),
+						spookylogging.String("file", action.Template.Destination))
 					return
 				}
 			}
@@ -228,16 +228,16 @@ func (tae *TemplateActionExecutor) executeTemplateEvaluate(action *config.Action
 			evaluatedContent, err := tae.evaluateRemoteTemplate(sshClient, action.Template.Source)
 			if err != nil {
 				logger.Error("Failed to evaluate template", err,
-					logging.String("machine", machine.Name),
-					logging.String("template", action.Template.Source))
+					spookylogging.String("machine", machine.Name),
+					spookylogging.String("template", action.Template.Source))
 				return
 			}
 
 			// Write evaluated content to destination
 			if err := tae.writeRemoteFile(sshClient, action.Template.Destination, evaluatedContent); err != nil {
 				logger.Error("Failed to write evaluated template", err,
-					logging.String("machine", machine.Name),
-					logging.String("destination", action.Template.Destination))
+					spookylogging.String("machine", machine.Name),
+					spookylogging.String("destination", action.Template.Destination))
 				return
 			}
 
@@ -245,15 +245,15 @@ func (tae *TemplateActionExecutor) executeTemplateEvaluate(action *config.Action
 			if action.Template.Validate {
 				if err := tae.validateRemoteFile(sshClient, action.Template.Destination); err != nil {
 					logger.Error("Template validation failed", err,
-						logging.String("machine", machine.Name),
-						logging.String("file", action.Template.Destination))
+						spookylogging.String("machine", machine.Name),
+						spookylogging.String("file", action.Template.Destination))
 					return
 				}
 			}
 
 			logger.Info("Successfully evaluated template on machine",
-				logging.String("machine", machine.Name),
-				logging.String("destination", action.Template.Destination),
+				spookylogging.String("machine", machine.Name),
+				spookylogging.String("destination", action.Template.Destination),
 			)
 		}()
 	}
@@ -262,39 +262,39 @@ func (tae *TemplateActionExecutor) executeTemplateEvaluate(action *config.Action
 }
 
 // executeTemplateValidate validates templates on target servers
-func (tae *TemplateActionExecutor) executeTemplateValidate(action *config.Action, machines []*config.Machine) error {
-	return tae.executeTemplateOperation(action, machines, "Validating", "validated", func(sshClient *SSHClient, action *config.Action) error {
+func (tae *TemplateActionExecutor) executeTemplateValidate(action *spookyconfig.Action, machines []*spookyconfig.Machine) error {
+	return tae.executeTemplateOperation(action, machines, "Validating", "validated", func(sshClient *SSHClient, action *spookyconfig.Action) error {
 		return tae.validateRemoteTemplate(sshClient, action.Template.Source)
 	})
 }
 
 // executeTemplateCleanup removes template files from target servers
-func (tae *TemplateActionExecutor) executeTemplateCleanup(action *config.Action, machines []*config.Machine) error {
-	return tae.executeTemplateOperation(action, machines, "Cleaning up", "cleaned up", func(sshClient *SSHClient, action *config.Action) error {
+func (tae *TemplateActionExecutor) executeTemplateCleanup(action *spookyconfig.Action, machines []*spookyconfig.Machine) error {
+	return tae.executeTemplateOperation(action, machines, "Cleaning up", "cleaned up", func(sshClient *SSHClient, action *spookyconfig.Action) error {
 		return tae.removeRemoteFile(sshClient, action.Template.Source)
 	})
 }
 
 // executeTemplateOperation is a helper function to reduce code duplication
 func (tae *TemplateActionExecutor) executeTemplateOperation(
-	action *config.Action,
-	machines []*config.Machine,
+	action *spookyconfig.Action,
+	machines []*spookyconfig.Machine,
 	operationName,
 	successVerb string,
-	operation func(*SSHClient, *config.Action) error,
+	operation func(*SSHClient, *spookyconfig.Action) error,
 ) error {
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 
 	for _, machine := range machines {
 		logger.Info(operationName+" template on machine",
-			logging.String("machine", machine.Name),
-			logging.String("template", action.Template.Source),
+			spookylogging.String("machine", machine.Name),
+			spookylogging.String("template", action.Template.Source),
 		)
 
 		sshClient, err := NewSSHClient(machine, 30)
 		if err != nil {
 			logger.Error("Failed to create SSH client", err,
-				logging.String("machine", machine.Name))
+				spookylogging.String("machine", machine.Name))
 			continue
 		}
 
@@ -304,14 +304,14 @@ func (tae *TemplateActionExecutor) executeTemplateOperation(
 
 			if err := operation(sshClient, action); err != nil {
 				logger.Error("Template "+operationName+" failed", err,
-					logging.String("machine", machine.Name),
-					logging.String("template", action.Template.Source))
+					spookylogging.String("machine", machine.Name),
+					spookylogging.String("template", action.Template.Source))
 				return
 			}
 
 			logger.Info("Successfully "+successVerb+" template on machine",
-				logging.String("machine", machine.Name),
-				logging.String("template", action.Template.Source),
+				spookylogging.String("machine", machine.Name),
+				spookylogging.String("template", action.Template.Source),
 			)
 		}()
 	}

@@ -6,52 +6,52 @@ import (
 	"sync"
 	"time"
 
-	"spooky/internal/config"
-	"spooky/internal/logging"
+	spookyconfig "spooky/internal/config"
+	spookylogging "spooky/internal/logging"
 )
 
 // ExecuteConfig executes all actions in the configuration
-func ExecuteConfig(cfg *config.Config) error {
-	logger := logging.GetLogger()
+func ExecuteConfig(cfg *spookyconfig.Config) error {
+	logger := spookylogging.GetLogger()
 
 	logger.Info("Starting configuration execution",
-		logging.Int("action_count", len(cfg.Actions)),
-		logging.Int("machine_count", len(cfg.Machines)),
+		spookylogging.Int("action_count", len(cfg.Actions)),
+		spookylogging.Int("machine_count", len(cfg.Machines)),
 	)
 
 	// Initialize template action executor
 	templateExecutor := NewTemplateActionExecutor()
 
 	// Initialize index cache for enterprise-scale performance
-	indexCache := &config.IndexCache{}
+	indexCache := &spookyconfig.IndexCache{}
 
 	for i := range cfg.Actions {
 		action := &cfg.Actions[i]
 		startTime := time.Now()
 
 		logger.Info("Executing action",
-			logging.Action(action.Name),
-			logging.String("description", action.Description),
-			logging.String("type", action.Type),
+			spookylogging.Action(action.Name),
+			spookylogging.String("description", action.Description),
+			spookylogging.String("type", action.Type),
 		)
 
 		// Get target machines for this action using optimized lookup
-		var targetMachines []*config.Machine
+		var targetMachines []*spookyconfig.Machine
 		var err error
 
 		// Use enterprise-scale lookup for better performance
-		index := indexCache.GetIndex(cfg)
-		targetMachines, err = config.GetMachinesForActionLarge(cfg, action, index)
+		index := indexCache.GetIndex(cfg.Machines)
+		targetMachines, err = spookyconfig.GetMachinesForActionLarge(cfg.Machines, action, index)
 		if err != nil {
 			logger.Error("Failed to get machines for action", err,
-				logging.Action(action.Name),
+				spookylogging.Action(action.Name),
 			)
 			return fmt.Errorf("failed to get machines for action %s: %w", action.Name, err)
 		}
 
 		logger.Info("Action target machines determined",
-			logging.Action(action.Name),
-			logging.Int("target_machine_count", len(targetMachines)),
+			spookylogging.Action(action.Name),
+			spookylogging.Int("target_machine_count", len(targetMachines)),
 		)
 
 		// Execute action based on type
@@ -68,26 +68,26 @@ func ExecuteConfig(cfg *config.Config) error {
 
 		if err != nil {
 			logger.Error("Failed to execute action", err,
-				logging.Action(action.Name),
-				logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+				spookylogging.Action(action.Name),
+				spookylogging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
 			)
 			return fmt.Errorf("failed to execute action %s: %w", action.Name, err)
 		}
 
 		logger.Info("Action completed successfully",
-			logging.Action(action.Name),
-			logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+			spookylogging.Action(action.Name),
+			spookylogging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
 		)
 	}
 
 	logger.Info("All actions completed successfully",
-		logging.Int("total_actions", len(cfg.Actions)),
+		spookylogging.Int("total_actions", len(cfg.Actions)),
 	)
 	return nil
 }
 
 // isTemplateAction checks if an action is a template action
-func isTemplateAction(action *config.Action) bool {
+func isTemplateAction(action *spookyconfig.Action) bool {
 	return action.Type == "template_deploy" ||
 		action.Type == "template_evaluate" ||
 		action.Type == "template_validate" ||
@@ -95,32 +95,32 @@ func isTemplateAction(action *config.Action) bool {
 }
 
 // executeTemplateAction executes a template action using the template executor
-func executeTemplateAction(templateExecutor *TemplateActionExecutor, action *config.Action, machines []*config.Machine) error {
-	logger := logging.GetLogger()
+func executeTemplateAction(templateExecutor *TemplateActionExecutor, action *spookyconfig.Action, machines []*spookyconfig.Machine) error {
+	logger := spookylogging.GetLogger()
 
 	logger.Info("Executing template action",
-		logging.Action(action.Name),
-		logging.String("type", action.Type),
-		logging.Int("machine_count", len(machines)),
+		spookylogging.Action(action.Name),
+		spookylogging.String("type", action.Type),
+		spookylogging.Int("machine_count", len(machines)),
 	)
 
 	return templateExecutor.ExecuteAction(action, machines)
 }
 
 // executeActionSequential executes an action sequentially on all target machines
-func executeActionSequential(action *config.Action, machines []*config.Machine) error {
-	logger := logging.GetLogger()
+func executeActionSequential(action *spookyconfig.Action, machines []*spookyconfig.Machine) error {
+	logger := spookylogging.GetLogger()
 
 	// Validate action before connecting
 	if action.Command != "" && action.Script != "" {
 		logger.Error("Action validation failed", fmt.Errorf("both command and script specified"),
-			logging.Action(action.Name),
+			spookylogging.Action(action.Name),
 		)
 		return fmt.Errorf("action %s: both command and script specified", action.Name)
 	}
 	if action.Command == "" && action.Script == "" {
 		logger.Error("Action validation failed", fmt.Errorf("neither command nor script specified"),
-			logging.Action(action.Name),
+			spookylogging.Action(action.Name),
 		)
 		return fmt.Errorf("action %s: neither command nor script specified", action.Name)
 	}
@@ -129,19 +129,19 @@ func executeActionSequential(action *config.Action, machines []*config.Machine) 
 		startTime := time.Now()
 
 		logger.Info("Connecting to machine",
-			logging.Server(machine.Name),
-			logging.Host(machine.Host),
-			logging.Port(machine.Port),
-			logging.String("user", machine.User),
+			spookylogging.Server(machine.Name),
+			spookylogging.Host(machine.Host),
+			spookylogging.Port(machine.Port),
+			spookylogging.String("user", machine.User),
 		)
 
 		// Create SSH client
 		client, err := NewSSHClient(machine, 30) // Default timeout
 		if err != nil {
 			logger.Error("Failed to connect to machine", err,
-				logging.Server(machine.Name),
-				logging.Host(machine.Host),
-				logging.Port(machine.Port),
+				spookylogging.Server(machine.Name),
+				spookylogging.Host(machine.Host),
+				spookylogging.Port(machine.Port),
 			)
 			continue
 		}
@@ -157,32 +157,32 @@ func executeActionSequential(action *config.Action, machines []*config.Machine) 
 		// Close client after execution
 		if closeErr := client.Close(); closeErr != nil {
 			logger.Warn("Failed to close SSH connection",
-				logging.Server(machine.Name),
-				logging.Error(closeErr),
+				spookylogging.Server(machine.Name),
+				spookylogging.Error(closeErr),
 			)
 		}
 
 		if err != nil {
 			logger.Error("Failed to execute action on machine", err,
-				logging.Server(machine.Name),
-				logging.Action(action.Name),
-				logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+				spookylogging.Server(machine.Name),
+				spookylogging.Action(action.Name),
+				spookylogging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
 			)
 			continue
 		}
 
 		logger.Info("Action executed successfully on machine",
-			logging.Server(machine.Name),
-			logging.Action(action.Name),
-			logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
-			logging.String("output_length", fmt.Sprintf("%d chars", len(output))),
+			spookylogging.Server(machine.Name),
+			spookylogging.Action(action.Name),
+			spookylogging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+			spookylogging.String("output_length", fmt.Sprintf("%d chars", len(output))),
 		)
 
 		if output != "" {
 			logger.Debug("Command output",
-				logging.Server(machine.Name),
-				logging.Action(action.Name),
-				logging.String("output", output),
+				spookylogging.Server(machine.Name),
+				spookylogging.Action(action.Name),
+				spookylogging.String("output", output),
 			)
 		}
 	}
@@ -191,19 +191,19 @@ func executeActionSequential(action *config.Action, machines []*config.Machine) 
 }
 
 // validateActionForParallel validates an action for parallel execution
-func validateActionForParallel(action *config.Action) error {
-	logger := logging.GetLogger()
+func validateActionForParallel(action *spookyconfig.Action) error {
+	logger := spookylogging.GetLogger()
 
 	// Validate action before connecting
 	if action.Command != "" && action.Script != "" {
 		logger.Error("Action validation failed", fmt.Errorf("both command and script specified"),
-			logging.Action(action.Name),
+			spookylogging.Action(action.Name),
 		)
 		return fmt.Errorf("action %s: both command and script specified", action.Name)
 	}
 	if action.Command == "" && action.Script == "" {
 		logger.Error("Action validation failed", fmt.Errorf("neither command nor script specified"),
-			logging.Action(action.Name),
+			spookylogging.Action(action.Name),
 		)
 		return fmt.Errorf("action %s: neither command nor script specified", action.Name)
 	}
@@ -212,8 +212,8 @@ func validateActionForParallel(action *config.Action) error {
 	if action.Script != "" {
 		if _, err := os.Stat(action.Script); os.IsNotExist(err) {
 			logger.Error("Script file not found", err,
-				logging.Action(action.Name),
-				logging.String("script_file", action.Script),
+				spookylogging.Action(action.Name),
+				spookylogging.String("script_file", action.Script),
 			)
 			return fmt.Errorf("failed to read script file %s: %w", action.Script, err)
 		}
@@ -223,25 +223,25 @@ func validateActionForParallel(action *config.Action) error {
 }
 
 // executeActionOnMachine executes an action on a single machine in a goroutine
-func executeActionOnMachine(action *config.Action, machine *config.Machine, results chan<- string, errors chan<- error, wg *sync.WaitGroup) {
+func executeActionOnMachine(action *spookyconfig.Action, machine *spookyconfig.Machine, results chan<- string, errors chan<- error, wg *sync.WaitGroup) {
 	defer wg.Done()
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 	startTime := time.Now()
 
 	logger.Info("Connecting to machine (parallel)",
-		logging.Server(machine.Name),
-		logging.Host(machine.Host),
-		logging.Port(machine.Port),
-		logging.String("user", machine.User),
+		spookylogging.Server(machine.Name),
+		spookylogging.Host(machine.Host),
+		spookylogging.Port(machine.Port),
+		spookylogging.String("user", machine.User),
 	)
 
 	// Create SSH client
 	client, err := NewSSHClient(machine, 30) // Default timeout
 	if err != nil {
 		logger.Error("Failed to connect to machine (parallel)", err,
-			logging.Server(machine.Name),
-			logging.Host(machine.Host),
-			logging.Port(machine.Port),
+			spookylogging.Server(machine.Name),
+			spookylogging.Host(machine.Host),
+			spookylogging.Port(machine.Port),
 		)
 		errors <- fmt.Errorf("failed to connect to %s: %w", machine.Name, err)
 		return
@@ -250,8 +250,8 @@ func executeActionOnMachine(action *config.Action, machine *config.Machine, resu
 	defer func() {
 		if closeErr := client.Close(); closeErr != nil {
 			logger.Warn("Failed to close SSH connection (parallel)",
-				logging.Server(machine.Name),
-				logging.Error(closeErr),
+				spookylogging.Server(machine.Name),
+				spookylogging.Error(closeErr),
 			)
 		}
 	}()
@@ -266,27 +266,27 @@ func executeActionOnMachine(action *config.Action, machine *config.Machine, resu
 
 	if err != nil {
 		logger.Error("Failed to execute action on machine (parallel)", err,
-			logging.Server(machine.Name),
-			logging.Action(action.Name),
-			logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+			spookylogging.Server(machine.Name),
+			spookylogging.Action(action.Name),
+			spookylogging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
 		)
 		errors <- fmt.Errorf("failed to execute action on %s: %w", machine.Name, err)
 		return
 	}
 
 	logger.Info("Action executed successfully on machine (parallel)",
-		logging.Server(machine.Name),
-		logging.Action(action.Name),
-		logging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
-		logging.String("output_length", fmt.Sprintf("%d chars", len(output))),
+		spookylogging.Server(machine.Name),
+		spookylogging.Action(action.Name),
+		spookylogging.Duration("duration_ms", time.Since(startTime).Milliseconds()),
+		spookylogging.String("output_length", fmt.Sprintf("%d chars", len(output))),
 	)
 
 	results <- fmt.Sprintf("✅ Success on %s\n%s", machine.Name, indentOutput(output))
 }
 
 // executeActionParallel executes an action in parallel on all target machines
-func executeActionParallel(action *config.Action, machines []*config.Machine) error {
-	logger := logging.GetLogger()
+func executeActionParallel(action *spookyconfig.Action, machines []*spookyconfig.Machine) error {
+	logger := spookylogging.GetLogger()
 
 	// Validate action before connecting
 	if err := validateActionForParallel(action); err != nil {
@@ -309,7 +309,7 @@ func executeActionParallel(action *config.Action, machines []*config.Machine) er
 
 	// Collect results
 	for result := range results {
-		logger.Info("Parallel execution result", logging.String("result", result))
+		logger.Info("Parallel execution result", spookylogging.String("result", result))
 	}
 
 	// Collect all errors
@@ -323,22 +323,22 @@ func executeActionParallel(action *config.Action, machines []*config.Machine) er
 		// Log all errors for debugging
 		for i, err := range allErrors {
 			logger.Error("Parallel execution error", err,
-				logging.Action(action.Name),
-				logging.Int("error_index", i+1),
-				logging.Int("total_errors", len(allErrors)),
+				spookylogging.Action(action.Name),
+				spookylogging.Int("error_index", i+1),
+				spookylogging.Int("total_errors", len(allErrors)),
 			)
 		}
 
 		// Return the first error with context about total errors
 		if len(allErrors) == 1 {
-			logger.Error("Parallel execution failed", allErrors[0], logging.Action(action.Name))
+			logger.Error("Parallel execution failed", allErrors[0], spookylogging.Action(action.Name))
 			return allErrors[0]
 		}
 		combinedError := fmt.Errorf("parallel execution failed on %d servers: %w", len(allErrors), allErrors[0])
-		logger.Error("Parallel execution failed", combinedError, logging.Action(action.Name))
+		logger.Error("Parallel execution failed", combinedError, spookylogging.Action(action.Name))
 		return combinedError
 	}
 
-	logger.Info("Parallel execution completed successfully", logging.Action(action.Name))
+	logger.Info("Parallel execution completed successfully", spookylogging.Action(action.Name))
 	return nil
 }

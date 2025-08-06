@@ -1,7 +1,7 @@
 package ssh
 
 import (
-	"spooky/internal/config"
+	spookyconfig "spooky/internal/config"
 
 	gossh "golang.org/x/crypto/ssh"
 )
@@ -10,7 +10,7 @@ import (
 //
 //revive:disable:exported
 type SSHClient struct {
-	config *config.Machine
+	config *spookyconfig.Machine
 	client *gossh.Client
 }
 

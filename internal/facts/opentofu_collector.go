@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"spooky/internal/logging"
+	spookylogging "spooky/internal/logging"
 )
 
 // OpenTofuState represents the structure of an OpenTofu state file
@@ -42,14 +42,14 @@ type OpenTofuInstance struct {
 // OpenTofuCollector collects facts from OpenTofu state files and outputs
 type OpenTofuCollector struct {
 	statePath   string
-	logger      logging.Logger
+	logger      spookylogging.Logger
 	mergePolicy MergePolicy
 }
 
 // NewOpenTofuCollector creates a new OpenTofu fact collector
-func NewOpenTofuCollector(statePath string, logger logging.Logger, mergePolicy MergePolicy) *OpenTofuCollector {
+func NewOpenTofuCollector(statePath string, logger spookylogging.Logger, mergePolicy MergePolicy) *OpenTofuCollector {
 	if logger == nil {
-		logger = logging.GetLogger()
+		logger = spookylogging.GetLogger()
 	}
 
 	return &OpenTofuCollector{

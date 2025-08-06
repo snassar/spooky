@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"spooky/internal/config"
+	spookyconfig "spooky/internal/config"
 )
 
 func TestExecuteConfig_NilConfig(t *testing.T) {
@@ -15,8 +15,8 @@ func TestExecuteConfig_NilConfig(t *testing.T) {
 }
 
 func TestExecuteConfig_EmptyActions(t *testing.T) {
-	cfg := &config.Config{
-		Machines: []config.Machine{
+	cfg := &spookyconfig.Config{
+		Machines: []spookyconfig.Machine{
 			{
 				Name:     "test-server",
 				Host:     "192.168.1.100",
@@ -25,7 +25,7 @@ func TestExecuteConfig_EmptyActions(t *testing.T) {
 				Password: "testpass",
 			},
 		},
-		Actions: []config.Action{}, // Empty actions
+		Actions: []spookyconfig.Action{}, // Empty actions
 	}
 
 	err := ExecuteConfig(cfg)
@@ -33,9 +33,9 @@ func TestExecuteConfig_EmptyActions(t *testing.T) {
 }
 
 func TestExecuteConfig_EmptyMachines(t *testing.T) {
-	cfg := &config.Config{
-		Machines: []config.Machine{}, // Empty machines
-		Actions: []config.Action{
+	cfg := &spookyconfig.Config{
+		Machines: []spookyconfig.Machine{}, // Empty machines
+		Actions: []spookyconfig.Action{
 			{
 				Name:    "test-action",
 				Type:    "command",
@@ -50,8 +50,8 @@ func TestExecuteConfig_EmptyMachines(t *testing.T) {
 }
 
 func TestExecuteConfig_UnsupportedActionType(t *testing.T) {
-	cfg := &config.Config{
-		Machines: []config.Machine{
+	cfg := &spookyconfig.Config{
+		Machines: []spookyconfig.Machine{
 			{
 				Name:     "test-server",
 				Host:     "192.168.1.100",
@@ -60,7 +60,7 @@ func TestExecuteConfig_UnsupportedActionType(t *testing.T) {
 				Password: "testpass",
 			},
 		},
-		Actions: []config.Action{
+		Actions: []spookyconfig.Action{
 			{
 				Name: "test-action",
 				Type: "unsupported_type",
@@ -74,8 +74,8 @@ func TestExecuteConfig_UnsupportedActionType(t *testing.T) {
 }
 
 func TestExecuteConfig_CommandAction(t *testing.T) {
-	cfg := &config.Config{
-		Machines: []config.Machine{
+	cfg := &spookyconfig.Config{
+		Machines: []spookyconfig.Machine{
 			{
 				Name:     "test-server",
 				Host:     "192.168.1.100",
@@ -84,7 +84,7 @@ func TestExecuteConfig_CommandAction(t *testing.T) {
 				Password: "testpass",
 			},
 		},
-		Actions: []config.Action{
+		Actions: []spookyconfig.Action{
 			{
 				Name:    "test-action",
 				Type:    "command",
@@ -101,8 +101,8 @@ func TestExecuteConfig_CommandAction(t *testing.T) {
 }
 
 func TestExecuteConfig_ScriptAction(t *testing.T) {
-	cfg := &config.Config{
-		Machines: []config.Machine{
+	cfg := &spookyconfig.Config{
+		Machines: []spookyconfig.Machine{
 			{
 				Name:     "test-server",
 				Host:     "192.168.1.100",
@@ -111,7 +111,7 @@ func TestExecuteConfig_ScriptAction(t *testing.T) {
 				Password: "testpass",
 			},
 		},
-		Actions: []config.Action{
+		Actions: []spookyconfig.Action{
 			{
 				Name:   "test-action",
 				Type:   "script",
@@ -128,8 +128,8 @@ func TestExecuteConfig_ScriptAction(t *testing.T) {
 }
 
 func TestExecuteConfig_TemplateAction(t *testing.T) {
-	cfg := &config.Config{
-		Machines: []config.Machine{
+	cfg := &spookyconfig.Config{
+		Machines: []spookyconfig.Machine{
 			{
 				Name:     "test-server",
 				Host:     "192.168.1.100",
@@ -138,11 +138,11 @@ func TestExecuteConfig_TemplateAction(t *testing.T) {
 				Password: "testpass",
 			},
 		},
-		Actions: []config.Action{
+		Actions: []spookyconfig.Action{
 			{
 				Name: "test-action",
 				Type: "template_deploy",
-				Template: &config.TemplateConfig{
+				Template: &spookyconfig.TemplateConfig{
 					Source:      "/tmp/test.tmpl",
 					Destination: "/tmp/test.conf",
 				},
@@ -158,8 +158,8 @@ func TestExecuteConfig_TemplateAction(t *testing.T) {
 }
 
 func TestExecuteConfig_ParallelExecution(t *testing.T) {
-	cfg := &config.Config{
-		Machines: []config.Machine{
+	cfg := &spookyconfig.Config{
+		Machines: []spookyconfig.Machine{
 			{
 				Name:     "server1",
 				Host:     "192.168.1.100",
@@ -175,7 +175,7 @@ func TestExecuteConfig_ParallelExecution(t *testing.T) {
 				Password: "testpass",
 			},
 		},
-		Actions: []config.Action{
+		Actions: []spookyconfig.Action{
 			{
 				Name:     "test-action",
 				Type:     "command",
@@ -194,8 +194,8 @@ func TestExecuteConfig_ParallelExecution(t *testing.T) {
 
 func TestExecuteConfig_WithTestDataFromExamples(t *testing.T) {
 	// Create a configuration similar to what would be in test data
-	cfg := &config.Config{
-		Machines: []config.Machine{
+	cfg := &spookyconfig.Config{
+		Machines: []spookyconfig.Machine{
 			{
 				Name:     "example-server",
 				Host:     "192.168.1.100",
@@ -208,7 +208,7 @@ func TestExecuteConfig_WithTestDataFromExamples(t *testing.T) {
 				},
 			},
 		},
-		Actions: []config.Action{
+		Actions: []spookyconfig.Action{
 			{
 				Name:        "deploy-config",
 				Description: "Deploy configuration files",
@@ -228,8 +228,8 @@ func TestExecuteConfig_WithTestDataFromExamples(t *testing.T) {
 }
 
 func TestExecuteConfig_ActionTypes(t *testing.T) {
-	cfg := &config.Config{
-		Machines: []config.Machine{
+	cfg := &spookyconfig.Config{
+		Machines: []spookyconfig.Machine{
 			{
 				Name:     "test-server",
 				Host:     "192.168.1.100",
@@ -279,35 +279,35 @@ func TestExecuteConfig_ActionTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var action config.Action
+			var action spookyconfig.Action
 
 			switch tt.actionType {
 			case "command":
-				action = config.Action{
+				action = spookyconfig.Action{
 					Name:    tt.name,
 					Type:    tt.actionType,
 					Command: "echo test",
 				}
 			case "script":
-				action = config.Action{
+				action = spookyconfig.Action{
 					Name:   tt.name,
 					Type:   tt.actionType,
 					Script: "/tmp/test.sh",
 				}
 			default: // template actions
-				action = config.Action{
+				action = spookyconfig.Action{
 					Name: tt.name,
 					Type: tt.actionType,
-					Template: &config.TemplateConfig{
+					Template: &spookyconfig.TemplateConfig{
 						Source:      "/tmp/test.tmpl",
 						Destination: "/tmp/test.conf",
 					},
 				}
 			}
 
-			testCfg := &config.Config{
+			testCfg := &spookyconfig.Config{
 				Machines: cfg.Machines,
-				Actions:  []config.Action{action},
+				Actions:  []spookyconfig.Action{action},
 			}
 
 			err := ExecuteConfig(testCfg)
@@ -363,7 +363,7 @@ func TestIsTemplateAction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			action := &config.Action{
+			action := &spookyconfig.Action{
 				Name: tt.name,
 				Type: tt.actionType,
 			}
@@ -375,8 +375,8 @@ func TestIsTemplateAction(t *testing.T) {
 }
 
 func TestExecuteConfig_MachineFiltering(t *testing.T) {
-	cfg := &config.Config{
-		Machines: []config.Machine{
+	cfg := &spookyconfig.Config{
+		Machines: []spookyconfig.Machine{
 			{
 				Name:     "server1",
 				Host:     "192.168.1.100",
@@ -399,7 +399,7 @@ func TestExecuteConfig_MachineFiltering(t *testing.T) {
 				Password: "testpass",
 			},
 		},
-		Actions: []config.Action{
+		Actions: []spookyconfig.Action{
 			{
 				Name:     "filtered-test",
 				Type:     "command",
@@ -417,8 +417,8 @@ func TestExecuteConfig_MachineFiltering(t *testing.T) {
 }
 
 func TestExecuteConfig_TimeoutConfiguration(t *testing.T) {
-	cfg := &config.Config{
-		Machines: []config.Machine{
+	cfg := &spookyconfig.Config{
+		Machines: []spookyconfig.Machine{
 			{
 				Name:     "test-server",
 				Host:     "192.168.1.100",
@@ -427,7 +427,7 @@ func TestExecuteConfig_TimeoutConfiguration(t *testing.T) {
 				Password: "testpass",
 			},
 		},
-		Actions: []config.Action{
+		Actions: []spookyconfig.Action{
 			{
 				Name:    "timeout-test",
 				Type:    "command",

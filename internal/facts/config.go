@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"spooky/internal/logging"
+	spookylogging "spooky/internal/logging"
 )
 
 // CollectorType represents the type of fact collector
@@ -27,7 +27,7 @@ type CollectorConfig struct {
 	Headers     map[string]string      // HTTP headers
 	Timeout     time.Duration          // Timeout for operations
 	MergePolicy MergePolicy            // How to merge facts
-	Logger      logging.Logger         // Logger instance
+	Logger      spookylogging.Logger         // Logger instance
 	Metadata    map[string]interface{} // Additional metadata
 	Parameters  map[string]interface{} // Parameters for specific collectors
 }
@@ -40,7 +40,7 @@ func NewCollectorConfig(collectorType CollectorType, source string) *CollectorCo
 		Headers:     make(map[string]string),
 		Timeout:     30 * time.Second,
 		MergePolicy: MergePolicyReplace,
-		Logger:      logging.GetLogger(),
+		Logger:      spookylogging.GetLogger(),
 		Metadata:    make(map[string]interface{}),
 		Parameters:  make(map[string]interface{}),
 	}
@@ -65,7 +65,7 @@ func (c *CollectorConfig) WithMergePolicy(policy MergePolicy) *CollectorConfig {
 }
 
 // WithLogger sets the logger for the collector
-func (c *CollectorConfig) WithLogger(logger logging.Logger) *CollectorConfig {
+func (c *CollectorConfig) WithLogger(logger spookylogging.Logger) *CollectorConfig {
 	c.Logger = logger
 	return c
 }

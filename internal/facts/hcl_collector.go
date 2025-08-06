@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"spooky/internal/config"
-	"spooky/internal/logging"
+	spookyconfig "spooky/internal/config"
+	spookylogging "spooky/internal/logging"
 
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclparse"
@@ -14,14 +14,14 @@ import (
 // HCLCollector collects facts from HCL configuration files
 type HCLCollector struct {
 	filePath    string
-	logger      logging.Logger
+	logger      spookylogging.Logger
 	mergePolicy MergePolicy
 }
 
 // NewHCLCollector creates a new HCL fact collector
-func NewHCLCollector(filePath string, logger logging.Logger, mergePolicy MergePolicy) *HCLCollector {
+func NewHCLCollector(filePath string, logger spookylogging.Logger, mergePolicy MergePolicy) *HCLCollector {
 	if logger == nil {
-		logger = logging.GetLogger()
+		logger = spookylogging.GetLogger()
 	}
 
 	return &HCLCollector{
@@ -40,7 +40,7 @@ func (c *HCLCollector) Collect(server string) (*FactCollection, error) {
 		c.logger,
 		c.parseHCLFile,
 		func(data interface{}, server string) map[string]*Fact {
-			config := data.(*config.Config)
+			config := data.(*spookyconfig.Config)
 			return c.extractFactsFromConfig(config, server)
 		},
 	)
@@ -67,29 +67,29 @@ func (c *HCLCollector) parseHCLFile() (interface{}, error) {
 	}
 
 	// Try to decode as inventory wrapper first
-	var inventoryWrapper config.InventoryWrapper
+	var inventoryWrapper spookyconfig.InventoryWrapper
 	diags = gohcl.DecodeBody(file.Body, nil, &inventoryWrapper)
 	if !diags.HasErrors() && inventoryWrapper.Inventory != nil {
 		// Convert to legacy Config format for compatibility
-		cfg := &config.Config{
+		cfg := &spookyconfig.Config{
 			Machines: inventoryWrapper.Inventory.Machines,
 		}
 		return cfg, nil
 	}
 
 	// Try to decode as actions wrapper
-	var actionsWrapper config.ActionsWrapper
+	var actionsWrapper spookyconfig.ActionsWrapper
 	diags = gohcl.DecodeBody(file.Body, nil, &actionsWrapper)
 	if !diags.HasErrors() && actionsWrapper.Actions != nil {
 		// Convert to legacy Config format for compatibility
-		cfg := &config.Config{
+		cfg := &spookyconfig.Config{
 			Actions: actionsWrapper.Actions.Actions,
 		}
 		return cfg, nil
 	}
 
 	// Try legacy format as fallback
-	var cfg config.Config
+	var cfg spookyconfig.Config
 	diags = gohcl.DecodeBody(file.Body, nil, &cfg)
 	if diags.HasErrors() {
 		return nil, fmt.Errorf("HCL decoding errors: %s", diags.Error())
@@ -99,7 +99,7 @@ func (c *HCLCollector) parseHCLFile() (interface{}, error) {
 }
 
 // extractFactsFromConfig extracts facts from the parsed configuration
-func (c *HCLCollector) extractFactsFromConfig(cfg *config.Config, server string) map[string]*Fact {
+func (c *HCLCollector) extractFactsFromConfig(cfg *spookyconfig.Config, server string) map[string]*Fact {
 	facts := make(map[string]*Fact)
 
 	// Extract machine-specific facts
@@ -122,7 +122,7 @@ func (c *HCLCollector) extractFactsFromConfig(cfg *config.Config, server string)
 }
 
 // extractMachineFacts extracts facts from a machine configuration
-func (c *HCLCollector) extractMachineFacts(machine *config.Machine, facts map[string]*Fact) {
+func (c *HCLCollector) extractMachineFacts(machine *spookyconfig.Machine, facts map[string]*Fact) {
 	// Basic machine facts
 	facts["machine.name"] = &Fact{
 		Key:    "machine.name",
@@ -180,11 +180,11 @@ func (c *HCLCollector) extractMachineFacts(machine *config.Machine, facts map[st
 }
 
 // extractGlobalFacts extracts global configuration facts
-func (c *HCLCollector) extractGlobalFacts(cfg *config.Config, facts map[string]*Fact) {
+func (c *HCLCollector) extractGlobalFacts(cfg *spookyconfig.Config, facts map[string]*Fact) {
 	// Always extract machine count if machines are present
 	if len(cfg.Machines) > 0 {
-		facts["config.machine_count"] = &Fact{
-			Key:    "config.machine_count",
+		facts["spookyconfig.machine_count"] = &Fact{
+			Key:    "spookyconfig.machine_count",
 			Value:  len(cfg.Machines),
 			Source: string(SourceHCL),
 		}
@@ -197,8 +197,8 @@ func (c *HCLCollector) extractGlobalFacts(cfg *config.Config, facts map[string]*
 			}
 		}
 
-		facts["config.unique_tags"] = &Fact{
-			Key:    "config.unique_tags",
+		facts["spookyconfig.unique_tags"] = &Fact{
+			Key:    "spookyconfig.unique_tags",
 			Value:  len(tagSet),
 			Source: string(SourceHCL),
 		}
@@ -206,8 +206,8 @@ func (c *HCLCollector) extractGlobalFacts(cfg *config.Config, facts map[string]*
 
 	// Always extract action count if actions are present
 	if len(cfg.Actions) > 0 {
-		facts["config.action_count"] = &Fact{
-			Key:    "config.action_count",
+		facts["spookyconfig.action_count"] = &Fact{
+			Key:    "spookyconfig.action_count",
 			Value:  len(cfg.Actions),
 			Source: string(SourceHCL),
 		}
@@ -215,7 +215,7 @@ func (c *HCLCollector) extractGlobalFacts(cfg *config.Config, facts map[string]*
 }
 
 // extractActionFacts extracts facts from actions that apply to the server
-func (c *HCLCollector) extractActionFacts(cfg *config.Config, facts map[string]*Fact, server string) {
+func (c *HCLCollector) extractActionFacts(cfg *spookyconfig.Config, facts map[string]*Fact, server string) {
 	// If no machines are present, include all actions (actions-only file)
 	if len(cfg.Machines) == 0 {
 		for i := range cfg.Actions {
@@ -282,7 +282,7 @@ func (c *HCLCollector) extractActionFacts(cfg *config.Config, facts map[string]*
 }
 
 // addActionFacts adds facts for a specific action
-func (c *HCLCollector) addActionFacts(action *config.Action, facts map[string]*Fact) {
+func (c *HCLCollector) addActionFacts(action *spookyconfig.Action, facts map[string]*Fact) {
 	// Add action-specific facts
 	factKey := fmt.Sprintf("action.%s.name", action.Name)
 	facts[factKey] = &Fact{

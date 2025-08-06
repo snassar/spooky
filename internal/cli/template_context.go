@@ -7,25 +7,25 @@ import (
 	"path/filepath"
 	"strings"
 
-	"spooky/internal/config"
-	"spooky/internal/facts"
-	"spooky/internal/logging"
-	"spooky/internal/ssh"
+	spookyconfig "spooky/internal/config"
+	spookyfacts "spooky/internal/facts"
+	spookylogging "spooky/internal/logging"
+	spookyssh "spooky/internal/ssh"
 )
 
 // TemplateContext holds all data available to templates
 type TemplateContext struct {
 	// Project configuration
-	Project *config.ProjectConfig
+	Project *spookyconfig.ProjectConfig
 
-	// Machine facts (from facts.db or JSON)
+	// Machine facts (from spookyfacts.db or JSON)
 	Facts map[string]interface{}
 
 	// Inventory information
-	Machines []*config.Machine
+	Machines []*spookyconfig.Machine
 
 	// Actions configuration
-	Actions []*config.Action
+	Actions []*spookyconfig.Action
 
 	// Server-specific data (when --server is specified)
 	ServerFacts map[string]interface{}
@@ -38,7 +38,7 @@ type TemplateContext struct {
 }
 
 // NewTemplateContext creates a new template context for a project
-func NewTemplateContext(logger logging.Logger, projectPath string) (*TemplateContext, error) {
+func NewTemplateContext(logger spookylogging.Logger, projectPath string) (*TemplateContext, error) {
 	ctx := &TemplateContext{
 		Facts:       make(map[string]interface{}),
 		Environment: make(map[string]string),
@@ -46,7 +46,7 @@ func NewTemplateContext(logger logging.Logger, projectPath string) (*TemplateCon
 	}
 
 	logger.Info("Creating template context",
-		logging.String("project_path", projectPath))
+		spookylogging.String("project_path", projectPath))
 
 	// Load project configuration
 	if err := ctx.loadProjectConfig(logger, projectPath); err != nil {
@@ -55,21 +55,21 @@ func NewTemplateContext(logger logging.Logger, projectPath string) (*TemplateCon
 
 	// Load facts
 	if err := ctx.loadFacts(logger, projectPath); err != nil {
-		logger.Warn("Failed to load facts", logging.String("error", err.Error()))
+		logger.Warn("Failed to load facts", spookylogging.String("error", err.Error()))
 	}
 
 	// Load inventory
 	if err := ctx.loadInventory(logger, projectPath); err != nil {
-		logger.Warn("Failed to load inventory", logging.String("error", err.Error()))
+		logger.Warn("Failed to load inventory", spookylogging.String("error", err.Error()))
 	} else {
-		logger.Info("Inventory loaded successfully", logging.Int("machines", len(ctx.Machines)))
+		logger.Info("Inventory loaded successfully", spookylogging.Int("machines", len(ctx.Machines)))
 	}
 
 	// Load actions
 	if err := ctx.loadActions(logger, projectPath); err != nil {
-		logger.Warn("Failed to load actions", logging.String("error", err.Error()))
+		logger.Warn("Failed to load actions", spookylogging.String("error", err.Error()))
 	} else {
-		logger.Info("Actions loaded successfully", logging.Int("actions", len(ctx.Actions)))
+		logger.Info("Actions loaded successfully", spookylogging.Int("actions", len(ctx.Actions)))
 	}
 
 	// Load environment variables
@@ -77,13 +77,13 @@ func NewTemplateContext(logger logging.Logger, projectPath string) (*TemplateCon
 
 	// Load custom data files
 	if err := ctx.loadCustomData(logger, projectPath); err != nil {
-		logger.Warn("Failed to load custom data", logging.String("error", err.Error()))
+		logger.Warn("Failed to load custom data", spookylogging.String("error", err.Error()))
 	}
 
 	logger.Info("Template context created successfully",
-		logging.Int("machines", len(ctx.Machines)),
-		logging.Int("actions", len(ctx.Actions)),
-		logging.Int("facts", len(ctx.Facts)))
+		spookylogging.Int("machines", len(ctx.Machines)),
+		spookylogging.Int("actions", len(ctx.Actions)),
+		spookylogging.Int("facts", len(ctx.Facts)))
 
 	// Direct output for debugging
 	fmt.Printf("DEBUG: Template context created with %d machines, %d actions, %d facts\n",
@@ -108,34 +108,34 @@ func fileExists(path string) bool {
 }
 
 // loadProjectConfig loads the project configuration
-func (ctx *TemplateContext) loadProjectConfig(logger logging.Logger, projectPath string) error {
+func (ctx *TemplateContext) loadProjectConfig(logger spookylogging.Logger, projectPath string) error {
 	projectFile := filepath.Join(projectPath, "project.hcl")
 	logger.Info("Loading project config",
-		logging.String("project_file", projectFile))
+		spookylogging.String("project_file", projectFile))
 
-	projectConfig, err := config.ParseProjectConfig(projectFile)
+	projectConfig, err := spookyconfig.ParseProjectConfig(projectFile)
 	if err != nil {
 		logger.Error("Failed to parse project config", err,
-			logging.String("project_file", projectFile))
+			spookylogging.String("project_file", projectFile))
 		return fmt.Errorf("failed to parse project config: %w", err)
 	}
 
 	ctx.Project = projectConfig
 	logger.Info("Project config loaded successfully",
-		logging.String("project_name", projectConfig.Name),
-		logging.String("inventory_file", projectConfig.InventoryFile),
-		logging.String("actions_file", projectConfig.ActionsFile))
+		spookylogging.String("project_name", projectConfig.Name),
+		spookylogging.String("inventory_file", projectConfig.InventoryFile),
+		spookylogging.String("actions_file", projectConfig.ActionsFile))
 
 	return nil
 }
 
-// loadFacts loads facts from facts.db or JSON files
-func (ctx *TemplateContext) loadFacts(logger logging.Logger, projectPath string) error {
-	// Try to load from facts.db first
-	factsDBPath := filepath.Join(projectPath, ".facts.db")
+// loadFacts loads facts from spookyfacts.db or JSON files
+func (ctx *TemplateContext) loadFacts(logger spookylogging.Logger, projectPath string) error {
+	// Try to load from spookyfacts.db first
+	factsDBPath := filepath.Join(projectPath, ".spookyfacts.db")
 	if _, err := os.Stat(factsDBPath); err == nil {
-		_ = facts.NewManager(nil) // TODO: Implement facts loading from badgerdb
-		logger.Info("Found facts.db, but loading not yet implemented")
+		_ = spookyfacts.NewManager(nil) // TODO: Implement facts loading from badgerdb
+		logger.Info("Found spookyfacts.db, but loading not yet implemented")
 		return nil
 	}
 
@@ -155,7 +155,7 @@ func (ctx *TemplateContext) loadFacts(logger logging.Logger, projectPath string)
 }
 
 // loadFactsFromJSON loads facts from JSON files in a directory
-func (ctx *TemplateContext) loadFactsFromJSON(logger logging.Logger, factsDir string) error {
+func (ctx *TemplateContext) loadFactsFromJSON(logger spookylogging.Logger, factsDir string) error {
 	entries, err := os.ReadDir(factsDir)
 	if err != nil {
 		return err
@@ -170,16 +170,16 @@ func (ctx *TemplateContext) loadFactsFromJSON(logger logging.Logger, factsDir st
 		data, err := os.ReadFile(filePath)
 		if err != nil {
 			logger.Warn("Failed to read facts file",
-				logging.String("file", filePath),
-				logging.String("error", err.Error()))
+				spookylogging.String("file", filePath),
+				spookylogging.String("error", err.Error()))
 			continue
 		}
 
 		var facts map[string]interface{}
 		if err := json.Unmarshal(data, &facts); err != nil {
 			logger.Warn("Failed to parse facts file",
-				logging.String("file", filePath),
-				logging.String("error", err.Error()))
+				spookylogging.String("file", filePath),
+				spookylogging.String("error", err.Error()))
 			continue
 		}
 
@@ -193,60 +193,60 @@ func (ctx *TemplateContext) loadFactsFromJSON(logger logging.Logger, factsDir st
 }
 
 // loadInventory loads inventory configuration
-func (ctx *TemplateContext) loadInventory(logger logging.Logger, projectPath string) error {
+func (ctx *TemplateContext) loadInventory(logger spookylogging.Logger, projectPath string) error {
 	return loadConfigWithLogging(ctx, logger, projectPath, ctx.Project.InventoryFile, "inventory",
-		func(inventoryConfig *config.InventoryConfig) {
-			ctx.Machines = make([]*config.Machine, len(inventoryConfig.Machines))
+		func(inventoryConfig *spookyconfig.InventoryConfig) {
+			ctx.Machines = make([]*spookyconfig.Machine, len(inventoryConfig.Machines))
 			for i := range inventoryConfig.Machines {
 				ctx.Machines[i] = &inventoryConfig.Machines[i]
 			}
-			logger.Info("Inventory config processed", logging.Int("machines", len(ctx.Machines)))
+			logger.Info("Inventory config processed", spookylogging.Int("machines", len(ctx.Machines)))
 		})
 }
 
 // loadActions loads actions configuration
-func (ctx *TemplateContext) loadActions(logger logging.Logger, projectPath string) error {
-	logger.Info("Loading actions from project", logging.String("project_path", projectPath))
+func (ctx *TemplateContext) loadActions(logger spookylogging.Logger, projectPath string) error {
+	logger.Info("Loading actions from project", spookylogging.String("project_path", projectPath))
 
 	// Use the new LoadActionsConfig function that can load from multiple sources
-	actionsConfig, err := config.LoadActionsConfig(projectPath)
+	actionsConfig, err := spookyconfig.LoadActionsConfig(projectPath)
 	if err != nil {
-		logger.Error("Failed to load actions", err, logging.String("project_path", projectPath))
+		logger.Error("Failed to load actions", err, spookylogging.String("project_path", projectPath))
 		return fmt.Errorf("failed to load actions: %w", err)
 	}
 
 	// Convert to slice of pointers
-	ctx.Actions = make([]*config.Action, len(actionsConfig.Actions))
+	ctx.Actions = make([]*spookyconfig.Action, len(actionsConfig.Actions))
 	for i := range actionsConfig.Actions {
 		ctx.Actions[i] = &actionsConfig.Actions[i]
 	}
 
 	logger.Info("Actions loaded successfully",
-		logging.String("project_path", projectPath),
-		logging.Int("actions", len(ctx.Actions)))
+		spookylogging.String("project_path", projectPath),
+		spookylogging.Int("actions", len(ctx.Actions)))
 
 	return nil
 }
 
 // loadConfigWithLogging is a generic helper to load configuration files with logging
-func loadConfigWithLogging[T any](ctx *TemplateContext, logger logging.Logger, projectPath, fileName, configType string, processor func(*T)) error {
+func loadConfigWithLogging[T any](ctx *TemplateContext, logger spookylogging.Logger, projectPath, fileName, configType string, processor func(*T)) error {
 	ctx.logConfigLoading(logger, projectPath, fileName, configType)
 	return loadConfigFileWithProcessor(logger, projectPath, fileName, configType, processor)
 }
 
 // logConfigLoading is a helper method to reduce duplication
-func (ctx *TemplateContext) logConfigLoading(logger logging.Logger, projectPath, filePath, configType string) {
+func (ctx *TemplateContext) logConfigLoading(logger spookylogging.Logger, projectPath, filePath, configType string) {
 	logger.Info("Loading "+configType,
-		logging.String("project_path", projectPath),
-		logging.String(configType+"_file", filePath))
+		spookylogging.String("project_path", projectPath),
+		spookylogging.String(configType+"_file", filePath))
 
-	logger.Info("Resolved "+configType+" path", logging.String(configType+"_path", filePath))
+	logger.Info("Resolved "+configType+" path", spookylogging.String(configType+"_path", filePath))
 }
 
 // loadConfigFileWithProcessor is a generic helper to load configuration files
-func loadConfigFileWithProcessor[T any](logger logging.Logger, _, fileName, configType string, processor func(*T)) error {
+func loadConfigFileWithProcessor[T any](logger spookylogging.Logger, _, fileName, configType string, processor func(*T)) error {
 	if fileName == "" {
-		logger.Info("No file name provided for config type", logging.String("config_type", configType))
+		logger.Info("No file name provided for config type", spookylogging.String("config_type", configType))
 		return nil
 	}
 
@@ -254,8 +254,8 @@ func loadConfigFileWithProcessor[T any](logger logging.Logger, _, fileName, conf
 	configPath := fileName
 
 	logger.Info("Loading config file",
-		logging.String("config_type", configType),
-		logging.String("config_path", configPath))
+		spookylogging.String("config_type", configType),
+		spookylogging.String("config_path", configPath))
 
 	// Use type-specific parser based on configType
 	var parsedConfig interface{}
@@ -263,17 +263,17 @@ func loadConfigFileWithProcessor[T any](logger logging.Logger, _, fileName, conf
 
 	switch configType {
 	case "inventory":
-		parsedConfig, err = config.ParseInventoryConfig(configPath)
+		parsedConfig, err = spookyconfig.ParseInventoryConfig(configPath)
 	case "actions":
-		parsedConfig, err = config.ParseActionsConfig(configPath)
+		parsedConfig, err = spookyconfig.ParseActionsConfig(configPath)
 	default:
 		return fmt.Errorf("unknown config type: %s", configType)
 	}
 
 	if err != nil {
 		logger.Error("Failed to parse config file", err,
-			logging.String("config_type", configType),
-			logging.String("config_path", configPath))
+			spookylogging.String("config_type", configType),
+			spookylogging.String("config_path", configPath))
 		return fmt.Errorf("failed to parse %s: %w", configType, err)
 	}
 
@@ -281,12 +281,12 @@ func loadConfigFileWithProcessor[T any](logger logging.Logger, _, fileName, conf
 	if typedConfig, ok := parsedConfig.(*T); ok {
 		processor(typedConfig)
 		logger.Info("Config file processed successfully",
-			logging.String("config_type", configType),
-			logging.String("config_path", configPath))
+			spookylogging.String("config_type", configType),
+			spookylogging.String("config_path", configPath))
 	} else {
 		logger.Error("Type assertion failed", nil,
-			logging.String("config_type", configType),
-			logging.String("config_path", configPath))
+			spookylogging.String("config_type", configType),
+			spookylogging.String("config_path", configPath))
 		return fmt.Errorf("type assertion failed for %s config", configType)
 	}
 
@@ -304,7 +304,7 @@ func (ctx *TemplateContext) loadEnvironment() {
 }
 
 // loadCustomData loads custom data files
-func (ctx *TemplateContext) loadCustomData(logger logging.Logger, projectPath string) error {
+func (ctx *TemplateContext) loadCustomData(logger spookylogging.Logger, projectPath string) error {
 	dataDir := filepath.Join(projectPath, "data")
 	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
 		return nil
@@ -324,16 +324,16 @@ func (ctx *TemplateContext) loadCustomData(logger logging.Logger, projectPath st
 		data, err := os.ReadFile(filePath)
 		if err != nil {
 			logger.Warn("Failed to read data file",
-				logging.String("file", filePath),
-				logging.String("error", err.Error()))
+				spookylogging.String("file", filePath),
+				spookylogging.String("error", err.Error()))
 			continue
 		}
 
 		var customData interface{}
 		if err := json.Unmarshal(data, &customData); err != nil {
 			logger.Warn("Failed to parse data file",
-				logging.String("file", filePath),
-				logging.String("error", err.Error()))
+				spookylogging.String("file", filePath),
+				spookylogging.String("error", err.Error()))
 			continue
 		}
 
@@ -347,9 +347,9 @@ func (ctx *TemplateContext) loadCustomData(logger logging.Logger, projectPath st
 }
 
 // LoadServerFacts loads facts for a specific server
-func (ctx *TemplateContext) LoadServerFacts(logger logging.Logger, serverName string) error {
+func (ctx *TemplateContext) LoadServerFacts(logger spookylogging.Logger, serverName string) error {
 	// Find the machine in inventory
-	var targetMachine *config.Machine
+	var targetMachine *spookyconfig.Machine
 	for _, machine := range ctx.Machines {
 		if machine.Name == serverName {
 			targetMachine = machine
@@ -362,7 +362,7 @@ func (ctx *TemplateContext) LoadServerFacts(logger logging.Logger, serverName st
 	}
 
 	// Create SSH client with 30 second timeout
-	sshClient, err := ssh.NewSSHClient(targetMachine, 30)
+	sshClient, err := spookyssh.NewSSHClient(targetMachine, 30)
 	if err != nil {
 		return fmt.Errorf("failed to create SSH client for %s: %w", serverName, err)
 	}
@@ -398,9 +398,9 @@ func (ctx *TemplateContext) LoadServerFacts(logger logging.Logger, serverName st
 		result, err := sshClient.ExecuteCommand(command)
 		if err != nil {
 			logger.Warn("Failed to collect fact",
-				logging.String("fact", factName),
-				logging.String("server", serverName),
-				logging.String("error", err.Error()))
+				spookylogging.String("fact", factName),
+				spookylogging.String("server", serverName),
+				spookylogging.String("error", err.Error()))
 			ctx.ServerFacts[factName] = "unknown"
 			continue
 		}
@@ -419,9 +419,9 @@ func (ctx *TemplateContext) LoadServerFacts(logger logging.Logger, serverName st
 		result, err := sshClient.ExecuteCommand(command)
 		if err != nil {
 			logger.Warn("Failed to collect file fact",
-				logging.String("fact", factName),
-				logging.String("server", serverName),
-				logging.String("error", err.Error()))
+				spookylogging.String("fact", factName),
+				spookylogging.String("server", serverName),
+				spookylogging.String("error", err.Error()))
 			ctx.ServerFacts[factName] = "false"
 			continue
 		}
@@ -441,9 +441,9 @@ func (ctx *TemplateContext) LoadServerFacts(logger logging.Logger, serverName st
 		result, err := sshClient.ExecuteCommand(command)
 		if err != nil {
 			logger.Warn("Failed to collect service fact",
-				logging.String("fact", factName),
-				logging.String("server", serverName),
-				logging.String("error", err.Error()))
+				spookylogging.String("fact", factName),
+				spookylogging.String("server", serverName),
+				spookylogging.String("error", err.Error()))
 			ctx.ServerFacts[factName] = "unknown"
 			continue
 		}
@@ -454,8 +454,8 @@ func (ctx *TemplateContext) LoadServerFacts(logger logging.Logger, serverName st
 	// Example: ctx.ServerFacts["custom_fact"] = ...
 
 	logger.Info("Server facts collected successfully",
-		logging.String("server", serverName),
-		logging.Int("fact_count", len(ctx.ServerFacts)))
+		spookylogging.String("server", serverName),
+		spookylogging.Int("fact_count", len(ctx.ServerFacts)))
 
 	return nil
 }
@@ -464,7 +464,7 @@ func (ctx *TemplateContext) LoadServerFacts(logger logging.Logger, serverName st
 func (ctx *TemplateContext) GetTemplateFunctions() map[string]interface{} {
 	return map[string]interface{}{
 		// Project functions
-		"project":            func() *config.ProjectConfig { return ctx.Project },
+		"project":            func() *spookyconfig.ProjectConfig { return ctx.Project },
 		"projectName":        func() string { return ctx.Project.Name },
 		"projectDescription": func() string { return ctx.Project.Description },
 
@@ -473,8 +473,8 @@ func (ctx *TemplateContext) GetTemplateFunctions() map[string]interface{} {
 		"fact":  func(key string) interface{} { return ctx.Facts[key] },
 
 		// Machine functions
-		"machines": func() []*config.Machine { return ctx.Machines },
-		"machine": func(name string) *config.Machine {
+		"machines": func() []*spookyconfig.Machine { return ctx.Machines },
+		"machine": func(name string) *spookyconfig.Machine {
 			for _, m := range ctx.Machines {
 				if m.Name == name {
 					return m
@@ -484,8 +484,8 @@ func (ctx *TemplateContext) GetTemplateFunctions() map[string]interface{} {
 		},
 
 		// Action functions
-		"actions": func() []*config.Action { return ctx.Actions },
-		"action": func(name string) *config.Action {
+		"actions": func() []*spookyconfig.Action { return ctx.Actions },
+		"action": func(name string) *spookyconfig.Action {
 			for _, a := range ctx.Actions {
 				if a.Name == name {
 					return a

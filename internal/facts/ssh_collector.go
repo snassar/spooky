@@ -6,16 +6,16 @@ import (
 	"strings"
 	"time"
 
-	"spooky/internal/ssh"
+	spookyssh "spooky/internal/ssh"
 )
 
 // SSHCollector collects facts from remote servers via SSH
 type SSHCollector struct {
-	sshClient *ssh.SSHClient
+	sshClient *spookyssh.SSHClient
 }
 
 // NewSSHCollector creates a new SSH-based fact collector
-func NewSSHCollector(sshClient *ssh.SSHClient) *SSHCollector {
+func NewSSHCollector(sshClient *spookyssh.SSHClient) *SSHCollector {
 	return &SSHCollector{
 		sshClient: sshClient,
 	}

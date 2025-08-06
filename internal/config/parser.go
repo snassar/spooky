@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"spooky/internal/logging"
+	spookylogging "spooky/internal/logging"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
@@ -54,10 +54,10 @@ func resolveProjectPaths(configFile string, project *ProjectConfig) {
 
 // ParseProjectConfig parses a project configuration file
 func ParseProjectConfig(filename string) (*ProjectConfig, error) {
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 
 	logger.Info("Parsing project configuration",
-		logging.String("config_file", filename),
+		spookylogging.String("config_file", filename),
 	)
 
 	parser := hclparse.NewParser()
@@ -67,7 +67,7 @@ func ParseProjectConfig(filename string) (*ProjectConfig, error) {
 	if diags.HasErrors() {
 		diagError := diags.Error()
 		logger.Error("Failed to parse project HCL file", errors.New(diagError),
-			logging.String("config_file", filename),
+			spookylogging.String("config_file", filename),
 		)
 		return nil, errors.New("failed to parse project HCL file: " + diagError)
 	}
@@ -78,7 +78,7 @@ func ParseProjectConfig(filename string) (*ProjectConfig, error) {
 	if diags.HasErrors() {
 		diagError := diags.Error()
 		logger.Error("Failed to decode project configuration", errors.New(diagError),
-			logging.String("config_file", filename),
+			spookylogging.String("config_file", filename),
 		)
 		return nil, errors.New("failed to decode project configuration: " + diagError)
 	}
@@ -99,8 +99,8 @@ func ParseProjectConfig(filename string) (*ProjectConfig, error) {
 	}
 
 	logger.Info("Project configuration parsed successfully",
-		logging.String("config_file", filename),
-		logging.String("project_name", config.Name),
+		spookylogging.String("config_file", filename),
+		spookylogging.String("project_name", config.Name),
 	)
 
 	return config, nil
@@ -108,10 +108,10 @@ func ParseProjectConfig(filename string) (*ProjectConfig, error) {
 
 // ParseProjectConfigWithDebug parses a project configuration file with optional debug output
 func ParseProjectConfigWithDebug(filename string, debug bool) (*ProjectConfig, error) {
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 
 	logger.Info("Parsing project configuration file",
-		logging.String("config_file", filename),
+		spookylogging.String("config_file", filename),
 	)
 
 	parser := hclparse.NewParser()
@@ -121,7 +121,7 @@ func ParseProjectConfigWithDebug(filename string, debug bool) (*ProjectConfig, e
 	if diags.HasErrors() {
 		diagError := diags.Error()
 		logger.Error("Failed to parse project HCL file", errors.New(diagError),
-			logging.String("config_file", filename),
+			spookylogging.String("config_file", filename),
 		)
 		return nil, errors.New("failed to parse project HCL file: " + diagError)
 	}
@@ -132,7 +132,7 @@ func ParseProjectConfigWithDebug(filename string, debug bool) (*ProjectConfig, e
 	if diags.HasErrors() {
 		diagError := diags.Error()
 		logger.Error("Failed to decode project configuration", errors.New(diagError),
-			logging.String("config_file", filename),
+			spookylogging.String("config_file", filename),
 		)
 		return nil, errors.New("failed to decode project configuration: " + diagError)
 	}
@@ -144,8 +144,8 @@ func ParseProjectConfigWithDebug(filename string, debug bool) (*ProjectConfig, e
 	config := wrapper.Project
 
 	logger.Debug("Project configuration decoded successfully",
-		logging.String("config_file", filename),
-		logging.String("project_name", config.Name),
+		spookylogging.String("config_file", filename),
+		spookylogging.String("project_name", config.Name),
 	)
 
 	// Resolve relative paths for file references
@@ -157,10 +157,10 @@ func ParseProjectConfigWithDebug(filename string, debug bool) (*ProjectConfig, e
 	}
 
 	logger.Info("Project configuration parsed successfully",
-		logging.String("config_file", filename),
-		logging.String("project_name", config.Name),
-		logging.String("inventory_file", config.InventoryFile),
-		logging.String("actions_file", config.ActionsFile),
+		spookylogging.String("config_file", filename),
+		spookylogging.String("project_name", config.Name),
+		spookylogging.String("inventory_file", config.InventoryFile),
+		spookylogging.String("actions_file", config.ActionsFile),
 	)
 
 	return config, nil
@@ -181,7 +181,7 @@ func ParseActionsConfig(filename string) (*ActionsConfig, error) {
 // 2. Load all .hcl files from actions/ directory (if exists)
 // 3. Merge all actions into a single ActionsConfig
 func LoadActionsConfig(projectPath string) (*ActionsConfig, error) {
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 
 	// Initialize merged config
 	mergedConfig := &ActionsConfig{
@@ -191,24 +191,24 @@ func LoadActionsConfig(projectPath string) (*ActionsConfig, error) {
 	// 1. Try to load actions.hcl from project root
 	rootActionsFile := filepath.Join(projectPath, "actions.hcl")
 	if _, err := os.Stat(rootActionsFile); err == nil {
-		logger.Info("Loading actions from root file", logging.String("file", rootActionsFile))
+		logger.Info("Loading actions from root file", spookylogging.String("file", rootActionsFile))
 		rootConfig, err := ParseActionsConfig(rootActionsFile)
 		if err != nil {
-			logger.Error("Failed to parse root actions file", err, logging.String("file", rootActionsFile))
+			logger.Error("Failed to parse root actions file", err, spookylogging.String("file", rootActionsFile))
 			return nil, fmt.Errorf("failed to parse root actions file: %w", err)
 		}
 		mergedConfig.Actions = append(mergedConfig.Actions, rootConfig.Actions...)
-		logger.Info("Loaded actions from root file", logging.Int("actions", len(rootConfig.Actions)))
+		logger.Info("Loaded actions from root file", spookylogging.Int("actions", len(rootConfig.Actions)))
 	}
 
 	// 2. Try to load all .hcl files from actions/ directory
 	actionsDir := filepath.Join(projectPath, "actions")
 	if _, err := os.Stat(actionsDir); err == nil {
-		logger.Info("Loading actions from directory", logging.String("dir", actionsDir))
+		logger.Info("Loading actions from directory", spookylogging.String("dir", actionsDir))
 
 		entries, err := os.ReadDir(actionsDir)
 		if err != nil {
-			logger.Error("Failed to read actions directory", err, logging.String("dir", actionsDir))
+			logger.Error("Failed to read actions directory", err, spookylogging.String("dir", actionsDir))
 			return nil, fmt.Errorf("failed to read actions directory: %w", err)
 		}
 
@@ -225,30 +225,30 @@ func LoadActionsConfig(projectPath string) (*ActionsConfig, error) {
 
 		for _, fileName := range actionFiles {
 			filePath := filepath.Join(actionsDir, fileName)
-			logger.Info("Loading action file", logging.String("file", filePath))
+			logger.Info("Loading action file", spookylogging.String("file", filePath))
 
 			fileConfig, err := ParseActionsConfig(filePath)
 			if err != nil {
-				logger.Error("Failed to parse action file", err, logging.String("file", filePath))
+				logger.Error("Failed to parse action file", err, spookylogging.String("file", filePath))
 				return nil, fmt.Errorf("failed to parse action file %s: %w", fileName, err)
 			}
 
 			mergedConfig.Actions = append(mergedConfig.Actions, fileConfig.Actions...)
 			logger.Info("Loaded actions from file",
-				logging.String("file", fileName),
-				logging.Int("actions", len(fileConfig.Actions)))
+				spookylogging.String("file", fileName),
+				spookylogging.Int("actions", len(fileConfig.Actions)))
 		}
 	}
 
 	// Check if we loaded any actions
 	if len(mergedConfig.Actions) == 0 {
-		logger.Warn("No actions found in project", logging.String("project_path", projectPath))
+		logger.Warn("No actions found in project", spookylogging.String("project_path", projectPath))
 		return mergedConfig, nil
 	}
 
 	logger.Info("Successfully loaded all actions",
-		logging.String("project_path", projectPath),
-		logging.Int("total_actions", len(mergedConfig.Actions)))
+		spookylogging.String("project_path", projectPath),
+		spookylogging.Int("total_actions", len(mergedConfig.Actions)))
 
 	return mergedConfig, nil
 }
@@ -294,10 +294,10 @@ func parseConfigWithWrapper[T any, W any](
 	extractConfig func(W) (*T, error),
 	resolvePaths func(*T),
 ) (*T, error) {
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 
 	logger.Info("Parsing "+configType+" configuration with wrapper block",
-		logging.String("config_file", filename),
+		spookylogging.String("config_file", filename),
 	)
 
 	parser := hclparse.NewParser()
@@ -307,7 +307,7 @@ func parseConfigWithWrapper[T any, W any](
 	if diags.HasErrors() {
 		diagError := diags.Error()
 		logger.Error("Failed to parse "+configType+" HCL file", errors.New(diagError),
-			logging.String("config_file", filename),
+			spookylogging.String("config_file", filename),
 		)
 		return nil, errors.New("failed to parse " + configType + " HCL file: " + diagError)
 	}
@@ -315,7 +315,7 @@ func parseConfigWithWrapper[T any, W any](
 	// Validate wrapper blocks
 	if err := validateWrapperBlocks(file); err != nil {
 		logger.Error("Failed to validate wrapper blocks", err,
-			logging.String("config_file", filename),
+			spookylogging.String("config_file", filename),
 		)
 		return nil, fmt.Errorf("wrapper block validation failed: %w", err)
 	}
@@ -325,7 +325,7 @@ func parseConfigWithWrapper[T any, W any](
 	if diags.HasErrors() {
 		diagError := diags.Error()
 		logger.Error("Failed to decode "+configType+" configuration", errors.New(diagError),
-			logging.String("config_file", filename),
+			spookylogging.String("config_file", filename),
 		)
 		return nil, errors.New("failed to decode " + configType + " configuration: " + diagError)
 	}
@@ -337,14 +337,14 @@ func parseConfigWithWrapper[T any, W any](
 	}
 
 	logger.Debug(configType+" configuration decoded successfully",
-		logging.String("config_file", filename),
+		spookylogging.String("config_file", filename),
 	)
 
 	// Resolve relative paths
 	resolvePaths(config)
 
 	logger.Info(configType+" configuration parsed successfully",
-		logging.String("config_file", filename),
+		spookylogging.String("config_file", filename),
 	)
 
 	return config, nil

@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"spooky/internal/logging"
+	spookylogging "spooky/internal/logging"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -185,18 +185,18 @@ func (v *Validator) ValidateMachine(machine *Machine) error {
 	if machine == nil {
 		return fmt.Errorf("machine is nil")
 	}
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 
 	// Perform validation
 	if err := v.validate.Struct(machine); err != nil {
 		logger.Error("Machine validation failed", err,
-			logging.String("machine_name", machine.Name),
+			spookylogging.String("machine_name", machine.Name),
 		)
 		return v.formatValidationErrors(err)
 	}
 
 	logger.Info("Machine validation successful",
-		logging.String("machine_name", machine.Name),
+		spookylogging.String("machine_name", machine.Name),
 	)
 
 	return nil
@@ -207,21 +207,21 @@ func (v *Validator) ValidateAction(action *Action) error {
 	if action == nil {
 		return fmt.Errorf("action is nil")
 	}
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 
 	if err := v.validate.Struct(action); err != nil {
 		logger.Error("Action validation failed", err,
-			logging.Action(action.Name),
-			logging.String("description", action.Description),
+			spookylogging.Action(action.Name),
+			spookylogging.String("description", action.Description),
 		)
 		return v.formatValidationErrors(err)
 	}
 
 	logger.Info("Action validation successful",
-		logging.Action(action.Name),
-		logging.String("description", action.Description),
-		logging.Bool("parallel", action.Parallel),
-		logging.Int("timeout", action.Timeout),
+		spookylogging.Action(action.Name),
+		spookylogging.String("description", action.Description),
+		spookylogging.Bool("parallel", action.Parallel),
+		spookylogging.Int("timeout", action.Timeout),
 	)
 
 	return nil

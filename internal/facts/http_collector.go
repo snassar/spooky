@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"spooky/internal/logging"
+	spookylogging "spooky/internal/logging"
 )
 
 // HTTPCollector collects facts from HTTP endpoints
@@ -17,7 +17,7 @@ type HTTPCollector struct {
 	baseURL     string
 	headers     map[string]string
 	mergePolicy MergePolicy
-	logger      logging.Logger
+	logger      spookylogging.Logger
 }
 
 // NewHTTPCollector creates a new HTTP-based fact collector
@@ -31,7 +31,7 @@ func NewHTTPCollector(baseURL string, headers map[string]string, timeout time.Du
 		baseURL:     baseURL,
 		headers:     headers,
 		mergePolicy: mergePolicy,
-		logger:      logging.GetLogger(),
+		logger:      spookylogging.GetLogger(),
 	}
 }
 
@@ -68,9 +68,9 @@ func (c *HTTPCollector) Collect(server string) (*FactCollection, error) {
 	}
 
 	c.logger.Debug("Starting HTTP fact collection",
-		logging.Field{Key: "url", Value: c.baseURL},
-		logging.Field{Key: "server", Value: server},
-		logging.Field{Key: "merge_policy", Value: c.mergePolicy})
+		spookylogging.Field{Key: "url", Value: c.baseURL},
+		spookylogging.Field{Key: "server", Value: server},
+		spookylogging.Field{Key: "merge_policy", Value: c.mergePolicy})
 
 	url := c.baseURL
 	if server != "local" {
@@ -81,15 +81,15 @@ func (c *HTTPCollector) Collect(server string) (*FactCollection, error) {
 	collection, err := c.fetchFromURL(url, server)
 	if err != nil {
 		c.logger.Error("Failed to collect facts from HTTP endpoint", err,
-			logging.Field{Key: "url", Value: url},
-			logging.Field{Key: "server", Value: server})
+			spookylogging.Field{Key: "url", Value: url},
+			spookylogging.Field{Key: "server", Value: server})
 		return nil, err
 	}
 
 	c.logger.Info("Successfully collected facts from HTTP endpoint",
-		logging.Field{Key: "url", Value: url},
-		logging.Field{Key: "server", Value: server},
-		logging.Field{Key: "fact_count", Value: len(collection.Facts)})
+		spookylogging.Field{Key: "url", Value: url},
+		spookylogging.Field{Key: "server", Value: server},
+		spookylogging.Field{Key: "fact_count", Value: len(collection.Facts)})
 
 	return collection, nil
 }
@@ -110,8 +110,8 @@ func (c *HTTPCollector) fetchFromURL(url, server string) (*FactCollection, error
 	defer cancel()
 
 	c.logger.Debug("Making HTTP request",
-		logging.Field{Key: "url", Value: url},
-		logging.Field{Key: "timeout", Value: c.client.Timeout})
+		spookylogging.Field{Key: "url", Value: url},
+		spookylogging.Field{Key: "timeout", Value: c.client.Timeout})
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, http.NoBody)
 	if err != nil {
@@ -139,14 +139,14 @@ func (c *HTTPCollector) fetchFromURL(url, server string) (*FactCollection, error
 
 	if resp.StatusCode != http.StatusOK {
 		c.logger.Error("HTTP request failed", fmt.Errorf("status %d: %s", resp.StatusCode, resp.Status),
-			logging.Field{Key: "url", Value: url},
-			logging.Field{Key: "status_code", Value: resp.StatusCode})
+			spookylogging.Field{Key: "url", Value: url},
+			spookylogging.Field{Key: "status_code", Value: resp.StatusCode})
 		return nil, fmt.Errorf("HTTP request failed with status %d: %s", resp.StatusCode, resp.Status)
 	}
 
 	c.logger.Debug("HTTP request successful",
-		logging.Field{Key: "url", Value: url},
-		logging.Field{Key: "status_code", Value: resp.StatusCode})
+		spookylogging.Field{Key: "url", Value: url},
+		spookylogging.Field{Key: "status_code", Value: resp.StatusCode})
 
 	return c.parseHTTPResponse(resp.Body, server)
 }

@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"spooky/internal/facts"
+	spookyfacts "spooky/internal/facts"
 )
 
 var TemplatesCmd = &cobra.Command{
@@ -228,16 +228,16 @@ func runTemplatesRender(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create fact manager for template rendering
-	var manager *facts.Manager
+	var manager *spookyfacts.Manager
 	if server != "" {
 		// Create storage for fact manager
-		storage, err := facts.NewFactStorage(facts.StorageOptions{
-			Type: facts.StorageTypeBadger,
+		storage, err := spookyfacts.NewFactStorage(spookyfacts.StorageOptions{
+			Type: spookyfacts.StorageTypeBadger,
 			Path: getFactsDBPath(),
 		})
 		if err == nil {
 			defer storage.Close()
-			manager = facts.NewManagerWithStorage(nil, storage)
+			manager = spookyfacts.NewManagerWithStorage(nil, storage)
 		}
 	}
 
