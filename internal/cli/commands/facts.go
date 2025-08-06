@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"spooky/internal/coordinator"
-	"spooky/internal/interfaces"
-	"spooky/internal/logging"
-	"spooky/internal/logging/types"
+	spookycoordinator "spooky/internal/coordinator"
+	spookyinterfaces "spooky/internal/interfaces"
+	spookylogging "spooky/internal/logging"
+	spookyloggingtypes "spooky/internal/logging/types"
 
 	"github.com/spf13/cobra"
 )
@@ -53,14 +53,14 @@ func createFactsGatherCommand() *cobra.Command {
 			}
 
 			// Create logger
-			logger := logging.NewLogger(types.Config{
-				Level:  types.InfoLevel,
+			logger := spookylogging.NewLogger(spookyloggingtypes.Config{
+				Level:  spookyloggingtypes.InfoLevel,
 				Format: "text",
 				Output: "stdout",
 			})
 
 			// Create coordinator manager
-			coord, err := coordinator.NewCoordinatorManagerFromProject(projectPath, logger)
+			coord, err := spookycoordinator.NewCoordinatorManagerFromProject(projectPath, logger)
 			if err != nil {
 				return fmt.Errorf("failed to create coordinator: %w", err)
 			}
@@ -113,14 +113,14 @@ func createFactsListCommand() *cobra.Command {
 			}
 
 			// Create logger
-			logger := logging.NewLogger(types.Config{
-				Level:  types.InfoLevel,
+			logger := spookylogging.NewLogger(spookyloggingtypes.Config{
+				Level:  spookyloggingtypes.InfoLevel,
 				Format: "text",
 				Output: "stdout",
 			})
 
 			// Create coordinator manager
-			coord, err := coordinator.NewCoordinatorManagerFromProject(projectPath, logger)
+			coord, err := spookycoordinator.NewCoordinatorManagerFromProject(projectPath, logger)
 			if err != nil {
 				return fmt.Errorf("failed to create coordinator: %w", err)
 			}
@@ -185,14 +185,14 @@ func createFactsValidateCommand() *cobra.Command {
 			}
 
 			// Create logger
-			logger := logging.NewLogger(types.Config{
-				Level:  types.InfoLevel,
+			logger := spookylogging.NewLogger(spookyloggingtypes.Config{
+				Level:  spookyloggingtypes.InfoLevel,
 				Format: "text",
 				Output: "stdout",
 			})
 
 			// Create coordinator manager
-			coord, err := coordinator.NewCoordinatorManagerFromProject(projectPath, logger)
+			coord, err := spookycoordinator.NewCoordinatorManagerFromProject(projectPath, logger)
 			if err != nil {
 				return fmt.Errorf("failed to create coordinator: %w", err)
 			}
@@ -201,8 +201,8 @@ func createFactsValidateCommand() *cobra.Command {
 			fmt.Println("Validating facts...")
 
 			// Load facts for validation
-			factsContext := &interfaces.FactsContext{
-				BaseContext: interfaces.BaseContext{
+			factsContext := &spookyinterfaces.FactsContext{
+				BaseContext: spookyinterfaces.BaseContext{
 					ProjectPath: projectPath,
 				},
 			}
@@ -253,14 +253,14 @@ func createFactsExportCommand() *cobra.Command {
 			}
 
 			// Create logger
-			logger := logging.NewLogger(types.Config{
-				Level:  types.InfoLevel,
+			logger := spookylogging.NewLogger(spookyloggingtypes.Config{
+				Level:  spookyloggingtypes.InfoLevel,
 				Format: "text",
 				Output: "stdout",
 			})
 
 			// Create coordinator manager
-			coord, err := coordinator.NewCoordinatorManagerFromProject(projectPath, logger)
+			coord, err := spookycoordinator.NewCoordinatorManagerFromProject(projectPath, logger)
 			if err != nil {
 				return fmt.Errorf("failed to create coordinator: %w", err)
 			}

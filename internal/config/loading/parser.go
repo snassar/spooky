@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclparse"
 
-	"spooky/internal/config/types"
+	spookyconfigtypes "spooky/internal/config/types"
 )
 
 // Parser implements ConfigParser interface
@@ -133,13 +133,13 @@ func (p *Parser) ValidateFormat(content []byte, format string) error {
 }
 
 // LoadActionsConfig loads actions configuration from a project
-func LoadActionsConfig(projectPath string) (*types.ActionsConfig, error) {
+func LoadActionsConfig(projectPath string) (*spookyconfigtypes.ActionsConfig, error) {
 	actionsFile := filepath.Join(projectPath, "actions.hcl")
 
 	// Check if actions file exists
 	if _, err := os.Stat(actionsFile); os.IsNotExist(err) {
-		return &types.ActionsConfig{
-			Actions: []types.Action{},
+		return &spookyconfigtypes.ActionsConfig{
+			Actions: []spookyconfigtypes.Action{},
 		}, nil
 	}
 
@@ -157,15 +157,15 @@ func LoadActionsConfig(projectPath string) (*types.ActionsConfig, error) {
 	}
 
 	// Decode the parsed content into our struct
-	var actionsWrapper types.ActionsWrapper
+	var actionsWrapper spookyconfigtypes.ActionsWrapper
 	if diags := gohcl.DecodeBody(file.Body, nil, &actionsWrapper); diags.HasErrors() {
 		return nil, fmt.Errorf("failed to decode actions file: %v", diags)
 	}
 
 	// If no actions block found, return empty config
 	if actionsWrapper.Actions == nil {
-		return &types.ActionsConfig{
-			Actions: []types.Action{},
+		return &spookyconfigtypes.ActionsConfig{
+			Actions: []spookyconfigtypes.Action{},
 		}, nil
 	}
 
@@ -173,11 +173,11 @@ func LoadActionsConfig(projectPath string) (*types.ActionsConfig, error) {
 }
 
 // ParseInventoryConfig loads inventory configuration from a file
-func ParseInventoryConfig(inventoryFile string) (*types.InventoryConfig, error) {
+func ParseInventoryConfig(inventoryFile string) (*spookyconfigtypes.InventoryConfig, error) {
 	// Check if inventory file exists
 	if _, err := os.Stat(inventoryFile); os.IsNotExist(err) {
-		return &types.InventoryConfig{
-			Machines: []types.Machine{},
+		return &spookyconfigtypes.InventoryConfig{
+			Machines: []spookyconfigtypes.Machine{},
 		}, nil
 	}
 
@@ -195,15 +195,15 @@ func ParseInventoryConfig(inventoryFile string) (*types.InventoryConfig, error) 
 	}
 
 	// Decode the parsed content into our struct
-	var inventoryWrapper types.InventoryWrapper
+	var inventoryWrapper spookyconfigtypes.InventoryWrapper
 	if diags := gohcl.DecodeBody(file.Body, nil, &inventoryWrapper); diags.HasErrors() {
 		return nil, fmt.Errorf("failed to decode inventory file: %v", diags)
 	}
 
 	// If no inventory block found, return empty config
 	if inventoryWrapper.Inventory == nil {
-		return &types.InventoryConfig{
-			Machines: []types.Machine{},
+		return &spookyconfigtypes.InventoryConfig{
+			Machines: []spookyconfigtypes.Machine{},
 		}, nil
 	}
 
@@ -211,11 +211,11 @@ func ParseInventoryConfig(inventoryFile string) (*types.InventoryConfig, error) 
 }
 
 // ParseMachinesInventory loads machines inventory from a file
-func ParseMachinesInventory(machinesFile string) (*types.InventoryConfig, error) {
+func ParseMachinesInventory(machinesFile string) (*spookyconfigtypes.InventoryConfig, error) {
 	// Check if machines file exists
 	if _, err := os.Stat(machinesFile); os.IsNotExist(err) {
-		return &types.InventoryConfig{
-			Machines: []types.Machine{},
+		return &spookyconfigtypes.InventoryConfig{
+			Machines: []spookyconfigtypes.Machine{},
 		}, nil
 	}
 
@@ -233,15 +233,15 @@ func ParseMachinesInventory(machinesFile string) (*types.InventoryConfig, error)
 	}
 
 	// Decode the parsed content into our struct
-	var machinesWrapper types.MachinesWrapper
+	var machinesWrapper spookyconfigtypes.MachinesWrapper
 	if diags := gohcl.DecodeBody(file.Body, nil, &machinesWrapper); diags.HasErrors() {
 		return nil, fmt.Errorf("failed to decode machines file: %v", diags)
 	}
 
 	// If no machines block found, return empty config
 	if machinesWrapper.Machines == nil {
-		return &types.InventoryConfig{
-			Machines: []types.Machine{},
+		return &spookyconfigtypes.InventoryConfig{
+			Machines: []spookyconfigtypes.Machine{},
 		}, nil
 	}
 

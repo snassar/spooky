@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"spooky/internal/facts/collectors"
-	"spooky/internal/facts/types"
+	spookyfactscollectors "spooky/internal/facts/collectors"
+	spookyfactstypes "spooky/internal/facts/types"
 
 	hcl2 "github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
@@ -17,7 +17,7 @@ import (
 
 // Collector collects facts from HCL configuration files
 type Collector struct {
-	collectors.BaseCollector
+	spookyfactscollectors.BaseCollector
 	hclFiles []string
 	parser   HCLParser
 }
@@ -34,7 +34,7 @@ type DefaultParser struct{}
 // NewCollector creates a new HCL fact collector
 func NewCollector(hclFiles []string) *Collector {
 	return &Collector{
-		BaseCollector: *collectors.NewBaseCollector(types.SourceHCL, types.MergePolicyMerge),
+		BaseCollector: *spookyfactscollectors.NewBaseCollector(spookyfactstypes.SourceHCL, spookyfactstypes.MergePolicyMerge),
 		hclFiles:      hclFiles,
 		parser:        &DefaultParser{},
 	}
@@ -43,18 +43,18 @@ func NewCollector(hclFiles []string) *Collector {
 // NewCollectorWithParser creates a new HCL fact collector with a custom parser
 func NewCollectorWithParser(hclFiles []string, parser HCLParser) *Collector {
 	return &Collector{
-		BaseCollector: *collectors.NewBaseCollector(types.SourceHCL, types.MergePolicyMerge),
+		BaseCollector: *spookyfactscollectors.NewBaseCollector(spookyfactstypes.SourceHCL, spookyfactstypes.MergePolicyMerge),
 		hclFiles:      hclFiles,
 		parser:        parser,
 	}
 }
 
 // Collect gathers facts from all configured HCL files
-func (c *Collector) Collect(server string) (*types.FactCollection, error) {
-	collection := &types.FactCollection{
+func (c *Collector) Collect(server string) (*spookyfactstypes.FactCollection, error) {
+	collection := &spookyfactstypes.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 	}
 
 	// Collect facts from each HCL file
@@ -68,11 +68,11 @@ func (c *Collector) Collect(server string) (*types.FactCollection, error) {
 }
 
 // CollectSpecific collects only the specified facts from HCL files
-func (c *Collector) CollectSpecific(server string, keys []string) (*types.FactCollection, error) {
-	collection := &types.FactCollection{
+func (c *Collector) CollectSpecific(server string, keys []string) (*spookyfactstypes.FactCollection, error) {
+	collection := &spookyfactstypes.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 	}
 
 	// Collect all facts first, then filter
@@ -87,10 +87,10 @@ func (c *Collector) CollectSpecific(server string, keys []string) (*types.FactCo
 	}
 
 	// Filter to only requested keys
-	filteredCollection := &types.FactCollection{
+	filteredCollection := &spookyfactstypes.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 	}
 
 	for _, key := range keys {
@@ -103,11 +103,11 @@ func (c *Collector) CollectSpecific(server string, keys []string) (*types.FactCo
 }
 
 // GetFact retrieves a single fact from HCL files
-func (c *Collector) GetFact(server, key string) (*types.Fact, error) {
-	collection := &types.FactCollection{
+func (c *Collector) GetFact(server, key string) (*spookyfactstypes.Fact, error) {
+	collection := &spookyfactstypes.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 	}
 
 	// Search through all HCL files for the specific fact
@@ -163,7 +163,7 @@ func (c *Collector) GetHCLFiles() []string {
 }
 
 // collectFromFile collects facts from a single HCL file
-func (c *Collector) collectFromFile(collection *types.FactCollection, filePath string) error {
+func (c *Collector) collectFromFile(collection *spookyfactstypes.FactCollection, filePath string) error {
 	// Parse the HCL file
 	facts, err := c.parser.ParseFile(filePath)
 	if err != nil {
@@ -179,8 +179,8 @@ func (c *Collector) collectFromFile(collection *types.FactCollection, filePath s
 }
 
 // createFact creates a fact in the collection
-func (c *Collector) createFact(collection *types.FactCollection, key string, value interface{}) {
-	collection.Facts[key] = &types.Fact{
+func (c *Collector) createFact(collection *spookyfactstypes.FactCollection, key string, value interface{}) {
+	collection.Facts[key] = &spookyfactstypes.Fact{
 		Key:       key,
 		Value:     value,
 		Source:    string(c.GetSource()),

@@ -3,85 +3,85 @@ package planning
 import (
 	"time"
 
-	"spooky/internal/actions/types"
+	spookyactionstypes "spooky/internal/actions/types"
 )
 
 // PlanningManager defines the interface for action planning operations
 type PlanningManager interface {
 	// Core planning operations
-	PlanAction(action *types.Action, context *types.ActionContext) (*types.ActionPlan, error)
-	PlanActionCollection(collection *types.ActionCollection, context *types.ActionContext) (*types.ActionPlan, error)
-	ValidatePlan(plan *types.ActionPlan) error
+	PlanAction(action *spookyactionstypes.Action, context *spookyactionstypes.ActionContext) (*spookyactionstypes.ActionPlan, error)
+	PlanActionCollection(collection *spookyactionstypes.ActionCollection, context *spookyactionstypes.ActionContext) (*spookyactionstypes.ActionPlan, error)
+	ValidatePlan(plan *spookyactionstypes.ActionPlan) error
 
 	// Planner management
-	CreatePlanner(action *types.Action) (Planner, error)
-	GetPlanner(action *types.Action) (Planner, error)
+	CreatePlanner(action *spookyactionstypes.Action) (Planner, error)
+	GetPlanner(action *spookyactionstypes.Action) (Planner, error)
 
 	// Plan management
-	GetPlan(planID string) (*types.ActionPlan, error)
-	ListPlans() ([]*types.ActionPlan, error)
+	GetPlan(planID string) (*spookyactionstypes.ActionPlan, error)
+	ListPlans() ([]*spookyactionstypes.ActionPlan, error)
 	DeletePlan(planID string) error
 
 	// Configuration
-	SetDefaultStrategy(strategy types.PlanningStrategy)
-	SetDefaultOptimization(optimization types.PlanningOptimization)
+	SetDefaultStrategy(strategy spookyactionstypes.PlanningStrategy)
+	SetDefaultOptimization(optimization spookyactionstypes.PlanningOptimization)
 }
 
 // Planner defines the interface for action planning
 type Planner interface {
 	// Core planning operations
-	Plan(context *types.ActionContext) (*types.ActionPlan, error)
-	Validate(plan *types.ActionPlan) error
-	Optimize(plan *types.ActionPlan) error
+	Plan(context *spookyactionstypes.ActionContext) (*spookyactionstypes.ActionPlan, error)
+	Validate(plan *spookyactionstypes.ActionPlan) error
+	Optimize(plan *spookyactionstypes.ActionPlan) error
 
 	// Strategy management
-	SetStrategy(strategy types.PlanningStrategy)
-	GetStrategy() types.PlanningStrategy
+	SetStrategy(strategy spookyactionstypes.PlanningStrategy)
+	GetStrategy() spookyactionstypes.PlanningStrategy
 
 	// Configuration
-	SetOptimization(optimization types.PlanningOptimization)
-	SetConstraints(constraints []types.PlanningConstraint)
+	SetOptimization(optimization spookyactionstypes.PlanningOptimization)
+	SetConstraints(constraints []spookyactionstypes.PlanningConstraint)
 }
 
 // PlanGenerator defines the interface for generating action plans
 type PlanGenerator interface {
 	// Plan generation
-	GeneratePlan(action *types.Action, context *types.ActionContext) (*types.ActionPlan, error)
-	GenerateCollectionPlan(collection *types.ActionCollection, context *types.ActionContext) (*types.ActionPlan, error)
+	GeneratePlan(action *spookyactionstypes.Action, context *spookyactionstypes.ActionContext) (*spookyactionstypes.ActionPlan, error)
+	GenerateCollectionPlan(collection *spookyactionstypes.ActionCollection, context *spookyactionstypes.ActionContext) (*spookyactionstypes.ActionPlan, error)
 
 	// Plan customization
-	CustomizePlan(plan *types.ActionPlan, options PlanOptions) error
-	ApplyConstraints(plan *types.ActionPlan, constraints []types.PlanningConstraint) error
+	CustomizePlan(plan *spookyactionstypes.ActionPlan, options PlanOptions) error
+	ApplyConstraints(plan *spookyactionstypes.ActionPlan, constraints []spookyactionstypes.PlanningConstraint) error
 
 	// Plan validation
-	ValidatePlanStructure(plan *types.ActionPlan) error
-	ValidatePlanDependencies(plan *types.ActionPlan) error
-	ValidatePlanResources(plan *types.ActionPlan) error
+	ValidatePlanStructure(plan *spookyactionstypes.ActionPlan) error
+	ValidatePlanDependencies(plan *spookyactionstypes.ActionPlan) error
+	ValidatePlanResources(plan *spookyactionstypes.ActionPlan) error
 }
 
 // PlanOptimizer defines the interface for optimizing action plans
 type PlanOptimizer interface {
 	// Plan optimization
-	OptimizePlan(plan *types.ActionPlan, target OptimizationTarget) error
-	OptimizeForSpeed(plan *types.ActionPlan) error
-	OptimizeForResources(plan *types.ActionPlan) error
-	OptimizeForReliability(plan *types.ActionPlan) error
+	OptimizePlan(plan *spookyactionstypes.ActionPlan, target OptimizationTarget) error
+	OptimizeForSpeed(plan *spookyactionstypes.ActionPlan) error
+	OptimizeForResources(plan *spookyactionstypes.ActionPlan) error
+	OptimizeForReliability(plan *spookyactionstypes.ActionPlan) error
 
 	// Optimization analysis
-	AnalyzePlan(plan *types.ActionPlan) (*PlanAnalysis, error)
-	GetOptimizationSuggestions(plan *types.ActionPlan) ([]OptimizationSuggestion, error)
+	AnalyzePlan(plan *spookyactionstypes.ActionPlan) (*PlanAnalysis, error)
+	GetOptimizationSuggestions(plan *spookyactionstypes.ActionPlan) ([]OptimizationSuggestion, error)
 
 	// Configuration
-	SetOptimizationLevel(level types.OptimizationLevel)
-	SetResourceLimits(limits *types.ResourceLimits)
+	SetOptimizationLevel(level spookyactionstypes.OptimizationLevel)
+	SetResourceLimits(limits *spookyactionstypes.ResourceLimits)
 }
 
 // PlanValidator defines the interface for validating action plans
 type PlanValidator interface {
 	// Plan validation
-	ValidatePlan(plan *types.ActionPlan) error
-	ValidatePlanStep(step *types.PlanStep) error
-	ValidatePlanDependencies(plan *types.ActionPlan) error
+	ValidatePlan(plan *spookyactionstypes.ActionPlan) error
+	ValidatePlanStep(step *spookyactionstypes.PlanStep) error
+	ValidatePlanDependencies(plan *spookyactionstypes.ActionPlan) error
 
 	// Validation rules
 	AddValidationRule(rule PlanValidationRule) error
@@ -90,13 +90,13 @@ type PlanValidator interface {
 
 	// Configuration
 	SetStrictMode(strict bool)
-	SetValidationLevel(level types.ValidationLevel)
+	SetValidationLevel(level spookyactionstypes.ValidationLevel)
 }
 
 // PlanScheduler defines the interface for scheduling action plans
 type PlanScheduler interface {
 	// Plan scheduling
-	SchedulePlan(plan *types.ActionPlan, schedule ScheduleOptions) error
+	SchedulePlan(plan *spookyactionstypes.ActionPlan, schedule ScheduleOptions) error
 	ReschedulePlan(planID string, schedule ScheduleOptions) error
 	CancelScheduledPlan(planID string) error
 
@@ -111,12 +111,12 @@ type PlanScheduler interface {
 
 // PlanOptions represents options for plan customization
 type PlanOptions struct {
-	Strategy      types.PlanningStrategy     `json:"strategy"`
-	Optimization  types.PlanningOptimization `json:"optimization"`
-	Constraints   []types.PlanningConstraint `json:"constraints"`
-	Timeout       time.Duration              `json:"timeout"`
-	Parallel      bool                       `json:"parallel"`
-	MaxConcurrent int                        `json:"max_concurrent"`
+	Strategy      spookyactionstypes.PlanningStrategy     `json:"strategy"`
+	Optimization  spookyactionstypes.PlanningOptimization `json:"optimization"`
+	Constraints   []spookyactionstypes.PlanningConstraint `json:"constraints"`
+	Timeout       time.Duration                           `json:"timeout"`
+	Parallel      bool                                    `json:"parallel"`
+	MaxConcurrent int                                     `json:"max_concurrent"`
 }
 
 // OptimizationTarget represents the target for plan optimization
@@ -190,12 +190,12 @@ type ScheduleOptions struct {
 
 // ScheduledPlan represents a scheduled plan
 type ScheduledPlan struct {
-	PlanID    string            `json:"plan_id"`
-	Plan      *types.ActionPlan `json:"plan"`
-	Schedule  ScheduleOptions   `json:"schedule"`
-	Status    string            `json:"status"`
-	CreatedAt time.Time         `json:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at"`
+	PlanID    string                         `json:"plan_id"`
+	Plan      *spookyactionstypes.ActionPlan `json:"plan"`
+	Schedule  ScheduleOptions                `json:"schedule"`
+	Status    string                         `json:"status"`
+	CreatedAt time.Time                      `json:"created_at"`
+	UpdatedAt time.Time                      `json:"updated_at"`
 }
 
 // ScheduleConflict represents a schedule conflict
@@ -211,7 +211,7 @@ type ScheduleConflict struct {
 // PlanValidationRule defines a custom plan validation rule
 type PlanValidationRule interface {
 	Name() string
-	Validate(plan *types.ActionPlan) error
-	ValidateStep(step *types.PlanStep) error
+	Validate(plan *spookyactionstypes.ActionPlan) error
+	ValidateStep(step *spookyactionstypes.PlanStep) error
 	GetDescription() string
 }

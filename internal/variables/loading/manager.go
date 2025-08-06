@@ -8,19 +8,22 @@ import (
 	"strings"
 
 	"spooky/internal/logging"
+	spookylogging "spooky/internal/logging"
 	"spooky/internal/schemas"
+	spookyschemas "spooky/internal/schemas"
 	"spooky/internal/variables/types"
+	spookyvariablestypes "spooky/internal/variables/types"
 )
 
 // Manager implements LoadingManager interface
 type Manager struct {
-	config  *types.LoadingConfig
+	config  *spookyvariablestypes.LoadingConfig
 	loaders map[string]VariableLoader
-	logger  logging.Logger
+	logger  spookylogging.Logger
 }
 
 // NewManager creates a new loading manager
-func NewManager(config *types.LoadingConfig, logger logging.Logger) *Manager {
+func NewManager(config *spookyvariablestypes.LoadingConfig, logger spookylogging.Logger) *Manager {
 	manager := &Manager{
 		config:  config,
 		loaders: make(map[string]VariableLoader),
@@ -28,7 +31,7 @@ func NewManager(config *types.LoadingConfig, logger logging.Logger) *Manager {
 	}
 
 	// Register default loaders
-	validator := schemas.NewSchemaValidator()
+	validator := spookyschemas.NewSchemaValidator()
 	manager.RegisterLoader(".hcl", NewHCLVariableLoader(validator))
 	manager.RegisterLoader(".json", NewJSONVariableLoader(validator))
 
@@ -41,7 +44,7 @@ func (m *Manager) RegisterLoader(extension string, loader VariableLoader) {
 }
 
 // LoadFromFile loads variables from a single file
-func (m *Manager) LoadFromFile(ctx context.Context, path string) ([]*types.Variable, error) {
+func (m *Manager) LoadFromFile(ctx context.Context, path string) ([]*spookyvariablestypes.Variable, error) {
 	// 1. Validate file exists and is readable
 	if err := m.ValidateFile(path); err != nil {
 		return nil, fmt.Errorf("file validation failed: %w", err)

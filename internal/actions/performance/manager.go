@@ -4,41 +4,41 @@ import (
 	"fmt"
 	"sync"
 
-	"spooky/internal/actions/types"
-	"spooky/internal/logging"
+	spookyactionstypes "spooky/internal/actions/types"
+	spookylogging "spooky/internal/logging"
 )
 
 // Manager implements the PerformanceManager interface
 type Manager struct {
 	// Configuration
-	optimizationLevel types.OptimizationLevel
-	resourceLimits    *types.ResourceLimits
+	optimizationLevel spookyactionstypes.OptimizationLevel
+	resourceLimits    *spookyactionstypes.ResourceLimits
 
 	// State
 	optimizers map[string]ActionOptimizer
-	metrics    map[string]*types.PerformanceMetrics
-	logger     logging.Logger
+	metrics    map[string]*spookyactionstypes.PerformanceMetrics
+	logger     spookylogging.Logger
 	mu         sync.RWMutex
 }
 
 // NewManager creates a new PerformanceManager
-func NewManager(logger logging.Logger) *Manager {
+func NewManager(logger spookylogging.Logger) *Manager {
 	return &Manager{
-		optimizationLevel: types.OptimizationLevelNone,
-		resourceLimits:    &types.ResourceLimits{},
+		optimizationLevel: spookyactionstypes.OptimizationLevelNone,
+		resourceLimits:    &spookyactionstypes.ResourceLimits{},
 		optimizers:        make(map[string]ActionOptimizer),
-		metrics:           make(map[string]*types.PerformanceMetrics),
+		metrics:           make(map[string]*spookyactionstypes.PerformanceMetrics),
 		logger:            logger,
 	}
 }
 
 // OptimizeAction optimizes a single action
-func (m *Manager) OptimizeAction(action *types.Action) error {
+func (m *Manager) OptimizeAction(action *spookyactionstypes.Action) error {
 	if action == nil {
 		return fmt.Errorf("action cannot be nil")
 	}
 
-	m.logger.Info("Optimizing action", logging.String("action", action.Name))
+	m.logger.Info("Optimizing action", spookylogging.String("action", action.Name))
 
 	// Create an optimizer for this action
 	optimizer, err := m.CreateOptimizer(action)
@@ -51,17 +51,17 @@ func (m *Manager) OptimizeAction(action *types.Action) error {
 		return fmt.Errorf("failed to optimize action %s: %w", action.Name, err)
 	}
 
-	m.logger.Info("Successfully optimized action", logging.String("action", action.Name))
+	m.logger.Info("Successfully optimized action", spookylogging.String("action", action.Name))
 	return nil
 }
 
 // OptimizeActionCollection optimizes a collection of actions
-func (m *Manager) OptimizeActionCollection(collection *types.ActionCollection) error {
+func (m *Manager) OptimizeActionCollection(collection *spookyactionstypes.ActionCollection) error {
 	if collection == nil {
 		return fmt.Errorf("action collection cannot be nil")
 	}
 
-	m.logger.Info("Optimizing action collection", logging.Int("actions_count", len(collection.Actions)))
+	m.logger.Info("Optimizing action collection", spookylogging.Int("actions_count", len(collection.Actions)))
 
 	// Optimize each action in the collection
 	for _, action := range collection.Actions {
@@ -70,17 +70,17 @@ func (m *Manager) OptimizeActionCollection(collection *types.ActionCollection) e
 		}
 	}
 
-	m.logger.Info("Successfully optimized action collection", logging.Int("actions_count", len(collection.Actions)))
+	m.logger.Info("Successfully optimized action collection", spookylogging.Int("actions_count", len(collection.Actions)))
 	return nil
 }
 
 // GetPerformanceMetrics gets performance metrics for an action
-func (m *Manager) GetPerformanceMetrics(action *types.Action) (*types.PerformanceMetrics, error) {
+func (m *Manager) GetPerformanceMetrics(action *spookyactionstypes.Action) (*spookyactionstypes.PerformanceMetrics, error) {
 	if action == nil {
 		return nil, fmt.Errorf("action cannot be nil")
 	}
 
-	m.logger.Info("Getting performance metrics", logging.String("action", action.Name))
+	m.logger.Info("Getting performance metrics", spookylogging.String("action", action.Name))
 
 	// Create an optimizer for this action
 	optimizer, err := m.CreateOptimizer(action)
@@ -94,12 +94,12 @@ func (m *Manager) GetPerformanceMetrics(action *types.Action) (*types.Performanc
 		return nil, fmt.Errorf("failed to get metrics for action %s: %w", action.Name, err)
 	}
 
-	m.logger.Info("Successfully retrieved performance metrics", logging.String("action", action.Name))
+	m.logger.Info("Successfully retrieved performance metrics", spookylogging.String("action", action.Name))
 	return metrics, nil
 }
 
 // CreateOptimizer creates a new optimizer for an action
-func (m *Manager) CreateOptimizer(action *types.Action) (ActionOptimizer, error) {
+func (m *Manager) CreateOptimizer(action *spookyactionstypes.Action) (ActionOptimizer, error) {
 	if action == nil {
 		return nil, fmt.Errorf("action cannot be nil")
 	}
@@ -116,12 +116,12 @@ func (m *Manager) CreateOptimizer(action *types.Action) (ActionOptimizer, error)
 	optimizer := NewActionOptimizer(action, m.logger)
 	m.optimizers[action.Name] = optimizer
 
-	m.logger.Debug("Created optimizer for action", logging.String("action", action.Name))
+	m.logger.Debug("Created optimizer for action", spookylogging.String("action", action.Name))
 	return optimizer, nil
 }
 
 // GetOptimizer gets an existing optimizer for an action
-func (m *Manager) GetOptimizer(action *types.Action) (ActionOptimizer, error) {
+func (m *Manager) GetOptimizer(action *spookyactionstypes.Action) (ActionOptimizer, error) {
 	if action == nil {
 		return nil, fmt.Errorf("action cannot be nil")
 	}
@@ -138,7 +138,7 @@ func (m *Manager) GetOptimizer(action *types.Action) (ActionOptimizer, error) {
 }
 
 // GetMetrics gets performance metrics for an action
-func (m *Manager) GetMetrics(action *types.Action) (*types.PerformanceMetrics, error) {
+func (m *Manager) GetMetrics(action *spookyactionstypes.Action) (*spookyactionstypes.PerformanceMetrics, error) {
 	if action == nil {
 		return nil, fmt.Errorf("action cannot be nil")
 	}
@@ -155,11 +155,11 @@ func (m *Manager) GetMetrics(action *types.Action) (*types.PerformanceMetrics, e
 }
 
 // ListMetrics lists all performance metrics
-func (m *Manager) ListMetrics() ([]*types.PerformanceMetrics, error) {
+func (m *Manager) ListMetrics() ([]*spookyactionstypes.PerformanceMetrics, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	metrics := make([]*types.PerformanceMetrics, 0, len(m.metrics))
+	metrics := make([]*spookyactionstypes.PerformanceMetrics, 0, len(m.metrics))
 	for _, metric := range m.metrics {
 		metrics = append(metrics, metric)
 	}
@@ -168,7 +168,7 @@ func (m *Manager) ListMetrics() ([]*types.PerformanceMetrics, error) {
 }
 
 // ClearMetrics clears performance metrics for an action
-func (m *Manager) ClearMetrics(action *types.Action) error {
+func (m *Manager) ClearMetrics(action *spookyactionstypes.Action) error {
 	if action == nil {
 		return fmt.Errorf("action cannot be nil")
 	}
@@ -177,21 +177,21 @@ func (m *Manager) ClearMetrics(action *types.Action) error {
 	defer m.mu.Unlock()
 
 	delete(m.metrics, action.Name)
-	m.logger.Info("Cleared metrics for action", logging.String("action", action.Name))
+	m.logger.Info("Cleared metrics for action", spookylogging.String("action", action.Name))
 	return nil
 }
 
 // SetOptimizationLevel sets the optimization level
-func (m *Manager) SetOptimizationLevel(level types.OptimizationLevel) {
+func (m *Manager) SetOptimizationLevel(level spookyactionstypes.OptimizationLevel) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.optimizationLevel = level
-	m.logger.Info("Set optimization level", logging.String("level", string(level)))
+	m.logger.Info("Set optimization level", spookylogging.String("level", string(level)))
 }
 
 // SetResourceLimits sets the resource limits
-func (m *Manager) SetResourceLimits(limits *types.ResourceLimits) {
+func (m *Manager) SetResourceLimits(limits *spookyactionstypes.ResourceLimits) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

@@ -5,20 +5,20 @@ import (
 	"os"
 	"path/filepath"
 
-	"spooky/internal/config/types"
-	"spooky/internal/logging"
+	spookyconfigtypes "spooky/internal/config/types"
+	spookylogging "spooky/internal/logging"
 )
 
 // Manager implements LoadingManager interface
 type Manager struct {
-	config     *types.LoadingConfig
+	config     *spookyconfigtypes.LoadingConfig
 	parser     ConfigParser
 	xdgManager XDGManager
-	logger     logging.Logger
+	logger     spookylogging.Logger
 }
 
 // NewManager creates a new loading manager
-func NewManager(config *types.LoadingConfig, logger logging.Logger) *Manager {
+func NewManager(config *spookyconfigtypes.LoadingConfig, logger spookylogging.Logger) *Manager {
 	return &Manager{
 		config:     config,
 		parser:     NewConfigParser(),
@@ -28,7 +28,7 @@ func NewManager(config *types.LoadingConfig, logger logging.Logger) *Manager {
 }
 
 // LoadGlobalConfig loads global configuration
-func (m *Manager) LoadGlobalConfig() (*types.GlobalConfig, error) {
+func (m *Manager) LoadGlobalConfig() (*spookyconfigtypes.GlobalConfig, error) {
 	// 1. Get config path
 	configPath := m.GetConfigPath()
 
@@ -48,11 +48,11 @@ func (m *Manager) LoadGlobalConfig() (*types.GlobalConfig, error) {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	return config.(*types.GlobalConfig), nil
+	return config.(*spookyconfigtypes.GlobalConfig), nil
 }
 
 // LoadProjectConfig loads project configuration
-func (m *Manager) LoadProjectConfig(projectPath string) (*types.ProjectConfig, error) {
+func (m *Manager) LoadProjectConfig(projectPath string) (*spookyconfigtypes.ProjectConfig, error) {
 	configPath := filepath.Join(projectPath, "project.hcl")
 
 	// 1. Validate config path
@@ -71,7 +71,7 @@ func (m *Manager) LoadProjectConfig(projectPath string) (*types.ProjectConfig, e
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	return config.(*types.ProjectConfig), nil
+	return config.(*spookyconfigtypes.ProjectConfig), nil
 }
 
 // LoadFromFile loads configuration from a file
@@ -116,16 +116,16 @@ func (m *Manager) LoadFromEnvironment() (map[string]interface{}, error) {
 // SetConfigPath sets the configuration path
 func (m *Manager) SetConfigPath(path string) error {
 	if m.config == nil {
-		m.config = &types.LoadingConfig{}
+		m.config = &spookyconfigtypes.LoadingConfig{}
 	}
 	m.config.ConfigPath = path
 	return nil
 }
 
 // SetDefaultConfig sets the default configuration
-func (m *Manager) SetDefaultConfig(defaultConfig *types.GlobalConfig) error {
+func (m *Manager) SetDefaultConfig(defaultConfig *spookyconfigtypes.GlobalConfig) error {
 	if m.config == nil {
-		m.config = &types.LoadingConfig{}
+		m.config = &spookyconfigtypes.LoadingConfig{}
 	}
 	m.config.DefaultConfig = defaultConfig
 	return nil
@@ -134,7 +134,7 @@ func (m *Manager) SetDefaultConfig(defaultConfig *types.GlobalConfig) error {
 // EnableAutoReload enables or disables auto-reload
 func (m *Manager) EnableAutoReload(enabled bool) error {
 	if m.config == nil {
-		m.config = &types.LoadingConfig{}
+		m.config = &spookyconfigtypes.LoadingConfig{}
 	}
 	m.config.AutoReload = enabled
 	return nil

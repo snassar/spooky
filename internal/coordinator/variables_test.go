@@ -5,7 +5,6 @@ import (
 	"time"
 
 	spookyfactstypes "spooky/internal/facts/types"
-	"spooky/internal/interfaces"
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
 	spookyloggingtypes "spooky/internal/logging/types"
@@ -38,13 +37,13 @@ func TestResolveVariables(t *testing.T) {
 	logger := spookylogging.NewLogger(spookyloggingtypes.Config{Level: spookyloggingtypes.InfoLevel})
 	integration := NewCoordinatorVariablesIntegration(nil, logger)
 
-	variablesContext := &interfaces.VariablesContext{
+	variablesContext := &spookyinterfaces.VariablesContext{
 		ResolvedVariables: make(map[string]interface{}),
 		VariableContext:   make(map[string]interface{}),
 		ResolutionContext: make(map[string]interface{}),
 	}
 
-	factsContext := &interfaces.FactsContext{
+	factsContext := &spookyinterfaces.FactsContext{
 		MachineFacts: make(map[string]*spookyfactstypes.FactCollection),
 	}
 
@@ -71,7 +70,7 @@ func TestSubstituteVariables(t *testing.T) {
 	integration := NewCoordinatorVariablesIntegration(nil, logger)
 
 	template := "Hello {{name}}!"
-	variablesContext := &interfaces.VariablesContext{
+	variablesContext := &spookyinterfaces.VariablesContext{
 		ResolvedVariables: map[string]interface{}{
 			"name": "World",
 		},
@@ -87,13 +86,13 @@ func TestVariablesIntegrationPerformance(t *testing.T) {
 	integration := NewCoordinatorVariablesIntegration(nil, logger)
 
 	// Test performance requirement: variable resolution < 50ms
-	variablesContext := &interfaces.VariablesContext{
+	variablesContext := &spookyinterfaces.VariablesContext{
 		ResolvedVariables: make(map[string]interface{}),
 		VariableContext:   make(map[string]interface{}),
 		ResolutionContext: make(map[string]interface{}),
 	}
 
-	factsContext := &interfaces.FactsContext{
+	factsContext := &spookyinterfaces.FactsContext{
 		MachineFacts: make(map[string]*spookyfactstypes.FactCollection),
 	}
 
@@ -115,13 +114,13 @@ func TestVariablesIntegrationConcurrent(t *testing.T) {
 
 	for i := 0; i < numOperations; i++ {
 		go func() {
-			variablesContext := &interfaces.VariablesContext{
+			variablesContext := &spookyinterfaces.VariablesContext{
 				ResolvedVariables: make(map[string]interface{}),
 				VariableContext:   make(map[string]interface{}),
 				ResolutionContext: make(map[string]interface{}),
 			}
 
-			factsContext := &interfaces.FactsContext{
+			factsContext := &spookyinterfaces.FactsContext{
 				MachineFacts: make(map[string]*spookyfactstypes.FactCollection),
 			}
 

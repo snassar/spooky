@@ -1,20 +1,20 @@
 package collectors
 
 import (
-	"spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/facts/types"
 )
 
 // Collector defines the interface for fact collection strategies
 type Collector interface {
 	// Core collection methods
-	Collect(server string) (*types.FactCollection, error)
-	CollectSpecific(server string, keys []string) (*types.FactCollection, error)
-	GetFact(server, key string) (*types.Fact, error)
+	Collect(server string) (*spookyfactstypes.FactCollection, error)
+	CollectSpecific(server string, keys []string) (*spookyfactstypes.FactCollection, error)
+	GetFact(server, key string) (*spookyfactstypes.Fact, error)
 
 	// Configuration
-	GetSource() types.FactSource
-	GetMergePolicy() types.MergePolicy
-	SetMergePolicy(policy types.MergePolicy)
+	GetSource() spookyfactstypes.FactSource
+	GetMergePolicy() spookyfactstypes.MergePolicy
+	SetMergePolicy(policy spookyfactstypes.MergePolicy)
 
 	// Validation
 	Validate() error
@@ -22,22 +22,22 @@ type Collector interface {
 
 // BaseCollector provides common functionality for collectors
 type BaseCollector struct {
-	source      types.FactSource
-	mergePolicy types.MergePolicy
+	source      spookyfactstypes.FactSource
+	mergePolicy spookyfactstypes.MergePolicy
 }
 
 // GetSource returns the fact source
-func (bc *BaseCollector) GetSource() types.FactSource {
+func (bc *BaseCollector) GetSource() spookyfactstypes.FactSource {
 	return bc.source
 }
 
 // GetMergePolicy returns the merge policy
-func (bc *BaseCollector) GetMergePolicy() types.MergePolicy {
+func (bc *BaseCollector) GetMergePolicy() spookyfactstypes.MergePolicy {
 	return bc.mergePolicy
 }
 
 // SetMergePolicy sets the merge policy
-func (bc *BaseCollector) SetMergePolicy(policy types.MergePolicy) {
+func (bc *BaseCollector) SetMergePolicy(policy spookyfactstypes.MergePolicy) {
 	bc.mergePolicy = policy
 }
 
@@ -48,7 +48,7 @@ func (bc *BaseCollector) Validate() error {
 }
 
 // NewBaseCollector creates a new base collector
-func NewBaseCollector(source types.FactSource, mergePolicy types.MergePolicy) *BaseCollector {
+func NewBaseCollector(source spookyfactstypes.FactSource, mergePolicy spookyfactstypes.MergePolicy) *BaseCollector {
 	return &BaseCollector{
 		source:      source,
 		mergePolicy: mergePolicy,

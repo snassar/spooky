@@ -8,6 +8,20 @@ import (
 	"spooky/internal/facts/types"
 )
 
+// ValidationResult represents validation result
+type ValidationResult struct {
+	Valid  bool
+	Schema string
+	Errors []ValidationError
+}
+
+// ValidationError represents a validation error
+type ValidationError struct {
+	Field    string
+	Message  string
+	Severity string
+}
+
 // ValidationUtils provides shared validation utilities to eliminate duplication
 type ValidationUtils struct{}
 

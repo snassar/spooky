@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"time"
-
 	"spooky/internal/facts/types"
 	"spooky/internal/logging"
+	"time"
 )
 
 // parseJSONFromReader handles JSON parsing with shared logic

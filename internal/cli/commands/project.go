@@ -356,19 +356,22 @@ func reencryptVariables(coord *spookycoordinator.CoordinatorManager, projectPath
 				currentValue := fmt.Sprintf("%v", variable)
 
 				// 2. Decrypt with old identity (using default identity)
-				decrypted, err := coord.Crypto().DecryptData([]byte(currentValue))
+				decrypted, err := coord.Secrets().DecryptData([]byte(currentValue))
 				if err != nil {
 					return fmt.Errorf("failed to decrypt variable %s: %w", varName, err)
 				}
 
 				// 3. Get new recipients from crypto manager config
-				newRecipients := coord.Crypto().GetCryptoStatus()["default_recipients"].([]string)
+				newRecipients, err := coord.Secrets().GetDefaultRecipients()
+				if err != nil {
+					return fmt.Errorf("failed to get default recipients: %w", err)
+				}
 				if len(newRecipients) == 0 {
 					return fmt.Errorf("no new recipients configured for re-encryption")
 				}
 
 				// 4. Encrypt with new recipients
-				encrypted, err := coord.Crypto().EncryptData(decrypted, newRecipients)
+				encrypted, err := coord.Secrets().EncryptData(decrypted, newRecipients)
 				if err != nil {
 					return fmt.Errorf("failed to encrypt variable %s: %w", varName, err)
 				}
@@ -441,25 +444,22 @@ func reencryptFacts(coord *spookycoordinator.CoordinatorManager, projectPath str
 				fmt.Printf("  Re-encrypting facts for machine: %s\n", machine)
 
 				// 1. Decrypt with old identity (using default identity)
-				decrypted, err := coord.Crypto().DecryptData([]byte(facts.EncryptedData))
+				decrypted, err := coord.Secrets().DecryptData([]byte(facts.EncryptedData))
 				if err != nil {
 					return fmt.Errorf("failed to decrypt facts for machine %s: %w", machine, err)
 				}
 
 				// 2. Get new recipients from crypto manager config
-				cryptoStatus := coord.Crypto().GetCryptoStatus()
-				newRecipientsInterface := cryptoStatus["default_recipients"]
-				if newRecipientsInterface == nil {
-					return fmt.Errorf("no new recipients configured for re-encryption")
+				newRecipients, err := coord.Secrets().GetDefaultRecipients()
+				if err != nil {
+					return fmt.Errorf("failed to get default recipients: %w", err)
 				}
-
-				newRecipients, ok := newRecipientsInterface.([]string)
-				if !ok || len(newRecipients) == 0 {
+				if len(newRecipients) == 0 {
 					return fmt.Errorf("invalid or empty new recipients configuration")
 				}
 
 				// 3. Encrypt with new recipients
-				encrypted, err := coord.Crypto().EncryptData(decrypted, newRecipients)
+				encrypted, err := coord.Secrets().EncryptData(decrypted, newRecipients)
 				if err != nil {
 					return fmt.Errorf("failed to encrypt facts for machine %s: %w", machine, err)
 				}

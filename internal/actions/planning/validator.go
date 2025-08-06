@@ -3,35 +3,35 @@ package planning
 import (
 	"fmt"
 
-	"spooky/internal/actions/types"
-	"spooky/internal/logging"
+	spookyactionstypes "spooky/internal/actions/types"
+	spookylogging "spooky/internal/logging"
 )
 
 // ActionPlanValidator implements the PlanValidator interface
 type ActionPlanValidator struct {
 	strictMode      bool
-	validationLevel types.ValidationLevel
+	validationLevel spookyactionstypes.ValidationLevel
 	rules           []PlanValidationRule
-	logger          logging.Logger
+	logger          spookylogging.Logger
 }
 
 // NewPlanValidator creates a new PlanValidator
-func NewPlanValidator(logger logging.Logger) PlanValidator {
+func NewPlanValidator(logger spookylogging.Logger) PlanValidator {
 	return &ActionPlanValidator{
 		strictMode:      false,
-		validationLevel: types.ValidationLevelBasic,
+		validationLevel: spookyactionstypes.ValidationLevelBasic,
 		rules:           make([]PlanValidationRule, 0),
 		logger:          logger,
 	}
 }
 
 // ValidatePlan validates an action plan
-func (v *ActionPlanValidator) ValidatePlan(plan *types.ActionPlan) error {
+func (v *ActionPlanValidator) ValidatePlan(plan *spookyactionstypes.ActionPlan) error {
 	if plan == nil {
 		return fmt.Errorf("plan cannot be nil")
 	}
 
-	v.logger.Info("Validating plan", logging.String("plan_id", plan.PlanID))
+	v.logger.Info("Validating plan", spookylogging.String("plan_id", plan.PlanID))
 
 	// Basic validation
 	if err := v.validatePlanStructure(plan); err != nil {
@@ -57,17 +57,17 @@ func (v *ActionPlanValidator) ValidatePlan(plan *types.ActionPlan) error {
 				return fmt.Errorf("custom rule '%s' validation failed: %w", rule.Name(), err)
 			}
 			v.logger.Warn("Custom validation rule failed",
-				logging.String("rule", rule.Name()),
-				logging.String("error", err.Error()))
+				spookylogging.String("rule", rule.Name()),
+				spookylogging.String("error", err.Error()))
 		}
 	}
 
-	v.logger.Info("Plan validation successful", logging.String("plan_id", plan.PlanID))
+	v.logger.Info("Plan validation successful", spookylogging.String("plan_id", plan.PlanID))
 	return nil
 }
 
 // ValidatePlanStep validates a plan step
-func (v *ActionPlanValidator) ValidatePlanStep(step *types.PlanStep) error {
+func (v *ActionPlanValidator) ValidatePlanStep(step *spookyactionstypes.PlanStep) error {
 	if step == nil {
 		return fmt.Errorf("step cannot be nil")
 	}
@@ -92,9 +92,9 @@ func (v *ActionPlanValidator) ValidatePlanStep(step *types.PlanStep) error {
 				return fmt.Errorf("custom rule '%s' step validation failed: %w", rule.Name(), err)
 			}
 			v.logger.Warn("Custom step validation rule failed",
-				logging.String("rule", rule.Name()),
-				logging.String("step_id", step.StepID),
-				logging.String("error", err.Error()))
+				spookylogging.String("rule", rule.Name()),
+				spookylogging.String("step_id", step.StepID),
+				spookylogging.String("error", err.Error()))
 		}
 	}
 
@@ -102,7 +102,7 @@ func (v *ActionPlanValidator) ValidatePlanStep(step *types.PlanStep) error {
 }
 
 // ValidatePlanDependencies validates plan dependencies
-func (v *ActionPlanValidator) ValidatePlanDependencies(plan *types.ActionPlan) error {
+func (v *ActionPlanValidator) ValidatePlanDependencies(plan *spookyactionstypes.ActionPlan) error {
 	if plan == nil {
 		return fmt.Errorf("plan cannot be nil")
 	}
@@ -129,7 +129,7 @@ func (v *ActionPlanValidator) AddValidationRule(rule PlanValidationRule) error {
 	}
 
 	v.rules = append(v.rules, rule)
-	v.logger.Debug("Added validation rule", logging.String("rule", rule.Name()))
+	v.logger.Debug("Added validation rule", spookylogging.String("rule", rule.Name()))
 	return nil
 }
 
@@ -138,7 +138,7 @@ func (v *ActionPlanValidator) RemoveValidationRule(name string) error {
 	for i, rule := range v.rules {
 		if rule.Name() == name {
 			v.rules = append(v.rules[:i], v.rules[i+1:]...)
-			v.logger.Debug("Removed validation rule", logging.String("rule", name))
+			v.logger.Debug("Removed validation rule", spookylogging.String("rule", name))
 			return nil
 		}
 	}
@@ -154,17 +154,17 @@ func (v *ActionPlanValidator) GetValidationRules() ([]PlanValidationRule, error)
 // SetStrictMode sets the strict validation mode
 func (v *ActionPlanValidator) SetStrictMode(strict bool) {
 	v.strictMode = strict
-	v.logger.Debug("Set strict validation mode", logging.Bool("strict", strict))
+	v.logger.Debug("Set strict validation mode", spookylogging.Bool("strict", strict))
 }
 
 // SetValidationLevel sets the validation level
-func (v *ActionPlanValidator) SetValidationLevel(level types.ValidationLevel) {
+func (v *ActionPlanValidator) SetValidationLevel(level spookyactionstypes.ValidationLevel) {
 	v.validationLevel = level
-	v.logger.Debug("Set validation level", logging.String("level", string(level)))
+	v.logger.Debug("Set validation level", spookylogging.String("level", string(level)))
 }
 
 // validatePlanStructure validates the basic structure of a plan
-func (v *ActionPlanValidator) validatePlanStructure(plan *types.ActionPlan) error {
+func (v *ActionPlanValidator) validatePlanStructure(plan *spookyactionstypes.ActionPlan) error {
 	if plan.PlanID == "" {
 		return fmt.Errorf("plan ID cannot be empty")
 	}
@@ -177,13 +177,13 @@ func (v *ActionPlanValidator) validatePlanStructure(plan *types.ActionPlan) erro
 }
 
 // hasCircularDependency checks for circular dependencies using DFS
-func (v *ActionPlanValidator) hasCircularDependency(step *types.PlanStep, allSteps []*types.PlanStep, visited, recStack map[string]bool) bool {
+func (v *ActionPlanValidator) hasCircularDependency(step *spookyactionstypes.PlanStep, allSteps []*spookyactionstypes.PlanStep, visited, recStack map[string]bool) bool {
 	visited[step.StepID] = true
 	recStack[step.StepID] = true
 
 	for _, depID := range step.Dependencies {
 		// Find the dependent step
-		var depStep *types.PlanStep
+		var depStep *spookyactionstypes.PlanStep
 		for _, s := range allSteps {
 			if s.StepID == depID {
 				depStep = s

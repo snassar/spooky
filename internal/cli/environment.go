@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	"spooky/internal/logging"
+	spookylogging "spooky/internal/logging"
 )
 
 // InitializeSpookyEnvironment initializes the Spooky environment
 func InitializeSpookyEnvironment() error {
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 
 	// Create necessary directories
 	dirs := []string{
@@ -23,7 +23,7 @@ func InitializeSpookyEnvironment() error {
 		if err := os.MkdirAll(expandedDir, 0755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", expandedDir, err)
 		}
-		logger.Info("Created directory", logging.String("path", expandedDir))
+		logger.Info("Created directory", spookylogging.String("path", expandedDir))
 	}
 
 	// Create default config file if it doesn't exist
@@ -32,7 +32,7 @@ func InitializeSpookyEnvironment() error {
 		if err := createDefaultConfig(configPath); err != nil {
 			return fmt.Errorf("failed to create default config: %w", err)
 		}
-		logger.Info("Created default config file", logging.String("path", configPath))
+		logger.Info("Created default config file", spookylogging.String("path", configPath))
 	}
 
 	return nil

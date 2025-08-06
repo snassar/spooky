@@ -3,7 +3,7 @@ package commands
 import (
 	"fmt"
 
-	"spooky/internal/cli/types"
+	spookyclitypes "spooky/internal/cli/types"
 )
 
 // Executor implements CommandExecutor interface
@@ -15,7 +15,7 @@ func NewExecutor() *Executor {
 }
 
 // ExecuteCommand executes a command
-func (e *Executor) ExecuteCommand(command *types.Command, args []string) error {
+func (e *Executor) ExecuteCommand(command *spookyclitypes.Command, args []string) error {
 	if command == nil {
 		return fmt.Errorf("command cannot be nil")
 	}
@@ -32,7 +32,7 @@ func (e *Executor) ExecuteCommand(command *types.Command, args []string) error {
 }
 
 // ExecuteSubcommand executes a subcommand
-func (e *Executor) ExecuteSubcommand(parent *types.Command, subcommand string, args []string) error {
+func (e *Executor) ExecuteSubcommand(parent *spookyclitypes.Command, subcommand string, args []string) error {
 	if parent == nil {
 		return fmt.Errorf("parent command cannot be nil")
 	}
@@ -42,7 +42,7 @@ func (e *Executor) ExecuteSubcommand(parent *types.Command, subcommand string, a
 	}
 
 	// Find the subcommand
-	var targetCommand *types.Command
+	var targetCommand *spookyclitypes.Command
 	for _, cmd := range parent.Subcommands {
 		if cmd.Name == subcommand {
 			targetCommand = cmd
@@ -59,7 +59,7 @@ func (e *Executor) ExecuteSubcommand(parent *types.Command, subcommand string, a
 }
 
 // ValidateExecution validates command execution
-func (e *Executor) ValidateExecution(command *types.Command, _ []string) error {
+func (e *Executor) ValidateExecution(command *spookyclitypes.Command, _ []string) error {
 	if command == nil {
 		return fmt.Errorf("command cannot be nil")
 	}

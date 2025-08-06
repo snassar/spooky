@@ -3,35 +3,35 @@ package cli
 import (
 	"fmt"
 
-	"spooky/internal/cli/commands"
-	"spooky/internal/cli/completion"
-	"spooky/internal/cli/flags"
-	"spooky/internal/cli/help"
-	"spooky/internal/cli/types"
-	"spooky/internal/logging"
+	spookyclicommands "spooky/internal/cli/commands"
+	spookyclicompletion "spooky/internal/cli/completion"
+	spookycliflags "spooky/internal/cli/flags"
+	spookyclihelp "spooky/internal/cli/help"
+	spookyclitypes "spooky/internal/cli/types"
+	spookylogging "spooky/internal/logging"
 
 	"github.com/spf13/cobra"
 )
 
 // Manager implements CLIManager interface
 type Manager struct {
-	config            *types.Config
-	commandsManager   commands.CommandsManager
-	completionManager completion.CompletionManager
-	helpManager       help.HelpManager
-	flagsManager      flags.FlagsManager
+	config            *spookyclitypes.Config
+	commandsManager   spookyclicommands.CommandsManager
+	completionManager spookyclicompletion.CompletionManager
+	helpManager       spookyclihelp.HelpManager
+	flagsManager      spookycliflags.FlagsManager
 	rootCommand       *cobra.Command
-	logger            logging.Logger
+	logger            spookylogging.Logger
 }
 
 // NewManager creates a new CLI manager
 func NewManager(
-	config *types.Config,
-	commandsManager commands.CommandsManager,
-	completionManager completion.CompletionManager,
-	helpManager help.HelpManager,
-	flagsManager flags.FlagsManager,
-	logger logging.Logger,
+	config *spookyclitypes.Config,
+	commandsManager spookyclicommands.CommandsManager,
+	completionManager spookyclicompletion.CompletionManager,
+	helpManager spookyclihelp.HelpManager,
+	flagsManager spookycliflags.FlagsManager,
+	logger spookylogging.Logger,
 ) *Manager {
 	return &Manager{
 		config:            config,
@@ -89,7 +89,7 @@ func (m *Manager) GetRootCommand() *cobra.Command {
 }
 
 // RegisterCommand registers a new command
-func (m *Manager) RegisterCommand(command *types.Command) error {
+func (m *Manager) RegisterCommand(command *spookyclitypes.Command) error {
 	return m.commandsManager.RegisterCommand(command)
 }
 
@@ -99,12 +99,12 @@ func (m *Manager) UnregisterCommand(name string) error {
 }
 
 // GetCommand gets a command by name
-func (m *Manager) GetCommand(name string) (*types.Command, error) {
+func (m *Manager) GetCommand(name string) (*spookyclitypes.Command, error) {
 	return m.commandsManager.GetCommand(name)
 }
 
 // ListCommands lists all commands
-func (m *Manager) ListCommands() []*types.Command {
+func (m *Manager) ListCommands() []*spookyclitypes.Command {
 	return m.commandsManager.ListCommands()
 }
 

@@ -5,20 +5,20 @@ import (
 	"text/template"
 	"time"
 
-	"spooky/internal/templates/types"
+	spookytemplatestypes "spooky/internal/templates/types"
 )
 
 // TemplateManager defines the main interface for template management
 type TemplateManager interface {
 	// Core template operations
-	LoadTemplate(path string) (*types.Template, error)
+	LoadTemplate(path string) (*spookytemplatestypes.Template, error)
 	RenderTemplate(templateFile, projectPath string, additionalData map[string]interface{}) (string, error)
 	ValidateTemplate(templateFile string) error
 	ValidateTemplates(projectPath string) ([]string, error)
 
 	// Context management
-	NewTemplateContext(projectPath string) (*types.TemplateContext, error)
-	GetTemplateFunctions(ctx *types.TemplateContext) template.FuncMap
+	NewTemplateContext(projectPath string) (*spookytemplatestypes.TemplateContext, error)
+	GetTemplateFunctions(ctx *spookytemplatestypes.TemplateContext) template.FuncMap
 
 	// Enhanced operations
 	RenderTemplateWithTimeout(ctx context.Context, templateFile, projectPath string, additionalData map[string]interface{}) (string, error)

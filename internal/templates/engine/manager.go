@@ -6,20 +6,20 @@ import (
 	"text/template"
 	"time"
 
-	"spooky/internal/logging"
-	"spooky/internal/templates/types"
+	spookylogging "spooky/internal/logging"
+	spookytemplatestypes "spooky/internal/templates/types"
 )
 
 // Manager implements EngineManager interface
 type Manager struct {
-	config   *types.EngineConfig
+	config   *spookytemplatestypes.EngineConfig
 	parser   TemplateParser
 	renderer TemplateRenderer
-	logger   logging.Logger
+	logger   spookylogging.Logger
 }
 
 // NewManager creates a new engine manager
-func NewManager(config *types.EngineConfig, logger logging.Logger) *Manager {
+func NewManager(config *spookytemplatestypes.EngineConfig, logger spookylogging.Logger) *Manager {
 	return &Manager{
 		config:   config,
 		parser:   NewTemplateParser(),
@@ -79,7 +79,7 @@ func (m *Manager) ValidateTemplate(tmpl *template.Template) error {
 // SetDelimiters sets template delimiters
 func (m *Manager) SetDelimiters(left, right string) error {
 	if m.config == nil {
-		m.config = &types.EngineConfig{}
+		m.config = &spookytemplatestypes.EngineConfig{}
 	}
 	m.config.Delimiters = []string{left, right}
 	return nil
@@ -88,7 +88,7 @@ func (m *Manager) SetDelimiters(left, right string) error {
 // SetMaxExecutionTime sets maximum execution time
 func (m *Manager) SetMaxExecutionTime(timeout time.Duration) error {
 	if m.config == nil {
-		m.config = &types.EngineConfig{}
+		m.config = &spookytemplatestypes.EngineConfig{}
 	}
 	m.config.MaxExecutionTime = timeout
 	return nil
@@ -97,7 +97,7 @@ func (m *Manager) SetMaxExecutionTime(timeout time.Duration) error {
 // EnableStrictMode enables strict mode
 func (m *Manager) EnableStrictMode(strict bool) error {
 	if m.config == nil {
-		m.config = &types.EngineConfig{}
+		m.config = &spookytemplatestypes.EngineConfig{}
 	}
 	m.config.StrictMode = strict
 	return nil

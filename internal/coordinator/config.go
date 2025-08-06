@@ -4,20 +4,20 @@ import (
 	"fmt"
 	"time"
 
-	"spooky/internal/config"
-	"spooky/internal/config/types"
-	"spooky/internal/interfaces"
-	"spooky/internal/logging"
+	spookyconfig "spooky/internal/config"
+	spookyconfigtypes "spooky/internal/config/types"
+	spookyinterfaces "spooky/internal/interfaces"
+	spookylogging "spooky/internal/logging"
 )
 
 // CoordinatorConfigIntegration implements config system integration
 type CoordinatorConfigIntegration struct {
-	configManager config.ConfigManager
-	logger        logging.Logger
+	configManager spookyconfig.ConfigManager
+	logger        spookylogging.Logger
 }
 
 // NewCoordinatorConfigIntegration creates a new config integration
-func NewCoordinatorConfigIntegration(configManager config.ConfigManager, logger logging.Logger) *CoordinatorConfigIntegration {
+func NewCoordinatorConfigIntegration(configManager spookyconfig.ConfigManager, logger spookylogging.Logger) *CoordinatorConfigIntegration {
 	return &CoordinatorConfigIntegration{
 		configManager: configManager,
 		logger:        logger,
@@ -25,7 +25,7 @@ func NewCoordinatorConfigIntegration(configManager config.ConfigManager, logger 
 }
 
 // LoadConfig loads configuration for the project
-func (ci *CoordinatorConfigIntegration) LoadConfig(projectPath string) (*interfaces.ConfigContext, error) {
+func (ci *CoordinatorConfigIntegration) LoadConfig(projectPath string) (*spookyinterfaces.ConfigContext, error) {
 	// Load global configuration
 	if err := ci.configManager.LoadConfig(); err != nil {
 		return nil, fmt.Errorf("failed to load global configuration: %w", err)
@@ -45,8 +45,8 @@ func (ci *CoordinatorConfigIntegration) LoadConfig(projectPath string) (*interfa
 	}
 
 	// Create config context
-	configContext := &interfaces.ConfigContext{
-		BaseContext: interfaces.BaseContext{
+	configContext := &spookyinterfaces.ConfigContext{
+		BaseContext: spookyinterfaces.BaseContext{
 			ProjectPath: projectPath,
 			Timestamp:   time.Now(),
 		},
@@ -56,8 +56,8 @@ func (ci *CoordinatorConfigIntegration) LoadConfig(projectPath string) (*interfa
 	}
 
 	ci.logger.Info("Loaded configuration",
-		logging.String("project", projectPath),
-		logging.String("source", string(config.Source)))
+		spookylogging.String("project", projectPath),
+		spookylogging.String("source", string(config.Source)))
 
 	return configContext, nil
 }
@@ -77,7 +77,7 @@ func (ci *CoordinatorConfigIntegration) ValidateConfig(projectPath string) error
 	}
 
 	ci.logger.Info("Validated configuration",
-		logging.String("project", projectPath))
+		spookylogging.String("project", projectPath))
 
 	return nil
 }
@@ -90,7 +90,7 @@ func (ci *CoordinatorConfigIntegration) GetConfigValue(path string) (interface{}
 
 // SetConfigValue sets a configuration value by path
 func (ci *CoordinatorConfigIntegration) SetConfigValue(path string, value interface{}) error {
-	return ci.configManager.SetValue(path, value, types.SourceCLI)
+	return ci.configManager.SetValue(path, value, spookyconfigtypes.SourceCLI)
 }
 
 // GetConfigString gets a string configuration value

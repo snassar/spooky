@@ -4,79 +4,79 @@ import (
 	"fmt"
 	"time"
 
-	"spooky/internal/actions/types"
-	"spooky/internal/logging"
+	spookyactionstypes "spooky/internal/actions/types"
+	spookylogging "spooky/internal/logging"
 )
 
 // ActionPlanner implements the Planner interface
 type ActionPlanner struct {
-	action       *types.Action
-	strategy     types.PlanningStrategy
-	optimization types.PlanningOptimization
-	constraints  []types.PlanningConstraint
-	logger       logging.Logger
+	action       *spookyactionstypes.Action
+	strategy     spookyactionstypes.PlanningStrategy
+	optimization spookyactionstypes.PlanningOptimization
+	constraints  []spookyactionstypes.PlanningConstraint
+	logger       spookylogging.Logger
 }
 
 // NewPlanner creates a new Planner
-func NewPlanner(action *types.Action, logger logging.Logger) Planner {
+func NewPlanner(action *spookyactionstypes.Action, logger spookylogging.Logger) Planner {
 	return &ActionPlanner{
 		action:       action,
-		strategy:     types.PlanningStrategySequential,
-		optimization: types.PlanningOptimizationNone,
-		constraints:  make([]types.PlanningConstraint, 0),
+		strategy:     spookyactionstypes.PlanningStrategySequential,
+		optimization: spookyactionstypes.PlanningOptimizationNone,
+		constraints:  make([]spookyactionstypes.PlanningConstraint, 0),
 		logger:       logger,
 	}
 }
 
 // Plan creates a plan for the action
-func (p *ActionPlanner) Plan(context *types.ActionContext) (*types.ActionPlan, error) {
+func (p *ActionPlanner) Plan(context *spookyactionstypes.ActionContext) (*spookyactionstypes.ActionPlan, error) {
 	if p.action == nil {
 		return nil, fmt.Errorf("action cannot be nil")
 	}
 
-	p.logger.Info("Creating plan for action", logging.String("action", p.action.Name))
+	p.logger.Info("Creating plan for action", spookylogging.String("action", p.action.Name))
 
 	// Create a new plan
-	plan := &types.ActionPlan{
+	plan := &spookyactionstypes.ActionPlan{
 		PlanID:       generatePlanID(),
 		ActionName:   p.action.Name,
-		Status:       types.PlanningStatusPending,
+		Status:       spookyactionstypes.PlanningStatusPending,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 		Strategy:     p.strategy,
 		Optimization: p.optimization,
-		Steps:        make([]*types.PlanStep, 0),
+		Steps:        make([]*spookyactionstypes.PlanStep, 0),
 		Constraints:  p.constraints,
 		Metadata:     make(map[string]interface{}),
 	}
 
 	// Create steps based on the action
-	step := &types.PlanStep{
+	step := &spookyactionstypes.PlanStep{
 		StepID:    generateStepID(),
 		StepName:  p.action.Name,
 		StepOrder: 1,
 		Action:    p.action,
-		Status:    types.PlanStepStatusPending,
+		Status:    spookyactionstypes.PlanStepStatusPending,
 		Metadata:  make(map[string]interface{}),
 	}
 
 	plan.Steps = append(plan.Steps, step)
 
 	p.logger.Info("Successfully created plan",
-		logging.String("action", p.action.Name),
-		logging.String("plan_id", plan.PlanID),
-		logging.Int("steps", len(plan.Steps)))
+		spookylogging.String("action", p.action.Name),
+		spookylogging.String("plan_id", plan.PlanID),
+		spookylogging.Int("steps", len(plan.Steps)))
 
 	return plan, nil
 }
 
 // Validate validates a plan
-func (p *ActionPlanner) Validate(plan *types.ActionPlan) error {
+func (p *ActionPlanner) Validate(plan *spookyactionstypes.ActionPlan) error {
 	if plan == nil {
 		return fmt.Errorf("plan cannot be nil")
 	}
 
-	p.logger.Info("Validating plan", logging.String("plan_id", plan.PlanID))
+	p.logger.Info("Validating plan", spookylogging.String("plan_id", plan.PlanID))
 
 	// Basic validation
 	if plan.PlanID == "" {
@@ -98,27 +98,27 @@ func (p *ActionPlanner) Validate(plan *types.ActionPlan) error {
 		}
 	}
 
-	p.logger.Info("Plan validation successful", logging.String("plan_id", plan.PlanID))
+	p.logger.Info("Plan validation successful", spookylogging.String("plan_id", plan.PlanID))
 	return nil
 }
 
 // Optimize optimizes a plan
-func (p *ActionPlanner) Optimize(plan *types.ActionPlan) error {
+func (p *ActionPlanner) Optimize(plan *spookyactionstypes.ActionPlan) error {
 	if plan == nil {
 		return fmt.Errorf("plan cannot be nil")
 	}
 
-	p.logger.Info("Optimizing plan", logging.String("plan_id", plan.PlanID))
+	p.logger.Info("Optimizing plan", spookylogging.String("plan_id", plan.PlanID))
 
 	// Apply optimization based on strategy
 	switch p.optimization {
-	case types.PlanningOptimizationBasic:
+	case spookyactionstypes.PlanningOptimizationBasic:
 		// Basic optimization: ensure proper step ordering
 		for i, step := range plan.Steps {
 			step.StepOrder = i + 1
 		}
 
-	case types.PlanningOptimizationAdvanced:
+	case spookyactionstypes.PlanningOptimizationAdvanced:
 		// Advanced optimization: parallel execution where possible
 		for _, step := range plan.Steps {
 			if step.Action != nil && step.Action.Parallel {
@@ -126,7 +126,7 @@ func (p *ActionPlanner) Optimize(plan *types.ActionPlan) error {
 			}
 		}
 
-	case types.PlanningOptimizationMaximum:
+	case spookyactionstypes.PlanningOptimizationMaximum:
 		// Maximum optimization: aggressive parallelization and resource optimization
 		for _, step := range plan.Steps {
 			step.Parallel = true
@@ -136,31 +136,31 @@ func (p *ActionPlanner) Optimize(plan *types.ActionPlan) error {
 		}
 	}
 
-	p.logger.Info("Plan optimization completed", logging.String("plan_id", plan.PlanID))
+	p.logger.Info("Plan optimization completed", spookylogging.String("plan_id", plan.PlanID))
 	return nil
 }
 
 // SetStrategy sets the planning strategy
-func (p *ActionPlanner) SetStrategy(strategy types.PlanningStrategy) {
+func (p *ActionPlanner) SetStrategy(strategy spookyactionstypes.PlanningStrategy) {
 	p.strategy = strategy
-	p.logger.Debug("Set planning strategy", logging.String("strategy", string(strategy)))
+	p.logger.Debug("Set planning strategy", spookylogging.String("strategy", string(strategy)))
 }
 
 // GetStrategy gets the current planning strategy
-func (p *ActionPlanner) GetStrategy() types.PlanningStrategy {
+func (p *ActionPlanner) GetStrategy() spookyactionstypes.PlanningStrategy {
 	return p.strategy
 }
 
 // SetOptimization sets the optimization level
-func (p *ActionPlanner) SetOptimization(optimization types.PlanningOptimization) {
+func (p *ActionPlanner) SetOptimization(optimization spookyactionstypes.PlanningOptimization) {
 	p.optimization = optimization
-	p.logger.Debug("Set optimization level", logging.String("optimization", string(optimization)))
+	p.logger.Debug("Set optimization level", spookylogging.String("optimization", string(optimization)))
 }
 
 // SetConstraints sets the planning constraints
-func (p *ActionPlanner) SetConstraints(constraints []types.PlanningConstraint) {
+func (p *ActionPlanner) SetConstraints(constraints []spookyactionstypes.PlanningConstraint) {
 	p.constraints = constraints
-	p.logger.Debug("Set planning constraints", logging.Int("constraints_count", len(constraints)))
+	p.logger.Debug("Set planning constraints", spookylogging.Int("constraints_count", len(constraints)))
 }
 
 // generateStepID generates a unique step ID

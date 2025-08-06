@@ -1,6 +1,6 @@
 package interfaces
 
-import "spooky/internal/templates/types"
+import spookytemplatestypes "spooky/internal/templates/types"
 
 // TemplatesIntegration defines the interface for templates system integration
 type TemplatesIntegration interface {
@@ -8,22 +8,22 @@ type TemplatesIntegration interface {
 	LoadTemplates(projectPath string) (*TemplatesContext, error)
 
 	// ValidateTemplate validates a template using the context
-	ValidateTemplate(template *types.Template, context *TemplatesContext) error
+	ValidateTemplate(template *spookytemplatestypes.Template, context *TemplatesContext) error
 
 	// RenderTemplate renders a template with the given context
-	RenderTemplate(template *types.Template, context *TemplatesContext) (string, error)
+	RenderTemplate(template *spookytemplatestypes.Template, context *TemplatesContext) (string, error)
 
 	// CacheTemplate caches a template for later use
-	CacheTemplate(template *types.Template) error
+	CacheTemplate(template *spookytemplatestypes.Template) error
 
 	// GetTemplate gets a specific template by name
-	GetTemplate(name string, context *TemplatesContext) (*types.Template, error)
+	GetTemplate(name string, context *TemplatesContext) (*spookytemplatestypes.Template, error)
 
 	// ListTemplates lists all available templates
-	ListTemplates(context *TemplatesContext) (map[string]*types.Template, error)
+	ListTemplates(context *TemplatesContext) (map[string]*spookytemplatestypes.Template, error)
 
 	// AddTemplate adds a new template to the project
-	AddTemplate(name string, template *types.Template, context *TemplatesContext) error
+	AddTemplate(name string, template *spookytemplatestypes.Template, context *TemplatesContext) error
 
 	// RemoveTemplate removes a template from the project
 	RemoveTemplate(name string, context *TemplatesContext) error

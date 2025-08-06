@@ -6,31 +6,31 @@ import (
 	"strings"
 	"time"
 
-	"spooky/internal/facts/types"
-	"spooky/internal/logging"
-	"spooky/internal/ssh"
-	sshTypes "spooky/internal/ssh/types"
+	spookyfactstypes "spooky/internal/facts/types"
+	spookylogging "spooky/internal/logging"
+	spookyssh "spooky/internal/ssh"
+	spookysshtypes "spooky/internal/ssh/types"
 )
 
 // Collector implements SSH-based fact collection
 type Collector struct {
-	sshManager ssh.SSHManager
-	logger     logging.Logger
+	sshManager spookyssh.SSHManager
+	logger     spookylogging.Logger
 }
 
 // NewCollector creates a new SSH fact collector
-func NewCollector(logger logging.Logger) *Collector {
+func NewCollector(logger spookylogging.Logger) *Collector {
 	return &Collector{
-		sshManager: ssh.NewDefaultManager(logger),
+		sshManager: spookyssh.NewDefaultManager(logger),
 		logger:     logger,
 	}
 }
 
 // Collect gathers facts from a remote machine via SSH
-func (c *Collector) Collect(server string, config *sshTypes.SSHConfig) (*types.FactCollection, error) {
-	collection := &types.FactCollection{
+func (c *Collector) Collect(server string, config *spookysshtypes.SSHConfig) (*spookyfactstypes.FactCollection, error) {
+	collection := &spookyfactstypes.FactCollection{
 		Server:    server,
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 		Timestamp: time.Now(),
 	}
 
@@ -88,7 +88,7 @@ type Platform struct {
 }
 
 // detectPlatform detects the operating system and architecture
-func (c *Collector) detectPlatform(connection *sshTypes.SSHConnection) (*Platform, error) {
+func (c *Collector) detectPlatform(connection *spookysshtypes.SSHConnection) (*Platform, error) {
 	// Get OS type
 	osResult, err := c.sshManager.ExecuteCommand(connection, "uname -s")
 	if err != nil {
@@ -134,7 +134,7 @@ func (c *Collector) detectPlatform(connection *sshTypes.SSHConnection) (*Platfor
 }
 
 // executeCommand executes a command via SSH and returns the stdout
-func (c *Collector) executeCommand(connection *sshTypes.SSHConnection, command string) (string, error) {
+func (c *Collector) executeCommand(connection *spookysshtypes.SSHConnection, command string) (string, error) {
 	result, err := c.sshManager.ExecuteCommand(connection, command)
 	if err != nil {
 		return "", fmt.Errorf("failed to execute command '%s': %w", command, err)
@@ -143,7 +143,7 @@ func (c *Collector) executeCommand(connection *sshTypes.SSHConnection, command s
 }
 
 // collectSystemFacts collects basic system information
-func (c *Collector) collectSystemFacts(collection *types.FactCollection, connection *sshTypes.SSHConnection, platform *Platform) error {
+func (c *Collector) collectSystemFacts(collection *spookyfactstypes.FactCollection, connection *spookysshtypes.SSHConnection, platform *Platform) error {
 	// System type
 	c.createFact(collection, "spooky_system", platform.OS)
 
@@ -179,7 +179,7 @@ func (c *Collector) collectSystemFacts(collection *types.FactCollection, connect
 }
 
 // collectOSFacts collects operating system information
-func (c *Collector) collectOSFacts(collection *types.FactCollection, connection *sshTypes.SSHConnection, platform *Platform) error {
+func (c *Collector) collectOSFacts(collection *spookyfactstypes.FactCollection, connection *spookysshtypes.SSHConnection, platform *Platform) error {
 	switch platform.OS {
 	case "linux":
 		return c.collectLinuxOSFacts(collection, connection)
@@ -193,7 +193,7 @@ func (c *Collector) collectOSFacts(collection *types.FactCollection, connection 
 }
 
 // collectHardwareFacts collects hardware information
-func (c *Collector) collectHardwareFacts(collection *types.FactCollection, connection *sshTypes.SSHConnection, platform *Platform) error {
+func (c *Collector) collectHardwareFacts(collection *spookyfactstypes.FactCollection, connection *spookysshtypes.SSHConnection, platform *Platform) error {
 	switch platform.OS {
 	case "linux":
 		return c.collectLinuxHardwareFacts(collection, connection)
@@ -207,7 +207,7 @@ func (c *Collector) collectHardwareFacts(collection *types.FactCollection, conne
 }
 
 // collectNetworkFacts collects network information
-func (c *Collector) collectNetworkFacts(collection *types.FactCollection, connection *sshTypes.SSHConnection, platform *Platform) error {
+func (c *Collector) collectNetworkFacts(collection *spookyfactstypes.FactCollection, connection *spookysshtypes.SSHConnection, platform *Platform) error {
 	switch platform.OS {
 	case "linux":
 		return c.collectLinuxNetworkFacts(collection, connection)
@@ -221,7 +221,7 @@ func (c *Collector) collectNetworkFacts(collection *types.FactCollection, connec
 }
 
 // collectUserFacts collects user information
-func (c *Collector) collectUserFacts(collection *types.FactCollection, connection *sshTypes.SSHConnection, platform *Platform) error {
+func (c *Collector) collectUserFacts(collection *spookyfactstypes.FactCollection, connection *spookysshtypes.SSHConnection, platform *Platform) error {
 	// User ID
 	userID, err := c.executeCommand(connection, "whoami")
 	if err == nil {
@@ -244,7 +244,7 @@ func (c *Collector) collectUserFacts(collection *types.FactCollection, connectio
 }
 
 // collectEnvironmentFacts collects environment information
-func (c *Collector) collectEnvironmentFacts(collection *types.FactCollection, connection *sshTypes.SSHConnection, platform *Platform) error {
+func (c *Collector) collectEnvironmentFacts(collection *spookyfactstypes.FactCollection, connection *spookysshtypes.SSHConnection, platform *Platform) error {
 	// Environment variables
 	envOutput, err := c.executeCommand(connection, "env")
 	if err == nil {
@@ -257,7 +257,7 @@ func (c *Collector) collectEnvironmentFacts(collection *types.FactCollection, co
 
 // Platform-specific collection methods
 
-func (c *Collector) collectLinuxOSFacts(collection *types.FactCollection, connection *sshTypes.SSHConnection) error {
+func (c *Collector) collectLinuxOSFacts(collection *spookyfactstypes.FactCollection, connection *spookysshtypes.SSHConnection) error {
 	// Read /etc/os-release
 	osRelease, err := c.executeCommand(connection, "cat /etc/os-release")
 	if err == nil {
@@ -272,7 +272,7 @@ func (c *Collector) collectLinuxOSFacts(collection *types.FactCollection, connec
 	return nil
 }
 
-func (c *Collector) collectDarwinOSFacts(collection *types.FactCollection, connection *sshTypes.SSHConnection) error {
+func (c *Collector) collectDarwinOSFacts(collection *spookyfactstypes.FactCollection, connection *spookysshtypes.SSHConnection) error {
 	// OS name
 	c.createFact(collection, "spooky_os_name", "Darwin")
 	c.createFact(collection, "spooky_os_family", "Darwin")
@@ -290,7 +290,7 @@ func (c *Collector) collectDarwinOSFacts(collection *types.FactCollection, conne
 	return nil
 }
 
-func (c *Collector) collectBSDOSFacts(collection *types.FactCollection, connection *sshTypes.SSHConnection, bsdType string) error {
+func (c *Collector) collectBSDOSFacts(collection *spookyfactstypes.FactCollection, connection *spookysshtypes.SSHConnection, bsdType string) error {
 	c.createFact(collection, "spooky_os_name", bsdType)
 	c.createFact(collection, "spooky_os_family", "BSD")
 	c.createFact(collection, "spooky_distribution", bsdType)
@@ -304,7 +304,7 @@ func (c *Collector) collectBSDOSFacts(collection *types.FactCollection, connecti
 	return nil
 }
 
-func (c *Collector) collectLinuxHardwareFacts(collection *types.FactCollection, connection *sshTypes.SSHConnection) error {
+func (c *Collector) collectLinuxHardwareFacts(collection *spookyfactstypes.FactCollection, connection *spookysshtypes.SSHConnection) error {
 	// CPU info
 	cpuInfo, err := c.executeCommand(connection, "cat /proc/cpuinfo | grep 'model name' | head -1 | cut -d: -f2")
 	if err == nil {
@@ -330,7 +330,7 @@ func (c *Collector) collectLinuxHardwareFacts(collection *types.FactCollection, 
 	return nil
 }
 
-func (c *Collector) collectDarwinHardwareFacts(collection *types.FactCollection, connection *sshTypes.SSHConnection) error {
+func (c *Collector) collectDarwinHardwareFacts(collection *spookyfactstypes.FactCollection, connection *spookysshtypes.SSHConnection) error {
 	// CPU info
 	cpuInfo, err := c.executeCommand(connection, "sysctl -n machdep.cpu.brand_string")
 	if err == nil {
@@ -357,7 +357,7 @@ func (c *Collector) collectDarwinHardwareFacts(collection *types.FactCollection,
 	return nil
 }
 
-func (c *Collector) collectBSDHardwareFacts(collection *types.FactCollection, connection *sshTypes.SSHConnection) error {
+func (c *Collector) collectBSDHardwareFacts(collection *spookyfactstypes.FactCollection, connection *spookysshtypes.SSHConnection) error {
 	// CPU info
 	cpuInfo, err := c.executeCommand(connection, "sysctl -n hw.model")
 	if err == nil {
@@ -384,7 +384,7 @@ func (c *Collector) collectBSDHardwareFacts(collection *types.FactCollection, co
 	return nil
 }
 
-func (c *Collector) collectLinuxNetworkFacts(collection *types.FactCollection, connection *sshTypes.SSHConnection) error {
+func (c *Collector) collectLinuxNetworkFacts(collection *spookyfactstypes.FactCollection, connection *spookysshtypes.SSHConnection) error {
 	// Get default IPv4
 	defaultIP, err := c.executeCommand(connection, "ip route get 1.1.1.1 | grep -oP 'src \\K\\S+'")
 	if err == nil {
@@ -407,7 +407,7 @@ func (c *Collector) collectLinuxNetworkFacts(collection *types.FactCollection, c
 	return nil
 }
 
-func (c *Collector) collectDarwinNetworkFacts(collection *types.FactCollection, connection *sshTypes.SSHConnection) error {
+func (c *Collector) collectDarwinNetworkFacts(collection *spookyfactstypes.FactCollection, connection *spookysshtypes.SSHConnection) error {
 	// Get default IPv4
 	defaultIP, err := c.executeCommand(connection, "route -n get 1.1.1.1 | grep 'interface:' | awk '{print $2}'")
 	if err == nil {
@@ -431,7 +431,7 @@ func (c *Collector) collectDarwinNetworkFacts(collection *types.FactCollection, 
 	return nil
 }
 
-func (c *Collector) collectBSDNetworkFacts(collection *types.FactCollection, connection *sshTypes.SSHConnection) error {
+func (c *Collector) collectBSDNetworkFacts(collection *spookyfactstypes.FactCollection, connection *spookysshtypes.SSHConnection) error {
 	// Get default IPv4
 	defaultIP, err := c.executeCommand(connection, "route -n get 1.1.1.1 | grep 'interface:' | awk '{print $2}'")
 	if err == nil {
@@ -457,8 +457,8 @@ func (c *Collector) collectBSDNetworkFacts(collection *types.FactCollection, con
 
 // Helper methods
 
-func (c *Collector) createFact(collection *types.FactCollection, key, value string) {
-	collection.Facts[key] = &types.Fact{
+func (c *Collector) createFact(collection *spookyfactstypes.FactCollection, key, value string) {
+	collection.Facts[key] = &spookyfactstypes.Fact{
 		Key:       key,
 		Value:     value,
 		Source:    "ssh",
@@ -466,8 +466,8 @@ func (c *Collector) createFact(collection *types.FactCollection, key, value stri
 	}
 }
 
-func (c *Collector) createFactWithValue(collection *types.FactCollection, key string, value interface{}) {
-	collection.Facts[key] = &types.Fact{
+func (c *Collector) createFactWithValue(collection *spookyfactstypes.FactCollection, key string, value interface{}) {
+	collection.Facts[key] = &spookyfactstypes.Fact{
 		Key:       key,
 		Value:     value,
 		Source:    "ssh",
@@ -475,9 +475,9 @@ func (c *Collector) createFactWithValue(collection *types.FactCollection, key st
 	}
 }
 
-func (c *Collector) parseOSRelease(osRelease string) types.OSInfo {
+func (c *Collector) parseOSRelease(osRelease string) spookyfactstypes.OSInfo {
 	lines := strings.Split(osRelease, "\n")
-	osInfo := types.OSInfo{}
+	osInfo := spookyfactstypes.OSInfo{}
 
 	for _, line := range lines {
 		if strings.HasPrefix(line, "NAME=") {
@@ -492,9 +492,9 @@ func (c *Collector) parseOSRelease(osRelease string) types.OSInfo {
 	return osInfo
 }
 
-func (c *Collector) parseMemInfo(memInfo string) types.MemoryInfo {
+func (c *Collector) parseMemInfo(memInfo string) spookyfactstypes.MemoryInfo {
 	lines := strings.Split(memInfo, "\n")
-	mem := types.MemoryInfo{}
+	mem := spookyfactstypes.MemoryInfo{}
 
 	for _, line := range lines {
 		if strings.HasPrefix(line, "MemTotal:") {

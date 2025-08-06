@@ -2,18 +2,18 @@ package validators
 
 import (
 	"fmt"
-	"spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/facts/types"
 )
 
 // Validator defines the interface for fact validation operations
 type Validator interface {
 	// Validation operations
-	ValidateCollection(collection *types.FactCollection) error
-	ValidateFact(fact *types.Fact) error
-	ValidateCustomFacts(facts map[string]*types.CustomFacts) error
+	ValidateCollection(collection *spookyfactstypes.FactCollection) error
+	ValidateFact(fact *spookyfactstypes.Fact) error
+	ValidateCustomFacts(facts map[string]*spookyfactstypes.CustomFacts) error
 
 	// Schema validation
-	ValidateAgainstSchema(collection *types.FactCollection, schema interface{}) error
+	ValidateAgainstSchema(collection *spookyfactstypes.FactCollection, schema interface{}) error
 
 	// Custom validation
 	AddValidationRule(rule ValidationRule) error
@@ -23,8 +23,8 @@ type Validator interface {
 // ValidationRule defines a custom validation rule
 type ValidationRule interface {
 	Name() string
-	Validate(fact *types.Fact) error
-	ValidateCollection(collection *types.FactCollection) error
+	Validate(fact *spookyfactstypes.Fact) error
+	ValidateCollection(collection *spookyfactstypes.FactCollection) error
 }
 
 // Manager provides validator management functionality

@@ -150,7 +150,7 @@ spooky facts import facts.json
     "project_id": "my-project",
     "export_format": "json",
     "version": "1.0.0",
-    "source_files": ["global-facts.db", "project-facts.db"],
+    "source_files": ["project-facts.db"],
     "fact_count": {
       "global_facts": 5,
       "project_facts": 3

@@ -5,19 +5,19 @@ import (
 	"os"
 	"strings"
 
-	"spooky/internal/config/types"
-	"spooky/internal/logging"
+	spookyconfigtypes "spooky/internal/config/types"
+	spookylogging "spooky/internal/logging"
 )
 
 // Manager implements EnvironmentManager interface
 type Manager struct {
-	config    *types.EnvironmentConfig
+	config    *spookyconfigtypes.EnvironmentConfig
 	validator EnvironmentValidator
-	logger    logging.Logger
+	logger    spookylogging.Logger
 }
 
 // NewManager creates a new environment manager
-func NewManager(config *types.EnvironmentConfig, logger logging.Logger) *Manager {
+func NewManager(config *spookyconfigtypes.EnvironmentConfig, logger spookylogging.Logger) *Manager {
 	return &Manager{
 		config:    config,
 		validator: NewEnvironmentValidator(),
@@ -52,7 +52,7 @@ func (m *Manager) GetAllEnvironmentVariables() (map[string]interface{}, error) {
 
 			// Validate variable
 			if err := m.validator.ValidateVariable(name, value); err != nil {
-				m.logger.Warn("Invalid environment variable", logging.String("name", name), logging.Error(err))
+				m.logger.Warn("Invalid environment variable", spookylogging.String("name", name), spookylogging.Error(err))
 				continue
 			}
 

@@ -1,21 +1,21 @@
 package config
 
 import (
-	"spooky/internal/config/loading"
-	"spooky/internal/config/types"
+	spookyconfigloading "spooky/internal/config/loading"
+	spookyconfigtypes "spooky/internal/config/types"
 )
 
 // LoadActionsConfig loads actions configuration from a project
-func LoadActionsConfig(projectPath string) (*types.ActionsConfig, error) {
-	return loading.LoadActionsConfig(projectPath)
+func LoadActionsConfig(projectPath string) (*spookyconfigtypes.ActionsConfig, error) {
+	return spookyconfigloading.LoadActionsConfig(projectPath)
 }
 
 // ParseInventoryConfig loads inventory configuration from a file
-func ParseInventoryConfig(inventoryFile string) (*types.InventoryConfig, error) {
-	return loading.ParseInventoryConfig(inventoryFile)
+func ParseInventoryConfig(inventoryFile string) (*spookyconfigtypes.InventoryConfig, error) {
+	return spookyconfigloading.ParseInventoryConfig(inventoryFile)
 }
 
 // ParseMachinesInventory loads machines inventory from a file
-func ParseMachinesInventory(machinesFile string) (*types.InventoryConfig, error) {
-	return loading.ParseMachinesInventory(machinesFile)
+func ParseMachinesInventory(machinesFile string) (*spookyconfigtypes.InventoryConfig, error) {
+	return spookyconfigloading.ParseMachinesInventory(machinesFile)
 }

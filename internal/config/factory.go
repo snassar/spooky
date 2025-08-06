@@ -1,41 +1,41 @@
 package config
 
 import (
-	"spooky/internal/config/environment"
-	"spooky/internal/config/loading"
-	"spooky/internal/config/types"
-	"spooky/internal/config/validation"
-	"spooky/internal/logging"
+	spookyconfigenvironment "spooky/internal/config/environment"
+	spookyconfigloading "spooky/internal/config/loading"
+	spookyconfigtypes "spooky/internal/config/types"
+	spookyconfigvalidation "spooky/internal/config/validation"
+	spookylogging "spooky/internal/logging"
 )
 
 // NewManagerWithConfig creates a new config manager with custom configuration
 func NewManagerWithConfig(
-	config *types.Config,
-	logger logging.Logger,
+	config *spookyconfigtypes.Config,
+	logger spookylogging.Logger,
 ) *Manager {
 	// Create sub-managers with default configs if not provided
-	loadingConfig := &types.LoadingConfig{
+	loadingConfig := &spookyconfigtypes.LoadingConfig{
 		ConfigPath: "",
 		AutoReload: true,
 	}
 	if config != nil {
-		loadingConfig = &types.LoadingConfig{
+		loadingConfig = &spookyconfigtypes.LoadingConfig{
 			ConfigPath: "",
 			AutoReload: true,
 		}
 	}
 
-	validationConfig := &types.ValidationConfig{
+	validationConfig := &spookyconfigtypes.ValidationConfig{
 		StrictValidation: false,
 	}
 
-	environmentConfig := &types.EnvironmentConfig{
+	environmentConfig := &spookyconfigtypes.EnvironmentConfig{
 		ValidateVariables: true,
 	}
 
-	loadingManager := loading.NewManager(loadingConfig, logger)
-	validationManager := validation.NewManager(validationConfig, logger)
-	environmentManager := environment.NewManager(environmentConfig, logger)
+	loadingManager := spookyconfigloading.NewManager(loadingConfig, logger)
+	validationManager := spookyconfigvalidation.NewManager(validationConfig, logger)
+	environmentManager := spookyconfigenvironment.NewManager(environmentConfig, logger)
 
 	// Create main manager
 	return NewManager(
@@ -49,11 +49,11 @@ func NewManagerWithConfig(
 
 // NewManagerWithDependencies creates a new config manager with custom dependencies
 func NewManagerWithDependencies(
-	config *types.Config,
-	loadingManager loading.LoadingManager,
-	validationManager validation.ValidationManager,
-	environmentManager environment.EnvironmentManager,
-	logger logging.Logger,
+	config *spookyconfigtypes.Config,
+	loadingManager spookyconfigloading.LoadingManager,
+	validationManager spookyconfigvalidation.ValidationManager,
+	environmentManager spookyconfigenvironment.EnvironmentManager,
+	logger spookylogging.Logger,
 ) *Manager {
 	return NewManager(
 		config,
@@ -65,16 +65,16 @@ func NewManagerWithDependencies(
 }
 
 // NewDefaultManager creates a new config manager with default configuration
-func NewDefaultManager(logger logging.Logger) *Manager {
+func NewDefaultManager(logger spookylogging.Logger) *Manager {
 	// Create default config
-	config := &types.Config{
-		GlobalConfig: &types.GlobalConfig{
+	config := &spookyconfigtypes.Config{
+		GlobalConfig: &spookyconfigtypes.GlobalConfig{
 			LogLevel: "info",
 			Quiet:    false,
 			Verbose:  false,
 		},
 		Environment: make(map[string]interface{}),
-		Source:      types.SourceDefault,
+		Source:      spookyconfigtypes.SourceDefault,
 	}
 
 	return NewManagerWithConfig(config, logger)

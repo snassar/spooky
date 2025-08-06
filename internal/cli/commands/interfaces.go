@@ -1,7 +1,7 @@
 package commands
 
 import (
-	"spooky/internal/cli/types"
+	spookyclitypes "spooky/internal/cli/types"
 
 	"github.com/spf13/cobra"
 )
@@ -9,10 +9,10 @@ import (
 // CommandsManager defines the interface for command management
 type CommandsManager interface {
 	// Core command operations
-	RegisterCommand(command *types.Command) error
+	RegisterCommand(command *spookyclitypes.Command) error
 	UnregisterCommand(name string) error
-	GetCommand(name string) (*types.Command, error)
-	ListCommands() []*types.Command
+	GetCommand(name string) (*spookyclitypes.Command, error)
+	ListCommands() []*spookyclitypes.Command
 	InitializeCommands() error
 
 	// Command creation
@@ -28,20 +28,20 @@ type CommandsManager interface {
 	SetCommandExamples(commandName string, examples []string) error
 
 	// Utility operations
-	ValidateCommand(command *types.Command) error
+	ValidateCommand(command *spookyclitypes.Command) error
 	Close() error
 }
 
 // CommandBuilder defines the interface for command building
 type CommandBuilder interface {
-	BuildCommand(command *types.Command) (*cobra.Command, error)
-	BuildSubcommands(parent *cobra.Command, subcommands []*types.Command) error
-	ValidateCommandStructure(command *types.Command) error
+	BuildCommand(command *spookyclitypes.Command) (*cobra.Command, error)
+	BuildSubcommands(parent *cobra.Command, subcommands []*spookyclitypes.Command) error
+	ValidateCommandStructure(command *spookyclitypes.Command) error
 }
 
 // CommandExecutor defines the interface for command execution
 type CommandExecutor interface {
-	ExecuteCommand(command *types.Command, args []string) error
-	ExecuteSubcommand(parent *types.Command, subcommand string, args []string) error
-	ValidateExecution(command *types.Command, args []string) error
+	ExecuteCommand(command *spookyclitypes.Command, args []string) error
+	ExecuteSubcommand(parent *spookyclitypes.Command, subcommand string, args []string) error
+	ValidateExecution(command *spookyclitypes.Command, args []string) error
 }

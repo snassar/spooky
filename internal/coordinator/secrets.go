@@ -10,22 +10,22 @@ import (
 	spookysecrets "spooky/internal/secrets"
 )
 
-// CoordinatorCryptoIntegration implements crypto system integration
-type CoordinatorCryptoIntegration struct {
+// CoordinatorSecretsIntegration implements secrets system integration
+type CoordinatorSecretsIntegration struct {
 	cryptoManager *spookysecrets.Manager
 	logger        spookylogging.Logger
 }
 
-// NewCoordinatorCryptoIntegration creates a new crypto integration
-func NewCoordinatorCryptoIntegration(cryptoManager *spookysecrets.Manager, logger spookylogging.Logger) *CoordinatorCryptoIntegration {
-	return &CoordinatorCryptoIntegration{
+// NewCoordinatorSecretsIntegration creates a new secrets integration
+func NewCoordinatorSecretsIntegration(cryptoManager *spookysecrets.Manager, logger spookylogging.Logger) *CoordinatorSecretsIntegration {
+	return &CoordinatorSecretsIntegration{
 		cryptoManager: cryptoManager,
 		logger:        logger,
 	}
 }
 
 // EncryptData encrypts data with age encryption
-func (ci *CoordinatorCryptoIntegration) EncryptData(data []byte, recipients []string) ([]byte, error) {
+func (ci *CoordinatorSecretsIntegration) EncryptData(data []byte, recipients []string) ([]byte, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("data cannot be empty")
 	}
@@ -53,7 +53,7 @@ func (ci *CoordinatorCryptoIntegration) EncryptData(data []byte, recipients []st
 }
 
 // DecryptData decrypts data with age encryption
-func (ci *CoordinatorCryptoIntegration) DecryptData(data []byte) ([]byte, error) {
+func (ci *CoordinatorSecretsIntegration) DecryptData(data []byte) ([]byte, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("data cannot be empty")
 	}
@@ -77,7 +77,7 @@ func (ci *CoordinatorCryptoIntegration) DecryptData(data []byte) ([]byte, error)
 }
 
 // ValidateEncryption validates encrypted data with enhanced checks
-func (ci *CoordinatorCryptoIntegration) ValidateEncryption(data []byte) error {
+func (ci *CoordinatorSecretsIntegration) ValidateEncryption(data []byte) error {
 	if len(data) == 0 {
 		return fmt.Errorf("data cannot be empty")
 	}
@@ -107,35 +107,8 @@ func (ci *CoordinatorCryptoIntegration) ValidateEncryption(data []byte) error {
 	return err
 }
 
-// GetCryptoStatus returns crypto system status
-func (ci *CoordinatorCryptoIntegration) GetCryptoStatus() map[string]interface{} {
-	status := map[string]interface{}{
-		"encryption_enabled": ci.cryptoManager != nil,
-	}
-
-	if ci.cryptoManager != nil {
-		// Get actual crypto manager status
-		cryptoStatus := ci.cryptoManager.GetStatus()
-
-		status["algorithm"] = cryptoStatus.Algorithm
-		status["key_count"] = cryptoStatus.KeyCount
-		status["default_identity"] = ci.cryptoManager.GetConfig().Keys.DefaultIdentity
-		status["default_recipients"] = ci.cryptoManager.GetConfig().Keys.DefaultRecipients
-		status["audit_logging"] = cryptoStatus.AuditLogging
-		status["default_identity_configured"] = cryptoStatus.DefaultIdentityConfigured
-		status["default_recipients_configured"] = cryptoStatus.DefaultRecipientsConfigured
-		status["default_recipient_count"] = cryptoStatus.DefaultRecipientCount
-
-		if cryptoStatus.KeyError != "" {
-			status["key_error"] = cryptoStatus.KeyError
-		}
-	}
-
-	return status
-}
-
 // EncryptFile encrypts a file with atomic operations
-func (ci *CoordinatorCryptoIntegration) EncryptFile(filePath string, recipients []string) error {
+func (ci *CoordinatorSecretsIntegration) EncryptFile(filePath string, recipients []string) error {
 	if filePath == "" {
 		return fmt.Errorf("file path cannot be empty")
 	}
@@ -168,7 +141,7 @@ func (ci *CoordinatorCryptoIntegration) EncryptFile(filePath string, recipients 
 }
 
 // DecryptFile decrypts a file with atomic operations
-func (ci *CoordinatorCryptoIntegration) DecryptFile(filePath string) error {
+func (ci *CoordinatorSecretsIntegration) DecryptFile(filePath string) error {
 	if filePath == "" {
 		return fmt.Errorf("file path cannot be empty")
 	}
@@ -200,7 +173,7 @@ func (ci *CoordinatorCryptoIntegration) DecryptFile(filePath string) error {
 }
 
 // ValidateEncryptedFile validates an encrypted file with comprehensive checks
-func (ci *CoordinatorCryptoIntegration) ValidateEncryptedFile(filePath string) error {
+func (ci *CoordinatorSecretsIntegration) ValidateEncryptedFile(filePath string) error {
 	if filePath == "" {
 		return fmt.Errorf("file path cannot be empty")
 	}
@@ -231,7 +204,7 @@ func (ci *CoordinatorCryptoIntegration) ValidateEncryptedFile(filePath string) e
 }
 
 // validateDecryptedFile validates a decrypted file
-func (ci *CoordinatorCryptoIntegration) validateDecryptedFile(filePath string) error {
+func (ci *CoordinatorSecretsIntegration) validateDecryptedFile(filePath string) error {
 	// Check if file exists
 	if _, err := os.Stat(filePath); err != nil {
 		return fmt.Errorf("decrypted file does not exist: %w", err)
@@ -248,7 +221,7 @@ func (ci *CoordinatorCryptoIntegration) validateDecryptedFile(filePath string) e
 }
 
 // AuditLog logs crypto operations for audit purposes
-func (ci *CoordinatorCryptoIntegration) AuditLog(operation string, details map[string]interface{}) {
+func (ci *CoordinatorSecretsIntegration) AuditLog(operation string, details map[string]interface{}) {
 	if ci.cryptoManager == nil {
 		return
 	}
@@ -270,4 +243,18 @@ func (ci *CoordinatorCryptoIntegration) AuditLog(operation string, details map[s
 
 	// In a real implementation, this would write to an audit log file
 	// or send to an audit system
+}
+
+// GetDefaultRecipients returns the default recipients for encryption
+func (ci *CoordinatorSecretsIntegration) GetDefaultRecipients() ([]string, error) {
+	if ci.cryptoManager == nil {
+		return nil, fmt.Errorf("crypto manager not available")
+	}
+
+	config := ci.cryptoManager.GetConfig()
+	if config == nil {
+		return nil, fmt.Errorf("crypto configuration not available")
+	}
+
+	return config.Keys.DefaultRecipients, nil
 }

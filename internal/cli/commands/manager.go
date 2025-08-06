@@ -4,32 +4,32 @@ import (
 	"fmt"
 	"sync"
 
-	"spooky/internal/cli/types"
-	"spooky/internal/logging"
+	spookyclitypes "spooky/internal/cli/types"
+	spookylogging "spooky/internal/logging"
 
 	"github.com/spf13/cobra"
 )
 
 // Manager implements CommandsManager interface
 type Manager struct {
-	config   *types.CommandsConfig
-	commands map[string]*types.Command
+	config   *spookyclitypes.CommandsConfig
+	commands map[string]*spookyclitypes.Command
 	builder  CommandBuilder
 	executor CommandExecutor
-	logger   logging.Logger
+	logger   spookylogging.Logger
 	mutex    sync.RWMutex
 }
 
 // NewManager creates a new commands manager
 func NewManager(
-	config *types.CommandsConfig,
+	config *spookyclitypes.CommandsConfig,
 	builder CommandBuilder,
 	executor CommandExecutor,
-	logger logging.Logger,
+	logger spookylogging.Logger,
 ) *Manager {
 	return &Manager{
 		config:   config,
-		commands: make(map[string]*types.Command),
+		commands: make(map[string]*spookyclitypes.Command),
 		builder:  builder,
 		executor: executor,
 		logger:   logger,
@@ -37,7 +37,7 @@ func NewManager(
 }
 
 // RegisterCommand registers a new command
-func (m *Manager) RegisterCommand(command *types.Command) error {
+func (m *Manager) RegisterCommand(command *spookyclitypes.Command) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -54,7 +54,7 @@ func (m *Manager) RegisterCommand(command *types.Command) error {
 	// 3. Register command
 	m.commands[command.Name] = command
 
-	m.logger.Info("Command registered", logging.String("name", command.Name))
+	m.logger.Info("Command registered", spookylogging.String("name", command.Name))
 	return nil
 }
 
@@ -69,12 +69,12 @@ func (m *Manager) UnregisterCommand(name string) error {
 
 	delete(m.commands, name)
 
-	m.logger.Info("Command unregistered", logging.String("name", name))
+	m.logger.Info("Command unregistered", spookylogging.String("name", name))
 	return nil
 }
 
 // GetCommand gets a command by name
-func (m *Manager) GetCommand(name string) (*types.Command, error) {
+func (m *Manager) GetCommand(name string) (*spookyclitypes.Command, error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
@@ -87,11 +87,11 @@ func (m *Manager) GetCommand(name string) (*types.Command, error) {
 }
 
 // ListCommands lists all registered commands
-func (m *Manager) ListCommands() []*types.Command {
+func (m *Manager) ListCommands() []*spookyclitypes.Command {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	commands := make([]*types.Command, 0, len(m.commands))
+	commands := make([]*spookyclitypes.Command, 0, len(m.commands))
 	for _, command := range m.commands {
 		commands = append(commands, command)
 	}
@@ -111,7 +111,7 @@ func (m *Manager) InitializeCommands() error {
 		}
 	}
 
-	m.logger.Info("All commands initialized", logging.Int("count", len(m.commands)))
+	m.logger.Info("All commands initialized", spookylogging.Int("count", len(m.commands)))
 	return nil
 }
 
@@ -174,7 +174,7 @@ func (m *Manager) SetCommandExamples(commandName string, examples []string) erro
 }
 
 // ValidateCommand validates a command
-func (m *Manager) ValidateCommand(command *types.Command) error {
+func (m *Manager) ValidateCommand(command *spookyclitypes.Command) error {
 	if command == nil {
 		return fmt.Errorf("command cannot be nil")
 	}
@@ -196,7 +196,7 @@ func (m *Manager) Close() error {
 	defer m.mutex.Unlock()
 
 	// Clear all commands
-	m.commands = make(map[string]*types.Command)
+	m.commands = make(map[string]*spookyclitypes.Command)
 
 	m.logger.Info("Commands manager closed")
 	return nil

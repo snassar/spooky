@@ -10,24 +10,24 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
 
-	"spooky/internal/facts/types"
-	"spooky/internal/logging"
+	spookyfactstypes "spooky/internal/facts/types"
+	spookylogging "spooky/internal/logging"
 )
 
 // ProcessorManager implements Processor interface
 type ProcessorManager struct {
-	logger logging.Logger
+	logger spookylogging.Logger
 }
 
 // NewProcessorManager creates a new processor manager
-func NewProcessorManager(logger logging.Logger) *ProcessorManager {
+func NewProcessorManager(logger spookylogging.Logger) *ProcessorManager {
 	return &ProcessorManager{
 		logger: logger,
 	}
 }
 
 // ExportToJSON exports fact collections to JSON format
-func (m *ProcessorManager) ExportToJSON(collections []*types.FactCollection, w io.Writer) error {
+func (m *ProcessorManager) ExportToJSON(collections []*spookyfactstypes.FactCollection, w io.Writer) error {
 	// Convert to export format
 	exportData := make(map[string]interface{})
 	for _, collection := range collections {
@@ -55,7 +55,7 @@ func (m *ProcessorManager) ExportToJSON(collections []*types.FactCollection, w i
 }
 
 // ExportToHCL exports fact collections to HCL format
-func (m *ProcessorManager) ExportToHCL(collections []*types.FactCollection, w io.Writer) error {
+func (m *ProcessorManager) ExportToHCL(collections []*spookyfactstypes.FactCollection, w io.Writer) error {
 	// Generate HCL content according to schema
 	hclContent := "facts = [\n"
 
@@ -92,7 +92,7 @@ func (m *ProcessorManager) ExportToHCL(collections []*types.FactCollection, w io
 }
 
 // ImportFromJSON imports fact collections from JSON format
-func (m *ProcessorManager) ImportFromJSON(r io.Reader) ([]*types.FactCollection, error) {
+func (m *ProcessorManager) ImportFromJSON(r io.Reader) ([]*spookyfactstypes.FactCollection, error) {
 	// Read and parse JSON
 	var data map[string]interface{}
 	decoder := json.NewDecoder(r)
@@ -101,7 +101,7 @@ func (m *ProcessorManager) ImportFromJSON(r io.Reader) ([]*types.FactCollection,
 	}
 
 	// Convert to fact collections
-	collections := make([]*types.FactCollection, 0, len(data))
+	collections := make([]*spookyfactstypes.FactCollection, 0, len(data))
 	for machineID, machineData := range data {
 		collection, err := convertToFactCollection(machineID, machineData)
 		if err != nil {
@@ -114,7 +114,7 @@ func (m *ProcessorManager) ImportFromJSON(r io.Reader) ([]*types.FactCollection,
 }
 
 // ImportFromHCL imports fact collections from HCL format
-func (m *ProcessorManager) ImportFromHCL(r io.Reader) ([]*types.FactCollection, error) {
+func (m *ProcessorManager) ImportFromHCL(r io.Reader) ([]*spookyfactstypes.FactCollection, error) {
 	// Read HCL content
 	content, err := io.ReadAll(r)
 	if err != nil {
@@ -165,13 +165,13 @@ func formatHCLValue(value interface{}) string {
 	}
 }
 
-func convertToFactCollection(machineID string, data interface{}) (*types.FactCollection, error) {
+func convertToFactCollection(machineID string, data interface{}) (*spookyfactstypes.FactCollection, error) {
 	// Implementation would convert map to FactCollection struct
 	// This is a placeholder - actual implementation would parse the data structure
 	return nil, fmt.Errorf("conversion not yet implemented")
 }
 
-func parseHCLToFactCollections(file *hcl.File) ([]*types.FactCollection, error) {
+func parseHCLToFactCollections(file *hcl.File) ([]*spookyfactstypes.FactCollection, error) {
 	// Implementation would traverse the HCL AST and convert to FactCollection structs
 	// This is a placeholder - actual implementation would parse the HCL structure
 	return nil, fmt.Errorf("HCL parsing not yet implemented")

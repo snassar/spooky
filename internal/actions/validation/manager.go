@@ -4,28 +4,28 @@ import (
 	"fmt"
 	"sync"
 
-	"spooky/internal/actions/types"
-	"spooky/internal/logging"
+	spookyactionstypes "spooky/internal/actions/types"
+	spookylogging "spooky/internal/logging"
 )
 
 // Manager implements the ValidationManager interface
 type Manager struct {
 	// Configuration
 	strictMode      bool
-	validationLevel types.ValidationLevel
+	validationLevel spookyactionstypes.ValidationLevel
 
 	// State
 	validators map[string]ActionValidator
 	rules      []ValidationRule
-	logger     logging.Logger
+	logger     spookylogging.Logger
 	mu         sync.RWMutex
 }
 
 // NewManager creates a new ValidationManager
-func NewManager(logger logging.Logger) *Manager {
+func NewManager(logger spookylogging.Logger) *Manager {
 	return &Manager{
 		strictMode:      false,
-		validationLevel: types.ValidationLevelBasic,
+		validationLevel: spookyactionstypes.ValidationLevelBasic,
 		validators:      make(map[string]ActionValidator),
 		rules:           make([]ValidationRule, 0),
 		logger:          logger,
@@ -33,12 +33,12 @@ func NewManager(logger logging.Logger) *Manager {
 }
 
 // ValidateAction validates a single action
-func (m *Manager) ValidateAction(action *types.Action) error {
+func (m *Manager) ValidateAction(action *spookyactionstypes.Action) error {
 	if action == nil {
 		return fmt.Errorf("action cannot be nil")
 	}
 
-	m.logger.Info("Validating action", logging.String("action", action.Name))
+	m.logger.Info("Validating action", spookylogging.String("action", action.Name))
 
 	// Create a validator for this action
 	validator, err := m.CreateValidator(action)
@@ -51,17 +51,17 @@ func (m *Manager) ValidateAction(action *types.Action) error {
 		return fmt.Errorf("action validation failed: %w", err)
 	}
 
-	m.logger.Info("Action validation successful", logging.String("action", action.Name))
+	m.logger.Info("Action validation successful", spookylogging.String("action", action.Name))
 	return nil
 }
 
 // ValidateActionCollection validates a collection of actions
-func (m *Manager) ValidateActionCollection(collection *types.ActionCollection) error {
+func (m *Manager) ValidateActionCollection(collection *spookyactionstypes.ActionCollection) error {
 	if collection == nil {
 		return fmt.Errorf("action collection cannot be nil")
 	}
 
-	m.logger.Info("Validating action collection", logging.Int("actions_count", len(collection.Actions)))
+	m.logger.Info("Validating action collection", spookylogging.Int("actions_count", len(collection.Actions)))
 
 	// Validate each action in the collection
 	for _, action := range collection.Actions {
@@ -70,12 +70,12 @@ func (m *Manager) ValidateActionCollection(collection *types.ActionCollection) e
 		}
 	}
 
-	m.logger.Info("Action collection validation successful", logging.Int("actions_count", len(collection.Actions)))
+	m.logger.Info("Action collection validation successful", spookylogging.Int("actions_count", len(collection.Actions)))
 	return nil
 }
 
 // ValidateActionContext validates an action context
-func (m *Manager) ValidateActionContext(context *types.ActionContext) error {
+func (m *Manager) ValidateActionContext(context *spookyactionstypes.ActionContext) error {
 	if context == nil {
 		return fmt.Errorf("action context cannot be nil")
 	}
@@ -107,7 +107,7 @@ func (m *Manager) ValidateActionContext(context *types.ActionContext) error {
 }
 
 // CreateValidator creates a new validator for an action
-func (m *Manager) CreateValidator(action *types.Action) (ActionValidator, error) {
+func (m *Manager) CreateValidator(action *spookyactionstypes.Action) (ActionValidator, error) {
 	if action == nil {
 		return nil, fmt.Errorf("action cannot be nil")
 	}
@@ -124,12 +124,12 @@ func (m *Manager) CreateValidator(action *types.Action) (ActionValidator, error)
 	validator := NewActionValidator(action, m.logger)
 	m.validators[action.Name] = validator
 
-	m.logger.Debug("Created validator for action", logging.String("action", action.Name))
+	m.logger.Debug("Created validator for action", spookylogging.String("action", action.Name))
 	return validator, nil
 }
 
 // GetValidator gets an existing validator for an action
-func (m *Manager) GetValidator(action *types.Action) (ActionValidator, error) {
+func (m *Manager) GetValidator(action *spookyactionstypes.Action) (ActionValidator, error) {
 	if action == nil {
 		return nil, fmt.Errorf("action cannot be nil")
 	}
@@ -155,7 +155,7 @@ func (m *Manager) AddValidationRule(rule ValidationRule) error {
 	defer m.mu.Unlock()
 
 	m.rules = append(m.rules, rule)
-	m.logger.Info("Added validation rule", logging.String("rule", rule.Name()))
+	m.logger.Info("Added validation rule", spookylogging.String("rule", rule.Name()))
 	return nil
 }
 
@@ -167,7 +167,7 @@ func (m *Manager) RemoveValidationRule(name string) error {
 	for i, rule := range m.rules {
 		if rule.Name() == name {
 			m.rules = append(m.rules[:i], m.rules[i+1:]...)
-			m.logger.Info("Removed validation rule", logging.String("rule", name))
+			m.logger.Info("Removed validation rule", spookylogging.String("rule", name))
 			return nil
 		}
 	}
@@ -191,14 +191,14 @@ func (m *Manager) SetStrictMode(strict bool) {
 	defer m.mu.Unlock()
 
 	m.strictMode = strict
-	m.logger.Info("Set strict validation mode", logging.Bool("strict", strict))
+	m.logger.Info("Set strict validation mode", spookylogging.Bool("strict", strict))
 }
 
 // SetValidationLevel sets the validation level
-func (m *Manager) SetValidationLevel(level types.ValidationLevel) {
+func (m *Manager) SetValidationLevel(level spookyactionstypes.ValidationLevel) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.validationLevel = level
-	m.logger.Info("Set validation level", logging.String("level", string(level)))
+	m.logger.Info("Set validation level", spookylogging.String("level", string(level)))
 }

@@ -1,10 +1,10 @@
 package interfaces
 
 import (
-	"spooky/internal/actions/types"
-	configtypes "spooky/internal/config/types"
-	factstypes "spooky/internal/facts/types"
-	templatesTypes "spooky/internal/templates/types"
+	spookyactionstypes "spooky/internal/actions/types"
+	spookyconfigtypes "spooky/internal/config/types"
+	spookyfactstypes "spooky/internal/facts/types"
+	spookytemplatestypes "spooky/internal/templates/types"
 	"time"
 )
 
@@ -18,17 +18,17 @@ type BaseContext struct {
 // ConfigContext provides configuration data for integrations
 type ConfigContext struct {
 	BaseContext
-	GlobalConfig  *configtypes.GlobalConfig
-	ProjectConfig *configtypes.ProjectConfig
+	GlobalConfig  *spookyconfigtypes.GlobalConfig
+	ProjectConfig *spookyconfigtypes.ProjectConfig
 	Environment   map[string]interface{}
 }
 
 // FactsContext provides facts data for integrations
 type FactsContext struct {
 	BaseContext
-	MachineFacts map[string]*factstypes.FactCollection
-	GlobalFacts  *factstypes.FactCollection
-	ProjectFacts *factstypes.FactCollection
+	MachineFacts map[string]*spookyfactstypes.FactCollection
+	GlobalFacts  *spookyfactstypes.FactCollection
+	ProjectFacts *spookyfactstypes.FactCollection
 	CacheKey     string
 }
 
@@ -43,7 +43,7 @@ type VariablesContext struct {
 // TemplatesContext provides templates data for integrations
 type TemplatesContext struct {
 	BaseContext
-	Templates     map[string]*templatesTypes.Template
+	Templates     map[string]*spookytemplatestypes.Template
 	RenderedCache map[string]string
 	Functions     map[string]interface{}
 }
@@ -55,6 +55,6 @@ type ActionExecutionContext struct {
 	VariablesContext *VariablesContext
 	TemplatesContext *TemplatesContext
 	MachineNames     []string
-	Action           *types.Action
+	Action           *spookyactionstypes.Action
 	Decrypt          bool
 }

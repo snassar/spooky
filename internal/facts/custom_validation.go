@@ -478,32 +478,29 @@ func (cfv *CustomFactsValidator) readCustomFactsFile(filePath string) (map[strin
 	return result, nil
 }
 
-// ValidateCustomFactsStorage validates custom facts for storage
+// ValidateCustomFactsStorage validates custom facts for project storage
 func (cfv *CustomFactsValidator) ValidateCustomFactsStorage(customFacts map[string]interface{}, storageType string) *ValidationResult {
 	result := cfv.ValidateCustomFacts(customFacts)
 
-	// Additional storage-specific validations
-	switch storageType {
-	case "project":
-		// Project storage validations
-		if err := cfv.validateProjectStorage(customFacts); err != nil {
-			result.Valid = false
-			result.Errors = append(result.Errors, ValidationError{
-				Field:    "project_storage",
-				Message:  err.Error(),
-				Severity: "error",
-			})
-		}
-	case "global":
-		// Global storage validations
-		if err := cfv.validateGlobalStorage(customFacts); err != nil {
-			result.Valid = false
-			result.Errors = append(result.Errors, ValidationError{
-				Field:    "global_storage",
-				Message:  err.Error(),
-				Severity: "error",
-			})
-		}
+	// Only project storage is supported
+	if storageType != "project" {
+		result.Valid = false
+		result.Errors = append(result.Errors, ValidationError{
+			Field:    "storage_type",
+			Message:  "only project storage is supported, got: " + storageType,
+			Severity: "error",
+		})
+		return result
+	}
+
+	// Validate project storage constraints
+	if err := cfv.validateProjectStorage(customFacts); err != nil {
+		result.Valid = false
+		result.Errors = append(result.Errors, ValidationError{
+			Field:    "project_storage",
+			Message:  err.Error(),
+			Severity: "error",
+		})
 	}
 
 	return result
@@ -515,17 +512,6 @@ func (cfv *CustomFactsValidator) validateProjectStorage(customFacts map[string]i
 	// For now, just ensure facts have project metadata
 	if _, exists := customFacts["_project_id"]; !exists {
 		return fmt.Errorf("project_id metadata is required for project storage")
-	}
-
-	return nil
-}
-
-// validateGlobalStorage validates global storage constraints
-func (cfv *CustomFactsValidator) validateGlobalStorage(customFacts map[string]interface{}) error {
-	// Global storage specific validations
-	// Global facts should not have project-specific metadata
-	if _, exists := customFacts["_project_id"]; exists {
-		return fmt.Errorf("project_id metadata should not be present in global storage")
 	}
 
 	return nil

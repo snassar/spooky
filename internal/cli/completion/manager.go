@@ -7,24 +7,24 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"spooky/internal/cli/types"
-	"spooky/internal/logging"
+	spookyclitypes "spooky/internal/cli/types"
+	spookylogging "spooky/internal/logging"
 )
 
 // Manager implements CompletionManager interface
 type Manager struct {
-	config    *types.CompletionConfig
+	config    *spookyclitypes.CompletionConfig
 	generator CompletionGenerator
 	rootCmd   *cobra.Command
-	logger    logging.Logger
+	logger    spookylogging.Logger
 }
 
 // NewManager creates a new completion manager
 func NewManager(
-	config *types.CompletionConfig,
+	config *spookyclitypes.CompletionConfig,
 	generator CompletionGenerator,
 	rootCmd *cobra.Command,
-	logger logging.Logger,
+	logger spookylogging.Logger,
 ) *Manager {
 	return &Manager{
 		config:    config,
@@ -82,8 +82,8 @@ func (m *Manager) GenerateCompletionFile(shell, outputPath string) error {
 	}
 
 	m.logger.Info("Completion file generated",
-		logging.String("shell", shell),
-		logging.String("path", outputPath))
+		spookylogging.String("shell", shell),
+		spookylogging.String("path", outputPath))
 	return nil
 }
 

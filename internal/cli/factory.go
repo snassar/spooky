@@ -1,24 +1,24 @@
 package cli
 
 import (
-	"spooky/internal/cli/commands"
-	"spooky/internal/cli/completion"
-	"spooky/internal/cli/flags"
-	"spooky/internal/cli/help"
-	"spooky/internal/cli/types"
-	"spooky/internal/logging"
+	spookyclicommands "spooky/internal/cli/commands"
+	spookyclicompletion "spooky/internal/cli/completion"
+	spookycliflags "spooky/internal/cli/flags"
+	spookyclihelp "spooky/internal/cli/help"
+	spookyclitypes "spooky/internal/cli/types"
+	spookylogging "spooky/internal/logging"
 )
 
 // NewCLIManager creates a new CLI manager with all dependencies wired together
-func NewCLIManager(config *types.Config, logger logging.Logger) CLIManager {
+func NewCLIManager(config *spookyclitypes.Config, logger spookylogging.Logger) CLIManager {
 	// Create concrete implementations
-	commandBuilder := commands.NewBuilder()
-	commandExecutor := commands.NewExecutor()
-	helpRenderer := help.NewRenderer()
-	flagsParser := flags.NewParser()
+	commandBuilder := spookyclicommands.NewBuilder()
+	commandExecutor := spookyclicommands.NewExecutor()
+	helpRenderer := spookyclihelp.NewRenderer()
+	flagsParser := spookycliflags.NewParser()
 
 	// Create sub-managers
-	commandsManager := commands.NewManager(
+	commandsManager := spookyclicommands.NewManager(
 		config.CommandsConfig,
 		commandBuilder,
 		commandExecutor,
@@ -26,7 +26,7 @@ func NewCLIManager(config *types.Config, logger logging.Logger) CLIManager {
 	)
 
 	// Create completion manager (will be updated when root command is available)
-	completionManager := completion.NewManager(
+	completionManager := spookyclicompletion.NewManager(
 		config.CompletionConfig,
 		nil, // generator will be set later
 		nil, // root command will be set later
@@ -34,7 +34,7 @@ func NewCLIManager(config *types.Config, logger logging.Logger) CLIManager {
 	)
 
 	// Create help manager (will be updated when root command is available)
-	helpManager := help.NewManager(
+	helpManager := spookyclihelp.NewManager(
 		config.HelpConfig,
 		helpRenderer,
 		nil, // root command will be set later
@@ -42,7 +42,7 @@ func NewCLIManager(config *types.Config, logger logging.Logger) CLIManager {
 	)
 
 	// Create flags manager
-	flagsManager := flags.NewManager(
+	flagsManager := spookycliflags.NewManager(
 		config.FlagsConfig,
 		flagsParser,
 		logger,

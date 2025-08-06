@@ -1,7 +1,7 @@
 package interfaces
 
-// CryptoIntegration defines the interface for crypto system integration
-type CryptoIntegration interface {
+// SecretsIntegration defines the interface for secrets system integration
+type SecretsIntegration interface {
 	// EncryptData encrypts data with age encryption
 	EncryptData(data []byte, recipients []string) ([]byte, error)
 
@@ -11,9 +11,6 @@ type CryptoIntegration interface {
 	// ValidateEncryption validates encrypted data
 	ValidateEncryption(data []byte) error
 
-	// GetCryptoStatus returns crypto system status
-	GetCryptoStatus() map[string]interface{}
-
 	// EncryptFile encrypts a file
 	EncryptFile(filePath string, recipients []string) error
 
@@ -22,4 +19,7 @@ type CryptoIntegration interface {
 
 	// ValidateEncryptedFile validates an encrypted file
 	ValidateEncryptedFile(filePath string) error
+
+	// GetDefaultRecipients returns the default recipients for encryption
+	GetDefaultRecipients() ([]string, error)
 }

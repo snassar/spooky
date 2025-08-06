@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"spooky/internal/cli/types"
+	spookyclitypes "spooky/internal/cli/types"
 	"spooky/internal/logging"
 
 	"github.com/spf13/cobra"
@@ -12,7 +12,7 @@ import (
 
 // Manager implements HelpManager interface
 type Manager struct {
-	config   *types.HelpConfig
+	config   *spookyclitypes.HelpConfig
 	renderer HelpRenderer
 	rootCmd  *cobra.Command
 	logger   logging.Logger
@@ -20,7 +20,7 @@ type Manager struct {
 
 // NewManager creates a new help manager
 func NewManager(
-	config *types.HelpConfig,
+	config *spookyclitypes.HelpConfig,
 	renderer HelpRenderer,
 	rootCmd *cobra.Command,
 	logger logging.Logger,

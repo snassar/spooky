@@ -1,20 +1,20 @@
 package loading
 
 import (
-	"spooky/internal/config/types"
+	spookyconfigtypes "spooky/internal/config/types"
 )
 
 // LoadingManager defines the interface for configuration loading operations
 type LoadingManager interface {
 	// Core loading operations
-	LoadGlobalConfig() (*types.GlobalConfig, error)
-	LoadProjectConfig(projectPath string) (*types.ProjectConfig, error)
+	LoadGlobalConfig() (*spookyconfigtypes.GlobalConfig, error)
+	LoadProjectConfig(projectPath string) (*spookyconfigtypes.ProjectConfig, error)
 	LoadFromFile(path string) (interface{}, error)
 	LoadFromEnvironment() (map[string]interface{}, error)
 
 	// Configuration
 	SetConfigPath(path string) error
-	SetDefaultConfig(defaultConfig *types.GlobalConfig) error
+	SetDefaultConfig(defaultConfig *spookyconfigtypes.GlobalConfig) error
 	EnableAutoReload(enabled bool) error
 
 	// Utility operations

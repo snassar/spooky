@@ -3,25 +3,25 @@ package cli
 import (
 	"testing"
 
-	"spooky/internal/cli/types"
-	"spooky/internal/logging"
+	spookyclitypes "spooky/internal/cli/types"
+	spookylogging "spooky/internal/logging"
 )
 
 func TestNewCLIManager(t *testing.T) {
 	// Create a test configuration
-	config := &types.Config{
-		CommandsConfig: &types.CommandsConfig{
+	config := &spookyclitypes.Config{
+		CommandsConfig: &spookyclitypes.CommandsConfig{
 			AutoInitialize:   true,
 			ValidateCommands: true,
 		},
-		CompletionConfig: &types.CompletionConfig{
+		CompletionConfig: &spookyclitypes.CompletionConfig{
 			EnabledShells: []string{"bash", "zsh"},
 		},
-		HelpConfig: &types.HelpConfig{
+		HelpConfig: &spookyclitypes.HelpConfig{
 			EnableExamples: true,
 			EnableUsage:    true,
 		},
-		FlagsConfig: &types.FlagsConfig{
+		FlagsConfig: &spookyclitypes.FlagsConfig{
 			GlobalFlags: make(map[string]interface{}),
 		},
 		EnableCompletion: true,
@@ -29,7 +29,7 @@ func TestNewCLIManager(t *testing.T) {
 	}
 
 	// Create a test logger
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 
 	// Create CLI manager
 	cliManager := NewCLIManager(config, logger)
@@ -63,17 +63,17 @@ func TestNewCLIManager(t *testing.T) {
 }
 
 func TestCLIManager_RegisterCommand(t *testing.T) {
-	config := &types.Config{
-		CommandsConfig: &types.CommandsConfig{
+	config := &spookyclitypes.Config{
+		CommandsConfig: &spookyclitypes.CommandsConfig{
 			AutoInitialize:   true,
 			ValidateCommands: true,
 		},
 	}
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 	cliManager := NewCLIManager(config, logger)
 
 	// Create a test command
-	testCommand := &types.Command{
+	testCommand := &spookyclitypes.Command{
 		Name:  "test",
 		Use:   "test",
 		Short: "Test command",

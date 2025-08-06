@@ -9,19 +9,21 @@ import (
 	"time"
 
 	"spooky/internal/interfaces"
+	spookyinterfaces "spooky/internal/interfaces"
 	"spooky/internal/logging"
-	"spooky/internal/variables"
+	spookylogging "spooky/internal/logging"
+	spookyvariables "spooky/internal/variables"
 	"spooky/internal/variables/types"
 )
 
 // CoordinatorVariablesIntegration implements variables system integration
 type CoordinatorVariablesIntegration struct {
-	variablesManager variables.VariableManager
-	logger           logging.Logger
+	variablesManager spookyvariables.VariableManager
+	logger           spookylogging.Logger
 }
 
 // NewCoordinatorVariablesIntegration creates a new variables integration
-func NewCoordinatorVariablesIntegration(variablesManager variables.VariableManager, logger logging.Logger) *CoordinatorVariablesIntegration {
+func NewCoordinatorVariablesIntegration(variablesManager spookyvariables.VariableManager, logger spookylogging.Logger) *CoordinatorVariablesIntegration {
 	return &CoordinatorVariablesIntegration{
 		variablesManager: variablesManager,
 		logger:           logger,
@@ -29,9 +31,9 @@ func NewCoordinatorVariablesIntegration(variablesManager variables.VariableManag
 }
 
 // LoadVariables loads variables from the project
-func (vi *CoordinatorVariablesIntegration) LoadVariables(projectPath string) (*interfaces.VariablesContext, error) {
-	variablesContext := &interfaces.VariablesContext{
-		BaseContext: interfaces.BaseContext{
+func (vi *CoordinatorVariablesIntegration) LoadVariables(projectPath string) (*spookyinterfaces.VariablesContext, error) {
+	variablesContext := &spookyinterfaces.VariablesContext{
+		BaseContext: spookyinterfaces.BaseContext{
 			ProjectPath: projectPath,
 			Timestamp:   time.Now(),
 		},
@@ -75,14 +77,14 @@ func (vi *CoordinatorVariablesIntegration) LoadVariables(projectPath string) (*i
 	}
 
 	vi.logger.Info("Loaded variables from project",
-		logging.String("project", projectPath),
-		logging.Int("variables_count", len(variablesContext.ResolvedVariables)))
+		spookylogging.String("project", projectPath),
+		spookylogging.Int("variables_count", len(variablesContext.ResolvedVariables)))
 
 	return variablesContext, nil
 }
 
 // ResolveVariables resolves variables using facts context with advanced features
-func (vi *CoordinatorVariablesIntegration) ResolveVariables(variablesContext *interfaces.VariablesContext, factsContext *interfaces.FactsContext) error {
+func (vi *CoordinatorVariablesIntegration) ResolveVariables(variablesContext *spookyinterfaces.VariablesContext, factsContext *spookyinterfaces.FactsContext) error {
 	if variablesContext == nil {
 		return fmt.Errorf("variables context cannot be nil")
 	}

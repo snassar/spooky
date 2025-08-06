@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"spooky/internal/facts/collectors"
-	"spooky/internal/facts/types"
+	spookyfactscollectors "spooky/internal/facts/collectors"
+	spookyfactstypes "spooky/internal/facts/types"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
@@ -18,7 +18,7 @@ import (
 
 // Collector collects custom facts from various sources
 type Collector struct {
-	collectors.BaseCollector
+	spookyfactscollectors.BaseCollector
 	customFactsPath string
 	overrides       map[string]interface{}
 }
@@ -26,18 +26,18 @@ type Collector struct {
 // NewCollector creates a new custom fact collector
 func NewCollector(customFactsPath string) *Collector {
 	return &Collector{
-		BaseCollector:   *collectors.NewBaseCollector(types.SourceCustom, types.MergePolicyMerge),
+		BaseCollector:   *spookyfactscollectors.NewBaseCollector(spookyfactstypes.SourceCustom, spookyfactstypes.MergePolicyMerge),
 		customFactsPath: customFactsPath,
 		overrides:       make(map[string]interface{}),
 	}
 }
 
 // Collect gathers custom facts from the configured sources
-func (c *Collector) Collect(server string) (*types.FactCollection, error) {
-	collection := &types.FactCollection{
+func (c *Collector) Collect(server string) (*spookyfactstypes.FactCollection, error) {
+	collection := &spookyfactstypes.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 	}
 
 	// Load custom facts from file
@@ -52,11 +52,11 @@ func (c *Collector) Collect(server string) (*types.FactCollection, error) {
 }
 
 // CollectSpecific collects only the specified custom facts
-func (c *Collector) CollectSpecific(server string, keys []string) (*types.FactCollection, error) {
-	collection := &types.FactCollection{
+func (c *Collector) CollectSpecific(server string, keys []string) (*spookyfactstypes.FactCollection, error) {
+	collection := &spookyfactstypes.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 	}
 
 	// Load all custom facts first
@@ -65,10 +65,10 @@ func (c *Collector) CollectSpecific(server string, keys []string) (*types.FactCo
 	}
 
 	// Filter to only requested keys
-	filteredCollection := &types.FactCollection{
+	filteredCollection := &spookyfactstypes.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 	}
 
 	for _, key := range keys {
@@ -84,11 +84,11 @@ func (c *Collector) CollectSpecific(server string, keys []string) (*types.FactCo
 }
 
 // GetFact retrieves a single custom fact
-func (c *Collector) GetFact(server, key string) (*types.Fact, error) {
-	collection := &types.FactCollection{
+func (c *Collector) GetFact(server, key string) (*spookyfactstypes.Fact, error) {
+	collection := &spookyfactstypes.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 	}
 
 	// Load custom facts from file
@@ -149,7 +149,7 @@ func (c *Collector) GetOverrides() map[string]interface{} {
 }
 
 // loadCustomFactsFromFile loads custom facts from the configured file
-func (c *Collector) loadCustomFactsFromFile(collection *types.FactCollection) error {
+func (c *Collector) loadCustomFactsFromFile(collection *spookyfactstypes.FactCollection) error {
 	if c.customFactsPath == "" {
 		return fmt.Errorf("custom facts path is not configured")
 	}
@@ -168,14 +168,14 @@ func (c *Collector) loadCustomFactsFromFile(collection *types.FactCollection) er
 }
 
 // loadFromJSON loads custom facts from a JSON file
-func (c *Collector) loadFromJSON(collection *types.FactCollection) error {
+func (c *Collector) loadFromJSON(collection *spookyfactstypes.FactCollection) error {
 	file, err := os.Open(c.customFactsPath)
 	if err != nil {
 		return fmt.Errorf("failed to open custom facts file: %w", err)
 	}
 	defer file.Close()
 
-	var customFacts types.CustomFacts
+	var customFacts spookyfactstypes.CustomFacts
 	if err := json.NewDecoder(file).Decode(&customFacts); err != nil {
 		return fmt.Errorf("failed to decode JSON: %w", err)
 	}
@@ -194,7 +194,7 @@ func (c *Collector) loadFromJSON(collection *types.FactCollection) error {
 }
 
 // loadFromHCL loads custom facts from an HCL file
-func (c *Collector) loadFromHCL(collection *types.FactCollection) error {
+func (c *Collector) loadFromHCL(collection *spookyfactstypes.FactCollection) error {
 	// For now, we'll use a simple approach to parse HCL
 	// In a real implementation, you would use the HCL parser
 	content, err := os.ReadFile(c.customFactsPath)
@@ -294,7 +294,7 @@ func extractHCLValue(expr hcl.Expression) (interface{}, error) {
 }
 
 // applyOverrides applies any configured overrides to the collection
-func (c *Collector) applyOverrides(collection *types.FactCollection) {
+func (c *Collector) applyOverrides(collection *spookyfactstypes.FactCollection) {
 	for key, value := range c.overrides {
 		if fact, exists := collection.Facts[key]; exists {
 			// Update existing fact
@@ -308,8 +308,8 @@ func (c *Collector) applyOverrides(collection *types.FactCollection) {
 }
 
 // createFact creates a fact in the collection
-func (c *Collector) createFact(collection *types.FactCollection, key string, value interface{}) {
-	collection.Facts[key] = &types.Fact{
+func (c *Collector) createFact(collection *spookyfactstypes.FactCollection, key string, value interface{}) {
+	collection.Facts[key] = &spookyfactstypes.Fact{
 		Key:       key,
 		Value:     value,
 		Source:    string(c.GetSource()),
@@ -318,7 +318,7 @@ func (c *Collector) createFact(collection *types.FactCollection, key string, val
 }
 
 // ImportCustomFacts imports custom facts from a source
-func (c *Collector) ImportCustomFacts(source string, mergePolicy types.MergePolicy) error {
+func (c *Collector) ImportCustomFacts(source string, mergePolicy spookyfactstypes.MergePolicy) error {
 	// Read source file
 	file, err := os.Open(source)
 	if err != nil {
@@ -329,7 +329,7 @@ func (c *Collector) ImportCustomFacts(source string, mergePolicy types.MergePoli
 	// Determine file type
 	ext := strings.ToLower(filepath.Ext(source))
 
-	var customFacts types.CustomFacts
+	var customFacts spookyfactstypes.CustomFacts
 	switch ext {
 	case ".json":
 		if err := json.NewDecoder(file).Decode(&customFacts); err != nil {
@@ -344,21 +344,21 @@ func (c *Collector) ImportCustomFacts(source string, mergePolicy types.MergePoli
 
 	// Apply merge policy
 	switch mergePolicy {
-	case types.MergePolicyReplace:
+	case spookyfactstypes.MergePolicyReplace:
 		c.overrides = make(map[string]interface{})
 		for k, v := range customFacts.Custom {
 			c.overrides[k] = v
 		}
-	case types.MergePolicyMerge:
+	case spookyfactstypes.MergePolicyMerge:
 		for k, v := range customFacts.Custom {
 			c.overrides[k] = v
 		}
-	case types.MergePolicyAppend:
+	case spookyfactstypes.MergePolicyAppend:
 		// Append logic would depend on the data type
 		for k, v := range customFacts.Custom {
 			c.overrides[k] = v
 		}
-	case types.MergePolicySkip:
+	case spookyfactstypes.MergePolicySkip:
 		// Only add facts that don't already exist
 		for k, v := range customFacts.Custom {
 			if _, exists := c.overrides[k]; !exists {
@@ -372,7 +372,7 @@ func (c *Collector) ImportCustomFacts(source string, mergePolicy types.MergePoli
 
 // ExportCustomFacts exports custom facts to a file
 func (c *Collector) ExportCustomFacts(w io.Writer, format string) error {
-	customFacts := types.CustomFacts{
+	customFacts := spookyfactstypes.CustomFacts{
 		Custom:    make(map[string]interface{}),
 		Overrides: c.overrides,
 		Source:    c.customFactsPath,
@@ -389,7 +389,7 @@ func (c *Collector) ExportCustomFacts(w io.Writer, format string) error {
 }
 
 // exportToHCL exports custom facts to HCL format
-func (c *Collector) exportToHCL(w io.Writer, customFacts types.CustomFacts) error {
+func (c *Collector) exportToHCL(w io.Writer, customFacts spookyfactstypes.CustomFacts) error {
 	// Write HCL header
 	if _, err := fmt.Fprintln(w, "# Custom Facts"); err != nil {
 		return err

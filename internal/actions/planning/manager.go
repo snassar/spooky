@@ -5,41 +5,41 @@ import (
 	"sync"
 	"time"
 
-	"spooky/internal/actions/types"
-	"spooky/internal/logging"
+	spookyactionstypes "spooky/internal/actions/types"
+	spookylogging "spooky/internal/logging"
 )
 
 // Manager implements the PlanningManager interface
 type Manager struct {
 	// Configuration
-	defaultStrategy     types.PlanningStrategy
-	defaultOptimization types.PlanningOptimization
+	defaultStrategy     spookyactionstypes.PlanningStrategy
+	defaultOptimization spookyactionstypes.PlanningOptimization
 
 	// State
 	planners map[string]Planner
-	plans    map[string]*types.ActionPlan
-	logger   logging.Logger
+	plans    map[string]*spookyactionstypes.ActionPlan
+	logger   spookylogging.Logger
 	mu       sync.RWMutex
 }
 
 // NewManager creates a new PlanningManager
-func NewManager(logger logging.Logger) *Manager {
+func NewManager(logger spookylogging.Logger) *Manager {
 	return &Manager{
-		defaultStrategy:     types.PlanningStrategySequential,
-		defaultOptimization: types.PlanningOptimizationNone,
+		defaultStrategy:     spookyactionstypes.PlanningStrategySequential,
+		defaultOptimization: spookyactionstypes.PlanningOptimizationNone,
 		planners:            make(map[string]Planner),
-		plans:               make(map[string]*types.ActionPlan),
+		plans:               make(map[string]*spookyactionstypes.ActionPlan),
 		logger:              logger,
 	}
 }
 
 // PlanAction plans a single action
-func (m *Manager) PlanAction(action *types.Action, context *types.ActionContext) (*types.ActionPlan, error) {
+func (m *Manager) PlanAction(action *spookyactionstypes.Action, context *spookyactionstypes.ActionContext) (*spookyactionstypes.ActionPlan, error) {
 	if action == nil {
 		return nil, fmt.Errorf("action cannot be nil")
 	}
 
-	m.logger.Info("Planning action", logging.String("action", action.Name))
+	m.logger.Info("Planning action", spookylogging.String("action", action.Name))
 
 	planner, err := m.CreatePlanner(action)
 	if err != nil {
@@ -57,27 +57,27 @@ func (m *Manager) PlanAction(action *types.Action, context *types.ActionContext)
 	m.mu.Unlock()
 
 	m.logger.Info("Successfully planned action",
-		logging.String("action", action.Name),
-		logging.String("plan_id", plan.PlanID),
-		logging.Int("steps", len(plan.Steps)))
+		spookylogging.String("action", action.Name),
+		spookylogging.String("plan_id", plan.PlanID),
+		spookylogging.Int("steps", len(plan.Steps)))
 
 	return plan, nil
 }
 
 // PlanActionCollection plans a collection of actions
-func (m *Manager) PlanActionCollection(collection *types.ActionCollection, context *types.ActionContext) (*types.ActionPlan, error) {
+func (m *Manager) PlanActionCollection(collection *spookyactionstypes.ActionCollection, context *spookyactionstypes.ActionContext) (*spookyactionstypes.ActionPlan, error) {
 	if collection == nil {
 		return nil, fmt.Errorf("action collection cannot be nil")
 	}
 
-	m.logger.Info("Planning action collection", logging.Int("actions_count", len(collection.Actions)))
+	m.logger.Info("Planning action collection", spookylogging.Int("actions_count", len(collection.Actions)))
 
 	// Create a combined plan
 	planID := generatePlanID()
-	plan := &types.ActionPlan{
+	plan := &spookyactionstypes.ActionPlan{
 		PlanID:       planID,
 		ActionName:   "collection",
-		Steps:        make([]*types.PlanStep, 0),
+		Steps:        make([]*spookyactionstypes.PlanStep, 0),
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 		Strategy:     m.defaultStrategy,
@@ -104,19 +104,19 @@ func (m *Manager) PlanActionCollection(collection *types.ActionCollection, conte
 	m.mu.Unlock()
 
 	m.logger.Info("Successfully planned action collection",
-		logging.String("plan_id", plan.PlanID),
-		logging.Int("total_steps", len(plan.Steps)))
+		spookylogging.String("plan_id", plan.PlanID),
+		spookylogging.Int("total_steps", len(plan.Steps)))
 
 	return plan, nil
 }
 
 // ValidatePlan validates an action plan
-func (m *Manager) ValidatePlan(plan *types.ActionPlan) error {
+func (m *Manager) ValidatePlan(plan *spookyactionstypes.ActionPlan) error {
 	if plan == nil {
 		return fmt.Errorf("plan cannot be nil")
 	}
 
-	m.logger.Info("Validating plan", logging.String("plan_id", plan.PlanID))
+	m.logger.Info("Validating plan", spookylogging.String("plan_id", plan.PlanID))
 
 	// Create a validator for this plan
 	validator := NewPlanValidator(m.logger)
@@ -126,12 +126,12 @@ func (m *Manager) ValidatePlan(plan *types.ActionPlan) error {
 		return fmt.Errorf("plan validation failed: %w", err)
 	}
 
-	m.logger.Info("Plan validation successful", logging.String("plan_id", plan.PlanID))
+	m.logger.Info("Plan validation successful", spookylogging.String("plan_id", plan.PlanID))
 	return nil
 }
 
 // CreatePlanner creates a new planner for an action
-func (m *Manager) CreatePlanner(action *types.Action) (Planner, error) {
+func (m *Manager) CreatePlanner(action *spookyactionstypes.Action) (Planner, error) {
 	if action == nil {
 		return nil, fmt.Errorf("action cannot be nil")
 	}
@@ -148,12 +148,12 @@ func (m *Manager) CreatePlanner(action *types.Action) (Planner, error) {
 	planner := NewPlanner(action, m.logger)
 	m.planners[action.Name] = planner
 
-	m.logger.Debug("Created planner for action", logging.String("action", action.Name))
+	m.logger.Debug("Created planner for action", spookylogging.String("action", action.Name))
 	return planner, nil
 }
 
 // GetPlanner gets an existing planner for an action
-func (m *Manager) GetPlanner(action *types.Action) (Planner, error) {
+func (m *Manager) GetPlanner(action *spookyactionstypes.Action) (Planner, error) {
 	if action == nil {
 		return nil, fmt.Errorf("action cannot be nil")
 	}
@@ -170,7 +170,7 @@ func (m *Manager) GetPlanner(action *types.Action) (Planner, error) {
 }
 
 // GetPlan gets a plan by ID
-func (m *Manager) GetPlan(planID string) (*types.ActionPlan, error) {
+func (m *Manager) GetPlan(planID string) (*spookyactionstypes.ActionPlan, error) {
 	if planID == "" {
 		return nil, fmt.Errorf("plan ID cannot be empty")
 	}
@@ -187,11 +187,11 @@ func (m *Manager) GetPlan(planID string) (*types.ActionPlan, error) {
 }
 
 // ListPlans lists all stored plans
-func (m *Manager) ListPlans() ([]*types.ActionPlan, error) {
+func (m *Manager) ListPlans() ([]*spookyactionstypes.ActionPlan, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	plans := make([]*types.ActionPlan, 0, len(m.plans))
+	plans := make([]*spookyactionstypes.ActionPlan, 0, len(m.plans))
 	for _, plan := range m.plans {
 		plans = append(plans, plan)
 	}
@@ -213,27 +213,27 @@ func (m *Manager) DeletePlan(planID string) error {
 	}
 
 	delete(m.plans, planID)
-	m.logger.Info("Deleted plan", logging.String("plan_id", planID))
+	m.logger.Info("Deleted plan", spookylogging.String("plan_id", planID))
 
 	return nil
 }
 
 // SetDefaultStrategy sets the default planning strategy
-func (m *Manager) SetDefaultStrategy(strategy types.PlanningStrategy) {
+func (m *Manager) SetDefaultStrategy(strategy spookyactionstypes.PlanningStrategy) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.defaultStrategy = strategy
-	m.logger.Info("Set default planning strategy", logging.String("strategy", string(strategy)))
+	m.logger.Info("Set default planning strategy", spookylogging.String("strategy", string(strategy)))
 }
 
 // SetDefaultOptimization sets the default planning optimization
-func (m *Manager) SetDefaultOptimization(optimization types.PlanningOptimization) {
+func (m *Manager) SetDefaultOptimization(optimization spookyactionstypes.PlanningOptimization) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	m.defaultOptimization = optimization
-	m.logger.Info("Set default planning optimization", logging.String("optimization", string(optimization)))
+	m.logger.Info("Set default planning optimization", spookylogging.String("optimization", string(optimization)))
 }
 
 // generatePlanID generates a unique plan ID

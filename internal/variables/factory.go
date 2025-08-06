@@ -1,51 +1,51 @@
 package variables
 
 import (
-	"spooky/internal/logging"
-	"spooky/internal/variables/importexport"
-	"spooky/internal/variables/loading"
-	"spooky/internal/variables/resolution"
-	"spooky/internal/variables/types"
-	"spooky/internal/variables/validation"
+	spookylogging "spooky/internal/logging"
+	spookyvariablesimportexport "spooky/internal/variables/importexport"
+	spookyvariablesloading "spooky/internal/variables/loading"
+	spookyvariablesresolution "spooky/internal/variables/resolution"
+	spookyvariablestypes "spooky/internal/variables/types"
+	spookyvariablesvalidation "spooky/internal/variables/validation"
 )
 
 // NewVariableManager creates a new VariableManager with all its dependencies
-func NewVariableManager(logger logging.Logger) VariableManager {
+func NewVariableManager(logger spookylogging.Logger) VariableManager {
 	// Create default configuration
-	config := &types.Config{
-		LoadingConfig: &types.LoadingConfig{
+	config := &spookyvariablestypes.Config{
+		LoadingConfig: &spookyvariablestypes.LoadingConfig{
 			DefaultEncoding:   "utf-8",
 			MaxFileSize:       1024 * 1024, // 1MB
 			AllowedExtensions: []string{".hcl", ".json"},
 		},
-		ResolutionConfig: &types.ResolutionConfig{
+		ResolutionConfig: &spookyvariablestypes.ResolutionConfig{
 			MaxRecursionDepth: 10,
 			DefaultValues:     make(map[string]interface{}),
 			StrictMode:        false,
 		},
-		ValidationConfig: &types.ValidationConfig{
-			ValidationRules:     &types.ValidationRules{},
+		ValidationConfig: &spookyvariablestypes.ValidationConfig{
+			ValidationRules:     &spookyvariablestypes.ValidationRules{},
 			StrictValidation:    false,
 			MaxValidationErrors: 100,
 		},
-		ImportExportConfig: &types.ImportExportConfig{
-			ExportOptions: &types.ExportOptions{
+		ImportExportConfig: &spookyvariablestypes.ImportExportConfig{
+			ExportOptions: &spookyvariablestypes.ExportOptions{
 				IncludeMetadata: true,
 				PrettyPrint:     true,
 			},
-			ImportOptions: &types.ImportOptions{
+			ImportOptions: &spookyvariablestypes.ImportOptions{
 				MergePolicy: "overwrite",
 				Overwrite:   false,
 			},
-			DefaultFormat: types.ExportFormatHCL,
+			DefaultFormat: spookyvariablestypes.ExportFormatHCL,
 		},
 	}
 
 	// Create sub-managers
-	loadingManager := loading.NewManager(config.LoadingConfig, logger)
-	resolutionManager := resolution.NewManager(config.ResolutionConfig, logger)
-	validationManager := validation.NewManager(config.ValidationConfig, logger)
-	importExportManager := importexport.NewManager(config.ImportExportConfig, logger)
+	loadingManager := spookyvariablesloading.NewManager(config.LoadingConfig, logger)
+	resolutionManager := spookyvariablesresolution.NewManager(config.ResolutionConfig, logger)
+	validationManager := spookyvariablesvalidation.NewManager(config.ValidationConfig, logger)
+	importExportManager := spookyvariablesimportexport.NewManager(config.ImportExportConfig, logger)
 
 	// Create main manager
 	return NewManager(

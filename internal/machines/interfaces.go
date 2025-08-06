@@ -1,30 +1,30 @@
 package machines
 
 import (
-	configtypes "spooky/internal/config/types"
-	"spooky/internal/machines/types"
+	spookyconfigtypes "spooky/internal/config/types"
+	spookymachinestypes "spooky/internal/machines/types"
 )
 
 // MachineManager defines the main interface for machine operations
 type MachineManager interface {
 	// Core operations
-	BuildIndexes(machines []configtypes.Machine) error
-	UpdateIndexes(machines []configtypes.Machine) error
-	GetState() *types.IndexManagerState
+	BuildIndexes(machines []spookyconfigtypes.Machine) error
+	UpdateIndexes(machines []spookyconfigtypes.Machine) error
+	GetState() *spookymachinestypes.IndexManagerState
 	Stop() error
 
 	// Lookup operations
-	LookupByName(name string) (*configtypes.Machine, bool)
-	LookupByHost(host string) (*configtypes.Machine, bool)
-	LookupByTag(tagKey string) ([]*configtypes.Machine, bool)
-	LookupByTagValue(tagKey, tagValue string) ([]*configtypes.Machine, bool)
-	LookupByNetwork(networkType string) ([]*configtypes.Machine, bool)
-	LookupBySubnet(subnet string) ([]*configtypes.Machine, bool)
-	FilterByTags(criteria map[string]string) []*configtypes.Machine
+	LookupByName(name string) (*spookyconfigtypes.Machine, bool)
+	LookupByHost(host string) (*spookyconfigtypes.Machine, bool)
+	LookupByTag(tagKey string) ([]*spookyconfigtypes.Machine, bool)
+	LookupByTagValue(tagKey, tagValue string) ([]*spookyconfigtypes.Machine, bool)
+	LookupByNetwork(networkType string) ([]*spookyconfigtypes.Machine, bool)
+	LookupBySubnet(subnet string) ([]*spookyconfigtypes.Machine, bool)
+	FilterByTags(criteria map[string]string) []*spookyconfigtypes.Machine
 
 	// Performance and optimization
-	GetIndexMetrics() *types.IndexMetrics
-	GetIndexPerformance() *types.IndexPerformanceStats
+	GetIndexMetrics() *spookymachinestypes.IndexMetrics
+	GetIndexPerformance() *spookymachinestypes.IndexPerformanceStats
 	OptimizeIndexes() error
 	CleanupIndexes() error
 	ValidateIndexes() error

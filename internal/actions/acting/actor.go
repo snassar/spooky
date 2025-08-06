@@ -6,20 +6,20 @@ import (
 	"fmt"
 	"time"
 
-	"spooky/internal/actions/types"
-	"spooky/internal/logging"
-	"spooky/internal/schemas"
+	spookyactionstypes "spooky/internal/actions/types"
+	spookylogging "spooky/internal/logging"
+	spookyschemas "spooky/internal/schemas"
 )
 
 // actorImpl implements the Actor interface
 type actorImpl struct {
 	// Action and context
-	action  *types.Action
-	context *types.ActionContext
+	action  *spookyactionstypes.Action
+	context *spookyactionstypes.ActionContext
 
 	// State
-	state    types.ActingState
-	status   types.ActingStatus
+	state    spookyactionstypes.ActingState
+	status   spookyactionstypes.ActingStatus
 	progress float64
 
 	// Configuration
@@ -27,24 +27,24 @@ type actorImpl struct {
 	parallel bool
 
 	// Dependencies
-	logger logging.Logger
+	logger spookylogging.Logger
 }
 
 // Execute executes the action
-func (a *actorImpl) Execute(ctx context.Context, context *types.ActionContext) (*types.ActingResult, error) {
+func (a *actorImpl) Execute(ctx context.Context, context *spookyactionstypes.ActionContext) (*spookyactionstypes.ActingResult, error) {
 	if context == nil {
 		return nil, fmt.Errorf("context cannot be nil")
 	}
 
-	a.logger.Info("Executing actor", logging.String("action", a.action.Name))
+	a.logger.Info("Executing actor", spookylogging.String("action", a.action.Name))
 
 	// Update state
-	a.state = types.ActingStateRunning
-	a.status = types.ActingStatusRunning
+	a.state = spookyactionstypes.ActingStateRunning
+	a.status = spookyactionstypes.ActingStatusRunning
 	a.progress = 0.0
 
 	// Create result
-	result := types.NewActingResult(a.action.Name, "default")
+	result := spookyactionstypes.NewActingResult(a.action.Name, "default")
 
 	// Set start time
 	now := time.Now()
@@ -78,33 +78,33 @@ func (a *actorImpl) Execute(ctx context.Context, context *types.ActionContext) (
 
 	// Update result based on execution
 	if err != nil {
-		result.Status = types.ActingStatusFailed
+		result.Status = spookyactionstypes.ActingStatusFailed
 		result.Error = err.Error()
-		a.state = types.ActingStateFailed
-		a.status = types.ActingStatusFailed
+		a.state = spookyactionstypes.ActingStateFailed
+		a.status = spookyactionstypes.ActingStatusFailed
 	} else {
-		result.Status = types.ActingStatusCompleted
+		result.Status = spookyactionstypes.ActingStatusCompleted
 		result.ExitCode = 0
-		a.state = types.ActingStateCompleted
-		a.status = types.ActingStatusCompleted
+		a.state = spookyactionstypes.ActingStateCompleted
+		a.status = spookyactionstypes.ActingStatusCompleted
 	}
 
 	a.progress = 100.0
 
 	a.logger.Info("Actor execution completed",
-		logging.String("action", a.action.Name),
-		logging.String("status", string(result.Status)))
+		spookylogging.String("action", a.action.Name),
+		spookylogging.String("status", string(result.Status)))
 
 	return result, err
 }
 
 // Prepare prepares the actor for execution
-func (a *actorImpl) Prepare(context *types.ActionContext) error {
+func (a *actorImpl) Prepare(context *spookyactionstypes.ActionContext) error {
 	if context == nil {
 		return fmt.Errorf("context cannot be nil")
 	}
 
-	a.logger.Info("Preparing actor", logging.String("action", a.action.Name))
+	a.logger.Info("Preparing actor", spookylogging.String("action", a.action.Name))
 
 	// Validate action
 	if err := a.validateAction(); err != nil {
@@ -117,28 +117,28 @@ func (a *actorImpl) Prepare(context *types.ActionContext) error {
 	}
 
 	// Update state
-	a.state = types.ActingStatePending
-	a.status = types.ActingStatusPending
+	a.state = spookyactionstypes.ActingStatePending
+	a.status = spookyactionstypes.ActingStatusPending
 	a.progress = 0.0
 
-	a.logger.Info("Actor prepared", logging.String("action", a.action.Name))
+	a.logger.Info("Actor prepared", spookylogging.String("action", a.action.Name))
 	return nil
 }
 
 // Cancel cancels the actor execution
 func (a *actorImpl) Cancel() error {
-	a.logger.Info("Cancelling actor", logging.String("action", a.action.Name))
+	a.logger.Info("Cancelling actor", spookylogging.String("action", a.action.Name))
 
 	// Update state
-	a.state = types.ActingStateCancelled
-	a.status = types.ActingStatusCancelled
+	a.state = spookyactionstypes.ActingStateCancelled
+	a.status = spookyactionstypes.ActingStatusCancelled
 
-	a.logger.Info("Actor cancelled", logging.String("action", a.action.Name))
+	a.logger.Info("Actor cancelled", spookylogging.String("action", a.action.Name))
 	return nil
 }
 
 // GetState returns the current state
-func (a *actorImpl) GetState() types.ActingState {
+func (a *actorImpl) GetState() spookyactionstypes.ActingState {
 	return a.state
 }
 
@@ -148,7 +148,7 @@ func (a *actorImpl) GetProgress() float64 {
 }
 
 // GetStatus returns the current status
-func (a *actorImpl) GetStatus() types.ActingStatus {
+func (a *actorImpl) GetStatus() spookyactionstypes.ActingStatus {
 	return a.status
 }
 
@@ -200,7 +200,7 @@ func (a *actorImpl) validateAction() error {
 }
 
 // prepareContext prepares the context
-func (a *actorImpl) prepareContext(context *types.ActionContext) error {
+func (a *actorImpl) prepareContext(context *spookyactionstypes.ActionContext) error {
 	if context == nil {
 		return fmt.Errorf("context cannot be nil")
 	}
@@ -225,10 +225,10 @@ func (a *actorImpl) prepareContext(context *types.ActionContext) error {
 }
 
 // executeCommand executes a command action
-func (a *actorImpl) executeCommand(ctx context.Context, context *types.ActionContext, result *types.ActingResult) error {
+func (a *actorImpl) executeCommand(ctx context.Context, context *spookyactionstypes.ActionContext, result *spookyactionstypes.ActingResult) error {
 	a.logger.Debug("Executing command action",
-		logging.String("action", a.action.Name),
-		logging.String("command", a.action.Command))
+		spookylogging.String("action", a.action.Name),
+		spookylogging.String("command", a.action.Command))
 
 	// TODO: Implement actual command execution
 	// This would involve:
@@ -244,9 +244,9 @@ func (a *actorImpl) executeCommand(ctx context.Context, context *types.ActionCon
 }
 
 // executeScript executes a script action
-func (a *actorImpl) executeScript(ctx context.Context, context *types.ActionContext, result *types.ActingResult) error {
+func (a *actorImpl) executeScript(ctx context.Context, context *spookyactionstypes.ActionContext, result *spookyactionstypes.ActingResult) error {
 	a.logger.Debug("Executing script action",
-		logging.String("action", a.action.Name))
+		spookylogging.String("action", a.action.Name))
 
 	// TODO: Implement actual script execution
 	// This would involve:
@@ -263,10 +263,10 @@ func (a *actorImpl) executeScript(ctx context.Context, context *types.ActionCont
 }
 
 // executeTemplateDeploy executes a template deploy action
-func (a *actorImpl) executeTemplateDeploy(ctx context.Context, context *types.ActionContext, result *types.ActingResult) error {
+func (a *actorImpl) executeTemplateDeploy(ctx context.Context, context *spookyactionstypes.ActionContext, result *spookyactionstypes.ActingResult) error {
 	a.logger.Debug("Executing template deploy action",
-		logging.String("action", a.action.Name),
-		logging.String("template", a.action.Template.Source))
+		spookylogging.String("action", a.action.Name),
+		spookylogging.String("template", a.action.Template.Source))
 
 	// TODO: Implement actual template deployment
 	// This would involve:
@@ -283,10 +283,10 @@ func (a *actorImpl) executeTemplateDeploy(ctx context.Context, context *types.Ac
 }
 
 // executeTemplateEvaluate executes a template evaluate action
-func (a *actorImpl) executeTemplateEvaluate(ctx context.Context, context *types.ActionContext, result *types.ActingResult) error {
+func (a *actorImpl) executeTemplateEvaluate(ctx context.Context, context *spookyactionstypes.ActionContext, result *spookyactionstypes.ActingResult) error {
 	a.logger.Debug("Executing template evaluate action",
-		logging.String("action", a.action.Name),
-		logging.String("template", a.action.Template.Source))
+		spookylogging.String("action", a.action.Name),
+		spookylogging.String("template", a.action.Template.Source))
 
 	// TODO: Implement actual template evaluation
 	// This would involve:
@@ -301,14 +301,14 @@ func (a *actorImpl) executeTemplateEvaluate(ctx context.Context, context *types.
 }
 
 // executeTemplateValidate executes a template validate action
-func (a *actorImpl) executeTemplateValidate(ctx context.Context, context *types.ActionContext, result *types.ActingResult) error {
+func (a *actorImpl) executeTemplateValidate(ctx context.Context, context *spookyactionstypes.ActionContext, result *spookyactionstypes.ActingResult) error {
 	a.logger.Debug("Executing template validate action",
-		logging.String("action", a.action.Name),
-		logging.String("template", a.action.Template.Source))
+		spookylogging.String("action", a.action.Name),
+		spookylogging.String("template", a.action.Template.Source))
 
 	// Use schema system for template validation
 	if err := a.validateTemplate([]byte(a.action.Template.Source)); err != nil {
-		result.Status = types.ActingStatusFailed
+		result.Status = spookyactionstypes.ActingStatusFailed
 		result.Error = err.Error()
 		return fmt.Errorf("template validation failed: %w", err)
 	}
@@ -320,10 +320,10 @@ func (a *actorImpl) executeTemplateValidate(ctx context.Context, context *types.
 }
 
 // executeTemplateCleanup executes a template cleanup action
-func (a *actorImpl) executeTemplateCleanup(ctx context.Context, context *types.ActionContext, result *types.ActingResult) error {
+func (a *actorImpl) executeTemplateCleanup(ctx context.Context, context *spookyactionstypes.ActionContext, result *spookyactionstypes.ActingResult) error {
 	a.logger.Debug("Executing template cleanup action",
-		logging.String("action", a.action.Name),
-		logging.String("template", a.action.Template.Source))
+		spookylogging.String("action", a.action.Name),
+		spookylogging.String("template", a.action.Template.Source))
 
 	// TODO: Implement actual template cleanup
 	// This would involve:
@@ -340,8 +340,8 @@ func (a *actorImpl) executeTemplateCleanup(ctx context.Context, context *types.A
 
 // validateTemplate validates template using schema system
 func (a *actorImpl) validateTemplate(content []byte) error {
-	validator := schemas.NewSchemaValidator()
-	if err := validator.LoadSchema(schemas.SchemaTypeTemplateMetadata); err != nil {
+	validator := spookyschemas.NewSchemaValidator()
+	if err := validator.LoadSchema(spookyschemas.SchemaTypeTemplateMetadata); err != nil {
 		return fmt.Errorf("failed to load template metadata schema: %w", err)
 	}
 

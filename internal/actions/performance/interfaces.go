@@ -1,51 +1,51 @@
 package performance
 
 import (
-	"spooky/internal/actions/types"
+	spookyactionstypes "spooky/internal/actions/types"
 )
 
 // PerformanceManager defines the interface for action performance operations
 type PerformanceManager interface {
 	// Core performance operations
-	OptimizeAction(action *types.Action) error
-	OptimizeActionCollection(collection *types.ActionCollection) error
-	GetPerformanceMetrics(action *types.Action) (*types.PerformanceMetrics, error)
+	OptimizeAction(action *spookyactionstypes.Action) error
+	OptimizeActionCollection(collection *spookyactionstypes.ActionCollection) error
+	GetPerformanceMetrics(action *spookyactionstypes.Action) (*spookyactionstypes.PerformanceMetrics, error)
 
 	// Optimizer management
-	CreateOptimizer(action *types.Action) (ActionOptimizer, error)
-	GetOptimizer(action *types.Action) (ActionOptimizer, error)
+	CreateOptimizer(action *spookyactionstypes.Action) (ActionOptimizer, error)
+	GetOptimizer(action *spookyactionstypes.Action) (ActionOptimizer, error)
 
 	// Metrics management
-	GetMetrics(action *types.Action) (*types.PerformanceMetrics, error)
-	ListMetrics() ([]*types.PerformanceMetrics, error)
-	ClearMetrics(action *types.Action) error
+	GetMetrics(action *spookyactionstypes.Action) (*spookyactionstypes.PerformanceMetrics, error)
+	ListMetrics() ([]*spookyactionstypes.PerformanceMetrics, error)
+	ClearMetrics(action *spookyactionstypes.Action) error
 
 	// Configuration
-	SetOptimizationLevel(level types.OptimizationLevel)
-	SetResourceLimits(limits *types.ResourceLimits)
+	SetOptimizationLevel(level spookyactionstypes.OptimizationLevel)
+	SetResourceLimits(limits *spookyactionstypes.ResourceLimits)
 }
 
 // ActionOptimizer defines the interface for action performance optimization
 type ActionOptimizer interface {
 	// Core optimization operations
-	Optimize(action *types.Action) error
-	GetMetrics(action *types.Action) (*types.PerformanceMetrics, error)
+	Optimize(action *spookyactionstypes.Action) error
+	GetMetrics(action *spookyactionstypes.Action) (*spookyactionstypes.PerformanceMetrics, error)
 
 	// Optimization management
-	SetLevel(level types.OptimizationLevel)
-	GetLevel() types.OptimizationLevel
+	SetLevel(level spookyactionstypes.OptimizationLevel)
+	GetLevel() spookyactionstypes.OptimizationLevel
 
 	// Configuration
-	SetResourceLimits(limits *types.ResourceLimits)
-	SetOptimizationTarget(target types.OptimizationTarget)
+	SetResourceLimits(limits *spookyactionstypes.ResourceLimits)
+	SetOptimizationTarget(target spookyactionstypes.OptimizationTarget)
 }
 
 // PerformanceAnalyzer defines the interface for performance analysis
 type PerformanceAnalyzer interface {
 	// Analysis operations
-	AnalyzeAction(action *types.Action) (*PerformanceAnalysis, error)
-	AnalyzeCollection(collection *types.ActionCollection) (*PerformanceAnalysis, error)
-	CompareActions(action1, action2 *types.Action) (*PerformanceComparison, error)
+	AnalyzeAction(action *spookyactionstypes.Action) (*PerformanceAnalysis, error)
+	AnalyzeCollection(collection *spookyactionstypes.ActionCollection) (*PerformanceAnalysis, error)
+	CompareActions(action1, action2 *spookyactionstypes.Action) (*PerformanceComparison, error)
 
 	// Analysis configuration
 	SetAnalysisDepth(depth int)

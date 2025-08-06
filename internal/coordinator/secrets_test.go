@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewCoordinatorCryptoIntegration(t *testing.T) {
+func TestNewCoordinatorSecretsIntegration(t *testing.T) {
 	logger := spookylogging.NewLogger(spookyloggingtypes.Config{Level: spookyloggingtypes.InfoLevel})
-	integration := NewCoordinatorCryptoIntegration(nil, logger)
+	integration := NewCoordinatorSecretsIntegration(nil, logger)
 
 	assert.NotNil(t, integration)
 	assert.NotNil(t, integration.logger)
@@ -19,7 +19,7 @@ func TestNewCoordinatorCryptoIntegration(t *testing.T) {
 
 func TestEncryptData(t *testing.T) {
 	logger := spookylogging.NewLogger(spookyloggingtypes.Config{Level: spookyloggingtypes.InfoLevel})
-	integration := NewCoordinatorCryptoIntegration(nil, logger)
+	integration := NewCoordinatorSecretsIntegration(nil, logger)
 
 	data := []byte("test data")
 	recipients := []string{"age1test"}
@@ -33,7 +33,7 @@ func TestEncryptData(t *testing.T) {
 
 func TestDecryptData(t *testing.T) {
 	logger := spookylogging.NewLogger(spookyloggingtypes.Config{Level: spookyloggingtypes.InfoLevel})
-	integration := NewCoordinatorCryptoIntegration(nil, logger)
+	integration := NewCoordinatorSecretsIntegration(nil, logger)
 
 	data := []byte("encrypted data")
 
@@ -46,7 +46,7 @@ func TestDecryptData(t *testing.T) {
 
 func TestValidateEncryption(t *testing.T) {
 	logger := spookylogging.NewLogger(spookyloggingtypes.Config{Level: spookyloggingtypes.InfoLevel})
-	integration := NewCoordinatorCryptoIntegration(nil, logger)
+	integration := NewCoordinatorSecretsIntegration(nil, logger)
 
 	// Test with valid encrypted data (at least 100 bytes)
 	encryptedData := make([]byte, 150)
@@ -60,18 +60,9 @@ func TestValidateEncryption(t *testing.T) {
 	assert.Contains(t, err.Error(), "crypto manager not available")
 }
 
-func TestGetCryptoStatus(t *testing.T) {
+func TestSecretsIntegrationConcurrent(t *testing.T) {
 	logger := spookylogging.NewLogger(spookyloggingtypes.Config{Level: spookyloggingtypes.InfoLevel})
-	integration := NewCoordinatorCryptoIntegration(nil, logger)
-
-	status := integration.GetCryptoStatus()
-	assert.NotNil(t, status)
-	assert.IsType(t, map[string]interface{}{}, status)
-}
-
-func TestCryptoIntegrationConcurrent(t *testing.T) {
-	logger := spookylogging.NewLogger(spookyloggingtypes.Config{Level: spookyloggingtypes.InfoLevel})
-	integration := NewCoordinatorCryptoIntegration(nil, logger)
+	integration := NewCoordinatorSecretsIntegration(nil, logger)
 
 	// Test concurrent operations
 	const numOperations = 10

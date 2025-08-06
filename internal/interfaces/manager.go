@@ -1,8 +1,6 @@
 package interfaces
 
-import (
-	"spooky/internal/actions/types"
-)
+import "spooky/internal/config/types"
 
 // IntegrationManager coordinates all system integrations
 type IntegrationManager interface {
@@ -12,7 +10,7 @@ type IntegrationManager interface {
 	Variables() VariablesIntegration
 	Templates() TemplatesIntegration
 	Machines() MachinesIntegration
-	Crypto() CryptoIntegration
+	Secrets() SecretsIntegration
 
 	// Context management
 	LoadContextForAction(action *types.Action, projectPath string, machineNames []string) (*ActionExecutionContext, error)

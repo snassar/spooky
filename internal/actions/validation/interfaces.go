@@ -1,19 +1,19 @@
 package validation
 
 import (
-	"spooky/internal/actions/types"
+	spookyactionstypes "spooky/internal/actions/types"
 )
 
 // ValidationManager defines the interface for action validation operations
 type ValidationManager interface {
 	// Core validation operations
-	ValidateAction(action *types.Action) error
-	ValidateActionCollection(collection *types.ActionCollection) error
-	ValidateActionContext(context *types.ActionContext) error
+	ValidateAction(action *spookyactionstypes.Action) error
+	ValidateActionCollection(collection *spookyactionstypes.ActionCollection) error
+	ValidateActionContext(context *spookyactionstypes.ActionContext) error
 
 	// Validator management
-	CreateValidator(action *types.Action) (ActionValidator, error)
-	GetValidator(action *types.Action) (ActionValidator, error)
+	CreateValidator(action *spookyactionstypes.Action) (ActionValidator, error)
+	GetValidator(action *spookyactionstypes.Action) (ActionValidator, error)
 
 	// Custom validation
 	AddValidationRule(rule ValidationRule) error
@@ -22,15 +22,15 @@ type ValidationManager interface {
 
 	// Configuration
 	SetStrictMode(strict bool)
-	SetValidationLevel(level types.ValidationLevel)
+	SetValidationLevel(level spookyactionstypes.ValidationLevel)
 }
 
 // ActionValidator defines the interface for action validation
 type ActionValidator interface {
 	// Core validation operations
-	Validate(action *types.Action) error
-	ValidateCollection(collection *types.ActionCollection) error
-	ValidateContext(context *types.ActionContext) error
+	Validate(action *spookyactionstypes.Action) error
+	ValidateCollection(collection *spookyactionstypes.ActionCollection) error
+	ValidateContext(context *spookyactionstypes.ActionContext) error
 
 	// Rule management
 	AddRule(rule ValidationRule) error
@@ -39,15 +39,15 @@ type ActionValidator interface {
 
 	// Configuration
 	SetStrictMode(strict bool)
-	SetLevel(level types.ValidationLevel)
+	SetLevel(level spookyactionstypes.ValidationLevel)
 }
 
 // ValidationRule defines a custom validation rule
 type ValidationRule interface {
 	Name() string
-	Validate(action *types.Action) error
-	ValidateCollection(collection *types.ActionCollection) error
-	ValidateContext(context *types.ActionContext) error
+	Validate(action *spookyactionstypes.Action) error
+	ValidateCollection(collection *spookyactionstypes.ActionCollection) error
+	ValidateContext(context *spookyactionstypes.ActionContext) error
 }
 
 // ValidationResult represents the result of a validation operation

@@ -4,25 +4,25 @@ import (
 	"fmt"
 	"sync"
 
-	"spooky/internal/cli/types"
-	"spooky/internal/logging"
+	spookyclitypes "spooky/internal/cli/types"
+	spookylogging "spooky/internal/logging"
 )
 
 // Manager implements FlagsManager interface
 type Manager struct {
-	config       *types.FlagsConfig
+	config       *spookyclitypes.FlagsConfig
 	globalFlags  map[string]interface{}
 	commandFlags map[string]map[string]interface{}
 	parser       FlagsParser
-	logger       logging.Logger
+	logger       spookylogging.Logger
 	mutex        sync.RWMutex
 }
 
 // NewManager creates a new flags manager
 func NewManager(
-	config *types.FlagsConfig,
+	config *spookyclitypes.FlagsConfig,
 	parser FlagsParser,
-	logger logging.Logger,
+	logger spookylogging.Logger,
 ) *Manager {
 	return &Manager{
 		config:       config,
@@ -48,7 +48,7 @@ func (m *Manager) SetGlobalFlags(flags map[string]interface{}) error {
 		m.globalFlags[name] = value
 	}
 
-	m.logger.Info("Global flags set", logging.Int("count", len(flags)))
+	m.logger.Info("Global flags set", spookylogging.Int("count", len(flags)))
 	return nil
 }
 
@@ -77,8 +77,8 @@ func (m *Manager) SetCommandFlags(commandName string, flags map[string]interface
 	}
 
 	m.logger.Info("Command flags set",
-		logging.String("command", commandName),
-		logging.Int("count", len(flags)))
+		spookylogging.String("command", commandName),
+		spookylogging.Int("count", len(flags)))
 	return nil
 }
 

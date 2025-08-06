@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"spooky/internal/facts/collectors"
-	"spooky/internal/facts/types"
+	spookyfactscollectors "spooky/internal/facts/collectors"
+	spookyfactstypes "spooky/internal/facts/types"
 )
 
 // Collector collects facts from OpenTofu state files and outputs
 type Collector struct {
-	collectors.BaseCollector
+	spookyfactscollectors.BaseCollector
 	stateFile string
 	configDir string
 	outputs   map[string]interface{}
@@ -24,7 +24,7 @@ type Collector struct {
 // NewCollector creates a new OpenTofu fact collector
 func NewCollector(stateFile, configDir string) *Collector {
 	return &Collector{
-		BaseCollector: *collectors.NewBaseCollector(types.SourceOpenTofu, types.MergePolicyMerge),
+		BaseCollector: *spookyfactscollectors.NewBaseCollector(spookyfactstypes.SourceOpenTofu, spookyfactstypes.MergePolicyMerge),
 		stateFile:     stateFile,
 		configDir:     configDir,
 		outputs:       make(map[string]interface{}),
@@ -32,11 +32,11 @@ func NewCollector(stateFile, configDir string) *Collector {
 }
 
 // Collect gathers facts from OpenTofu state and outputs
-func (c *Collector) Collect(server string) (*types.FactCollection, error) {
-	collection := &types.FactCollection{
+func (c *Collector) Collect(server string) (*spookyfactstypes.FactCollection, error) {
+	collection := &spookyfactstypes.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 	}
 
 	// Collect from state file if available
@@ -57,11 +57,11 @@ func (c *Collector) Collect(server string) (*types.FactCollection, error) {
 }
 
 // CollectSpecific collects only the specified facts from OpenTofu
-func (c *Collector) CollectSpecific(server string, keys []string) (*types.FactCollection, error) {
-	collection := &types.FactCollection{
+func (c *Collector) CollectSpecific(server string, keys []string) (*spookyfactstypes.FactCollection, error) {
+	collection := &spookyfactstypes.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 	}
 
 	// Collect all facts first, then filter
@@ -81,11 +81,11 @@ func (c *Collector) CollectSpecific(server string, keys []string) (*types.FactCo
 }
 
 // GetFact retrieves a single fact from OpenTofu
-func (c *Collector) GetFact(server, key string) (*types.Fact, error) {
-	collection := &types.FactCollection{
+func (c *Collector) GetFact(server, key string) (*spookyfactstypes.Fact, error) {
+	collection := &spookyfactstypes.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 	}
 
 	// Try to get from state file first
@@ -151,7 +151,7 @@ func (c *Collector) GetConfigDir() string {
 }
 
 // collectFromStateFile collects facts from OpenTofu state file
-func (c *Collector) collectFromStateFile(collection *types.FactCollection) error {
+func (c *Collector) collectFromStateFile(collection *spookyfactstypes.FactCollection) error {
 	if c.stateFile == "" {
 		return fmt.Errorf("state file not configured")
 	}
@@ -175,7 +175,7 @@ func (c *Collector) collectFromStateFile(collection *types.FactCollection) error
 }
 
 // collectFromOutputs collects facts from OpenTofu outputs
-func (c *Collector) collectFromOutputs(collection *types.FactCollection) error {
+func (c *Collector) collectFromOutputs(collection *spookyfactstypes.FactCollection) error {
 	if c.configDir == "" {
 		return fmt.Errorf("config directory not configured")
 	}
@@ -202,7 +202,7 @@ func (c *Collector) collectFromOutputs(collection *types.FactCollection) error {
 }
 
 // extractFactsFromState extracts facts from OpenTofu state
-func (c *Collector) extractFactsFromState(collection *types.FactCollection, state *StateFile) {
+func (c *Collector) extractFactsFromState(collection *spookyfactstypes.FactCollection, state *StateFile) {
 	// Extract version
 	c.createFact(collection, "tofu_version", state.Version)
 
@@ -232,7 +232,7 @@ func (c *Collector) extractFactsFromState(collection *types.FactCollection, stat
 }
 
 // extractFactsFromOutputs extracts facts from OpenTofu outputs
-func (c *Collector) extractFactsFromOutputs(collection *types.FactCollection, outputs map[string]Output) {
+func (c *Collector) extractFactsFromOutputs(collection *spookyfactstypes.FactCollection, outputs map[string]Output) {
 	for name, output := range outputs {
 		c.createFact(collection, fmt.Sprintf("output_%s", name), output.Value)
 		c.createFact(collection, fmt.Sprintf("output_%s_sensitive", name), output.Sensitive)
@@ -240,8 +240,8 @@ func (c *Collector) extractFactsFromOutputs(collection *types.FactCollection, ou
 }
 
 // createFact creates a fact in the collection
-func (c *Collector) createFact(collection *types.FactCollection, key string, value interface{}) {
-	collection.Facts[key] = &types.Fact{
+func (c *Collector) createFact(collection *spookyfactstypes.FactCollection, key string, value interface{}) {
+	collection.Facts[key] = &spookyfactstypes.Fact{
 		Key:       key,
 		Value:     value,
 		Source:    string(c.GetSource()),

@@ -3,37 +3,37 @@ package validation
 import (
 	"fmt"
 
-	"spooky/internal/actions/types"
-	"spooky/internal/logging"
+	spookyactionstypes "spooky/internal/actions/types"
+	spookylogging "spooky/internal/logging"
 )
 
 // ActionValidatorImpl implements the ActionValidator interface
 type ActionValidatorImpl struct {
-	action          *types.Action
+	action          *spookyactionstypes.Action
 	strictMode      bool
-	validationLevel types.ValidationLevel
+	validationLevel spookyactionstypes.ValidationLevel
 	rules           []ValidationRule
-	logger          logging.Logger
+	logger          spookylogging.Logger
 }
 
 // NewActionValidator creates a new ActionValidator
-func NewActionValidator(action *types.Action, logger logging.Logger) ActionValidator {
+func NewActionValidator(action *spookyactionstypes.Action, logger spookylogging.Logger) ActionValidator {
 	return &ActionValidatorImpl{
 		action:          action,
 		strictMode:      false,
-		validationLevel: types.ValidationLevelBasic,
+		validationLevel: spookyactionstypes.ValidationLevelBasic,
 		rules:           make([]ValidationRule, 0),
 		logger:          logger,
 	}
 }
 
 // Validate validates an action
-func (v *ActionValidatorImpl) Validate(action *types.Action) error {
+func (v *ActionValidatorImpl) Validate(action *spookyactionstypes.Action) error {
 	if action == nil {
 		return fmt.Errorf("action cannot be nil")
 	}
 
-	v.logger.Info("Validating action", logging.String("action", action.Name))
+	v.logger.Info("Validating action", spookylogging.String("action", action.Name))
 
 	// Basic action validation
 	if action.Name == "" {
@@ -56,22 +56,22 @@ func (v *ActionValidatorImpl) Validate(action *types.Action) error {
 				return fmt.Errorf("custom rule '%s' validation failed: %w", rule.Name(), err)
 			}
 			v.logger.Warn("Custom validation rule failed",
-				logging.String("rule", rule.Name()),
-				logging.String("error", err.Error()))
+				spookylogging.String("rule", rule.Name()),
+				spookylogging.String("error", err.Error()))
 		}
 	}
 
-	v.logger.Info("Action validation successful", logging.String("action", action.Name))
+	v.logger.Info("Action validation successful", spookylogging.String("action", action.Name))
 	return nil
 }
 
 // ValidateCollection validates an action collection
-func (v *ActionValidatorImpl) ValidateCollection(collection *types.ActionCollection) error {
+func (v *ActionValidatorImpl) ValidateCollection(collection *spookyactionstypes.ActionCollection) error {
 	if collection == nil {
 		return fmt.Errorf("action collection cannot be nil")
 	}
 
-	v.logger.Info("Validating action collection", logging.Int("actions_count", len(collection.Actions)))
+	v.logger.Info("Validating action collection", spookylogging.Int("actions_count", len(collection.Actions)))
 
 	// Validate each action in the collection
 	for _, action := range collection.Actions {
@@ -80,12 +80,12 @@ func (v *ActionValidatorImpl) ValidateCollection(collection *types.ActionCollect
 		}
 	}
 
-	v.logger.Info("Action collection validation successful", logging.Int("actions_count", len(collection.Actions)))
+	v.logger.Info("Action collection validation successful", spookylogging.Int("actions_count", len(collection.Actions)))
 	return nil
 }
 
 // ValidateContext validates an action context
-func (v *ActionValidatorImpl) ValidateContext(context *types.ActionContext) error {
+func (v *ActionValidatorImpl) ValidateContext(context *spookyactionstypes.ActionContext) error {
 	if context == nil {
 		return fmt.Errorf("action context cannot be nil")
 	}
@@ -117,7 +117,7 @@ func (v *ActionValidatorImpl) AddRule(rule ValidationRule) error {
 	}
 
 	v.rules = append(v.rules, rule)
-	v.logger.Debug("Added validation rule", logging.String("rule", rule.Name()))
+	v.logger.Debug("Added validation rule", spookylogging.String("rule", rule.Name()))
 	return nil
 }
 
@@ -126,7 +126,7 @@ func (v *ActionValidatorImpl) RemoveRule(name string) error {
 	for i, rule := range v.rules {
 		if rule.Name() == name {
 			v.rules = append(v.rules[:i], v.rules[i+1:]...)
-			v.logger.Debug("Removed validation rule", logging.String("rule", name))
+			v.logger.Debug("Removed validation rule", spookylogging.String("rule", name))
 			return nil
 		}
 	}
@@ -144,17 +144,17 @@ func (v *ActionValidatorImpl) GetRules() ([]ValidationRule, error) {
 // SetStrictMode sets the strict validation mode
 func (v *ActionValidatorImpl) SetStrictMode(strict bool) {
 	v.strictMode = strict
-	v.logger.Debug("Set strict validation mode", logging.Bool("strict", strict))
+	v.logger.Debug("Set strict validation mode", spookylogging.Bool("strict", strict))
 }
 
 // SetLevel sets the validation level
-func (v *ActionValidatorImpl) SetLevel(level types.ValidationLevel) {
+func (v *ActionValidatorImpl) SetLevel(level spookyactionstypes.ValidationLevel) {
 	v.validationLevel = level
-	v.logger.Debug("Set validation level", logging.String("level", string(level)))
+	v.logger.Debug("Set validation level", spookylogging.String("level", string(level)))
 }
 
 // validateActionConfig validates the action configuration
-func (v *ActionValidatorImpl) validateActionConfig(action *types.Action) error {
+func (v *ActionValidatorImpl) validateActionConfig(action *spookyactionstypes.Action) error {
 	// Validate timeout if specified
 	if action.Timeout < 0 {
 		return fmt.Errorf("action timeout cannot be negative")

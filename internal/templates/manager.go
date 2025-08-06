@@ -7,32 +7,32 @@ import (
 	"text/template"
 	"time"
 
-	"spooky/internal/logging"
-	"spooky/internal/templates/engine"
-	"spooky/internal/templates/functions"
-	"spooky/internal/templates/secrets"
-	"spooky/internal/templates/types"
-	"spooky/internal/templates/validation"
+	spookylogging "spooky/internal/logging"
+	spookytemplatesengine "spooky/internal/templates/engine"
+	spookytemplatesfunctions "spooky/internal/templates/functions"
+	spookytemplatessecrets "spooky/internal/templates/secrets"
+	spookytemplatestypes "spooky/internal/templates/types"
+	spookytemplatesvalidation "spooky/internal/templates/validation"
 )
 
 // Manager implements TemplateManager interface
 type Manager struct {
-	config            *types.Config
-	engineManager     engine.EngineManager
-	functionsManager  functions.FunctionsManager
-	validationManager validation.ValidationManager
-	secretsManager    secrets.SecretsManager
-	logger            logging.Logger
+	config            *spookytemplatestypes.Config
+	engineManager     spookytemplatesengine.EngineManager
+	functionsManager  spookytemplatesfunctions.FunctionsManager
+	validationManager spookytemplatesvalidation.ValidationManager
+	secretsManager    spookytemplatessecrets.SecretsManager
+	logger            spookylogging.Logger
 }
 
 // NewManager creates a new template manager
 func NewManager(
-	config *types.Config,
-	engineManager engine.EngineManager,
-	functionsManager functions.FunctionsManager,
-	validationManager validation.ValidationManager,
-	secretsManager secrets.SecretsManager,
-	logger logging.Logger,
+	config *spookytemplatestypes.Config,
+	engineManager spookytemplatesengine.EngineManager,
+	functionsManager spookytemplatesfunctions.FunctionsManager,
+	validationManager spookytemplatesvalidation.ValidationManager,
+	secretsManager spookytemplatessecrets.SecretsManager,
+	logger spookylogging.Logger,
 ) *Manager {
 	return &Manager{
 		config:            config,
@@ -45,7 +45,7 @@ func NewManager(
 }
 
 // LoadTemplate loads a template from a file
-func (m *Manager) LoadTemplate(path string) (*types.Template, error) {
+func (m *Manager) LoadTemplate(path string) (*spookytemplatestypes.Template, error) {
 	// Read template content
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -53,7 +53,7 @@ func (m *Manager) LoadTemplate(path string) (*types.Template, error) {
 	}
 
 	// Create template object
-	template := &types.Template{
+	template := &spookytemplatestypes.Template{
 		Name:      path,
 		Source:    path,
 		Content:   string(content),
@@ -145,8 +145,8 @@ func (m *Manager) ValidateTemplates(projectPath string) ([]string, error) {
 
 // NewTemplateContext creates a new template context
 // Aligns with template-context.hcl schema
-func (m *Manager) NewTemplateContext(projectPath string) (*types.TemplateContext, error) {
-	return &types.TemplateContext{
+func (m *Manager) NewTemplateContext(projectPath string) (*spookytemplatestypes.TemplateContext, error) {
+	return &spookytemplatestypes.TemplateContext{
 		ProjectPath: projectPath,
 		Data:        make(map[string]interface{}),
 		Functions:   m.functionsManager.GetBuiltinFunctions(),
@@ -155,7 +155,7 @@ func (m *Manager) NewTemplateContext(projectPath string) (*types.TemplateContext
 }
 
 // GetTemplateFunctions returns template functions for a context
-func (m *Manager) GetTemplateFunctions(ctx *types.TemplateContext) template.FuncMap {
+func (m *Manager) GetTemplateFunctions(ctx *spookytemplatestypes.TemplateContext) template.FuncMap {
 	functions := m.functionsManager.GetBuiltinFunctions()
 
 	// Add custom functions
@@ -209,7 +209,7 @@ func (m *Manager) Close() error {
 }
 
 // Coordinator integration methods
-func (m *Manager) LoadTemplatesForProject(_ string) ([]*types.Template, error) {
+func (m *Manager) LoadTemplatesForProject(_ string) ([]*spookytemplatestypes.Template, error) {
 	// Load all templates from project templates directory
 	// For now, return empty list - this would be implemented to load all templates
 	// In a full implementation, this would:
@@ -217,7 +217,7 @@ func (m *Manager) LoadTemplatesForProject(_ string) ([]*types.Template, error) {
 	// 2. Load each .tmpl file
 	// 3. Parse template metadata
 	// 4. Return list of templates
-	return []*types.Template{}, nil
+	return []*spookytemplatestypes.Template{}, nil
 }
 
 func (m *Manager) ValidateTemplatesForProject(projectPath string) error {
@@ -234,7 +234,7 @@ func (m *Manager) ValidateTemplatesForProject(projectPath string) error {
 	return nil
 }
 
-func (m *Manager) RenderTemplateForContext(templateFile string, context *types.TemplateContext) (string, error) {
+func (m *Manager) RenderTemplateForContext(templateFile string, context *spookytemplatestypes.TemplateContext) (string, error) {
 	// Render template with provided context
 	return m.RenderTemplate(templateFile, context.ProjectPath, context.Data)
 }

@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"spooky/internal/cli/types"
+	spookyclitypes "spooky/internal/cli/types"
 
 	"github.com/spf13/cobra"
 )
@@ -14,10 +14,10 @@ type CLIManager interface {
 	GetRootCommand() *cobra.Command
 
 	// Command management
-	RegisterCommand(command *types.Command) error
+	RegisterCommand(command *spookyclitypes.Command) error
 	UnregisterCommand(name string) error
-	GetCommand(name string) (*types.Command, error)
-	ListCommands() []*types.Command
+	GetCommand(name string) (*spookyclitypes.Command, error)
+	ListCommands() []*spookyclitypes.Command
 
 	// Configuration
 	SetGlobalFlags(flags map[string]interface{}) error
@@ -32,10 +32,10 @@ type CLIManager interface {
 
 // CommandsManager defines the interface for command management
 type CommandsManager interface {
-	RegisterCommand(command *types.Command) error
+	RegisterCommand(command *spookyclitypes.Command) error
 	UnregisterCommand(name string) error
-	GetCommand(name string) (*types.Command, error)
-	ListCommands() []*types.Command
+	GetCommand(name string) (*spookyclitypes.Command, error)
+	ListCommands() []*spookyclitypes.Command
 	InitializeCommands() error
 }
 

@@ -3,7 +3,7 @@ package facts
 import (
 	"time"
 
-	"spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/facts/types"
 )
 
 // MetadataKey represents standard metadata keys
@@ -89,7 +89,7 @@ func (b *MetadataBuilder) WithFormat(format string) *MetadataBuilder {
 }
 
 // WithMergePolicy sets the merge policy
-func (b *MetadataBuilder) WithMergePolicy(policy types.MergePolicy) *MetadataBuilder {
+func (b *MetadataBuilder) WithMergePolicy(policy spookyfactstypes.MergePolicy) *MetadataBuilder {
 	b.metadata[string(MetadataKeyMergePolicy)] = string(policy)
 	return b
 }

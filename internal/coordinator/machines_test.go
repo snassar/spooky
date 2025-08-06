@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"spooky/internal/interfaces"
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
 	spookyloggingtypes "spooky/internal/logging/types"
@@ -49,7 +48,7 @@ func TestConnectToMachine(t *testing.T) {
 	logger := spookylogging.NewLogger(spookyloggingtypes.Config{Level: spookyloggingtypes.InfoLevel})
 	integration := NewCoordinatorMachinesIntegration(nil, logger)
 
-	connectionContext := &interfaces.ConnectionContext{
+	connectionContext := &spookyinterfaces.ConnectionContext{
 		Timeout: 30,
 	}
 

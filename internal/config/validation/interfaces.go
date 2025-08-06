@@ -1,23 +1,23 @@
 package validation
 
 import (
-	"spooky/internal/config/types"
+	spookyconfigtypes "spooky/internal/config/types"
 )
 
 // ValidationManager defines the interface for configuration validation
 type ValidationManager interface {
 	// Core validation operations
-	ValidateGlobalConfig(config *types.GlobalConfig) error
-	ValidateProjectConfig(config *types.ProjectConfig) error
+	ValidateGlobalConfig(config *spookyconfigtypes.GlobalConfig) error
+	ValidateProjectConfig(config *spookyconfigtypes.ProjectConfig) error
 	ValidateConfigFile(path string) error
 	ValidateAgainstSchema(config interface{}, schemaName string) error
 
 	// Configuration
-	SetValidationRules(rules *types.ValidationRules) error
+	SetValidationRules(rules *spookyconfigtypes.ValidationRules) error
 	EnableStrictValidation(strict bool) error
 
 	// Utility operations
-	GetValidationErrors() []types.ValidationError
+	GetValidationErrors() []spookyconfigtypes.ValidationError
 	ClearValidationErrors() error
 	Close() error
 }

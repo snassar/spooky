@@ -2,26 +2,26 @@ package processors
 
 import (
 	"io"
-	"spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/facts/types"
 )
 
 // Processor defines the interface for fact processing operations
 type Processor interface {
 	// Merging operations
-	MergeCollections(collections ...*types.FactCollection) (*types.FactCollection, error)
-	MergeWithPolicy(existing, new *types.FactCollection, policy types.MergePolicy) (*types.FactCollection, error)
+	MergeCollections(collections ...*spookyfactstypes.FactCollection) (*spookyfactstypes.FactCollection, error)
+	MergeWithPolicy(existing, new *spookyfactstypes.FactCollection, policy spookyfactstypes.MergePolicy) (*spookyfactstypes.FactCollection, error)
 
 	// Validation operations
-	ValidateCollection(collection *types.FactCollection) error
-	ValidateFact(fact *types.Fact) error
+	ValidateCollection(collection *spookyfactstypes.FactCollection) error
+	ValidateFact(fact *spookyfactstypes.Fact) error
 
 	// Export operations
-	ExportToJSON(collections []*types.FactCollection, w io.Writer) error
-	ExportToHCL(collections []*types.FactCollection, w io.Writer) error
+	ExportToJSON(collections []*spookyfactstypes.FactCollection, w io.Writer) error
+	ExportToHCL(collections []*spookyfactstypes.FactCollection, w io.Writer) error
 
 	// Import operations
-	ImportFromJSON(r io.Reader) ([]*types.FactCollection, error)
-	ImportFromHCL(r io.Reader) ([]*types.FactCollection, error)
+	ImportFromJSON(r io.Reader) ([]*spookyfactstypes.FactCollection, error)
+	ImportFromHCL(r io.Reader) ([]*spookyfactstypes.FactCollection, error)
 }
 
 // Manager provides processor management functionality

@@ -1,7 +1,7 @@
 package types
 
 import (
-	"spooky/internal/config/types"
+	spookyconfigtypes "spooky/internal/config/types"
 	"time"
 )
 
@@ -109,7 +109,7 @@ type ActionResourceLimits struct {
 }
 
 // NewAction creates a new Action from a config Action
-func NewAction(configAction *types.Action) *Action {
+func NewAction(configAction *spookyconfigtypes.Action) *Action {
 	if configAction == nil {
 		return nil
 	}
@@ -167,12 +167,12 @@ func NewAction(configAction *types.Action) *Action {
 }
 
 // ToConfigAction converts an Action to a config.Action
-func (a *Action) ToConfigAction() *types.Action {
+func (a *Action) ToConfigAction() *spookyconfigtypes.Action {
 	if a == nil {
 		return nil
 	}
 
-	configAction := &types.Action{
+	configAction := &spookyconfigtypes.Action{
 		Name:              a.Name,
 		Description:       a.Description,
 		Type:              a.Type,
@@ -201,7 +201,7 @@ func (a *Action) ToConfigAction() *types.Action {
 
 	// Convert template config if present
 	if a.Template != nil {
-		configAction.Template = &types.TemplateConfig{
+		configAction.Template = &spookyconfigtypes.TemplateConfig{
 			Source:      a.Template.Source,
 			Destination: a.Template.Destination,
 			Validate:    a.Template.Validate,
@@ -214,7 +214,7 @@ func (a *Action) ToConfigAction() *types.Action {
 
 	// Convert resource limits if present
 	if a.ResourceLimits != nil {
-		configAction.ResourceLimits = &types.ActionResourceLimits{
+		configAction.ResourceLimits = &spookyconfigtypes.ActionResourceLimits{
 			MemoryMB:   a.ResourceLimits.MemoryMB,
 			CPUPercent: a.ResourceLimits.CPUPercent,
 			DiskMB:     a.ResourceLimits.DiskMB,

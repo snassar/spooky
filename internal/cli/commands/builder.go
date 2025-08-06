@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"spooky/internal/cli/types"
+	spookyclitypes "spooky/internal/cli/types"
 )
 
 // Builder implements CommandBuilder interface
@@ -17,7 +17,7 @@ func NewBuilder() *Builder {
 }
 
 // BuildCommand builds a cobra command from a command type
-func (b *Builder) BuildCommand(command *types.Command) (*cobra.Command, error) {
+func (b *Builder) BuildCommand(command *spookyclitypes.Command) (*cobra.Command, error) {
 	if command == nil {
 		return nil, fmt.Errorf("command cannot be nil")
 	}
@@ -41,7 +41,7 @@ func (b *Builder) BuildCommand(command *types.Command) (*cobra.Command, error) {
 }
 
 // BuildSubcommands builds subcommands for a parent command
-func (b *Builder) BuildSubcommands(parent *cobra.Command, subcommands []*types.Command) error {
+func (b *Builder) BuildSubcommands(parent *cobra.Command, subcommands []*spookyclitypes.Command) error {
 	for _, subcommand := range subcommands {
 		cobraSubcommand, err := b.BuildCommand(subcommand)
 		if err != nil {
@@ -53,7 +53,7 @@ func (b *Builder) BuildSubcommands(parent *cobra.Command, subcommands []*types.C
 }
 
 // ValidateCommandStructure validates a command structure
-func (b *Builder) ValidateCommandStructure(command *types.Command) error {
+func (b *Builder) ValidateCommandStructure(command *spookyclitypes.Command) error {
 	if command == nil {
 		return fmt.Errorf("command cannot be nil")
 	}

@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"spooky/internal/config/types"
-	"spooky/internal/logging"
+	spookyconfigtypes "spooky/internal/config/types"
+	spookylogging "spooky/internal/logging"
 )
 
 // ProjectManager coordinates all project system components
@@ -38,7 +38,7 @@ func NewProjectManager() *ProjectManager {
 
 // LoadProject loads a project from the specified path
 func (pm *ProjectManager) LoadProject(projectPath string) (*Project, error) {
-	logger := logging.GetLogger()
+	logger := spookylogging.GetLogger()
 
 	// Validate project path using schema validation
 	pathResult := pm.structure.ValidateProjectStructure(projectPath)
@@ -53,7 +53,7 @@ func (pm *ProjectManager) LoadProject(projectPath string) (*Project, error) {
 	}
 
 	// Parse project.hcl file using HCL parser with schema validation
-	logger.Info("Loading project configuration", logging.String("path", projectHCLPath))
+	logger.Info("Loading project configuration", spookylogging.String("path", projectHCLPath))
 
 	// For now, create a basic project structure
 	// In a real implementation, this would use the config manager to parse project.hcl
@@ -73,8 +73,8 @@ func (pm *ProjectManager) LoadProject(projectPath string) (*Project, error) {
 	}
 
 	logger.Info("Project loaded successfully",
-		logging.String("name", project.Name),
-		logging.String("path", project.Path))
+		spookylogging.String("name", project.Name),
+		spookylogging.String("path", project.Path))
 
 	// Integration managers are now handled by the coordinator package
 
@@ -102,7 +102,7 @@ func (pm *ProjectManager) CheckProjectMachineAccess(project *Project, machineNam
 }
 
 // convertProjectConfig converts config.ProjectConfig to project.Project
-func (pm *ProjectManager) convertProjectConfig(config *types.ProjectConfig, projectPath string) *Project {
+func (pm *ProjectManager) convertProjectConfig(config *spookyconfigtypes.ProjectConfig, projectPath string) *Project {
 	project := &Project{
 		Path:      projectPath,
 		CreatedAt: time.Now(),

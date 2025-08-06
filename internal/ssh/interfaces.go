@@ -3,29 +3,29 @@ package ssh
 import (
 	"time"
 
-	"spooky/internal/ssh/types"
+	spookysshtypes "spooky/internal/ssh/types"
 )
 
 // SSHManager defines the main interface for SSH operations
 type SSHManager interface {
 	// Core SSH operations
-	Connect(host string, config *types.SSHConfig) (*types.SSHConnection, error)
-	ExecuteCommand(connection *types.SSHConnection, command string) (*types.CommandResult, error)
-	ExecuteScript(connection *types.SSHConnection, script string) (*types.CommandResult, error)
-	CloseConnection(connection *types.SSHConnection) error
+	Connect(host string, config *spookysshtypes.SSHConfig) (*spookysshtypes.SSHConnection, error)
+	ExecuteCommand(connection *spookysshtypes.SSHConnection, command string) (*spookysshtypes.CommandResult, error)
+	ExecuteScript(connection *spookysshtypes.SSHConnection, script string) (*spookysshtypes.CommandResult, error)
+	CloseConnection(connection *spookysshtypes.SSHConnection) error
 
 	// Connection pool operations
-	GetConnection(host string) (*types.SSHConnection, error)
-	ReturnConnection(connection *types.SSHConnection) error
+	GetConnection(host string) (*spookysshtypes.SSHConnection, error)
+	ReturnConnection(connection *spookysshtypes.SSHConnection) error
 	CloseAllConnections() error
 
 	// Authentication operations
-	Authenticate(connection *types.SSHConnection, auth *types.AuthenticationConfig) error
-	ValidateAuthentication(auth *types.AuthenticationConfig) error
+	Authenticate(connection *spookysshtypes.SSHConnection, auth *spookysshtypes.AuthenticationConfig) error
+	ValidateAuthentication(auth *spookysshtypes.AuthenticationConfig) error
 
 	// Acting operations
-	ExecuteAction(connection *types.SSHConnection, action *types.SSHAction) (*types.ActionResult, error)
-	ExecuteTemplate(connection *types.SSHConnection, template *types.TemplateAction) (*types.ActionResult, error)
+	ExecuteAction(connection *spookysshtypes.SSHConnection, action *spookysshtypes.SSHAction) (*spookysshtypes.ActionResult, error)
+	ExecuteTemplate(connection *spookysshtypes.SSHConnection, template *spookysshtypes.TemplateAction) (*spookysshtypes.ActionResult, error)
 
 	// Configuration
 	SetDefaultTimeout(timeout time.Duration) error
@@ -34,44 +34,44 @@ type SSHManager interface {
 
 	// Utility operations
 	TestConnection(host string) error
-	GetConnectionStats() *types.ConnectionStats
+	GetConnectionStats() *spookysshtypes.ConnectionStats
 	Close() error
 }
 
 // SSHClient defines the interface for SSH client operations
 type SSHClient interface {
-	Connect(host string, config *types.SSHConfig) (*types.SSHConnection, error)
-	ExecuteCommand(connection *types.SSHConnection, command string) (*types.CommandResult, error)
-	ExecuteScript(connection *types.SSHConnection, script string) (*types.CommandResult, error)
-	CloseConnection(connection *types.SSHConnection) error
+	Connect(host string, config *spookysshtypes.SSHConfig) (*spookysshtypes.SSHConnection, error)
+	ExecuteCommand(connection *spookysshtypes.SSHConnection, command string) (*spookysshtypes.CommandResult, error)
+	ExecuteScript(connection *spookysshtypes.SSHConnection, script string) (*spookysshtypes.CommandResult, error)
+	CloseConnection(connection *spookysshtypes.SSHConnection) error
 }
 
 // AuthenticationEngine defines the interface for authentication operations
 type AuthenticationEngine interface {
-	Authenticate(connection *types.SSHConnection, auth *types.AuthenticationConfig) error
-	ValidateAuthentication(auth *types.AuthenticationConfig) error
+	Authenticate(connection *spookysshtypes.SSHConnection, auth *spookysshtypes.AuthenticationConfig) error
+	ValidateAuthentication(auth *spookysshtypes.AuthenticationConfig) error
 	GetSupportedMethods() []string
 }
 
 // ConnectionPool defines the interface for connection pooling
 type ConnectionPool interface {
-	GetConnection(host string) (*types.SSHConnection, error)
-	ReturnConnection(connection *types.SSHConnection) error
-	CloseConnection(connection *types.SSHConnection) error
+	GetConnection(host string) (*spookysshtypes.SSHConnection, error)
+	ReturnConnection(connection *spookysshtypes.SSHConnection) error
+	CloseConnection(connection *spookysshtypes.SSHConnection) error
 	CloseAllConnections() error
-	GetStats() *types.PoolStats
+	GetStats() *spookysshtypes.PoolStats
 }
 
 // ActingEngine defines the interface for action execution
 type ActingEngine interface {
-	ExecuteAction(connection *types.SSHConnection, action *types.SSHAction) (*types.ActionResult, error)
-	ExecuteTemplate(connection *types.SSHConnection, template *types.TemplateAction) (*types.ActionResult, error)
-	ExecuteSequential(connection *types.SSHConnection, actions []*types.SSHAction) (*types.ActionResult, error)
-	ExecuteParallel(connection *types.SSHConnection, actions []*types.SSHAction) (*types.ActionResult, error)
+	ExecuteAction(connection *spookysshtypes.SSHConnection, action *spookysshtypes.SSHAction) (*spookysshtypes.ActionResult, error)
+	ExecuteTemplate(connection *spookysshtypes.SSHConnection, template *spookysshtypes.TemplateAction) (*spookysshtypes.ActionResult, error)
+	ExecuteSequential(connection *spookysshtypes.SSHConnection, actions []*spookysshtypes.SSHAction) (*spookysshtypes.ActionResult, error)
+	ExecuteParallel(connection *spookysshtypes.SSHConnection, actions []*spookysshtypes.SSHAction) (*spookysshtypes.ActionResult, error)
 }
 
 // SSHKeyManager defines the interface for SSH key management
 type SSHKeyManager interface {
-	LoadPrivateKey(path string) (*types.SSHKey, error)
+	LoadPrivateKey(path string) (*spookysshtypes.SSHKey, error)
 	ValidateKeyFile(path string) error
 }

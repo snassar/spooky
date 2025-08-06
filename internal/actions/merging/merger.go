@@ -4,39 +4,39 @@ import (
 	"fmt"
 	"time"
 
-	"spooky/internal/actions/types"
-	"spooky/internal/logging"
+	spookyactionstypes "spooky/internal/actions/types"
+	spookylogging "spooky/internal/logging"
 )
 
 // ActionMergerImpl implements the ActionMerger interface
 type ActionMergerImpl struct {
-	policy             types.MergePolicy
-	conflictResolution types.ConflictResolution
-	mergeStrategy      types.MergeStrategy
-	logger             logging.Logger
+	policy             spookyactionstypes.MergePolicy
+	conflictResolution spookyactionstypes.ConflictResolution
+	mergeStrategy      spookyactionstypes.MergeStrategy
+	logger             spookylogging.Logger
 }
 
 // NewActionMerger creates a new ActionMerger
-func NewActionMerger(policy types.MergePolicy, logger logging.Logger) ActionMerger {
+func NewActionMerger(policy spookyactionstypes.MergePolicy, logger spookylogging.Logger) ActionMerger {
 	return &ActionMergerImpl{
 		policy:             policy,
-		conflictResolution: types.ConflictResolutionFirst,
-		mergeStrategy:      types.MergeStrategyAppend,
+		conflictResolution: spookyactionstypes.ConflictResolutionFirst,
+		mergeStrategy:      spookyactionstypes.MergeStrategyAppend,
 		logger:             logger,
 	}
 }
 
 // Merge merges multiple actions into a collection
-func (m *ActionMergerImpl) Merge(actions ...*types.Action) (*types.ActionCollection, error) {
+func (m *ActionMergerImpl) Merge(actions ...*spookyactionstypes.Action) (*spookyactionstypes.ActionCollection, error) {
 	if len(actions) == 0 {
 		return nil, fmt.Errorf("no actions provided for merging")
 	}
 
-	m.logger.Info("Merging actions", logging.Int("actions_count", len(actions)))
+	m.logger.Info("Merging actions", spookylogging.Int("actions_count", len(actions)))
 
 	// Create a new collection
-	collection := &types.ActionCollection{
-		Actions:   make([]*types.Action, 0, len(actions)),
+	collection := &spookyactionstypes.ActionCollection{
+		Actions:   make([]*spookyactionstypes.Action, 0, len(actions)),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 		Metadata:  make(map[string]interface{}),
@@ -44,17 +44,17 @@ func (m *ActionMergerImpl) Merge(actions ...*types.Action) (*types.ActionCollect
 
 	// Add actions to collection based on strategy
 	switch m.mergeStrategy {
-	case types.MergeStrategyAppend:
+	case spookyactionstypes.MergeStrategyAppend:
 		// Simply append all actions
 		collection.Actions = append(collection.Actions, actions...)
 
-	case types.MergeStrategyReplace:
+	case spookyactionstypes.MergeStrategyReplace:
 		// Replace with new actions
 		collection.Actions = append(collection.Actions, actions...)
 
-	case types.MergeStrategyMerge:
+	case spookyactionstypes.MergeStrategyMerge:
 		// Merge actions by name, resolving conflicts
-		actionMap := make(map[string]*types.Action)
+		actionMap := make(map[string]*spookyactionstypes.Action)
 		for _, action := range actions {
 			if existing, exists := actionMap[action.Name]; exists {
 				// Conflict resolution
@@ -71,12 +71,12 @@ func (m *ActionMergerImpl) Merge(actions ...*types.Action) (*types.ActionCollect
 		}
 	}
 
-	m.logger.Info("Successfully merged actions", logging.Int("actions_count", len(collection.Actions)))
+	m.logger.Info("Successfully merged actions", spookylogging.Int("actions_count", len(collection.Actions)))
 	return collection, nil
 }
 
 // MergeWithPolicy merges action collections with a specific policy
-func (m *ActionMergerImpl) MergeWithPolicy(existing, new *types.ActionCollection, policy types.MergePolicy) (*types.ActionCollection, error) {
+func (m *ActionMergerImpl) MergeWithPolicy(existing, new *spookyactionstypes.ActionCollection, policy spookyactionstypes.MergePolicy) (*spookyactionstypes.ActionCollection, error) {
 	if existing == nil {
 		return nil, fmt.Errorf("existing collection cannot be nil")
 	}
@@ -86,13 +86,13 @@ func (m *ActionMergerImpl) MergeWithPolicy(existing, new *types.ActionCollection
 	}
 
 	m.logger.Info("Merging collections with policy",
-		logging.String("policy", policy.PolicyName),
-		logging.Int("existing_count", len(existing.Actions)),
-		logging.Int("new_count", len(new.Actions)))
+		spookylogging.String("policy", policy.PolicyName),
+		spookylogging.Int("existing_count", len(existing.Actions)),
+		spookylogging.Int("new_count", len(new.Actions)))
 
 	// Create a new collection
-	collection := &types.ActionCollection{
-		Actions:   make([]*types.Action, 0, len(existing.Actions)+len(new.Actions)),
+	collection := &spookyactionstypes.ActionCollection{
+		Actions:   make([]*spookyactionstypes.Action, 0, len(existing.Actions)+len(new.Actions)),
 		CreatedAt: existing.CreatedAt,
 		UpdatedAt: time.Now(),
 		Metadata:  make(map[string]interface{}),
@@ -100,18 +100,18 @@ func (m *ActionMergerImpl) MergeWithPolicy(existing, new *types.ActionCollection
 
 	// Merge based on policy strategy
 	switch policy.Strategy {
-	case types.MergeStrategyAppend:
+	case spookyactionstypes.MergeStrategyAppend:
 		// Append new actions to existing
 		collection.Actions = append(collection.Actions, existing.Actions...)
 		collection.Actions = append(collection.Actions, new.Actions...)
 
-	case types.MergeStrategyReplace:
+	case spookyactionstypes.MergeStrategyReplace:
 		// Replace existing with new
 		collection.Actions = append(collection.Actions, new.Actions...)
 
-	case types.MergeStrategyMerge:
+	case spookyactionstypes.MergeStrategyMerge:
 		// Merge by name, resolving conflicts
-		actionMap := make(map[string]*types.Action)
+		actionMap := make(map[string]*spookyactionstypes.Action)
 
 		// Add existing actions
 		for _, action := range existing.Actions {
@@ -136,55 +136,55 @@ func (m *ActionMergerImpl) MergeWithPolicy(existing, new *types.ActionCollection
 	}
 
 	m.logger.Info("Successfully merged collections with policy",
-		logging.String("policy", policy.PolicyName),
-		logging.Int("result_count", len(collection.Actions)))
+		spookylogging.String("policy", policy.PolicyName),
+		spookylogging.Int("result_count", len(collection.Actions)))
 
 	return collection, nil
 }
 
 // SetPolicy sets the merge policy
-func (m *ActionMergerImpl) SetPolicy(policy types.MergePolicy) {
+func (m *ActionMergerImpl) SetPolicy(policy spookyactionstypes.MergePolicy) {
 	m.policy = policy
-	m.logger.Debug("Set merge policy", logging.String("policy", policy.PolicyName))
+	m.logger.Debug("Set merge policy", spookylogging.String("policy", policy.PolicyName))
 }
 
 // GetPolicy gets the current merge policy
-func (m *ActionMergerImpl) GetPolicy() types.MergePolicy {
+func (m *ActionMergerImpl) GetPolicy() spookyactionstypes.MergePolicy {
 	return m.policy
 }
 
 // SetConflictResolution sets the conflict resolution strategy
-func (m *ActionMergerImpl) SetConflictResolution(resolution types.ConflictResolution) {
+func (m *ActionMergerImpl) SetConflictResolution(resolution spookyactionstypes.ConflictResolution) {
 	m.conflictResolution = resolution
-	m.logger.Debug("Set conflict resolution", logging.String("resolution", string(resolution)))
+	m.logger.Debug("Set conflict resolution", spookylogging.String("resolution", string(resolution)))
 }
 
 // SetMergeStrategy sets the merge strategy
-func (m *ActionMergerImpl) SetMergeStrategy(strategy types.MergeStrategy) {
+func (m *ActionMergerImpl) SetMergeStrategy(strategy spookyactionstypes.MergeStrategy) {
 	m.mergeStrategy = strategy
-	m.logger.Debug("Set merge strategy", logging.String("strategy", string(strategy)))
+	m.logger.Debug("Set merge strategy", spookylogging.String("strategy", string(strategy)))
 }
 
 // resolveConflict resolves conflicts between two actions
-func (m *ActionMergerImpl) resolveConflict(existing, new *types.Action) *types.Action {
+func (m *ActionMergerImpl) resolveConflict(existing, new *spookyactionstypes.Action) *spookyactionstypes.Action {
 	switch m.conflictResolution {
-	case types.ConflictResolutionFirst:
+	case spookyactionstypes.ConflictResolutionFirst:
 		// Keep the first (existing) action
 		return existing
 
-	case types.ConflictResolutionLast:
+	case spookyactionstypes.ConflictResolutionLast:
 		// Keep the last (new) action
 		return new
 
-	case types.ConflictResolutionMerge:
+	case spookyactionstypes.ConflictResolutionMerge:
 		// Merge the actions (simplified - just take the new one)
 		return new
 
-	case types.ConflictResolutionSkip:
+	case spookyactionstypes.ConflictResolutionSkip:
 		// Skip the conflict (return existing)
 		return existing
 
-	case types.ConflictResolutionError:
+	case spookyactionstypes.ConflictResolutionError:
 		// This should be handled by the caller
 		// For now, return the existing action
 		return existing

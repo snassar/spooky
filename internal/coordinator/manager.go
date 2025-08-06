@@ -28,7 +28,7 @@ type CoordinatorManager struct {
 	variables spookyinterfaces.VariablesIntegration
 	templates spookyinterfaces.TemplatesIntegration
 	machines  spookyinterfaces.MachinesIntegration
-	crypto    spookyinterfaces.CryptoIntegration
+	secrets   spookyinterfaces.SecretsIntegration
 	config    spookyinterfaces.ConfigIntegration
 	logger    spookylogging.Logger
 	cache     *spookyinterfaces.CacheManager
@@ -41,7 +41,7 @@ func NewCoordinatorManager(
 	variablesManager spookyvariables.VariableManager,
 	templatesManager spookytemplates.TemplateManager,
 	machinesManager spookymachines.MachineManager,
-	cryptoManager *spookysecrets.Manager,
+	secretsManager *spookysecrets.Manager,
 	configManager spookyconfig.ConfigManager,
 	logger spookylogging.Logger,
 ) *CoordinatorManager {
@@ -51,7 +51,7 @@ func NewCoordinatorManager(
 		variables: NewCoordinatorVariablesIntegration(variablesManager, logger),
 		templates: NewCoordinatorTemplatesIntegration(templatesManager, logger),
 		machines:  NewCoordinatorMachinesIntegration(machinesManager, logger),
-		crypto:    NewCoordinatorCryptoIntegration(cryptoManager, logger),
+		secrets:   NewCoordinatorSecretsIntegration(secretsManager, logger),
 		config:    NewCoordinatorConfigIntegration(configManager, logger),
 		logger:    logger,
 		cache:     spookyinterfaces.NewCacheManager(),
@@ -86,10 +86,10 @@ func NewCoordinatorManagerFromProject(projectPath string, logger spookylogging.L
 	// Create machines manager with default config
 	machinesManager := spookymachines.NewManager(spookymachinestypes.DefaultIndexManagerConfig(), logger)
 
-	// Create crypto manager
-	cryptoManager, err := spookysecrets.NewManager(nil)
+	// Create secrets manager
+	secretsManager, err := spookysecrets.NewManager(nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create crypto manager: %w", err)
+		return nil, fmt.Errorf("failed to create secrets manager: %w", err)
 	}
 
 	// Create config manager with nil dependencies for now
@@ -101,7 +101,7 @@ func NewCoordinatorManagerFromProject(projectPath string, logger spookylogging.L
 		variablesManager,
 		templatesManager,
 		machinesManager,
-		cryptoManager,
+		secretsManager,
 		configManager,
 		logger,
 	), nil
@@ -132,9 +132,9 @@ func (m *CoordinatorManager) Machines() spookyinterfaces.MachinesIntegration {
 	return m.machines
 }
 
-// Crypto returns the crypto integration
-func (m *CoordinatorManager) Crypto() spookyinterfaces.CryptoIntegration {
-	return m.crypto
+// Secrets returns the secrets integration
+func (m *CoordinatorManager) Secrets() spookyinterfaces.SecretsIntegration {
+	return m.secrets
 }
 
 // Config returns the config integration
@@ -259,9 +259,9 @@ func (m *CoordinatorManager) ValidateIntegrationHealth() error {
 		errors = append(errors, fmt.Errorf("machines integration: %w", err))
 	}
 
-	// Validate crypto integration
-	if err := m.validateCryptoHealth(); err != nil {
-		errors = append(errors, fmt.Errorf("crypto integration: %w", err))
+	// Validate secrets integration
+	if err := m.validateSecretsHealth(); err != nil {
+		errors = append(errors, fmt.Errorf("secrets integration: %w", err))
 	}
 
 	if len(errors) > 0 {
@@ -269,18 +269,6 @@ func (m *CoordinatorManager) ValidateIntegrationHealth() error {
 	}
 
 	return nil
-}
-
-// GetIntegrationStats returns statistics for all integrations
-func (m *CoordinatorManager) GetIntegrationStats() map[string]interface{} {
-	return map[string]interface{}{
-		"facts":     m.getFactsStats(),
-		"actions":   m.getActionsStats(),
-		"variables": m.getVariablesStats(),
-		"templates": m.getTemplatesStats(),
-		"machines":  m.getMachinesStats(),
-		"crypto":    m.getCryptoStats(),
-	}
 }
 
 // ClearAllCaches clears all caches
@@ -463,55 +451,13 @@ func (m *CoordinatorManager) validateMachinesHealth() error {
 	return nil
 }
 
-func (m *CoordinatorManager) validateCryptoHealth() error {
-	// Basic crypto integration health check
-	if m.crypto == nil {
-		return fmt.Errorf("crypto integration is nil")
-	}
-
-	// Test crypto status retrieval
-	status := m.crypto.GetCryptoStatus()
-	if status == nil {
-		return fmt.Errorf("crypto integration returned nil status")
+func (m *CoordinatorManager) validateSecretsHealth() error {
+	// Basic secrets integration health check
+	if m.secrets == nil {
+		return fmt.Errorf("secrets integration is nil")
 	}
 
 	return nil
-}
-
-func (m *CoordinatorManager) getFactsStats() map[string]interface{} {
-	return map[string]interface{}{
-		"status": "healthy",
-	}
-}
-
-func (m *CoordinatorManager) getActionsStats() map[string]interface{} {
-	return map[string]interface{}{
-		"status": "healthy",
-	}
-}
-
-func (m *CoordinatorManager) getVariablesStats() map[string]interface{} {
-	return map[string]interface{}{
-		"status": "healthy",
-	}
-}
-
-func (m *CoordinatorManager) getTemplatesStats() map[string]interface{} {
-	return map[string]interface{}{
-		"status": "healthy",
-	}
-}
-
-func (m *CoordinatorManager) getMachinesStats() map[string]interface{} {
-	return map[string]interface{}{
-		"status": "healthy",
-	}
-}
-
-func (m *CoordinatorManager) getCryptoStats() map[string]interface{} {
-	return map[string]interface{}{
-		"status": "healthy",
-	}
 }
 
 func (m *CoordinatorManager) validateProjectFacts(projectPath string) error {

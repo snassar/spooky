@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"spooky/internal/facts/collectors"
-	"spooky/internal/facts/types"
+	spookyfactscollectors "spooky/internal/facts/collectors"
+	spookyfactstypes "spooky/internal/facts/types"
 
 	machinecpu "github.com/shirou/gopsutil/v4/cpu"
 	machinedisk "github.com/shirou/gopsutil/v4/disk"
@@ -24,22 +24,22 @@ import (
 
 // Collector collects facts from the local system
 type Collector struct {
-	collectors.BaseCollector
+	spookyfactscollectors.BaseCollector
 }
 
 // NewCollector creates a new local fact collector
 func NewCollector() *Collector {
 	return &Collector{
-		BaseCollector: *collectors.NewBaseCollector(types.SourceLocal, types.MergePolicyReplace),
+		BaseCollector: *spookyfactscollectors.NewBaseCollector(spookyfactstypes.SourceLocal, spookyfactstypes.MergePolicyReplace),
 	}
 }
 
 // Collect gathers all available facts from the local system
-func (c *Collector) Collect(server string) (*types.FactCollection, error) {
-	collection := &types.FactCollection{
+func (c *Collector) Collect(server string) (*spookyfactstypes.FactCollection, error) {
+	collection := &spookyfactstypes.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 	}
 
 	// Collect system facts
@@ -81,11 +81,11 @@ func (c *Collector) Collect(server string) (*types.FactCollection, error) {
 }
 
 // CollectSpecific collects only the specified facts
-func (c *Collector) CollectSpecific(server string, keys []string) (*types.FactCollection, error) {
-	collection := &types.FactCollection{
+func (c *Collector) CollectSpecific(server string, keys []string) (*spookyfactstypes.FactCollection, error) {
+	collection := &spookyfactstypes.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 	}
 
 	for _, key := range keys {
@@ -98,11 +98,11 @@ func (c *Collector) CollectSpecific(server string, keys []string) (*types.FactCo
 }
 
 // GetFact retrieves a single fact
-func (c *Collector) GetFact(server, key string) (*types.Fact, error) {
-	collection := &types.FactCollection{
+func (c *Collector) GetFact(server, key string) (*spookyfactstypes.Fact, error) {
+	collection := &spookyfactstypes.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 	}
 
 	if err := c.collectSpecificFact(collection, key); err != nil {
@@ -124,7 +124,7 @@ func (c *Collector) Validate() error {
 }
 
 // collectSystemFacts collects basic system information
-func (c *Collector) collectSystemFacts(collection *types.FactCollection) error {
+func (c *Collector) collectSystemFacts(collection *spookyfactstypes.FactCollection) error {
 	// Hostname
 	if hostname, err := os.Hostname(); err == nil {
 		c.createFact(collection, "hostname", hostname)
@@ -144,7 +144,7 @@ func (c *Collector) collectSystemFacts(collection *types.FactCollection) error {
 }
 
 // collectOSFacts collects operating system information
-func (c *Collector) collectOSFacts(collection *types.FactCollection) error {
+func (c *Collector) collectOSFacts(collection *spookyfactstypes.FactCollection) error {
 	// OS name
 	c.createFact(collection, "os_name", runtime.GOOS)
 
@@ -170,7 +170,7 @@ func (c *Collector) collectOSFacts(collection *types.FactCollection) error {
 }
 
 // collectHardwareFacts collects hardware information
-func (c *Collector) collectHardwareFacts(collection *types.FactCollection) error {
+func (c *Collector) collectHardwareFacts(collection *spookyfactstypes.FactCollection) error {
 	// CPU cores
 	c.createFactWithValue(collection, "cpu_cores", runtime.NumCPU())
 
@@ -197,7 +197,7 @@ func (c *Collector) collectHardwareFacts(collection *types.FactCollection) error
 }
 
 // collectNetworkFacts collects network information
-func (c *Collector) collectNetworkFacts(collection *types.FactCollection) error {
+func (c *Collector) collectNetworkFacts(collection *spookyfactstypes.FactCollection) error {
 	// IP addresses
 	if ips, err := c.getIPAddresses(); err == nil {
 		c.createFactWithValue(collection, "ip_addresses", ips)
@@ -218,7 +218,7 @@ func (c *Collector) collectNetworkFacts(collection *types.FactCollection) error 
 }
 
 // collectEnvironmentFacts collects environment information
-func (c *Collector) collectEnvironmentFacts(collection *types.FactCollection) error {
+func (c *Collector) collectEnvironmentFacts(collection *spookyfactstypes.FactCollection) error {
 	// Environment variables
 	env := make(map[string]string)
 	for _, e := range os.Environ() {
@@ -233,7 +233,7 @@ func (c *Collector) collectEnvironmentFacts(collection *types.FactCollection) er
 }
 
 // collectEnhancedFacts collects comprehensive system information using gopsutil
-func (c *Collector) collectEnhancedFacts(collection *types.FactCollection) error {
+func (c *Collector) collectEnhancedFacts(collection *spookyfactstypes.FactCollection) error {
 	// Collect load averages
 	if loadAvg, err := machineload.Avg(); err == nil {
 		c.createFactWithValue(collection, "load_average", map[string]interface{}{
@@ -394,8 +394,8 @@ func (c *Collector) collectEnhancedFacts(collection *types.FactCollection) error
 }
 
 // collectSpecificFact collects a specific fact by key
-func (c *Collector) collectSpecificFact(collection *types.FactCollection, key string) error {
-	factCollectors := map[string]func(*types.FactCollection) error{
+func (c *Collector) collectSpecificFact(collection *spookyfactstypes.FactCollection, key string) error {
+	factCollectors := map[string]func(*spookyfactstypes.FactCollection) error{
 		"hostname":         c.collectHostname,
 		"machine_id":       c.collectMachineID,
 		"fqdn":             c.collectFQDN,
@@ -427,59 +427,59 @@ func (c *Collector) collectSpecificFact(collection *types.FactCollection, key st
 }
 
 // Helper methods for specific fact collection
-func (c *Collector) collectHostname(collection *types.FactCollection) error {
+func (c *Collector) collectHostname(collection *spookyfactstypes.FactCollection) error {
 	if hostname, err := os.Hostname(); err == nil {
 		c.createFact(collection, "hostname", hostname)
 	}
 	return nil
 }
 
-func (c *Collector) collectMachineID(collection *types.FactCollection) error {
+func (c *Collector) collectMachineID(collection *spookyfactstypes.FactCollection) error {
 	if machineID, err := c.getMachineID(); err == nil {
 		c.createFact(collection, "machine_id", machineID)
 	}
 	return nil
 }
 
-func (c *Collector) collectFQDN(collection *types.FactCollection) error {
+func (c *Collector) collectFQDN(collection *spookyfactstypes.FactCollection) error {
 	if fqdn, err := c.getFQDN(); err == nil {
 		c.createFact(collection, "fqdn", fqdn)
 	}
 	return nil
 }
 
-func (c *Collector) collectOSName(collection *types.FactCollection) error {
+func (c *Collector) collectOSName(collection *spookyfactstypes.FactCollection) error {
 	c.createFact(collection, "os_name", runtime.GOOS)
 	return nil
 }
 
-func (c *Collector) collectOSVersion(collection *types.FactCollection) error {
+func (c *Collector) collectOSVersion(collection *spookyfactstypes.FactCollection) error {
 	if version, err := c.getOSVersion(); err == nil {
 		c.createFact(collection, "os_version", version)
 	}
 	return nil
 }
 
-func (c *Collector) collectOSDistro(collection *types.FactCollection) error {
+func (c *Collector) collectOSDistro(collection *spookyfactstypes.FactCollection) error {
 	if distro, err := c.getOSDistro(); err == nil {
 		c.createFact(collection, "os_distro", distro)
 	}
 	return nil
 }
 
-func (c *Collector) collectOSArch(collection *types.FactCollection) error {
+func (c *Collector) collectOSArch(collection *spookyfactstypes.FactCollection) error {
 	c.createFact(collection, "os_arch", runtime.GOARCH)
 	return nil
 }
 
-func (c *Collector) collectKernelVersion(collection *types.FactCollection) error {
+func (c *Collector) collectKernelVersion(collection *spookyfactstypes.FactCollection) error {
 	if kernel, err := c.getKernelVersion(); err == nil {
 		c.createFact(collection, "kernel_version", kernel)
 	}
 	return nil
 }
 
-func (c *Collector) collectCPUCores(collection *types.FactCollection) error {
+func (c *Collector) collectCPUCores(collection *spookyfactstypes.FactCollection) error {
 	// Use gopsutil for more accurate CPU information
 	if cpuInfo, err := machinecpu.Info(); err == nil && len(cpuInfo) > 0 {
 		// Calculate total cores across all CPUs
@@ -496,14 +496,14 @@ func (c *Collector) collectCPUCores(collection *types.FactCollection) error {
 	return nil
 }
 
-func (c *Collector) collectCPUModel(collection *types.FactCollection) error {
+func (c *Collector) collectCPUModel(collection *spookyfactstypes.FactCollection) error {
 	if model, err := c.getCPUModel(); err == nil {
 		c.createFact(collection, "cpu_model", model)
 	}
 	return nil
 }
 
-func (c *Collector) collectMemoryTotal(collection *types.FactCollection) error {
+func (c *Collector) collectMemoryTotal(collection *spookyfactstypes.FactCollection) error {
 	// Use gopsutil for memory information
 	if memInfo, err := machinemem.VirtualMemory(); err == nil {
 		c.createFactWithValue(collection, "memory_total", memInfo.Total)
@@ -516,7 +516,7 @@ func (c *Collector) collectMemoryTotal(collection *types.FactCollection) error {
 	return nil
 }
 
-func (c *Collector) collectMemoryUsed(collection *types.FactCollection) error {
+func (c *Collector) collectMemoryUsed(collection *spookyfactstypes.FactCollection) error {
 	// Use gopsutil for memory information
 	if memInfo, err := machinemem.VirtualMemory(); err == nil {
 		c.createFactWithValue(collection, "memory_used", memInfo.Used)
@@ -529,7 +529,7 @@ func (c *Collector) collectMemoryUsed(collection *types.FactCollection) error {
 	return nil
 }
 
-func (c *Collector) collectMemoryAvailable(collection *types.FactCollection) error {
+func (c *Collector) collectMemoryAvailable(collection *spookyfactstypes.FactCollection) error {
 	// Use gopsutil for memory information
 	if memInfo, err := machinemem.VirtualMemory(); err == nil {
 		c.createFactWithValue(collection, "memory_available", memInfo.Available)
@@ -542,7 +542,7 @@ func (c *Collector) collectMemoryAvailable(collection *types.FactCollection) err
 	return nil
 }
 
-func (c *Collector) collectDiskTotal(collection *types.FactCollection) error {
+func (c *Collector) collectDiskTotal(collection *spookyfactstypes.FactCollection) error {
 	// Use gopsutil for disk information
 	if diskInfo, err := machinedisk.Usage("/"); err == nil {
 		c.createFactWithValue(collection, "disk_total", diskInfo.Total)
@@ -555,7 +555,7 @@ func (c *Collector) collectDiskTotal(collection *types.FactCollection) error {
 	return nil
 }
 
-func (c *Collector) collectDiskUsed(collection *types.FactCollection) error {
+func (c *Collector) collectDiskUsed(collection *spookyfactstypes.FactCollection) error {
 	// Use gopsutil for disk information
 	if diskInfo, err := machinedisk.Usage("/"); err == nil {
 		c.createFactWithValue(collection, "disk_used", diskInfo.Used)
@@ -568,7 +568,7 @@ func (c *Collector) collectDiskUsed(collection *types.FactCollection) error {
 	return nil
 }
 
-func (c *Collector) collectDiskAvailable(collection *types.FactCollection) error {
+func (c *Collector) collectDiskAvailable(collection *spookyfactstypes.FactCollection) error {
 	// Use gopsutil for disk information
 	if diskInfo, err := machinedisk.Usage("/"); err == nil {
 		c.createFactWithValue(collection, "disk_available", diskInfo.Free)
@@ -581,35 +581,35 @@ func (c *Collector) collectDiskAvailable(collection *types.FactCollection) error
 	return nil
 }
 
-func (c *Collector) collectIPAddresses(collection *types.FactCollection) error {
+func (c *Collector) collectIPAddresses(collection *spookyfactstypes.FactCollection) error {
 	if ips, err := c.getIPAddresses(); err == nil {
 		c.createFactWithValue(collection, "ip_addresses", ips)
 	}
 	return nil
 }
 
-func (c *Collector) collectMACAddresses(collection *types.FactCollection) error {
+func (c *Collector) collectMACAddresses(collection *spookyfactstypes.FactCollection) error {
 	if macs, err := c.getMACAddresses(); err == nil {
 		c.createFactWithValue(collection, "mac_addresses", macs)
 	}
 	return nil
 }
 
-func (c *Collector) collectDNSServers(collection *types.FactCollection) error {
+func (c *Collector) collectDNSServers(collection *spookyfactstypes.FactCollection) error {
 	if dns, err := c.getDNSConfig(); err == nil {
 		c.createFactWithValue(collection, "dns_servers", dns.Nameservers)
 	}
 	return nil
 }
 
-func (c *Collector) collectDNSSearch(collection *types.FactCollection) error {
+func (c *Collector) collectDNSSearch(collection *spookyfactstypes.FactCollection) error {
 	if dns, err := c.getDNSConfig(); err == nil {
 		c.createFactWithValue(collection, "dns_search", dns.Search)
 	}
 	return nil
 }
 
-func (c *Collector) collectEnvironment(collection *types.FactCollection) error {
+func (c *Collector) collectEnvironment(collection *spookyfactstypes.FactCollection) error {
 	env := make(map[string]string)
 	for _, e := range os.Environ() {
 		pair := strings.SplitN(e, "=", 2)
@@ -726,7 +726,7 @@ func (c *Collector) getCPUModel() (string, error) {
 	return "unknown", nil
 }
 
-func (c *Collector) getMemoryInfo() (*types.MemoryInfo, error) {
+func (c *Collector) getMemoryInfo() (*spookyfactstypes.MemoryInfo, error) {
 	switch runtime.GOOS {
 	case "linux":
 		if data, err := os.ReadFile("/proc/meminfo"); err == nil {
@@ -739,10 +739,10 @@ func (c *Collector) getMemoryInfo() (*types.MemoryInfo, error) {
 		}
 	}
 
-	return &types.MemoryInfo{}, fmt.Errorf("memory info not available for %s", runtime.GOOS)
+	return &spookyfactstypes.MemoryInfo{}, fmt.Errorf("memory info not available for %s", runtime.GOOS)
 }
 
-func (c *Collector) getDiskInfo() (*types.DiskInfo, error) {
+func (c *Collector) getDiskInfo() (*spookyfactstypes.DiskInfo, error) {
 	switch runtime.GOOS {
 	case "linux":
 		if output, err := exec.Command("df", "-h", "/").Output(); err == nil {
@@ -754,7 +754,7 @@ func (c *Collector) getDiskInfo() (*types.DiskInfo, error) {
 		}
 	}
 
-	return &types.DiskInfo{}, fmt.Errorf("disk info not available for %s", runtime.GOOS)
+	return &spookyfactstypes.DiskInfo{}, fmt.Errorf("disk info not available for %s", runtime.GOOS)
 }
 
 func (c *Collector) getIPAddresses() ([]string, error) {
@@ -787,7 +787,7 @@ func (c *Collector) getMACAddresses() ([]string, error) {
 	return []string{}, fmt.Errorf("MAC addresses not available for %s", runtime.GOOS)
 }
 
-func (c *Collector) getDNSConfig() (*types.DNSInfo, error) {
+func (c *Collector) getDNSConfig() (*spookyfactstypes.DNSInfo, error) {
 	switch runtime.GOOS {
 	case "linux":
 		if data, err := os.ReadFile("/etc/resolv.conf"); err == nil {
@@ -799,12 +799,12 @@ func (c *Collector) getDNSConfig() (*types.DNSInfo, error) {
 		}
 	}
 
-	return &types.DNSInfo{}, fmt.Errorf("DNS config not available for %s", runtime.GOOS)
+	return &spookyfactstypes.DNSInfo{}, fmt.Errorf("DNS config not available for %s", runtime.GOOS)
 }
 
 // Helper methods for creating facts
-func (c *Collector) createFact(collection *types.FactCollection, key, value string) {
-	collection.Facts[key] = &types.Fact{
+func (c *Collector) createFact(collection *spookyfactstypes.FactCollection, key, value string) {
+	collection.Facts[key] = &spookyfactstypes.Fact{
 		Key:       key,
 		Value:     value,
 		Source:    string(c.GetSource()),
@@ -812,8 +812,8 @@ func (c *Collector) createFact(collection *types.FactCollection, key, value stri
 	}
 }
 
-func (c *Collector) createFactWithValue(collection *types.FactCollection, key string, value interface{}) {
-	collection.Facts[key] = &types.Fact{
+func (c *Collector) createFactWithValue(collection *spookyfactstypes.FactCollection, key string, value interface{}) {
+	collection.Facts[key] = &spookyfactstypes.Fact{
 		Key:       key,
 		Value:     value,
 		Source:    string(c.GetSource()),
@@ -822,8 +822,8 @@ func (c *Collector) createFactWithValue(collection *types.FactCollection, key st
 }
 
 // Parsing helper methods
-func (c *Collector) parseMemInfo(memInfo string) *types.MemoryInfo {
-	info := &types.MemoryInfo{}
+func (c *Collector) parseMemInfo(memInfo string) *spookyfactstypes.MemoryInfo {
+	info := &spookyfactstypes.MemoryInfo{}
 	lines := strings.Split(memInfo, "\n")
 
 	for _, line := range lines {
@@ -855,8 +855,8 @@ func (c *Collector) parseMemInfo(memInfo string) *types.MemoryInfo {
 	return info
 }
 
-func (c *Collector) parseDarwinMemInfo(vmStat string) *types.MemoryInfo {
-	info := &types.MemoryInfo{}
+func (c *Collector) parseDarwinMemInfo(vmStat string) *spookyfactstypes.MemoryInfo {
+	info := &spookyfactstypes.MemoryInfo{}
 	lines := strings.Split(vmStat, "\n")
 
 	for _, line := range lines {
@@ -885,8 +885,8 @@ func (c *Collector) parseDarwinMemInfo(vmStat string) *types.MemoryInfo {
 	return info
 }
 
-func (c *Collector) parseDiskInfo(dfOutput string) *types.DiskInfo {
-	info := &types.DiskInfo{}
+func (c *Collector) parseDiskInfo(dfOutput string) *spookyfactstypes.DiskInfo {
+	info := &spookyfactstypes.DiskInfo{}
 	lines := strings.Split(dfOutput, "\n")
 
 	// Skip header line
@@ -984,8 +984,8 @@ func (c *Collector) parseDarwinMACAddresses(ifconfigOutput string) []string {
 	return macs
 }
 
-func (c *Collector) parseDNSConfig(resolvConf string) *types.DNSInfo {
-	info := &types.DNSInfo{}
+func (c *Collector) parseDNSConfig(resolvConf string) *spookyfactstypes.DNSInfo {
+	info := &spookyfactstypes.DNSInfo{}
 	lines := strings.Split(resolvConf, "\n")
 
 	for _, line := range lines {
@@ -1002,8 +1002,8 @@ func (c *Collector) parseDNSConfig(resolvConf string) *types.DNSInfo {
 	return info
 }
 
-func (c *Collector) parseDarwinDNSConfig(scutilOutput string) *types.DNSInfo {
-	info := &types.DNSInfo{}
+func (c *Collector) parseDarwinDNSConfig(scutilOutput string) *spookyfactstypes.DNSInfo {
+	info := &spookyfactstypes.DNSInfo{}
 	lines := strings.Split(scutilOutput, "\n")
 
 	for _, line := range lines {
@@ -1021,7 +1021,7 @@ func (c *Collector) parseDarwinDNSConfig(scutilOutput string) *types.DNSInfo {
 }
 
 // collectSpookyMinimalFacts collects Spooky's minimal facts for local system
-func (c *Collector) collectSpookyMinimalFacts(collection *types.FactCollection) error {
+func (c *Collector) collectSpookyMinimalFacts(collection *spookyfactstypes.FactCollection) error {
 	// Detect platform first
 	platform, err := c.detectPlatform()
 	if err != nil {
@@ -1112,7 +1112,7 @@ func (c *Collector) detectPlatform() (*Platform, error) {
 }
 
 // collectSpookySystemFacts collects basic system information
-func (c *Collector) collectSpookySystemFacts(collection *types.FactCollection, platform *Platform) error {
+func (c *Collector) collectSpookySystemFacts(collection *spookyfactstypes.FactCollection, platform *Platform) error {
 	// System type
 	c.createFact(collection, "spooky_system", platform.OS)
 
@@ -1145,7 +1145,7 @@ func (c *Collector) collectSpookySystemFacts(collection *types.FactCollection, p
 }
 
 // collectSpookyOSFacts collects operating system information
-func (c *Collector) collectSpookyOSFacts(collection *types.FactCollection, platform *Platform) error {
+func (c *Collector) collectSpookyOSFacts(collection *spookyfactstypes.FactCollection, platform *Platform) error {
 	switch platform.OS {
 	case "linux":
 		return c.collectSpookyLinuxOSFacts(collection)
@@ -1161,7 +1161,7 @@ func (c *Collector) collectSpookyOSFacts(collection *types.FactCollection, platf
 }
 
 // collectSpookyHardwareFacts collects hardware information
-func (c *Collector) collectSpookyHardwareFacts(collection *types.FactCollection, platform *Platform) error {
+func (c *Collector) collectSpookyHardwareFacts(collection *spookyfactstypes.FactCollection, platform *Platform) error {
 	switch platform.OS {
 	case "linux":
 		return c.collectSpookyLinuxHardwareFacts(collection)
@@ -1177,7 +1177,7 @@ func (c *Collector) collectSpookyHardwareFacts(collection *types.FactCollection,
 }
 
 // collectSpookyNetworkFacts collects network information
-func (c *Collector) collectSpookyNetworkFacts(collection *types.FactCollection, platform *Platform) error {
+func (c *Collector) collectSpookyNetworkFacts(collection *spookyfactstypes.FactCollection, platform *Platform) error {
 	switch platform.OS {
 	case "linux":
 		return c.collectSpookyLinuxNetworkFacts(collection)
@@ -1193,7 +1193,7 @@ func (c *Collector) collectSpookyNetworkFacts(collection *types.FactCollection, 
 }
 
 // collectSpookyUserFacts collects user information
-func (c *Collector) collectSpookyUserFacts(collection *types.FactCollection, platform *Platform) error {
+func (c *Collector) collectSpookyUserFacts(collection *spookyfactstypes.FactCollection, platform *Platform) error {
 	// User ID
 	userID := os.Getenv("USER")
 	if userID == "" {
@@ -1225,7 +1225,7 @@ func (c *Collector) collectSpookyUserFacts(collection *types.FactCollection, pla
 }
 
 // collectSpookyEnvironmentFacts collects environment information
-func (c *Collector) collectSpookyEnvironmentFacts(collection *types.FactCollection, platform *Platform) error {
+func (c *Collector) collectSpookyEnvironmentFacts(collection *spookyfactstypes.FactCollection, platform *Platform) error {
 	// Environment variables
 	env := make(map[string]string)
 	for _, envVar := range os.Environ() {
@@ -1242,7 +1242,7 @@ func (c *Collector) collectSpookyEnvironmentFacts(collection *types.FactCollecti
 
 // Platform-specific Ansible fact collection methods
 
-func (c *Collector) collectSpookyLinuxOSFacts(collection *types.FactCollection) error {
+func (c *Collector) collectSpookyLinuxOSFacts(collection *spookyfactstypes.FactCollection) error {
 	// Read /etc/os-release
 	if data, err := os.ReadFile("/etc/os-release"); err == nil {
 		osInfo := c.parseOSRelease(string(data))
@@ -1256,7 +1256,7 @@ func (c *Collector) collectSpookyLinuxOSFacts(collection *types.FactCollection) 
 	return nil
 }
 
-func (c *Collector) collectSpookyDarwinOSFacts(collection *types.FactCollection) error {
+func (c *Collector) collectSpookyDarwinOSFacts(collection *spookyfactstypes.FactCollection) error {
 	// OS name
 	c.createFact(collection, "spooky_os_name", "Darwin")
 	c.createFact(collection, "spooky_os_family", "Darwin")
@@ -1273,7 +1273,7 @@ func (c *Collector) collectSpookyDarwinOSFacts(collection *types.FactCollection)
 	return nil
 }
 
-func (c *Collector) collectSpookyWindowsOSFacts(collection *types.FactCollection) error {
+func (c *Collector) collectSpookyWindowsOSFacts(collection *spookyfactstypes.FactCollection) error {
 	// OS name
 	c.createFact(collection, "spooky_os_name", "Windows")
 	c.createFact(collection, "spooky_os_family", "Windows")
@@ -1285,7 +1285,7 @@ func (c *Collector) collectSpookyWindowsOSFacts(collection *types.FactCollection
 	return nil
 }
 
-func (c *Collector) collectSpookyBSDOSFacts(collection *types.FactCollection, bsdType string) error {
+func (c *Collector) collectSpookyBSDOSFacts(collection *spookyfactstypes.FactCollection, bsdType string) error {
 	c.createFact(collection, "spooky_os_name", bsdType)
 	c.createFact(collection, "spooky_os_family", "BSD")
 	c.createFact(collection, "spooky_distribution", bsdType)
@@ -1298,7 +1298,7 @@ func (c *Collector) collectSpookyBSDOSFacts(collection *types.FactCollection, bs
 	return nil
 }
 
-func (c *Collector) collectSpookyLinuxHardwareFacts(collection *types.FactCollection) error {
+func (c *Collector) collectSpookyLinuxHardwareFacts(collection *spookyfactstypes.FactCollection) error {
 	// CPU info
 	if cpuModel, err := c.getCPUModel(); err == nil {
 		c.createFactWithValue(collection, "spooky_processor", []string{cpuModel})
@@ -1318,7 +1318,7 @@ func (c *Collector) collectSpookyLinuxHardwareFacts(collection *types.FactCollec
 	return nil
 }
 
-func (c *Collector) collectSpookyDarwinHardwareFacts(collection *types.FactCollection) error {
+func (c *Collector) collectSpookyDarwinHardwareFacts(collection *spookyfactstypes.FactCollection) error {
 	// CPU info
 	if cpuModel, err := c.getCPUModel(); err == nil {
 		c.createFactWithValue(collection, "spooky_processor", []string{cpuModel})
@@ -1338,7 +1338,7 @@ func (c *Collector) collectSpookyDarwinHardwareFacts(collection *types.FactColle
 	return nil
 }
 
-func (c *Collector) collectSpookyWindowsHardwareFacts(collection *types.FactCollection) error {
+func (c *Collector) collectSpookyWindowsHardwareFacts(collection *spookyfactstypes.FactCollection) error {
 	// CPU info
 	if cpuModel, err := c.getCPUModel(); err == nil {
 		c.createFactWithValue(collection, "spooky_processor", []string{cpuModel})
@@ -1358,7 +1358,7 @@ func (c *Collector) collectSpookyWindowsHardwareFacts(collection *types.FactColl
 	return nil
 }
 
-func (c *Collector) collectSpookyBSDHardwareFacts(collection *types.FactCollection) error {
+func (c *Collector) collectSpookyBSDHardwareFacts(collection *spookyfactstypes.FactCollection) error {
 	// CPU info
 	if cpuModel, err := c.getCPUModel(); err == nil {
 		c.createFactWithValue(collection, "spooky_processor", []string{cpuModel})
@@ -1378,7 +1378,7 @@ func (c *Collector) collectSpookyBSDHardwareFacts(collection *types.FactCollecti
 	return nil
 }
 
-func (c *Collector) collectSpookyLinuxNetworkFacts(collection *types.FactCollection) error {
+func (c *Collector) collectSpookyLinuxNetworkFacts(collection *spookyfactstypes.FactCollection) error {
 	// Get default IPv4
 	if addrs, err := machinenet.Interfaces(); err == nil {
 		for _, addr := range addrs {
@@ -1406,7 +1406,7 @@ func (c *Collector) collectSpookyLinuxNetworkFacts(collection *types.FactCollect
 	return nil
 }
 
-func (c *Collector) collectSpookyDarwinNetworkFacts(collection *types.FactCollection) error {
+func (c *Collector) collectSpookyDarwinNetworkFacts(collection *spookyfactstypes.FactCollection) error {
 	// Get default IPv4
 	if addrs, err := machinenet.Interfaces(); err == nil {
 		for _, addr := range addrs {
@@ -1434,7 +1434,7 @@ func (c *Collector) collectSpookyDarwinNetworkFacts(collection *types.FactCollec
 	return nil
 }
 
-func (c *Collector) collectSpookyWindowsNetworkFacts(collection *types.FactCollection) error {
+func (c *Collector) collectSpookyWindowsNetworkFacts(collection *spookyfactstypes.FactCollection) error {
 	// Get default IPv4
 	if addrs, err := machinenet.Interfaces(); err == nil {
 		for _, addr := range addrs {
@@ -1462,7 +1462,7 @@ func (c *Collector) collectSpookyWindowsNetworkFacts(collection *types.FactColle
 	return nil
 }
 
-func (c *Collector) collectSpookyBSDNetworkFacts(collection *types.FactCollection) error {
+func (c *Collector) collectSpookyBSDNetworkFacts(collection *spookyfactstypes.FactCollection) error {
 	// Get default IPv4
 	if addrs, err := machinenet.Interfaces(); err == nil {
 		for _, addr := range addrs {
@@ -1514,9 +1514,9 @@ func (c *Collector) getDomain() (string, error) {
 	return "", nil
 }
 
-func (c *Collector) parseOSRelease(osRelease string) types.OSInfo {
+func (c *Collector) parseOSRelease(osRelease string) spookyfactstypes.OSInfo {
 	lines := strings.Split(osRelease, "\n")
-	osInfo := types.OSInfo{}
+	osInfo := spookyfactstypes.OSInfo{}
 
 	for _, line := range lines {
 		if strings.HasPrefix(line, "NAME=") {

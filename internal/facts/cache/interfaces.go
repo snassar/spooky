@@ -4,21 +4,21 @@ import (
 	"sync"
 	"time"
 
-	"spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/facts/types"
 )
 
 // Cache defines the interface for fact caching operations
 type Cache interface {
 	// Core cache operations
-	Get(server string) (*types.FactCollection, error)
-	Set(server string, collection *types.FactCollection) error
+	Get(server string) (*spookyfactstypes.FactCollection, error)
+	Set(server string, collection *spookyfactstypes.FactCollection) error
 	Delete(server string) error
 	Clear() error
 
 	// Cache management
 	ClearExpired() error
-	GetAll() ([]*types.FactCollection, error)
-	GetFiltered(server string, keys []string) (*types.FactCollection, error)
+	GetAll() ([]*spookyfactstypes.FactCollection, error)
+	GetFiltered(server string, keys []string) (*spookyfactstypes.FactCollection, error)
 
 	// Configuration
 	SetTTL(ttl time.Duration)

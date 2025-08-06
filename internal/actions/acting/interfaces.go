@@ -4,23 +4,23 @@ import (
 	"context"
 	"time"
 
-	"spooky/internal/actions/types"
+	spookyactionstypes "spooky/internal/actions/types"
 )
 
 // ActingManager defines the interface for action execution operations
 type ActingManager interface {
 	// Core acting operations
-	ExecuteAction(ctx context.Context, action *types.Action, context *types.ActionContext) (*types.ActingSession, error)
-	ExecuteActionCollection(ctx context.Context, collection *types.ActionCollection, context *types.ActionContext) (*types.ActingSession, error)
-	PrepareAction(action *types.Action, context *types.ActionContext) error
+	ExecuteAction(ctx context.Context, action *spookyactionstypes.Action, context *spookyactionstypes.ActionContext) (*spookyactionstypes.ActingSession, error)
+	ExecuteActionCollection(ctx context.Context, collection *spookyactionstypes.ActionCollection, context *spookyactionstypes.ActionContext) (*spookyactionstypes.ActingSession, error)
+	PrepareAction(action *spookyactionstypes.Action, context *spookyactionstypes.ActionContext) error
 
 	// Actor management
-	CreateActor(action *types.Action, context *types.ActionContext) (Actor, error)
-	GetActor(action *types.Action) (Actor, error)
+	CreateActor(action *spookyactionstypes.Action, context *spookyactionstypes.ActionContext) (Actor, error)
+	GetActor(action *spookyactionstypes.Action) (Actor, error)
 
 	// Session management
-	GetSession(sessionID string) (*types.ActingSession, error)
-	ListSessions() ([]*types.ActingSession, error)
+	GetSession(sessionID string) (*spookyactionstypes.ActingSession, error)
+	ListSessions() ([]*spookyactionstypes.ActingSession, error)
 	CancelSession(sessionID string) error
 
 	// Configuration
@@ -32,14 +32,14 @@ type ActingManager interface {
 // Actor defines the interface for individual action execution
 type Actor interface {
 	// Core acting operations
-	Execute(ctx context.Context, context *types.ActionContext) (*types.ActingResult, error)
-	Prepare(context *types.ActionContext) error
+	Execute(ctx context.Context, context *spookyactionstypes.ActionContext) (*spookyactionstypes.ActingResult, error)
+	Prepare(context *spookyactionstypes.ActionContext) error
 	Cancel() error
 
 	// State management
-	GetState() types.ActingState
+	GetState() spookyactionstypes.ActingState
 	GetProgress() float64
-	GetStatus() types.ActingStatus
+	GetStatus() spookyactionstypes.ActingStatus
 
 	// Configuration
 	SetTimeout(timeout time.Duration)
@@ -49,9 +49,9 @@ type Actor interface {
 // ActingExecutor defines the interface for executing actions on machines
 type ActingExecutor interface {
 	// Core execution operations
-	ExecuteCommand(ctx context.Context, command string, context *types.ActionContext) (*types.ActingResult, error)
-	ExecuteScript(ctx context.Context, script string, context *types.ActionContext) (*types.ActingResult, error)
-	ExecuteTemplate(ctx context.Context, template *types.TemplateConfig, context *types.ActionContext) (*types.ActingResult, error)
+	ExecuteCommand(ctx context.Context, command string, context *spookyactionstypes.ActionContext) (*spookyactionstypes.ActingResult, error)
+	ExecuteScript(ctx context.Context, script string, context *spookyactionstypes.ActionContext) (*spookyactionstypes.ActingResult, error)
+	ExecuteTemplate(ctx context.Context, template *spookyactionstypes.TemplateConfig, context *spookyactionstypes.ActionContext) (*spookyactionstypes.ActingResult, error)
 
 	// Machine management
 	GetMachine(machineID string) (Machine, error)
@@ -81,8 +81,8 @@ type Machine interface {
 	IsConnected() bool
 
 	// Execution operations
-	ExecuteCommand(ctx context.Context, command string) (*types.ActingResult, error)
-	ExecuteScript(ctx context.Context, script string) (*types.ActingResult, error)
+	ExecuteCommand(ctx context.Context, command string) (*spookyactionstypes.ActingResult, error)
+	ExecuteScript(ctx context.Context, script string) (*spookyactionstypes.ActingResult, error)
 	UploadFile(ctx context.Context, localPath, remotePath string) error
 	DownloadFile(ctx context.Context, remotePath, localPath string) error
 
@@ -96,10 +96,10 @@ type Machine interface {
 // ActingSessionManager defines the interface for managing acting sessions
 type ActingSessionManager interface {
 	// Session management
-	CreateSession(actionName string) (*types.ActingSession, error)
-	GetSession(sessionID string) (*types.ActingSession, error)
-	ListSessions() ([]*types.ActingSession, error)
-	UpdateSession(session *types.ActingSession) error
+	CreateSession(actionName string) (*spookyactionstypes.ActingSession, error)
+	GetSession(sessionID string) (*spookyactionstypes.ActingSession, error)
+	ListSessions() ([]*spookyactionstypes.ActingSession, error)
+	UpdateSession(session *spookyactionstypes.ActingSession) error
 	DeleteSession(sessionID string) error
 
 	// Session state management
@@ -116,20 +116,20 @@ type ActingSessionManager interface {
 // ActingResultProcessor defines the interface for processing acting results
 type ActingResultProcessor interface {
 	// Result processing
-	ProcessResult(result *types.ActingResult) error
-	ProcessResults(results []*types.ActingResult) error
+	ProcessResult(result *spookyactionstypes.ActingResult) error
+	ProcessResults(results []*spookyactionstypes.ActingResult) error
 
 	// Result aggregation
-	AggregateResults(results []*types.ActingResult) (*types.ActingSession, error)
-	CalculateSuccessRate(results []*types.ActingResult) float64
+	AggregateResults(results []*spookyactionstypes.ActingResult) (*spookyactionstypes.ActingSession, error)
+	CalculateSuccessRate(results []*spookyactionstypes.ActingResult) float64
 
 	// Result validation
-	ValidateResult(result *types.ActingResult) error
-	ValidateResults(results []*types.ActingResult) error
+	ValidateResult(result *spookyactionstypes.ActingResult) error
+	ValidateResults(results []*spookyactionstypes.ActingResult) error
 
 	// Result transformation
-	TransformResult(result *types.ActingResult, format string) (interface{}, error)
-	TransformResults(results []*types.ActingResult, format string) (interface{}, error)
+	TransformResult(result *spookyactionstypes.ActingResult, format string) (interface{}, error)
+	TransformResults(results []*spookyactionstypes.ActingResult, format string) (interface{}, error)
 }
 
 // ActingProgressTracker defines the interface for tracking acting progress

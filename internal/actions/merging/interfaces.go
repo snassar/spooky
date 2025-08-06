@@ -1,52 +1,52 @@
 package merging
 
 import (
-	"spooky/internal/actions/types"
+	spookyactionstypes "spooky/internal/actions/types"
 )
 
 // MergingManager defines the interface for action merging operations
 type MergingManager interface {
 	// Core merging operations
-	MergeActions(actions ...*types.Action) (*types.ActionCollection, error)
-	MergeWithPolicy(existing, new *types.ActionCollection, policy types.MergePolicy) (*types.ActionCollection, error)
+	MergeActions(actions ...*spookyactionstypes.Action) (*spookyactionstypes.ActionCollection, error)
+	MergeWithPolicy(existing, new *spookyactionstypes.ActionCollection, policy spookyactionstypes.MergePolicy) (*spookyactionstypes.ActionCollection, error)
 
 	// Merger management
-	CreateMerger(policy types.MergePolicy) (ActionMerger, error)
-	GetMerger(policy types.MergePolicy) (ActionMerger, error)
+	CreateMerger(policy spookyactionstypes.MergePolicy) (ActionMerger, error)
+	GetMerger(policy spookyactionstypes.MergePolicy) (ActionMerger, error)
 
 	// Policy management
-	GetMergePolicy(name string) (types.MergePolicy, error)
-	ListMergePolicies() ([]types.MergePolicy, error)
-	AddMergePolicy(policy types.MergePolicy) error
+	GetMergePolicy(name string) (spookyactionstypes.MergePolicy, error)
+	ListMergePolicies() ([]spookyactionstypes.MergePolicy, error)
+	AddMergePolicy(policy spookyactionstypes.MergePolicy) error
 	RemoveMergePolicy(name string) error
 
 	// Configuration
-	SetDefaultPolicy(policy types.MergePolicy)
-	SetConflictResolution(resolution types.ConflictResolution)
+	SetDefaultPolicy(policy spookyactionstypes.MergePolicy)
+	SetConflictResolution(resolution spookyactionstypes.ConflictResolution)
 }
 
 // ActionMerger defines the interface for action merging
 type ActionMerger interface {
 	// Core merging operations
-	Merge(actions ...*types.Action) (*types.ActionCollection, error)
-	MergeWithPolicy(existing, new *types.ActionCollection, policy types.MergePolicy) (*types.ActionCollection, error)
+	Merge(actions ...*spookyactionstypes.Action) (*spookyactionstypes.ActionCollection, error)
+	MergeWithPolicy(existing, new *spookyactionstypes.ActionCollection, policy spookyactionstypes.MergePolicy) (*spookyactionstypes.ActionCollection, error)
 
 	// Policy management
-	SetPolicy(policy types.MergePolicy)
-	GetPolicy() types.MergePolicy
+	SetPolicy(policy spookyactionstypes.MergePolicy)
+	GetPolicy() spookyactionstypes.MergePolicy
 
 	// Configuration
-	SetConflictResolution(resolution types.ConflictResolution)
-	SetMergeStrategy(strategy types.MergeStrategy)
+	SetConflictResolution(resolution spookyactionstypes.ConflictResolution)
+	SetMergeStrategy(strategy spookyactionstypes.MergeStrategy)
 }
 
 // MergeResult represents the result of a merge operation
 type MergeResult struct {
-	Success       bool                   `json:"success"`
-	MergedActions []*types.Action        `json:"merged_actions"`
-	Conflicts     []MergeConflict        `json:"conflicts"`
-	Warnings      []MergeWarning         `json:"warnings"`
-	Details       map[string]interface{} `json:"details"`
+	Success       bool                         `json:"success"`
+	MergedActions []*spookyactionstypes.Action `json:"merged_actions"`
+	Conflicts     []MergeConflict              `json:"conflicts"`
+	Warnings      []MergeWarning               `json:"warnings"`
+	Details       map[string]interface{}       `json:"details"`
 }
 
 // MergeConflict represents a merge conflict
