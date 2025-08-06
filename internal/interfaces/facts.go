@@ -2,8 +2,8 @@ package interfaces
 
 import (
 	"io"
-	"spooky/internal/facts"
-	"spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/facts/types"
+	spookystorage "spooky/internal/storage"
 	"time"
 )
 
@@ -22,7 +22,7 @@ type FactsIntegration interface {
 	OptimizeFactsGathering(machineNames []string, parallel int) (int, time.Duration, error)
 
 	// GetFactsForMachine gets facts for a specific machine
-	GetFactsForMachine(machine string) (*types.FactCollection, error)
+	GetFactsForMachine(machine string) (*spookyfactstypes.FactCollection, error)
 
 	// CacheFacts caches facts for later use
 	CacheFacts(facts *FactsContext) error
@@ -37,10 +37,10 @@ type FactsIntegration interface {
 	GetFactValue(factKey string, factsContext *FactsContext) (interface{}, error)
 
 	// ExportFacts exports facts to JSON format with encryption support
-	ExportFacts(w io.Writer, opts facts.ExportOptions) error
+	ExportFacts(w io.Writer, opts spookystorage.ExportOptions) error
 
 	// ExportToHCL exports facts to HCL format
-	ExportToHCL(w io.Writer, query *facts.FactQuery) error
+	ExportToHCL(w io.Writer, query *spookystorage.FactQuery) error
 
 	// ImportFacts imports facts from JSON format
 	ImportFacts(r io.Reader) error

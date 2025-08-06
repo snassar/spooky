@@ -6,13 +6,14 @@ import (
 	"path/filepath"
 	"time"
 
-	spookybadger "spooky/internal/facts/storage/badger"
-	"spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/facts/types"
+	spookystorage "spooky/internal/storage"
+	spookystoragebadger "spooky/internal/storage/badger"
 )
 
 // ProjectFactsStorage manages project-specific facts storage
 type ProjectFactsStorage struct {
-	storage    FactStorage
+	storage    spookystorage.FactStorage
 	projectDir string
 	projectID  string
 	schemaPath string
@@ -40,7 +41,7 @@ func NewProjectFactsStorage(projectDir string) (*ProjectFactsStorage, error) {
 	factsDBPath := filepath.Join(projectDir, "facts.db")
 
 	// Initialize BadgerDB storage for project facts
-	storage, err := spookybadger.NewBadgerFactStorage(factsDBPath)
+	storage, err := spookystoragebadger.NewBadgerFactStorage(factsDBPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize project facts storage: %w", err)
 	}
@@ -56,7 +57,7 @@ func NewProjectFactsStorage(projectDir string) (*ProjectFactsStorage, error) {
 // UpdateExpiredFacts updates facts that have expired based on TTL
 func (pfs *ProjectFactsStorage) UpdateExpiredFacts() error {
 	// Query all fact collections in this project
-	query := &types.FactQuery{
+	query := &spookyfactstypes.FactQuery{
 		Limit: 1000, // Reasonable limit for project facts
 	}
 
@@ -123,13 +124,13 @@ func (pfs *ProjectFactsStorage) validateMachineID(machineID string) error {
 }
 
 // validateProjectFacts validates facts against project schema
-func (pfs *ProjectFactsStorage) validateProjectFacts(facts *types.FactCollection) error {
+func (pfs *ProjectFactsStorage) validateProjectFacts(facts *spookyfactstypes.FactCollection) error {
 	utils := NewValidationUtils()
 	return utils.ValidateFactsCollection(facts)
 }
 
 // StoreFactCollection stores a fact collection in project storage
-func (pfs *ProjectFactsStorage) StoreFactCollection(machineID string, collection *types.FactCollection) error {
+func (pfs *ProjectFactsStorage) StoreFactCollection(machineID string, collection *spookyfactstypes.FactCollection) error {
 	// Validate machine ID format (32-character hex)
 	if err := pfs.validateMachineID(machineID); err != nil {
 		return fmt.Errorf("invalid machine ID: %w", err)
@@ -160,7 +161,7 @@ func (pfs *ProjectFactsStorage) StoreFactCollection(machineID string, collection
 }
 
 // GetFactCollection retrieves a fact collection from project storage
-func (pfs *ProjectFactsStorage) GetFactCollection(machineID string) (*types.FactCollection, error) {
+func (pfs *ProjectFactsStorage) GetFactCollection(machineID string) (*spookyfactstypes.FactCollection, error) {
 	if err := pfs.validateMachineID(machineID); err != nil {
 		return nil, fmt.Errorf("invalid machine ID: %w", err)
 	}
@@ -184,7 +185,7 @@ func (pfs *ProjectFactsStorage) GetFactCollection(machineID string) (*types.Fact
 }
 
 // QueryFactCollections queries fact collections with project-specific filters
-func (pfs *ProjectFactsStorage) QueryFactCollections(query *types.FactQuery) ([]*types.FactCollection, error) {
+func (pfs *ProjectFactsStorage) QueryFactCollections(query *spookyfactstypes.FactQuery) ([]*spookyfactstypes.FactCollection, error) {
 	// Validate query parameters
 	if err := pfs.validateQuery(query); err != nil {
 		return nil, fmt.Errorf("invalid query: %w", err)
@@ -196,7 +197,7 @@ func (pfs *ProjectFactsStorage) QueryFactCollections(query *types.FactQuery) ([]
 	}
 
 	// Filter to only include facts from this project
-	var projectCollections []*types.FactCollection
+	var projectCollections []*spookyfactstypes.FactCollection
 	for _, collection := range collections {
 		if pfs.belongsToProject(collection) {
 			projectCollections = append(projectCollections, collection)
@@ -222,7 +223,7 @@ func (pfs *ProjectFactsStorage) DeleteFactCollection(machineID string) error {
 }
 
 // DeleteFactCollections deletes fact collections matching query criteria
-func (pfs *ProjectFactsStorage) DeleteFactCollections(query *types.FactQuery) (int, error) {
+func (pfs *ProjectFactsStorage) DeleteFactCollections(query *spookyfactstypes.FactQuery) (int, error) {
 	// Validate query parameters
 	if err := pfs.validateQuery(query); err != nil {
 		return 0, fmt.Errorf("invalid query: %w", err)
@@ -234,7 +235,7 @@ func (pfs *ProjectFactsStorage) DeleteFactCollections(query *types.FactQuery) (i
 	}
 
 	// Only delete facts from this project
-	var projectCollections []*types.FactCollection
+	var projectCollections []*spookyfactstypes.FactCollection
 	for _, collection := range collections {
 		if pfs.belongsToProject(collection) {
 			projectCollections = append(projectCollections, collection)
@@ -258,7 +259,7 @@ func (pfs *ProjectFactsStorage) DeleteFactCollections(query *types.FactQuery) (i
 }
 
 // checkProjectCollision checks for machine ID collisions within the project
-func (pfs *ProjectFactsStorage) checkProjectCollision(machineID string, newCollection *types.FactCollection) error {
+func (pfs *ProjectFactsStorage) checkProjectCollision(machineID string, newCollection *spookyfactstypes.FactCollection) error {
 	existingCollection, err := pfs.storage.GetFactCollection(machineID)
 	if err != nil {
 		// No existing facts, no collision
@@ -279,7 +280,7 @@ func (pfs *ProjectFactsStorage) checkProjectCollision(machineID string, newColle
 }
 
 // belongsToProject checks if a fact collection belongs to this project
-func (pfs *ProjectFactsStorage) belongsToProject(collection *types.FactCollection) bool {
+func (pfs *ProjectFactsStorage) belongsToProject(collection *spookyfactstypes.FactCollection) bool {
 	if collection == nil {
 		return false
 	}
@@ -295,7 +296,7 @@ func (pfs *ProjectFactsStorage) belongsToProject(collection *types.FactCollectio
 }
 
 // extractMachineID extracts machine ID from a fact collection
-func (pfs *ProjectFactsStorage) extractMachineID(collection *types.FactCollection) string {
+func (pfs *ProjectFactsStorage) extractMachineID(collection *spookyfactstypes.FactCollection) string {
 	if collection == nil {
 		return ""
 	}
@@ -310,7 +311,7 @@ func (pfs *ProjectFactsStorage) extractMachineID(collection *types.FactCollectio
 }
 
 // validateQuery validates query parameters
-func (pfs *ProjectFactsStorage) validateQuery(query *types.FactQuery) error {
+func (pfs *ProjectFactsStorage) validateQuery(query *spookyfactstypes.FactQuery) error {
 	if query == nil {
 		return fmt.Errorf("query cannot be nil")
 	}
@@ -327,7 +328,7 @@ func (pfs *ProjectFactsStorage) validateQuery(query *types.FactQuery) error {
 }
 
 // isExpired checks if a fact collection has expired
-func (pfs *ProjectFactsStorage) isExpired(collection *types.FactCollection) bool {
+func (pfs *ProjectFactsStorage) isExpired(collection *spookyfactstypes.FactCollection) bool {
 	if collection == nil {
 		return true
 	}
@@ -343,7 +344,7 @@ func (pfs *ProjectFactsStorage) isExpired(collection *types.FactCollection) bool
 }
 
 // addProjectMetadata adds project-specific metadata to facts
-func (pfs *ProjectFactsStorage) addProjectMetadata(facts *types.FactCollection) {
+func (pfs *ProjectFactsStorage) addProjectMetadata(facts *spookyfactstypes.FactCollection) {
 	for _, fact := range facts.Facts {
 		if fact.Metadata == nil {
 			fact.Metadata = make(map[string]interface{})
@@ -355,7 +356,7 @@ func (pfs *ProjectFactsStorage) addProjectMetadata(facts *types.FactCollection) 
 
 // GetProjectFactsSummary returns a summary of facts in the project
 func (pfs *ProjectFactsStorage) GetProjectFactsSummary() (*ProjectFactsSummary, error) {
-	query := &types.FactQuery{
+	query := &spookyfactstypes.FactQuery{
 		Limit: 10000,
 	}
 
@@ -365,7 +366,7 @@ func (pfs *ProjectFactsStorage) GetProjectFactsSummary() (*ProjectFactsSummary, 
 	}
 
 	// Filter to only include facts from this project
-	var projectCollections []*types.FactCollection
+	var projectCollections []*spookyfactstypes.FactCollection
 	for _, collection := range collections {
 		if pfs.belongsToProject(collection) {
 			projectCollections = append(projectCollections, collection)

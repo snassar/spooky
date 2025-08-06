@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	spookyfactstypes "spooky/internal/facts/types"
@@ -525,6 +526,102 @@ func (b *BadgerFactStorage) ImportFromHCL(r io.Reader) error {
 	})
 }
 
+// ExportToHCL exports all fact collections to HCL format
+func (b *BadgerFactStorage) ExportToHCL(w io.Writer) error {
+	// Validate against schema first
+	validator := spookyschemas.NewSchemaValidator()
+	if err := validator.LoadSchema(spookyschemas.SchemaTypeFactsStructure); err != nil {
+		return fmt.Errorf("failed to load facts schema: %w", err)
+	}
+
+	facts := make(map[string]*spookyfactstypes.FactCollection)
+
+	err := b.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.Prefix = []byte("facts:")
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Rewind(); it.Valid(); it.Next() {
+			item := it.Item()
+			var collection spookyfactstypes.FactCollection
+
+			err := item.Value(func(val []byte) error {
+				return json.Unmarshal(val, &collection)
+			})
+			if err != nil {
+				continue // Skip invalid entries
+			}
+
+			// Check if collection is encrypted and decrypt if needed
+			if b.isEncryptedCollection(&collection) {
+				decrypted, err := b.decryptFactCollection(&collection)
+				if err != nil {
+					continue // Skip entries that can't be decrypted
+				}
+				collection = *decrypted
+			}
+
+			// Validate each collection against schema
+			if err := validator.ValidateData(&collection, string(spookyschemas.SchemaTypeFactsStructure)); err != nil {
+				return fmt.Errorf("failed to validate fact collection for %s: %w", collection.Server, err)
+			}
+
+			facts[collection.Server] = &collection
+		}
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to export facts: %w", err)
+	}
+
+	// Generate HCL content
+	hclContent := generateHCLContent(facts)
+	_, err = w.Write([]byte(hclContent))
+	return err
+}
+
+// generateHCLContent generates HCL content from fact collections
+func generateHCLContent(facts map[string]*spookyfactstypes.FactCollection) string {
+	var content strings.Builder
+	content.WriteString("facts {\n")
+
+	for machineID, collection := range facts {
+		content.WriteString(fmt.Sprintf("  %s {\n", machineID))
+		content.WriteString(fmt.Sprintf("    server = \"%s\"\n", collection.Server))
+		content.WriteString(fmt.Sprintf("    timestamp = \"%s\"\n", collection.Timestamp.Format(time.RFC3339)))
+
+		// Write facts
+		for factKey, fact := range collection.Facts {
+			content.WriteString(fmt.Sprintf("    %s = %s\n", factKey, formatHCLValue(fact.Value)))
+		}
+
+		content.WriteString("  }\n")
+	}
+
+	content.WriteString("}\n")
+	return content.String()
+}
+
+// formatHCLValue formats a value for HCL output
+func formatHCLValue(value interface{}) string {
+	switch v := value.(type) {
+	case string:
+		return fmt.Sprintf("\"%s\"", v)
+	case int, int32, int64:
+		return fmt.Sprintf("%d", v)
+	case float32, float64:
+		return fmt.Sprintf("%f", v)
+	case bool:
+		return fmt.Sprintf("%t", v)
+	default:
+		// For complex types, convert to JSON string
+		jsonBytes, _ := json.Marshal(v)
+		return fmt.Sprintf("\"%s\"", string(jsonBytes))
+	}
+}
+
 // parseHCLToFactCollections parses HCL AST to fact collections
 func parseHCLToFactCollections(file *hcl.File) ([]*spookyfactstypes.FactCollection, error) {
 	// Basic implementation for parsing HCL to fact collections
@@ -556,4 +653,45 @@ func (b *BadgerFactStorage) Close() error {
 		return b.db.Close()
 	}
 	return nil
+}
+
+// Set stores a key-value pair in the database
+func (b *BadgerFactStorage) Set(key string, value interface{}) error {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Errorf("failed to marshal value: %w", err)
+	}
+
+	return b.db.Update(func(txn *badger.Txn) error {
+		return txn.Set([]byte(key), data)
+	})
+}
+
+// Get retrieves a value by key from the database
+func (b *BadgerFactStorage) Get(key string) (interface{}, error) {
+	var value interface{}
+
+	err := b.db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get([]byte(key))
+		if err != nil {
+			return err
+		}
+
+		return item.Value(func(val []byte) error {
+			return json.Unmarshal(val, &value)
+		})
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get value for key %s: %w", key, err)
+	}
+
+	return value, nil
+}
+
+// Delete removes a key-value pair from the database
+func (b *BadgerFactStorage) Delete(key string) error {
+	return b.db.Update(func(txn *badger.Txn) error {
+		return txn.Delete([]byte(key))
+	})
 }

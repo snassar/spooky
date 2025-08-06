@@ -9,24 +9,25 @@ import (
 	"strings"
 	"time"
 
-	"spooky/internal/facts/types"
-	"spooky/internal/schemas"
+	spookyfactstypes "spooky/internal/facts/types"
+	spookyschemas "spooky/internal/schemas"
+	spookystorage "spooky/internal/storage"
 )
 
 // Exporter handles exporting facts to various formats
 type Exporter struct {
-	storage FactStorage
+	storage spookystorage.FactStorage
 }
 
 // NewExporter creates a new facts exporter
-func NewExporter(storage FactStorage) *Exporter {
+func NewExporter(storage spookystorage.FactStorage) *Exporter {
 	return &Exporter{
 		storage: storage,
 	}
 }
 
 // ExportToJSON exports facts to JSON format
-func (e *Exporter) ExportToJSON(w io.Writer, query *FactQuery) error {
+func (e *Exporter) ExportToJSON(w io.Writer, query *spookystorage.FactQuery) error {
 	// Query facts from storage
 	collections, err := e.storage.QueryFactCollections(query)
 	if err != nil {
@@ -34,8 +35,8 @@ func (e *Exporter) ExportToJSON(w io.Writer, query *FactQuery) error {
 	}
 
 	// Validate against schema
-	validator := schemas.NewSchemaValidator()
-	if err := validator.LoadSchema(schemas.SchemaTypeFactsStructure); err != nil {
+	validator := spookyschemas.NewSchemaValidator()
+	if err := validator.LoadSchema(spookyschemas.SchemaTypeFactsStructure); err != nil {
 		return fmt.Errorf("failed to load facts schema: %w", err)
 	}
 
@@ -97,7 +98,7 @@ func (e *Exporter) ExportToJSON(w io.Writer, query *FactQuery) error {
 }
 
 // ExportToHCL exports facts to HCL format
-func (e *Exporter) ExportToHCL(w io.Writer, query *FactQuery) error {
+func (e *Exporter) ExportToHCL(w io.Writer, query *spookystorage.FactQuery) error {
 	// Query facts from storage
 	collections, err := e.storage.QueryFactCollections(query)
 	if err != nil {
@@ -105,8 +106,8 @@ func (e *Exporter) ExportToHCL(w io.Writer, query *FactQuery) error {
 	}
 
 	// Validate against schema
-	validator := schemas.NewSchemaValidator()
-	if err := validator.LoadSchema(schemas.SchemaTypeFactsStructure); err != nil {
+	validator := spookyschemas.NewSchemaValidator()
+	if err := validator.LoadSchema(spookyschemas.SchemaTypeFactsStructure); err != nil {
 		return fmt.Errorf("failed to load facts schema: %w", err)
 	}
 
@@ -122,8 +123,8 @@ func (e *Exporter) ExportToHCL(w io.Writer, query *FactQuery) error {
 	hclContent += "  }\n"
 
 	// Separate global and project facts
-	var globalFacts []*types.FactCollection
-	var projectFacts []*types.FactCollection
+	var globalFacts []*spookyfactstypes.FactCollection
+	var projectFacts []*spookyfactstypes.FactCollection
 
 	for _, collection := range collections {
 		if e.isGlobalFact(collection) {
@@ -230,7 +231,7 @@ func formatHCLValue(value interface{}) string {
 }
 
 // ExportToFile exports facts to a file in the specified format
-func (e *Exporter) ExportToFile(outputPath, format string, query *FactQuery) error {
+func (e *Exporter) ExportToFile(outputPath, format string, query *spookystorage.FactQuery) error {
 	// Create output file
 	file, err := os.Create(outputPath)
 	if err != nil {
@@ -279,8 +280,8 @@ func (e *Exporter) ExportProjectFacts(projectPath, outputPath, format string) er
 	}
 
 	// Open storage for the project (read-only)
-	storage, err := OpenFactStorage(StorageOptions{
-		Type: StorageTypeBadger,
+	storage, err := spookystorage.OpenFactStorage(spookystorage.StorageOptions{
+		Type: spookystorage.StorageTypeBadger,
 		Path: factsPath,
 	})
 	if err != nil {
@@ -292,7 +293,7 @@ func (e *Exporter) ExportProjectFacts(projectPath, outputPath, format string) er
 	exporter := NewExporter(storage)
 
 	// Export all facts
-	query := &FactQuery{}
+	query := &spookystorage.FactQuery{}
 	return exporter.ExportToFile(outputPath, format, query)
 }
 
@@ -326,8 +327,8 @@ func (e *Exporter) ExportMachineFacts(projectPath, machineID, outputPath, format
 	}
 
 	// Open storage for the project (read-only)
-	storage, err := OpenFactStorage(StorageOptions{
-		Type: StorageTypeBadger,
+	storage, err := spookystorage.OpenFactStorage(spookystorage.StorageOptions{
+		Type: spookystorage.StorageTypeBadger,
 		Path: factsPath,
 	})
 	if err != nil {
@@ -339,7 +340,7 @@ func (e *Exporter) ExportMachineFacts(projectPath, machineID, outputPath, format
 	exporter := NewExporter(storage)
 
 	// Export facts for specific machine
-	query := &FactQuery{
+	query := &spookystorage.FactQuery{
 		MachineName: machineID, // Use machine name for querying
 	}
 	return exporter.ExportToFile(outputPath, format, query)
@@ -375,8 +376,8 @@ func (e *Exporter) ExportFilteredFacts(projectPath, filter, outputPath, format s
 	}
 
 	// Open storage for the project (read-only)
-	storage, err := OpenFactStorage(StorageOptions{
-		Type: StorageTypeBadger,
+	storage, err := spookystorage.OpenFactStorage(spookystorage.StorageOptions{
+		Type: spookystorage.StorageTypeBadger,
 		Path: factsPath,
 	})
 	if err != nil {
@@ -397,9 +398,9 @@ func (e *Exporter) ExportFilteredFacts(projectPath, filter, outputPath, format s
 }
 
 // ParseFilter parses a filter string into a FactQuery
-func ParseFilter(filter string) (*FactQuery, error) {
+func ParseFilter(filter string) (*spookystorage.FactQuery, error) {
 	// This is a simple filter parser - can be enhanced for more complex queries
-	query := &FactQuery{}
+	query := &spookystorage.FactQuery{}
 
 	// For now, just support basic machine name filtering
 	// TODO: Implement more sophisticated filter parsing
@@ -411,7 +412,7 @@ func ParseFilter(filter string) (*FactQuery, error) {
 }
 
 // isGlobalFact determines if a fact collection contains global facts
-func (e *Exporter) isGlobalFact(collection *types.FactCollection) bool {
+func (e *Exporter) isGlobalFact(collection *spookyfactstypes.FactCollection) bool {
 	// Check for system-related facts that indicate global facts
 	systemKeys := []string{"os", "hardware", "network", "cpu", "memory", "disk", "load", "processes"}
 
@@ -436,12 +437,12 @@ func (e *Exporter) isGlobalFact(collection *types.FactCollection) bool {
 
 // filterCustomFacts removes custom facts from the facts map
 // Custom facts are those that come from /etc/spooky/facts.hcl and should not be exported
-func (e *Exporter) filterCustomFacts(facts map[string]*types.Fact) map[string]*types.Fact {
-	filtered := make(map[string]*types.Fact)
+func (e *Exporter) filterCustomFacts(facts map[string]*spookyfactstypes.Fact) map[string]*spookyfactstypes.Fact {
+	filtered := make(map[string]*spookyfactstypes.Fact)
 
 	for key, fact := range facts {
 		// Skip custom facts that come from /etc/spooky/facts.hcl
-		if fact.Source == string(types.SourceCustom) {
+		if fact.Source == string(spookyfactstypes.SourceCustom) {
 			continue
 		}
 

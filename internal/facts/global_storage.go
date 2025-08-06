@@ -6,13 +6,14 @@ import (
 	"path/filepath"
 	"time"
 
-	spookybadger "spooky/internal/facts/storage/badger"
 	spookyfactstypes "spooky/internal/facts/types"
+	spookystorage "spooky/internal/storage"
+	spookystoragebadger "spooky/internal/storage/badger"
 )
 
 // GlobalFactsStorage manages global facts storage with XDG compliance
 type GlobalFactsStorage struct {
-	storage    FactStorage
+	storage    spookystorage.FactStorage
 	basePath   string
 	schemaPath string
 }
@@ -36,7 +37,7 @@ func NewGlobalFactsStorage() (*GlobalFactsStorage, error) {
 	}
 
 	// Initialize BadgerDB storage for global facts
-	storage, err := spookybadger.NewBadgerFactStorage(filepath.Join(spookyStateDir, "global-facts.db"))
+	storage, err := spookystoragebadger.NewBadgerFactStorage(filepath.Join(spookyStateDir, "global-facts.db"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize global facts storage: %w", err)
 	}

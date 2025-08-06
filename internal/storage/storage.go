@@ -1,36 +1,15 @@
-package facts
+package storage
 
 import (
 	"fmt"
-	"io"
 	"time"
 
-	spookybadger "spooky/internal/facts/storage/badger"
-	"spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/facts/types"
+	spookystoragebadger "spooky/internal/storage/badger"
 )
 
-// FactStorage defines the interface for persistent fact storage
-type FactStorage interface {
-	// Core fact collection operations
-	SetFactCollection(machineID string, collection *types.FactCollection) error
-	GetFactCollection(machineID string) (*types.FactCollection, error)
-	QueryFactCollections(query *FactQuery) ([]*types.FactCollection, error)
-	DeleteFactCollection(machineID string) error
-	DeleteFactCollections(query *FactQuery) (int, error)
-
-	// Import/Export operations
-	ExportToJSON(w io.Writer) error
-	ImportFromJSON(r io.Reader) error
-	ImportFromHCL(r io.Reader) error // NEW: HCL import
-	ExportToJSONWithEncryption(w io.Writer, opts ExportOptions) error
-	ImportFromJSONWithDecryption(r io.Reader, identityFile string) error
-
-	// Close the storage connection
-	Close() error
-}
-
 // ExportOptions defines options for encrypted export
-type ExportOptions = types.ExportOptions
+type ExportOptions = spookyfactstypes.ExportOptions
 
 // TimeRange defines a time range for filtering
 type TimeRange struct {
@@ -39,10 +18,10 @@ type TimeRange struct {
 }
 
 // FactQuery defines query parameters for fact collections
-type FactQuery = types.FactQuery
+type FactQuery = spookyfactstypes.FactQuery
 
 // matchesQuery checks if a fact collection matches the query criteria
-func matchesQuery(collection *types.FactCollection, query *FactQuery) bool {
+func matchesQuery(collection *spookyfactstypes.FactCollection, query *spookyfactstypes.FactQuery) bool {
 	if query.MachineName != "" && collection.Server != query.MachineName {
 		return false
 	}
@@ -105,34 +84,14 @@ func matchesQuery(collection *types.FactCollection, query *FactQuery) bool {
 		return false
 	}
 
-	// TODO: Implement text search functionality
 	return true
-}
-
-// StorageType defines the type of storage backend
-type StorageType string
-
-const (
-	StorageTypeBadger StorageType = "badger"
-	StorageTypeJSON   StorageType = "json"
-	StorageTypeHCL    StorageType = "hcl"
-)
-
-// StorageOptions defines configuration for fact storage
-type StorageOptions struct {
-	Type StorageType
-	Path string
 }
 
 // NewFactStorage creates a new fact storage instance (for writing/creating)
 func NewFactStorage(opts StorageOptions) (FactStorage, error) {
 	switch opts.Type {
-	case StorageTypeJSON:
-		return NewJSONFactStorage(opts.Path)
-	case StorageTypeHCL:
-		return NewHCLFactStorage(opts.Path)
 	case StorageTypeBadger, "": // Default to BadgerDB
-		return spookybadger.NewBadgerFactStorage(opts.Path)
+		return spookystoragebadger.NewBadgerFactStorage(opts.Path)
 	default:
 		return nil, fmt.Errorf("unsupported storage type: %s", opts.Type)
 	}
@@ -142,12 +101,8 @@ func NewFactStorage(opts StorageOptions) (FactStorage, error) {
 // This will fail if the storage doesn't exist
 func OpenFactStorage(opts StorageOptions) (FactStorage, error) {
 	switch opts.Type {
-	case StorageTypeJSON:
-		return NewJSONFactStorage(opts.Path)
-	case StorageTypeHCL:
-		return NewHCLFactStorage(opts.Path)
 	case StorageTypeBadger, "": // Default to BadgerDB
-		return spookybadger.NewBadgerFactStorageReadOnly(opts.Path)
+		return spookystoragebadger.NewBadgerFactStorageReadOnly(opts.Path)
 	default:
 		return nil, fmt.Errorf("unsupported storage type: %s", opts.Type)
 	}

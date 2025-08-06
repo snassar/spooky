@@ -1,4 +1,4 @@
-package facts
+package storage
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/facts/types"
 
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclparse"
@@ -27,7 +27,7 @@ const (
 type BaseFileStorage struct {
 	filepath string
 	format   FileStorageFormat
-	facts    map[string]*types.FactCollection
+	facts    map[string]*spookyfactstypes.FactCollection
 	mu       sync.RWMutex
 }
 
@@ -36,7 +36,7 @@ func NewBaseFileStorage(filepath string, format FileStorageFormat) (*BaseFileSto
 	storage := &BaseFileStorage{
 		filepath: filepath,
 		format:   format,
-		facts:    make(map[string]*types.FactCollection),
+		facts:    make(map[string]*spookyfactstypes.FactCollection),
 	}
 
 	// Load existing data if file exists
@@ -48,7 +48,7 @@ func NewBaseFileStorage(filepath string, format FileStorageFormat) (*BaseFileSto
 }
 
 // SetFactCollection stores a fact collection for a specific machine
-func (b *BaseFileStorage) SetFactCollection(machineID string, collection *types.FactCollection) error {
+func (b *BaseFileStorage) SetFactCollection(machineID string, collection *spookyfactstypes.FactCollection) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -60,7 +60,7 @@ func (b *BaseFileStorage) SetFactCollection(machineID string, collection *types.
 }
 
 // GetFactCollection retrieves a fact collection for a specific machine
-func (b *BaseFileStorage) GetFactCollection(machineID string) (*types.FactCollection, error) {
+func (b *BaseFileStorage) GetFactCollection(machineID string) (*spookyfactstypes.FactCollection, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -72,11 +72,11 @@ func (b *BaseFileStorage) GetFactCollection(machineID string) (*types.FactCollec
 }
 
 // QueryFactCollections searches for fact collections matching the query criteria
-func (b *BaseFileStorage) QueryFactCollections(query *FactQuery) ([]*types.FactCollection, error) {
+func (b *BaseFileStorage) QueryFactCollections(query *spookyfactstypes.FactQuery) ([]*spookyfactstypes.FactCollection, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	var results []*types.FactCollection
+	var results []*spookyfactstypes.FactCollection
 
 	for _, collection := range b.facts {
 		if matchesQuery(collection, query) {
@@ -100,11 +100,11 @@ func (b *BaseFileStorage) DeleteFactCollection(machineID string) error {
 }
 
 // DeleteFactCollections deletes fact collections matching the query criteria
-func (b *BaseFileStorage) DeleteFactCollections(query *FactQuery) (int, error) {
+func (b *BaseFileStorage) DeleteFactCollections(query *spookyfactstypes.FactQuery) (int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	deletedCount := 0
+	var deletedCount int
 	for machineID, collection := range b.facts {
 		if matchesQuery(collection, query) {
 			delete(b.facts, machineID)
@@ -113,9 +113,7 @@ func (b *BaseFileStorage) DeleteFactCollections(query *FactQuery) (int, error) {
 	}
 
 	if deletedCount > 0 {
-		if err := b.save(); err != nil {
-			return deletedCount, err
-		}
+		return deletedCount, b.save()
 	}
 
 	return deletedCount, nil
@@ -133,7 +131,7 @@ func (b *BaseFileStorage) ExportToJSON(w io.Writer) error {
 
 // ImportFromJSON imports fact collections from JSON
 func (b *BaseFileStorage) ImportFromJSON(r io.Reader) error {
-	var facts map[string]*types.FactCollection
+	var facts map[string]*spookyfactstypes.FactCollection
 	if err := json.NewDecoder(r).Decode(&facts); err != nil {
 		return fmt.Errorf("failed to decode JSON: %w", err)
 	}
@@ -212,7 +210,7 @@ func (b *BaseFileStorage) saveJSON() error {
 
 // HCLFactsWrapper wraps facts for HCL serialization
 type HCLFactsWrapper struct {
-	Facts map[string]*types.FactCollection `hcl:"facts,block"`
+	Facts map[string]*spookyfactstypes.FactCollection `hcl:"facts,block"`
 }
 
 // loadHCL loads facts from HCL file

@@ -9,13 +9,13 @@ import (
 	spookyactionstypes "spooky/internal/actions/types"
 	spookyconfig "spooky/internal/config"
 	spookyfacts "spooky/internal/facts"
-	spookybadger "spooky/internal/facts/storage/badger"
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
 	spookymachines "spooky/internal/machines"
 	spookymachinestypes "spooky/internal/machines/types"
 	spookysecrets "spooky/internal/secrets"
 	spookyssh "spooky/internal/ssh"
+	spookystoragebadger "spooky/internal/storage/badger"
 	spookytemplates "spooky/internal/templates"
 	spookytemplatestypes "spooky/internal/templates/types"
 	spookyvariables "spooky/internal/variables"
@@ -61,7 +61,7 @@ func NewCoordinatorManager(
 // NewCoordinatorManagerFromProject creates a new coordinator manager from a project path
 func NewCoordinatorManagerFromProject(projectPath string, logger spookylogging.Logger) (*CoordinatorManager, error) {
 	// Create facts manager
-	factsStorage, err := spookybadger.NewBadgerFactStorage(filepath.Join(projectPath, "facts.db"))
+	factsStorage, err := spookystoragebadger.NewBadgerFactStorage(filepath.Join(projectPath, "facts.db"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create facts storage: %w", err)
 	}

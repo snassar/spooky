@@ -4,46 +4,47 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
-	"os"
-	"spooky/internal/facts/types"
-	"spooky/internal/logging"
-	"spooky/internal/ssh"
+	spookyfactstypes "spooky/internal/facts/types"
+	spookylogging "spooky/internal/logging"
+	spookyssh "spooky/internal/ssh"
+	spookystorage "spooky/internal/storage"
 )
 
 // Manager implements the FactManager interface
 type Manager struct {
 	// Core components
-	collector types.FactCollector
-	storage   FactStorage
-	logger    logging.Logger
+	collector spookyfactstypes.FactCollector
+	storage   spookystorage.FactStorage
+	logger    spookylogging.Logger
 
 	// Configuration
 	defaultTTL time.Duration
-	cache      map[string]*types.FactCollection
+	cache      map[string]*spookyfactstypes.FactCollection
 	cacheMu    sync.RWMutex
 
 	// Custom collectors
-	customCollectors map[string]types.FactCollector
+	customCollectors map[string]spookyfactstypes.FactCollector
 }
 
 // NewManager creates a new fact collection manager
-func NewManager(sshClient *ssh.SSHClient, logger logging.Logger) *Manager {
+func NewManager(sshClient *spookyssh.SSHClient, logger spookylogging.Logger) *Manager {
 	return &Manager{
 		collector:        NewSSHCollector(sshClient),
 		storage:          nil, // Will be configured when storage is provided
 		logger:           logger,
-		customCollectors: make(map[string]types.FactCollector),
-		cache:            make(map[string]*types.FactCollection),
+		customCollectors: make(map[string]spookyfactstypes.FactCollector),
+		cache:            make(map[string]*spookyfactstypes.FactCollection),
 		defaultTTL:       30 * time.Minute,
 	}
 }
 
 // NewManagerWithStorage creates a new fact collection manager with storage
-func NewManagerWithStorage(sshClient *ssh.SSHClient, storage FactStorage, logger logging.Logger) *Manager {
+func NewManagerWithStorage(sshClient *spookyssh.SSHClient, storage spookystorage.FactStorage, logger spookylogging.Logger) *Manager {
 	manager := NewManager(sshClient, logger)
 	manager.storage = storage
 	return manager
@@ -51,23 +52,23 @@ func NewManagerWithStorage(sshClient *ssh.SSHClient, storage FactStorage, logger
 
 // ConfigureHCLCollector configures the HCL collector with a file path
 func (m *Manager) ConfigureHCLCollector(filePath string) {
-	m.collector = NewHCLCollector(filePath, nil, types.MergePolicyReplace)
+	m.collector = NewHCLCollector(filePath, nil, spookyfactstypes.MergePolicyReplace)
 }
 
 // ConfigureOpenTofuCollector configures the OpenTofu collector with a state path
 func (m *Manager) ConfigureOpenTofuCollector(statePath string) {
-	m.collector = NewOpenTofuCollector(statePath, nil, types.MergePolicyReplace)
+	m.collector = NewOpenTofuCollector(statePath, nil, spookyfactstypes.MergePolicyReplace)
 }
 
 // CollectAllFacts collects facts from all sources for a server
-func (m *Manager) CollectAllFacts(server string) (*types.FactCollection, error) {
+func (m *Manager) CollectAllFacts(server string) (*spookyfactstypes.FactCollection, error) {
 	// Check cache first
 	if cached := m.getCachedFacts(server); cached != nil {
 		return cached, nil
 	}
 
 	// Collect from all sources
-	var collections []*types.FactCollection
+	var collections []*spookyfactstypes.FactCollection
 	var errors []error
 
 	// SSH collection (if server is remote)
@@ -118,7 +119,7 @@ func (m *Manager) CollectAllFacts(server string) (*types.FactCollection, error) 
 }
 
 // CollectSpecificFacts collects only the specified facts
-func (m *Manager) CollectSpecificFacts(server string, keys []string) (*types.FactCollection, error) {
+func (m *Manager) CollectSpecificFacts(server string, keys []string) (*spookyfactstypes.FactCollection, error) {
 	// Check cache first for specific keys
 	if cached := m.getCachedFacts(server); cached != nil {
 		if filtered := m.getFilteredCachedFacts(cached, keys); filtered != nil {
@@ -142,7 +143,7 @@ func (m *Manager) CollectSpecificFacts(server string, keys []string) (*types.Fac
 }
 
 // GetFact retrieves a single fact
-func (m *Manager) GetFact(server, key string) (*types.Fact, error) {
+func (m *Manager) GetFact(server, key string) (*spookyfactstypes.Fact, error) {
 	// Check cache first
 	if cached := m.getCachedFacts(server); cached != nil {
 		if fact, exists := cached.Facts[key]; exists && !m.isExpired(fact) {
@@ -154,23 +155,23 @@ func (m *Manager) GetFact(server, key string) (*types.Fact, error) {
 	sources := m.determineSources([]string{key})
 
 	for _, source := range sources {
-		var fact *types.Fact
+		var fact *spookyfactstypes.Fact
 		var err error
 
 		switch source {
-		case types.SourceSSH:
+		case spookyfactstypes.SourceSSH:
 			if server != "local" {
 				fact, err = m.collector.GetFact(server, key)
 			}
-		case types.SourceLocal:
+		case spookyfactstypes.SourceLocal:
 			fact, err = m.collector.GetFact(server, key)
-		case types.SourceHCL:
+		case spookyfactstypes.SourceHCL:
 			if m.collector != nil {
 				fact, err = m.collector.GetFact(server, key)
 			} else {
 				err = fmt.Errorf("HCL collector not configured")
 			}
-		case types.SourceOpenTofu:
+		case spookyfactstypes.SourceOpenTofu:
 			if m.collector != nil {
 				fact, err = m.collector.GetFact(server, key)
 			} else {
@@ -189,7 +190,7 @@ func (m *Manager) GetFact(server, key string) (*types.Fact, error) {
 }
 
 // PersistFacts persists a fact collection to storage
-func (m *Manager) PersistFacts(machineID string, collection *types.FactCollection) error {
+func (m *Manager) PersistFacts(machineID string, collection *spookyfactstypes.FactCollection) error {
 	if m.storage == nil {
 		return nil // No storage configured
 	}
@@ -203,13 +204,13 @@ func (m *Manager) PersistFacts(machineID string, collection *types.FactCollectio
 }
 
 // LoadPersistedFacts loads facts from storage for a server
-func (m *Manager) LoadPersistedFacts(server string) (*types.FactCollection, error) {
+func (m *Manager) LoadPersistedFacts(server string) (*spookyfactstypes.FactCollection, error) {
 	if m.storage == nil {
 		return nil, fmt.Errorf("no storage configured")
 	}
 
 	// Try to find facts by server name first
-	query := &types.FactQuery{
+	query := &spookyfactstypes.FactQuery{
 		MachineName: server,
 		Limit:       1,
 	}
@@ -227,7 +228,7 @@ func (m *Manager) LoadPersistedFacts(server string) (*types.FactCollection, erro
 }
 
 // QueryPersistedFacts queries facts from storage
-func (m *Manager) QueryPersistedFacts(query *types.FactQuery) ([]*types.FactCollection, error) {
+func (m *Manager) QueryPersistedFacts(query *spookyfactstypes.FactQuery) ([]*spookyfactstypes.FactCollection, error) {
 	if m.storage == nil {
 		return nil, fmt.Errorf("no storage configured")
 	}
@@ -236,7 +237,7 @@ func (m *Manager) QueryPersistedFacts(query *types.FactQuery) ([]*types.FactColl
 }
 
 // DeletePersistedFacts deletes facts from storage
-func (m *Manager) DeletePersistedFacts(query *types.FactQuery) (int, error) {
+func (m *Manager) DeletePersistedFacts(query *spookyfactstypes.FactQuery) (int, error) {
 	if m.storage == nil {
 		return 0, fmt.Errorf("no storage configured")
 	}
@@ -263,7 +264,7 @@ func (m *Manager) ImportFacts(r io.Reader) error {
 }
 
 // ExportFactsWithEncryption exports facts with encryption support
-func (m *Manager) ExportFactsWithEncryption(w io.Writer, opts types.ExportOptions) error {
+func (m *Manager) ExportFactsWithEncryption(w io.Writer, opts spookyfactstypes.ExportOptions) error {
 	if m.storage == nil {
 		return fmt.Errorf("no storage configured")
 	}
@@ -282,7 +283,7 @@ func (m *Manager) ImportFactsWithDecryption(r io.Reader, identityFile string) er
 func (m *Manager) ClearCache() {
 	m.cacheMu.Lock()
 	defer m.cacheMu.Unlock()
-	m.cache = make(map[string]*types.FactCollection)
+	m.cache = make(map[string]*spookyfactstypes.FactCollection)
 }
 
 // ClearExpiredCache removes expired facts from cache
@@ -309,11 +310,11 @@ func (m *Manager) ClearExpiredCache() {
 }
 
 // GetAllFacts returns all cached facts from all servers
-func (m *Manager) GetAllFacts() ([]*types.Fact, error) {
+func (m *Manager) GetAllFacts() ([]*spookyfactstypes.Fact, error) {
 	m.cacheMu.RLock()
 	defer m.cacheMu.RUnlock()
 
-	var allFacts []*types.Fact
+	var allFacts []*spookyfactstypes.Fact
 	for _, collection := range m.cache {
 		for _, fact := range collection.Facts {
 			if !m.isExpired(fact) {
@@ -331,13 +332,13 @@ func (m *Manager) SetDefaultTTL(ttl time.Duration) {
 }
 
 // RegisterCustomCollector registers a custom fact collector
-func (m *Manager) RegisterCustomCollector(name string, collector types.FactCollector) {
+func (m *Manager) RegisterCustomCollector(name string, collector spookyfactstypes.FactCollector) {
 	m.customCollectors[name] = collector
 }
 
 // ImportCustomFacts imports facts from a custom source
-func (m *Manager) ImportCustomFacts(source, server string, mergePolicy types.MergePolicy) (*types.FactCollection, error) {
-	var collector types.FactCollector
+func (m *Manager) ImportCustomFacts(source, server string, mergePolicy spookyfactstypes.MergePolicy) (*spookyfactstypes.FactCollection, error) {
+	var collector spookyfactstypes.FactCollector
 	var err error
 
 	// Determine source type and create appropriate collector
@@ -355,7 +356,7 @@ func (m *Manager) ImportCustomFacts(source, server string, mergePolicy types.Mer
 	}
 
 	// Get existing facts if we have storage
-	var existingCollection *types.FactCollection
+	var existingCollection *spookyfactstypes.FactCollection
 	if m.storage != nil {
 		existingCollection, _ = m.LoadPersistedFacts(server)
 	}
@@ -381,10 +382,10 @@ func (m *Manager) ImportCustomFacts(source, server string, mergePolicy types.Mer
 }
 
 // ImportCustomFactsWithOptions imports facts with enhanced options
-func (m *Manager) ImportCustomFactsWithOptions(source string, options *types.ImportOptions) error {
+func (m *Manager) ImportCustomFactsWithOptions(source string, options *spookyfactstypes.ImportOptions) error {
 	// For now, implement a simplified version
 	// This would need to be expanded based on the options
-	_, err := m.ImportCustomFacts(source, options.Server, types.MergePolicyReplace)
+	_, err := m.ImportCustomFacts(source, options.Server, spookyfactstypes.MergePolicyReplace)
 	return err
 }
 
@@ -412,7 +413,7 @@ func (m *Manager) GetCustomFacts(server string) (map[string]interface{}, error) 
 }
 
 // GenerateMachineID generates a machine ID from fact collection
-func (m *Manager) GenerateMachineID(facts *types.FactCollection) string {
+func (m *Manager) GenerateMachineID(facts *spookyfactstypes.FactCollection) string {
 	// Use machine_id fact if available
 	if machineID, exists := facts.Facts["machine_id"]; exists {
 		if id, ok := machineID.Value.(string); ok && id != "" {
@@ -433,7 +434,7 @@ func (m *Manager) Close() error {
 }
 
 // GetFactCollection retrieves a fact collection from storage
-func (m *Manager) GetFactCollection(machineID string) (*types.FactCollection, error) {
+func (m *Manager) GetFactCollection(machineID string) (*spookyfactstypes.FactCollection, error) {
 	if m.storage == nil {
 		return nil, fmt.Errorf("no storage configured")
 	}
@@ -441,7 +442,7 @@ func (m *Manager) GetFactCollection(machineID string) (*types.FactCollection, er
 }
 
 // SetFactCollection sets a fact collection for a machine
-func (m *Manager) SetFactCollection(machineID string, collection *types.FactCollection) error {
+func (m *Manager) SetFactCollection(machineID string, collection *spookyfactstypes.FactCollection) error {
 	if m.storage == nil {
 		return fmt.Errorf("storage not configured")
 	}
@@ -454,14 +455,14 @@ func (m *Manager) SetFactCollection(machineID string, collection *types.FactColl
 }
 
 // GetStorage returns the underlying storage for coordinator integration
-func (m *Manager) GetStorage() FactStorage {
+func (m *Manager) GetStorage() spookystorage.FactStorage {
 	return m.storage
 }
 
 // Helper methods
 
 // getFilteredCachedFacts returns filtered facts from cache if all are available and not expired
-func (m *Manager) getFilteredCachedFacts(cached *types.FactCollection, keys []string) *types.FactCollection {
+func (m *Manager) getFilteredCachedFacts(cached *spookyfactstypes.FactCollection, keys []string) *spookyfactstypes.FactCollection {
 	// Check if all requested keys are in cache and not expired
 	for _, key := range keys {
 		if fact, exists := cached.Facts[key]; !exists || m.isExpired(fact) {
@@ -470,10 +471,10 @@ func (m *Manager) getFilteredCachedFacts(cached *types.FactCollection, keys []st
 	}
 
 	// Return only requested facts
-	filtered := &types.FactCollection{
+	filtered := &spookyfactstypes.FactCollection{
 		Server:    cached.Server,
 		Timestamp: cached.Timestamp,
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 	}
 	for _, key := range keys {
 		if fact, exists := cached.Facts[key]; exists {
@@ -484,8 +485,8 @@ func (m *Manager) getFilteredCachedFacts(cached *types.FactCollection, keys []st
 }
 
 // collectFromSources collects facts from the appropriate sources
-func (m *Manager) collectFromSources(server string, keys []string) ([]*types.FactCollection, []error) {
-	var collections []*types.FactCollection
+func (m *Manager) collectFromSources(server string, keys []string) ([]*spookyfactstypes.FactCollection, []error) {
+	var collections []*spookyfactstypes.FactCollection
 	var errors []error
 
 	// Determine which sources to use based on fact keys
@@ -504,20 +505,20 @@ func (m *Manager) collectFromSources(server string, keys []string) ([]*types.Fac
 }
 
 // collectFromSource collects facts from a specific source
-func (m *Manager) collectFromSource(source types.FactSource, server string, keys []string) (*types.FactCollection, error) {
+func (m *Manager) collectFromSource(source spookyfactstypes.FactSource, server string, keys []string) (*spookyfactstypes.FactCollection, error) {
 	switch source {
-	case types.SourceSSH:
+	case spookyfactstypes.SourceSSH:
 		if server != "local" {
 			return m.collector.CollectSpecific(server, keys)
 		}
-	case types.SourceLocal:
+	case spookyfactstypes.SourceLocal:
 		return m.collector.CollectSpecific(server, keys)
-	case types.SourceHCL:
+	case spookyfactstypes.SourceHCL:
 		if m.collector != nil {
 			return m.collector.CollectSpecific(server, keys)
 		}
 		return nil, fmt.Errorf("HCL collector not configured")
-	case types.SourceOpenTofu:
+	case spookyfactstypes.SourceOpenTofu:
 		if m.collector != nil {
 			return m.collector.CollectSpecific(server, keys)
 		}
@@ -527,34 +528,34 @@ func (m *Manager) collectFromSource(source types.FactSource, server string, keys
 }
 
 // determineSources determines which sources to use based on fact keys
-func (m *Manager) determineSources(keys []string) []types.FactSource {
-	sources := make(map[types.FactSource]bool)
+func (m *Manager) determineSources(keys []string) []spookyfactstypes.FactSource {
+	sources := make(map[spookyfactstypes.FactSource]bool)
 
 	for _, key := range keys {
 		switch {
 		case m.isSystemFact(key):
-			sources[types.SourceSSH] = true
-			sources[types.SourceLocal] = true
+			sources[spookyfactstypes.SourceSSH] = true
+			sources[spookyfactstypes.SourceLocal] = true
 		case m.isOSFact(key):
-			sources[types.SourceSSH] = true
-			sources[types.SourceLocal] = true
+			sources[spookyfactstypes.SourceSSH] = true
+			sources[spookyfactstypes.SourceLocal] = true
 		case m.isHardwareFact(key):
-			sources[types.SourceSSH] = true
-			sources[types.SourceLocal] = true
+			sources[spookyfactstypes.SourceSSH] = true
+			sources[spookyfactstypes.SourceLocal] = true
 		case m.isNetworkFact(key):
-			sources[types.SourceSSH] = true
-			sources[types.SourceLocal] = true
+			sources[spookyfactstypes.SourceSSH] = true
+			sources[spookyfactstypes.SourceLocal] = true
 		case m.isEnvironmentFact(key):
-			sources[types.SourceSSH] = true
-			sources[types.SourceLocal] = true
+			sources[spookyfactstypes.SourceSSH] = true
+			sources[spookyfactstypes.SourceLocal] = true
 		case m.isHCLFact(key):
-			sources[types.SourceHCL] = true
+			sources[spookyfactstypes.SourceHCL] = true
 		case m.isOpenTofuFact(key):
-			sources[types.SourceOpenTofu] = true
+			sources[spookyfactstypes.SourceOpenTofu] = true
 		}
 	}
 
-	result := make([]types.FactSource, 0, len(sources))
+	result := make([]spookyfactstypes.FactSource, 0, len(sources))
 	for source := range sources {
 		result = append(result, source)
 	}
@@ -645,15 +646,15 @@ func (m *Manager) isOpenTofuFact(key string) bool {
 }
 
 // mergeCollections merges multiple fact collections
-func (m *Manager) mergeCollections(collections []*types.FactCollection) *types.FactCollection {
+func (m *Manager) mergeCollections(collections []*spookyfactstypes.FactCollection) *spookyfactstypes.FactCollection {
 	if len(collections) == 0 {
 		return nil
 	}
 
-	merged := &types.FactCollection{
+	merged := &spookyfactstypes.FactCollection{
 		Server:    collections[0].Server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookyfactstypes.Fact),
 	}
 
 	for _, collection := range collections {
@@ -669,22 +670,22 @@ func (m *Manager) mergeCollections(collections []*types.FactCollection) *types.F
 }
 
 // cacheFacts caches a fact collection
-func (m *Manager) cacheFacts(server string, collection *types.FactCollection) {
+func (m *Manager) cacheFacts(server string, collection *spookyfactstypes.FactCollection) {
 	m.cacheMu.Lock()
 	defer m.cacheMu.Unlock()
 	m.cache[server] = collection
 }
 
 // cacheFact caches a single fact
-func (m *Manager) cacheFact(server string, fact *types.Fact) {
+func (m *Manager) cacheFact(server string, fact *spookyfactstypes.Fact) {
 	m.cacheMu.Lock()
 	defer m.cacheMu.Unlock()
 
 	if m.cache[server] == nil {
-		m.cache[server] = &types.FactCollection{
+		m.cache[server] = &spookyfactstypes.FactCollection{
 			Server:    server,
 			Timestamp: time.Now(),
-			Facts:     make(map[string]*types.Fact),
+			Facts:     make(map[string]*spookyfactstypes.Fact),
 		}
 	}
 
@@ -692,7 +693,7 @@ func (m *Manager) cacheFact(server string, fact *types.Fact) {
 }
 
 // getCachedFacts retrieves cached facts for a server
-func (m *Manager) getCachedFacts(server string) *types.FactCollection {
+func (m *Manager) getCachedFacts(server string) *spookyfactstypes.FactCollection {
 	m.cacheMu.RLock()
 	defer m.cacheMu.RUnlock()
 
@@ -715,7 +716,7 @@ func (m *Manager) getCachedFacts(server string) *types.FactCollection {
 }
 
 // isExpired checks if a fact has expired
-func (m *Manager) isExpired(fact *types.Fact) bool {
+func (m *Manager) isExpired(fact *spookyfactstypes.Fact) bool {
 	if fact.TTL == 0 {
 		return false // No expiration
 	}
@@ -723,7 +724,7 @@ func (m *Manager) isExpired(fact *types.Fact) bool {
 }
 
 // generateUUIDFromFacts generates a UUID from fact data
-func (m *Manager) generateUUIDFromFacts(facts *types.FactCollection) string {
+func (m *Manager) generateUUIDFromFacts(facts *spookyfactstypes.FactCollection) string {
 	// Simple hash-based ID generation
 	// In a real implementation, you'd use a proper UUID library
 	data := facts.Server
@@ -797,7 +798,7 @@ func (m *Manager) ExportFactsFromProject(ctx context.Context, projectPath string
 	case "hcl":
 		// Create exporter and export to HCL
 		exporter := NewExporter(m.storage)
-		query := &types.FactQuery{}
+		query := &spookyfactstypes.FactQuery{}
 		return exporter.ExportToHCL(file, query)
 	default:
 		return fmt.Errorf("unsupported export format: %s", format)

@@ -5,20 +5,21 @@ import (
 	"io"
 	"time"
 
-	"spooky/internal/facts"
-	"spooky/internal/facts/types"
-	"spooky/internal/interfaces"
-	"spooky/internal/logging"
+	spookyfacts "spooky/internal/facts"
+	spookyfactstypes "spooky/internal/facts/types"
+	spookyinterfaces "spooky/internal/interfaces"
+	spookylogging "spooky/internal/logging"
+	spookystorage "spooky/internal/storage"
 )
 
-// CoordinatorFactsIntegration implements facts system integration
+// CoordinatorFactsIntegration implements the FactsIntegration interface
 type CoordinatorFactsIntegration struct {
-	factsManager facts.FactManager
-	logger       logging.Logger
+	factsManager spookyfacts.FactManager
+	logger       spookylogging.Logger
 }
 
-// NewCoordinatorFactsIntegration creates a new facts integration
-func NewCoordinatorFactsIntegration(factsManager facts.FactManager, logger logging.Logger) *CoordinatorFactsIntegration {
+// NewCoordinatorFactsIntegration creates a new facts integration coordinator
+func NewCoordinatorFactsIntegration(factsManager spookyfacts.FactManager, logger spookylogging.Logger) *CoordinatorFactsIntegration {
 	return &CoordinatorFactsIntegration{
 		factsManager: factsManager,
 		logger:       logger,
@@ -26,12 +27,12 @@ func NewCoordinatorFactsIntegration(factsManager facts.FactManager, logger loggi
 }
 
 // LoadFacts loads facts for the specified machines
-func (fi *CoordinatorFactsIntegration) LoadFacts(machineNames []string) (*interfaces.FactsContext, error) {
-	context := &interfaces.FactsContext{
-		BaseContext: interfaces.BaseContext{
+func (fi *CoordinatorFactsIntegration) LoadFacts(machineNames []string) (*spookyinterfaces.FactsContext, error) {
+	context := &spookyinterfaces.FactsContext{
+		BaseContext: spookyinterfaces.BaseContext{
 			Timestamp: time.Now(),
 		},
-		MachineFacts: make(map[string]*types.FactCollection),
+		MachineFacts: make(map[string]*spookyfactstypes.FactCollection),
 	}
 
 	// Load machine-specific facts
@@ -40,8 +41,8 @@ func (fi *CoordinatorFactsIntegration) LoadFacts(machineNames []string) (*interf
 			facts, err := fi.factsManager.GetFactCollection(machine)
 			if err != nil {
 				fi.logger.Warn("Failed to load facts for machine",
-					logging.String("machine", machine),
-					logging.Error(err))
+					spookylogging.String("machine", machine),
+					spookylogging.Error(err))
 				continue
 			}
 			context.MachineFacts[machine] = facts
@@ -65,17 +66,17 @@ func (fi *CoordinatorFactsIntegration) LoadFacts(machineNames []string) (*interf
 }
 
 // CollectFacts collects facts from the specified machines
-func (fi *CoordinatorFactsIntegration) CollectFacts(machineNames []string) (*interfaces.FactsContext, error) {
+func (fi *CoordinatorFactsIntegration) CollectFacts(machineNames []string) (*spookyinterfaces.FactsContext, error) {
 	// Validate inputs
-	if err := interfaces.ValidateMachineNames(machineNames); err != nil {
+	if err := spookyinterfaces.ValidateMachineNames(machineNames); err != nil {
 		return nil, err
 	}
 
-	fi.logger.Info("Collecting facts from machines", logging.StringSlice("machines", machineNames))
+	fi.logger.Info("Collecting facts from machines", spookylogging.StringSlice("machines", machineNames))
 
 	// Create facts context
-	context := &interfaces.FactsContext{
-		MachineFacts: make(map[string]*types.FactCollection),
+	context := &spookyinterfaces.FactsContext{
+		MachineFacts: make(map[string]*spookyfactstypes.FactCollection),
 		GlobalFacts:  nil,
 		ProjectFacts: nil,
 	}
@@ -83,21 +84,21 @@ func (fi *CoordinatorFactsIntegration) CollectFacts(machineNames []string) (*int
 	// Collect facts from each machine
 	if fi.factsManager != nil {
 		for _, machine := range machineNames {
-			fi.logger.Info("Collecting facts from machine", logging.String("machine", machine))
+			fi.logger.Info("Collecting facts from machine", spookylogging.String("machine", machine))
 
 			// Collect facts using the facts manager
 			facts, err := fi.factsManager.CollectAllFacts(machine)
 			if err != nil {
 				fi.logger.Warn("Failed to collect facts for machine",
-					logging.String("machine", machine),
-					logging.Error(err))
+					spookylogging.String("machine", machine),
+					spookylogging.Error(err))
 				continue
 			}
 
 			context.MachineFacts[machine] = facts
 			fi.logger.Info("Successfully collected facts from machine",
-				logging.String("machine", machine),
-				logging.Int("facts_count", len(facts.Facts)))
+				spookylogging.String("machine", machine),
+				spookylogging.Int("facts_count", len(facts.Facts)))
 		}
 	}
 
@@ -105,14 +106,14 @@ func (fi *CoordinatorFactsIntegration) CollectFacts(machineNames []string) (*int
 	context.CacheKey = fi.generateCacheKey(machineNames)
 
 	fi.logger.Info("Completed facts collection",
-		logging.Int("machines_processed", len(context.MachineFacts)),
-		logging.Int("total_machines", len(machineNames)))
+		spookylogging.Int("machines_processed", len(context.MachineFacts)),
+		spookylogging.Int("total_machines", len(machineNames)))
 
 	return context, nil
 }
 
 // ValidateFacts validates facts data integrity
-func (fi *CoordinatorFactsIntegration) ValidateFacts(factsContext *interfaces.FactsContext) error {
+func (fi *CoordinatorFactsIntegration) ValidateFacts(factsContext *spookyinterfaces.FactsContext) error {
 	if factsContext == nil {
 		return fmt.Errorf("facts context cannot be nil")
 	}
@@ -143,33 +144,33 @@ func (fi *CoordinatorFactsIntegration) ValidateFacts(factsContext *interfaces.Fa
 // OptimizeFactsGathering optimizes facts gathering performance
 func (fi *CoordinatorFactsIntegration) OptimizeFactsGathering(machineNames []string, parallel int) (int, time.Duration, error) {
 	// Validate inputs
-	if err := interfaces.ValidateMachineNames(machineNames); err != nil {
+	if err := spookyinterfaces.ValidateMachineNames(machineNames); err != nil {
 		return 0, 0, err
 	}
 
-	if err := interfaces.ValidateParallelWorkers(parallel); err != nil {
+	if err := spookyinterfaces.ValidateParallelWorkers(parallel); err != nil {
 		return 0, 0, err
 	}
 
 	// Calculate optimal parallel workers
-	optimalParallel := interfaces.CalculateOptimalParallel(parallel, len(machineNames), interfaces.DefaultOptimizationConfig())
+	optimalParallel := spookyinterfaces.CalculateOptimalParallel(parallel, len(machineNames), spookyinterfaces.DefaultOptimizationConfig())
 
 	// Calculate optimal timeout
-	optimalTimeout := interfaces.CalculateOptimalTimeout(len(machineNames), optimalParallel, interfaces.DefaultOptimizationConfig())
+	optimalTimeout := spookyinterfaces.CalculateOptimalTimeout(len(machineNames), optimalParallel, spookyinterfaces.DefaultOptimizationConfig())
 
 	return optimalParallel, optimalTimeout, nil
 }
 
 // GetFactsForMachine gets facts for a specific machine
-func (fi *CoordinatorFactsIntegration) GetFactsForMachine(machine string) (*types.FactCollection, error) {
+func (fi *CoordinatorFactsIntegration) GetFactsForMachine(machine string) (*spookyfactstypes.FactCollection, error) {
 	if fi.factsManager == nil {
-		return &types.FactCollection{}, nil
+		return &spookyfactstypes.FactCollection{}, nil
 	}
 	return fi.factsManager.GetFactCollection(machine)
 }
 
 // CacheFacts caches facts for later use
-func (fi *CoordinatorFactsIntegration) CacheFacts(factsContext *interfaces.FactsContext) error {
+func (fi *CoordinatorFactsIntegration) CacheFacts(factsContext *spookyinterfaces.FactsContext) error {
 	if factsContext == nil {
 		return fmt.Errorf("facts context cannot be nil")
 	}
@@ -184,8 +185,8 @@ func (fi *CoordinatorFactsIntegration) CacheFacts(factsContext *interfaces.Facts
 		if factCollection != nil {
 			if err := fi.factsManager.SetFactCollection(machine, factCollection); err != nil {
 				fi.logger.Warn("Failed to cache facts for machine",
-					logging.String("machine", machine),
-					logging.Error(err))
+					spookylogging.String("machine", machine),
+					spookylogging.Error(err))
 			}
 		}
 	}
@@ -193,14 +194,14 @@ func (fi *CoordinatorFactsIntegration) CacheFacts(factsContext *interfaces.Facts
 	// Cache global facts if present
 	if factsContext.GlobalFacts != nil {
 		if err := fi.factsManager.PersistFacts("global", factsContext.GlobalFacts); err != nil {
-			fi.logger.Warn("Failed to cache global facts", logging.Error(err))
+			fi.logger.Warn("Failed to cache global facts", spookylogging.Error(err))
 		}
 	}
 
 	// Cache project facts if present
 	if factsContext.ProjectFacts != nil {
 		if err := fi.factsManager.PersistFacts("project", factsContext.ProjectFacts); err != nil {
-			fi.logger.Warn("Failed to cache project facts", logging.Error(err))
+			fi.logger.Warn("Failed to cache project facts", spookylogging.Error(err))
 		}
 	}
 
@@ -208,12 +209,12 @@ func (fi *CoordinatorFactsIntegration) CacheFacts(factsContext *interfaces.Facts
 }
 
 // CollectFactsForAction collects facts needed for action execution
-func (fi *CoordinatorFactsIntegration) CollectFactsForAction(_ interface{}, machines []string) (*interfaces.FactsContext, error) {
+func (fi *CoordinatorFactsIntegration) CollectFactsForAction(_ interface{}, machines []string) (*spookyinterfaces.FactsContext, error) {
 	return fi.LoadFacts(machines)
 }
 
 // ValidateActionWithFacts validates an action using facts data
-func (fi *CoordinatorFactsIntegration) ValidateActionWithFacts(action interface{}, factsContext *interfaces.FactsContext) error {
+func (fi *CoordinatorFactsIntegration) ValidateActionWithFacts(action interface{}, factsContext *spookyinterfaces.FactsContext) error {
 	// Basic validation - ensure facts context is valid
 	if err := fi.ValidateFacts(factsContext); err != nil {
 		return fmt.Errorf("facts validation failed: %w", err)
@@ -250,7 +251,7 @@ func (fi *CoordinatorFactsIntegration) ValidateActionWithFacts(action interface{
 }
 
 // GetFactValue gets a specific fact value from the context
-func (fi *CoordinatorFactsIntegration) GetFactValue(factKey string, factsContext *interfaces.FactsContext) (interface{}, error) {
+func (fi *CoordinatorFactsIntegration) GetFactValue(factKey string, factsContext *spookyinterfaces.FactsContext) (interface{}, error) {
 	if factsContext == nil {
 		return nil, fmt.Errorf("facts context cannot be nil")
 	}
@@ -259,8 +260,8 @@ func (fi *CoordinatorFactsIntegration) GetFactValue(factKey string, factsContext
 	for machine, factCollection := range factsContext.MachineFacts {
 		if fact, exists := factCollection.Facts[factKey]; exists {
 			fi.logger.Debug("Found fact in machine facts",
-				logging.String("fact_key", factKey),
-				logging.String("machine", machine))
+				spookylogging.String("fact_key", factKey),
+				spookylogging.String("machine", machine))
 			return fact.Value, nil
 		}
 	}
@@ -269,7 +270,7 @@ func (fi *CoordinatorFactsIntegration) GetFactValue(factKey string, factsContext
 	if factsContext.GlobalFacts != nil {
 		if fact, exists := factsContext.GlobalFacts.Facts[factKey]; exists {
 			fi.logger.Debug("Found fact in global facts",
-				logging.String("fact_key", factKey))
+				spookylogging.String("fact_key", factKey))
 			return fact.Value, nil
 		}
 	}
@@ -278,7 +279,7 @@ func (fi *CoordinatorFactsIntegration) GetFactValue(factKey string, factsContext
 	if factsContext.ProjectFacts != nil {
 		if fact, exists := factsContext.ProjectFacts.Facts[factKey]; exists {
 			fi.logger.Debug("Found fact in project facts",
-				logging.String("fact_key", factKey))
+				spookylogging.String("fact_key", factKey))
 			return fact.Value, nil
 		}
 	}
@@ -287,7 +288,7 @@ func (fi *CoordinatorFactsIntegration) GetFactValue(factKey string, factsContext
 }
 
 // ExportFacts exports facts to JSON format with encryption support
-func (fi *CoordinatorFactsIntegration) ExportFacts(w io.Writer, opts facts.ExportOptions) error {
+func (fi *CoordinatorFactsIntegration) ExportFacts(w io.Writer, opts spookystorage.ExportOptions) error {
 	if fi.factsManager == nil {
 		return fmt.Errorf("facts manager is not available")
 	}
@@ -297,7 +298,7 @@ func (fi *CoordinatorFactsIntegration) ExportFacts(w io.Writer, opts facts.Expor
 }
 
 // ExportToHCL exports facts to HCL format
-func (fi *CoordinatorFactsIntegration) ExportToHCL(w io.Writer, query *facts.FactQuery) error {
+func (fi *CoordinatorFactsIntegration) ExportToHCL(w io.Writer, query *spookystorage.FactQuery) error {
 	if fi.factsManager == nil {
 		return fmt.Errorf("facts manager is not available")
 	}
@@ -308,7 +309,7 @@ func (fi *CoordinatorFactsIntegration) ExportToHCL(w io.Writer, query *facts.Fac
 		return fmt.Errorf("facts storage is not available")
 	}
 
-	exporter := facts.NewExporter(storage)
+	exporter := spookyfacts.NewExporter(storage)
 	return exporter.ExportToHCL(w, query)
 }
 

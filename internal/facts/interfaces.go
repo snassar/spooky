@@ -4,50 +4,51 @@ import (
 	"io"
 	"time"
 
-	"spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/facts/types"
+	spookystorage "spooky/internal/storage"
 )
 
 // FactManager defines the main interface for fact collection and management
 type FactManager interface {
 	// Core collection operations
-	CollectAllFacts(server string) (*types.FactCollection, error)
-	CollectSpecificFacts(server string, keys []string) (*types.FactCollection, error)
-	GetFact(server, key string) (*types.Fact, error)
+	CollectAllFacts(server string) (*spookyfactstypes.FactCollection, error)
+	CollectSpecificFacts(server string, keys []string) (*spookyfactstypes.FactCollection, error)
+	GetFact(server, key string) (*spookyfactstypes.Fact, error)
 
 	// Storage operations
-	PersistFacts(machineID string, collection *types.FactCollection) error
-	LoadPersistedFacts(server string) (*types.FactCollection, error)
-	QueryPersistedFacts(query *FactQuery) ([]*types.FactCollection, error)
-	DeletePersistedFacts(query *FactQuery) (int, error)
+	PersistFacts(machineID string, collection *spookyfactstypes.FactCollection) error
+	LoadPersistedFacts(server string) (*spookyfactstypes.FactCollection, error)
+	QueryPersistedFacts(query *spookystorage.FactQuery) ([]*spookyfactstypes.FactCollection, error)
+	DeletePersistedFacts(query *spookystorage.FactQuery) (int, error)
 
 	// Export/Import operations
 	ExportFacts(w io.Writer) error
 	ImportFacts(r io.Reader) error
-	ExportFactsWithEncryption(w io.Writer, opts ExportOptions) error
+	ExportFactsWithEncryption(w io.Writer, opts spookystorage.ExportOptions) error
 	ImportFactsWithDecryption(r io.Reader, identityFile string) error
 
 	// Cache operations
 	ClearCache()
 	ClearExpiredCache()
-	GetAllFacts() ([]*types.Fact, error)
+	GetAllFacts() ([]*spookyfactstypes.Fact, error)
 
 	// Configuration
 	SetDefaultTTL(ttl time.Duration)
-	RegisterCustomCollector(name string, collector types.FactCollector)
+	RegisterCustomCollector(name string, collector spookyfactstypes.FactCollector)
 
 	// Custom facts operations
-	ImportCustomFacts(source, server string, mergePolicy types.MergePolicy) (*types.FactCollection, error)
-	ImportCustomFactsWithOptions(source string, options *types.ImportOptions) error
+	ImportCustomFacts(source, server string, mergePolicy spookyfactstypes.MergePolicy) (*spookyfactstypes.FactCollection, error)
+	ImportCustomFactsWithOptions(source string, options *spookyfactstypes.ImportOptions) error
 	GetCustomFacts(server string) (map[string]interface{}, error)
 
 	// Utility operations
-	GenerateMachineID(facts *types.FactCollection) string
+	GenerateMachineID(facts *spookyfactstypes.FactCollection) string
 	Close() error
 
 	// Coordinator integration methods
-	GetFactCollection(machine string) (*types.FactCollection, error)
-	SetFactCollection(machine string, collection *types.FactCollection) error
+	GetFactCollection(machine string) (*spookyfactstypes.FactCollection, error)
+	SetFactCollection(machine string, collection *spookyfactstypes.FactCollection) error
 
 	// Storage access for coordinator integration
-	GetStorage() FactStorage
+	GetStorage() spookystorage.FactStorage
 }
