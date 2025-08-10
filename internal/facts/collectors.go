@@ -5,7 +5,7 @@ import (
 
 	spookyfactscollectorslocal "spooky/internal/facts/collectors/local"
 	spookyfactscollectorsssh "spooky/internal/facts/collectors/ssh"
-	spookyfactstypes "spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/types/facts"
 	spookylogging "spooky/internal/logging"
 	spookysshtypes "spooky/internal/ssh/types"
 	"time"

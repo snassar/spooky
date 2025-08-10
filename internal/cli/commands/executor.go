@@ -3,36 +3,36 @@ package commands
 import (
 	"fmt"
 
-	spookyclitypes "spooky/internal/cli/types"
+	spookytypescli "spooky/internal/types/cli"
 )
 
-// Executor implements CommandExecutor interface
-type Executor struct{}
+// Actor implements CommandActor interface
+type Actor struct{}
 
-// NewExecutor creates a new command executor
-func NewExecutor() *Executor {
-	return &Executor{}
+// NewActor creates a new command actor
+func NewActor() *Actor {
+	return &Actor{}
 }
 
-// ExecuteCommand executes a command
-func (e *Executor) ExecuteCommand(command *spookyclitypes.Command, args []string) error {
+// RunCommand runs a command
+func (a *Actor) RunCommand(command *spookytypescli.Command, args []string) error {
 	if command == nil {
 		return fmt.Errorf("command cannot be nil")
 	}
 
-	// Validate execution
-	if err := e.ValidateExecution(command, args); err != nil {
-		return fmt.Errorf("execution validation failed: %w", err)
+	// Validate command
+	if err := a.ValidateCommand(command, args); err != nil {
+		return fmt.Errorf("command validation failed: %w", err)
 	}
 
-	// TODO: Implement actual command execution logic
-	// This would typically involve calling the coordinator to execute the command
+	// TODO: Implement actual command running logic
+	// This would typically involve calling the coordinator to run the command
 
 	return nil
 }
 
-// ExecuteSubcommand executes a subcommand
-func (e *Executor) ExecuteSubcommand(parent *spookyclitypes.Command, subcommand string, args []string) error {
+// RunSubcommand runs a subcommand
+func (a *Actor) RunSubcommand(parent *spookytypescli.Command, subcommand string, args []string) error {
 	if parent == nil {
 		return fmt.Errorf("parent command cannot be nil")
 	}
@@ -42,7 +42,7 @@ func (e *Executor) ExecuteSubcommand(parent *spookyclitypes.Command, subcommand 
 	}
 
 	// Find the subcommand
-	var targetCommand *spookyclitypes.Command
+	var targetCommand *spookytypescli.Command
 	for _, cmd := range parent.Subcommands {
 		if cmd.Name == subcommand {
 			targetCommand = cmd
@@ -54,12 +54,12 @@ func (e *Executor) ExecuteSubcommand(parent *spookyclitypes.Command, subcommand 
 		return fmt.Errorf("subcommand not found: %s", subcommand)
 	}
 
-	// Execute the subcommand
-	return e.ExecuteCommand(targetCommand, args)
+	// Run the subcommand
+	return a.RunCommand(targetCommand, args)
 }
 
-// ValidateExecution validates command execution
-func (e *Executor) ValidateExecution(command *spookyclitypes.Command, _ []string) error {
+// ValidateCommand validates command
+func (a *Actor) ValidateCommand(command *spookytypescli.Command, _ []string) error {
 	if command == nil {
 		return fmt.Errorf("command cannot be nil")
 	}

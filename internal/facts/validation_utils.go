@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"time"
 
-	"spooky/internal/facts/types"
+	"spooky/internal/types/facts"
 )
 
 // ValidationResult represents validation result

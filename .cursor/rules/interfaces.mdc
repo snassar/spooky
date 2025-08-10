@@ -234,12 +234,8 @@ Always consider how new code integrates with:
 11. **Optimization interfaces** - For performance tuning
 12. **Caching interfaces** - For performance optimization
 
-## Terminology Requirements
+## Terminology
 
-- Use "acting" instead of "execution" for action operations
-- Use "passphrase" instead of "password" for authentication
-- Use "machines" instead of "hosts" for inventory
-- Use "facts" instead of "metadata" for machine information
-- Use "variables" instead of "parameters" for configuration
+For all terminology requirements, refer to `@terminology.mdc`.
 
 This rule ensures consistent architecture and maintainable code by enforcing interface contracts and established patterns throughout the spooky codebase. 

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"spooky/internal/logging"
-	loggingTypes "spooky/internal/logging/types"
+	loggingTypes "spooky/internal/types/logging"
 	"spooky/internal/templates/engine"
 	"spooky/internal/templates/functions"
 	"spooky/internal/templates/secrets"

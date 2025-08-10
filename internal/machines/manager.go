@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	spookyconfigtypes "spooky/internal/config/types"
+	spookyconfigtypes "spooky/internal/types/config"
 	spookylogging "spooky/internal/logging"
 	spookymachinesconnectivity "spooky/internal/machines/connectivity"
 	spookymachinesindexing "spooky/internal/machines/indexing"

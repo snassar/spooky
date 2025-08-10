@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	spookyfactstypes "spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/types/facts"
 	spookyschemas "spooky/internal/schemas"
 	spookysecrets "spooky/internal/secrets"
 

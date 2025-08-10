@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	spookyfactstypes "spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/types/facts"
 )
 
 func TestNewBadgerFactStorage(t *testing.T) {

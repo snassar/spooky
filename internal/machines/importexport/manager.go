@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	spookyconfigtypes "spooky/internal/config/types"
+	spookyconfigtypes "spooky/internal/types/config"
 	spookylogging "spooky/internal/logging"
 	spookymachinestypes "spooky/internal/machines/types"
 	spookyschemas "spooky/internal/schemas"

@@ -4,10 +4,10 @@ import (
 	"testing"
 	"time"
 
-	spookyfactstypes "spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/types/facts"
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
-	spookyloggingtypes "spooky/internal/logging/types"
+	spookyloggingtypes "spooky/internal/types/logging"
 
 	"github.com/stretchr/testify/assert"
 )

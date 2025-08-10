@@ -6,7 +6,7 @@ import (
 	"time"
 
 	spookyfacts "spooky/internal/facts"
-	spookyfactstypes "spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/types/facts"
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
 	spookystorage "spooky/internal/storage"

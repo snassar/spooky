@@ -198,12 +198,8 @@ The types system works closely with the interfaces system:
 4. **Error Types**: Align with interface error patterns
 5. **Configuration Types**: Support interface configuration needs
 
-## Terminology Requirements
+## Terminology
 
-- Use "acting" instead of "execution" for action-related types
-- Use "passphrase" instead of "password" for authentication types
-- Use "machines" instead of "hosts" for inventory types
-- Use "facts" instead of "metadata" for machine information types
-- Use "variables" instead of "parameters" for configuration types
+For all terminology requirements, refer to `@terminology.mdc`.
 
 This rule ensures consistent type definitions and maintainable code by enforcing type system patterns and conventions throughout the spooky codebase.

@@ -2,7 +2,7 @@ package validators
 
 import (
 	"fmt"
-	"spooky/internal/schemas/types"
+	spookytypesschemas "spooky/internal/types/schemas"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
@@ -21,8 +21,8 @@ func NewHCLValidator() *HCLValidator {
 }
 
 // Validate validates HCL data against a schema
-func (v *HCLValidator) Validate(data interface{}, schema *types.Schema) *types.ValidationResult {
-	result := &types.ValidationResult{
+func (v *HCLValidator) Validate(data interface{}, schema *spookytypesschemas.Schema) *spookytypesschemas.ValidationResult {
+	result := &spookytypesschemas.ValidationResult{
 		Valid:  true,
 		Schema: string(schema.Type),
 	}
@@ -32,7 +32,7 @@ func (v *HCLValidator) Validate(data interface{}, schema *types.Schema) *types.V
 	if diags.HasErrors() {
 		result.Valid = false
 		for _, diag := range diags {
-			result.Errors = append(result.Errors, types.ValidationError{
+			result.Errors = append(result.Errors, spookytypesschemas.ValidationError{
 				File:     schema.Filename,
 				Line:     diag.Subject.Start.Line,
 				Column:   diag.Subject.Start.Column,
@@ -46,7 +46,7 @@ func (v *HCLValidator) Validate(data interface{}, schema *types.Schema) *types.V
 	// Basic HCL validation
 	if err := v.validateBasicHCL(file); err != nil {
 		result.Valid = false
-		result.Errors = append(result.Errors, types.ValidationError{
+		result.Errors = append(result.Errors, spookytypesschemas.ValidationError{
 			File:     schema.Filename,
 			Message:  err.Error(),
 			Severity: "error",

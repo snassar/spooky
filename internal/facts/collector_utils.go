@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"spooky/internal/facts/types"
+	"spooky/internal/types/facts"
 	"spooky/internal/logging"
 	"time"
 )

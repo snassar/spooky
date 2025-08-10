@@ -1,6 +1,6 @@
 package interfaces
 
-import "spooky/internal/config/types"
+import spookytypesconfig "spooky/internal/types/config"
 
 // IntegrationManager coordinates all system integrations
 type IntegrationManager interface {
@@ -13,10 +13,10 @@ type IntegrationManager interface {
 	Secrets() SecretsIntegration
 
 	// Context management
-	LoadContextForAction(action *types.Action, projectPath string, machineNames []string) (*ActionExecutionContext, error)
-	ValidateActionWithAllSystems(action *types.Action, context *ActionExecutionContext) error
-	PrepareActionForExecution(action *types.Action, context *ActionExecutionContext) error
-	ExecuteAction(action *types.Action, context *ActionExecutionContext) error
+	LoadContextForAction(action *spookytypesconfig.Action, projectPath string, machineNames []string) (*ActionExecutionContext, error)
+	ValidateActionWithAllSystems(action *spookytypesconfig.Action, context *ActionExecutionContext) error
+	PrepareActionForExecution(action *spookytypesconfig.Action, context *ActionExecutionContext) error
+	ExecuteAction(action *spookytypesconfig.Action, context *ActionExecutionContext) error
 
 	// Health and status
 	ValidateIntegrationHealth() error

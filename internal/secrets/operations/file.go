@@ -8,7 +8,7 @@ import (
 
 	"spooky/internal/logging"
 	"spooky/internal/secrets/age"
-	"spooky/internal/secrets/types"
+	"spooky/internal/types/secrets"
 )
 
 // FileManager handles file encryption and decryption operations

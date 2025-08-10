@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	spookyfactstypes "spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/types/facts"
 	spookylogging "spooky/internal/logging"
 	spookyssh "spooky/internal/ssh"
 	spookystorage "spooky/internal/storage"

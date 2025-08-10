@@ -3,7 +3,7 @@ package storage
 import (
 	"fmt"
 
-	spookyfactstypes "spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/types/facts"
 	spookyschemas "spooky/internal/schemas"
 )
 

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	spookyfactscollectors "spooky/internal/facts/collectors"
-	spookyfactstypes "spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/types/facts"
 )
 
 // Collector collects facts from OpenTofu state files and outputs

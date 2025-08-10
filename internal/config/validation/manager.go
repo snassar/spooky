@@ -3,35 +3,35 @@ package validation
 import (
 	"fmt"
 
-	spookyconfigtypes "spooky/internal/config/types"
-	spookylogging "spooky/internal/logging"
+	spookytypesconfig "spooky/internal/types/config"
+	spookytypeslogging "spooky/internal/types/logging"
 )
 
 // Manager implements ValidationManager interface
 type Manager struct {
-	config     *spookyconfigtypes.ValidationConfig
-	validators map[string]ConfigValidator
-	logger     spookylogging.Logger
-	errors     []spookyconfigtypes.ValidationError
+	config     *spookytypesconfig.ValidationConfig
+	validators map[string]spookytypesconfig.ConfigValidator
+	logger     spookytypeslogging.Logger
+	errors     []spookytypesconfig.ValidationError
 }
 
 // NewManager creates a new validation manager
-func NewManager(config *spookyconfigtypes.ValidationConfig, logger spookylogging.Logger) *Manager {
+func NewManager(config *spookytypesconfig.ValidationConfig, logger spookytypeslogging.Logger) *Manager {
 	return &Manager{
 		config:     config,
-		validators: make(map[string]ConfigValidator),
+		validators: make(map[string]spookytypesconfig.ConfigValidator),
 		logger:     logger,
-		errors:     make([]spookyconfigtypes.ValidationError, 0),
+		errors:     make([]spookytypesconfig.ValidationError, 0),
 	}
 }
 
 // ValidateGlobalConfig validates global configuration
-func (m *Manager) ValidateGlobalConfig(config *spookyconfigtypes.GlobalConfig) error {
+func (m *Manager) ValidateGlobalConfig(config *spookytypesconfig.GlobalConfig) error {
 	return m.validateConfig(config, "global", m.validateGlobalConfigBasic)
 }
 
 // ValidateProjectConfig validates project configuration
-func (m *Manager) ValidateProjectConfig(config *spookyconfigtypes.ProjectConfig) error {
+func (m *Manager) ValidateProjectConfig(config *spookytypesconfig.ProjectConfig) error {
 	return m.validateConfig(config, "project", m.validateProjectConfigBasic)
 }
 
@@ -42,12 +42,12 @@ func (m *Manager) validateConfig(config interface{}, configType string, basicVal
 	}
 
 	// Clear previous errors
-	m.errors = make([]spookyconfigtypes.ValidationError, 0)
+	m.errors = make([]spookytypesconfig.ValidationError, 0)
 
 	// Run custom validators
 	for name, validator := range m.validators {
 		if err := validator.Validate(config); err != nil {
-			m.errors = append(m.errors, spookyconfigtypes.ValidationError{
+			m.errors = append(m.errors, spookytypesconfig.ValidationError{
 				Field:   name,
 				Message: err.Error(),
 			})
@@ -56,7 +56,7 @@ func (m *Manager) validateConfig(config interface{}, configType string, basicVal
 
 	// Basic validation
 	if err := basicValidator(config); err != nil {
-		m.errors = append(m.errors, spookyconfigtypes.ValidationError{
+		m.errors = append(m.errors, spookytypesconfig.ValidationError{
 			Field:   configType,
 			Message: err.Error(),
 		})
@@ -87,9 +87,9 @@ func (m *Manager) ValidateAgainstSchema(config interface{}, _ string) error {
 }
 
 // SetValidationRules sets validation rules
-func (m *Manager) SetValidationRules(rules *spookyconfigtypes.ValidationRules) error {
+func (m *Manager) SetValidationRules(rules *spookytypesconfig.ValidationRules) error {
 	if m.config == nil {
-		m.config = &spookyconfigtypes.ValidationConfig{}
+		m.config = &spookytypesconfig.ValidationConfig{}
 	}
 	m.config.ValidationRules = rules
 	return nil
@@ -98,20 +98,20 @@ func (m *Manager) SetValidationRules(rules *spookyconfigtypes.ValidationRules) e
 // EnableStrictValidation enables or disables strict validation
 func (m *Manager) EnableStrictValidation(strict bool) error {
 	if m.config == nil {
-		m.config = &spookyconfigtypes.ValidationConfig{}
+		m.config = &spookytypesconfig.ValidationConfig{}
 	}
 	m.config.StrictValidation = strict
 	return nil
 }
 
 // GetValidationErrors returns validation errors
-func (m *Manager) GetValidationErrors() []spookyconfigtypes.ValidationError {
+func (m *Manager) GetValidationErrors() []spookytypesconfig.ValidationError {
 	return m.errors
 }
 
 // ClearValidationErrors clears validation errors
 func (m *Manager) ClearValidationErrors() error {
-	m.errors = make([]spookyconfigtypes.ValidationError, 0)
+	m.errors = make([]spookytypesconfig.ValidationError, 0)
 	return nil
 }
 
@@ -123,7 +123,7 @@ func (m *Manager) Close() error {
 
 // validateGlobalConfigBasic performs basic validation on global config
 func (m *Manager) validateGlobalConfigBasic(config interface{}) error {
-	globalConfig, ok := config.(*spookyconfigtypes.GlobalConfig)
+	globalConfig, ok := config.(*spookytypesconfig.GlobalConfig)
 	if !ok {
 		return fmt.Errorf("invalid config type for global validation")
 	}
@@ -148,7 +148,7 @@ func (m *Manager) validateGlobalConfigBasic(config interface{}) error {
 
 // validateProjectConfigBasic performs basic validation on project config
 func (m *Manager) validateProjectConfigBasic(config interface{}) error {
-	projectConfig, ok := config.(*spookyconfigtypes.ProjectConfig)
+	projectConfig, ok := config.(*spookytypesconfig.ProjectConfig)
 	if !ok {
 		return fmt.Errorf("invalid config type for project validation")
 	}

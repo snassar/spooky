@@ -1,10 +1,10 @@
 package interfaces
 
 import (
-	spookyactionstypes "spooky/internal/actions/types"
-	spookyconfigtypes "spooky/internal/config/types"
-	spookyfactstypes "spooky/internal/facts/types"
-	spookytemplatestypes "spooky/internal/templates/types"
+	spookytypesactions "spooky/internal/types/actions"
+	spookytypesconfig "spooky/internal/types/config"
+	spookytypesfacts "spooky/internal/types/facts"
+	spookytypestemplates "spooky/internal/types/templates"
 	"time"
 )
 
@@ -18,17 +18,17 @@ type BaseContext struct {
 // ConfigContext provides configuration data for integrations
 type ConfigContext struct {
 	BaseContext
-	GlobalConfig  *spookyconfigtypes.GlobalConfig
-	ProjectConfig *spookyconfigtypes.ProjectConfig
+	GlobalConfig  *spookytypesconfig.GlobalConfig
+	ProjectConfig *spookytypesconfig.ProjectConfig
 	Environment   map[string]interface{}
 }
 
 // FactsContext provides facts data for integrations
 type FactsContext struct {
 	BaseContext
-	MachineFacts map[string]*spookyfactstypes.FactCollection
-	GlobalFacts  *spookyfactstypes.FactCollection
-	ProjectFacts *spookyfactstypes.FactCollection
+	MachineFacts map[string]*spookytypesfacts.FactCollection
+	GlobalFacts  *spookytypesfacts.FactCollection
+	ProjectFacts *spookytypesfacts.FactCollection
 	CacheKey     string
 }
 
@@ -43,7 +43,7 @@ type VariablesContext struct {
 // TemplatesContext provides templates data for integrations
 type TemplatesContext struct {
 	BaseContext
-	Templates     map[string]*spookytemplatestypes.Template
+	Templates     map[string]*spookytypestemplates.Template
 	RenderedCache map[string]string
 	Functions     map[string]interface{}
 }
@@ -55,6 +55,6 @@ type ActionExecutionContext struct {
 	VariablesContext *VariablesContext
 	TemplatesContext *TemplatesContext
 	MachineNames     []string
-	Action           *spookyactionstypes.Action
+	Action           *spookytypesactions.Action
 	Decrypt          bool
 }

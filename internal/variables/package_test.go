@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"spooky/internal/logging"
-	loggingtypes "spooky/internal/logging/types"
+	loggingtypes "spooky/internal/types/logging"
 	vartypes "spooky/internal/variables/types"
 )
 

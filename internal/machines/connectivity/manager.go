@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	configtypes "spooky/internal/config/types"
+	configtypes "spooky/internal/types/config"
 	"spooky/internal/machines/types"
 
 	"golang.org/x/crypto/ssh"

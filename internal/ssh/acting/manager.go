@@ -19,30 +19,30 @@ func NewManager(config *spookysshtypes.ActingConfig, logger spookylogging.Logger
 	}
 }
 
-// ExecuteAction executes an action on the SSH connection
-func (m *Manager) ExecuteAction(connection *spookysshtypes.SSHConnection, action *spookysshtypes.SSHAction) (*spookysshtypes.ActionResult, error) {
-	// TODO: Implement action execution logic
-	m.logger.Info("Action executed", spookylogging.String("host", connection.Host), spookylogging.String("action", action.Name))
+// RunAction runs an action on the SSH connection
+func (m *Manager) RunAction(connection *spookysshtypes.SSHConnection, action *spookysshtypes.SSHAction) (*spookysshtypes.ActionResult, error) {
+	// TODO: Implement action running logic
+	m.logger.Info("Action run", spookylogging.String("host", connection.Host), spookylogging.String("action", action.Name))
 	return &spookysshtypes.ActionResult{}, nil
 }
 
-// ExecuteTemplate executes a template action on the SSH connection
-func (m *Manager) ExecuteTemplate(connection *spookysshtypes.SSHConnection, template *spookysshtypes.TemplateAction) (*spookysshtypes.ActionResult, error) {
-	// TODO: Implement template execution logic
-	m.logger.Info("Template executed", spookylogging.String("host", connection.Host), spookylogging.String("template", template.Name))
+// RunTemplate runs a template action on the SSH connection
+func (m *Manager) RunTemplate(connection *spookysshtypes.SSHConnection, template *spookysshtypes.TemplateAction) (*spookysshtypes.ActionResult, error) {
+	// TODO: Implement template running logic
+	m.logger.Info("Template run", spookylogging.String("host", connection.Host), spookylogging.String("template", template.Name))
 	return &spookysshtypes.ActionResult{}, nil
 }
 
-// ExecuteSequential executes actions sequentially
-func (m *Manager) ExecuteSequential(connection *spookysshtypes.SSHConnection, actions []*spookysshtypes.SSHAction) (*spookysshtypes.ActionResult, error) {
-	// TODO: Implement sequential execution logic
-	m.logger.Info("Sequential execution requested", spookylogging.String("host", connection.Host), spookylogging.Int("action_count", len(actions)))
+// RunSequential runs actions sequentially
+func (m *Manager) RunSequential(connection *spookysshtypes.SSHConnection, actions []*spookysshtypes.SSHAction) (*spookysshtypes.ActionResult, error) {
+	// TODO: Implement sequential running logic
+	m.logger.Info("Sequential running requested", spookylogging.String("host", connection.Host), spookylogging.Int("action_count", len(actions)))
 	return &spookysshtypes.ActionResult{}, nil
 }
 
-// ExecuteParallel executes actions in parallel
-func (m *Manager) ExecuteParallel(connection *spookysshtypes.SSHConnection, actions []*spookysshtypes.SSHAction) (*spookysshtypes.ActionResult, error) {
-	// TODO: Implement parallel execution logic
-	m.logger.Info("Parallel execution requested", spookylogging.String("host", connection.Host), spookylogging.Int("action_count", len(actions)))
+// RunParallel runs actions in parallel
+func (m *Manager) RunParallel(connection *spookysshtypes.SSHConnection, actions []*spookysshtypes.SSHAction) (*spookysshtypes.ActionResult, error) {
+	// TODO: Implement parallel running logic
+	m.logger.Info("Parallel running requested", spookylogging.String("host", connection.Host), spookylogging.Int("action_count", len(actions)))
 	return &spookysshtypes.ActionResult{}, nil
 }

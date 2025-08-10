@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"spooky/internal/facts/types"
+	"spooky/internal/types/facts"
 	"spooky/internal/logging"
 )
 

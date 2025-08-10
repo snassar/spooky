@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"time"
 
-	"spooky/internal/facts/types"
+	"spooky/internal/types/facts"
 )
 
 // ProjectFactsValidator provides validation for project facts using schema

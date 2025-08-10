@@ -5,22 +5,23 @@ import (
 	"os"
 	"strings"
 
-	spookyconfigtypes "spooky/internal/config/types"
+	spookytypesconfig "spooky/internal/types/config"
 	spookylogging "spooky/internal/logging"
+	spookytypeslogging "spooky/internal/types/logging"
 )
 
 // Manager implements EnvironmentManager interface
 type Manager struct {
-	config    *spookyconfigtypes.EnvironmentConfig
-	validator EnvironmentValidator
-	logger    spookylogging.Logger
+	config    *spookytypesconfig.EnvironmentConfig
+	validator spookytypesconfig.EnvironmentValidator
+	logger    spookytypeslogging.Logger
 }
 
 // NewManager creates a new environment manager
-func NewManager(config *spookyconfigtypes.EnvironmentConfig, logger spookylogging.Logger) *Manager {
+func NewManager(config *spookytypesconfig.EnvironmentConfig, logger spookytypeslogging.Logger) *Manager {
 	return &Manager{
 		config:    config,
-		validator: NewEnvironmentValidator(),
+		validator: Newspookytypesconfig.EnvironmentValidator(),
 		logger:    logger,
 	}
 }

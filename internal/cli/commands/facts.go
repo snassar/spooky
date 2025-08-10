@@ -10,7 +10,7 @@ import (
 	spookycoordinator "spooky/internal/coordinator"
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
-	spookyloggingtypes "spooky/internal/logging/types"
+	spookyloggingtypes "spooky/internal/types/logging"
 
 	"github.com/spf13/cobra"
 )

@@ -3,7 +3,7 @@ package facts
 import (
 	"time"
 
-	spookyfactstypes "spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/types/facts"
 )
 
 // MetadataKey represents standard metadata keys

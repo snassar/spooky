@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	spookyfactstypes "spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/types/facts"
 	spookystorage "spooky/internal/storage"
 	spookystoragebadger "spooky/internal/storage/badger"
 )

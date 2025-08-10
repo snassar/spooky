@@ -5,36 +5,36 @@ import (
 	"sync"
 	"time"
 
-	configtypes "spooky/internal/config/types"
-	"spooky/internal/machines/types"
+	spookytypesconfig "spooky/internal/types/config"
+	spookytypesmachines "spooky/internal/types/machines"
 )
 
 // Manager provides comprehensive indexing capabilities for machine data
 type Manager struct {
-	indexes map[types.IndexType]*types.MachineIndex
+	indexes map[spookytypesmachines.IndexType]*spookytypesmachines.MachineIndex
 	mutex   sync.RWMutex
 }
 
 // NewManager creates a new indexing manager
 func NewManager() *Manager {
 	return &Manager{
-		indexes: make(map[types.IndexType]*types.MachineIndex),
+		indexes: make(map[spookytypesmachines.IndexType]*spookytypesmachines.MachineIndex),
 	}
 }
 
 // BuildIndexes builds all indexes for the given machines
-func (im *Manager) BuildIndexes(machines []configtypes.Machine) error {
+func (im *Manager) BuildIndexes(machines []spookytypesconfig.Machine) error {
 	startTime := time.Now()
 
 	// Build each index type
-	indexTypes := []types.IndexType{
-		types.IndexTypeName,
-		types.IndexTypeHost,
-		types.IndexTypeTag,
-		types.IndexTypeGroup,
-		types.IndexTypeUser,
-		types.IndexTypePort,
-		types.IndexTypeMetadata,
+	indexTypes := []spookytypesmachines.IndexType{
+		spookytypesmachines.IndexTypeName,
+		spookytypesmachines.IndexTypeHost,
+		spookytypesmachines.IndexTypeTag,
+		spookytypesmachines.IndexTypeGroup,
+		spookytypesmachines.IndexTypeUser,
+		spookytypesmachines.IndexTypePort,
+		spookytypesmachines.IndexTypeMetadata,
 	}
 
 	for _, indexType := range indexTypes {
@@ -58,14 +58,14 @@ func (im *Manager) BuildIndexes(machines []configtypes.Machine) error {
 }
 
 // UpdateIndexes updates existing indexes with new machine data
-func (im *Manager) UpdateIndexes(machines []configtypes.Machine) error {
+func (im *Manager) UpdateIndexes(machines []spookytypesconfig.Machine) error {
 	// For now, rebuild all indexes
 	// In a more sophisticated implementation, we could do incremental updates
 	return im.BuildIndexes(machines)
 }
 
 // SynchronizeIndexes synchronizes indexes with external data
-func (im *Manager) SynchronizeIndexes(syncData *types.IndexSyncData) error {
+func (im *Manager) SynchronizeIndexes(syncData *spookytypesmachines.IndexSyncData) error {
 	if syncData == nil {
 		return fmt.Errorf("sync data is nil")
 	}
@@ -76,100 +76,100 @@ func (im *Manager) SynchronizeIndexes(syncData *types.IndexSyncData) error {
 }
 
 // LookupByName looks up a machine by name
-func (im *Manager) LookupByName(name string) (*configtypes.Machine, bool) {
+func (im *Manager) LookupByName(name string) (*spookytypesconfig.Machine, bool) {
 	im.mutex.RLock()
 	defer im.mutex.RUnlock()
 
-	if index, exists := im.indexes[types.IndexTypeName]; exists {
+	if index, exists := im.indexes[spookytypesmachines.IndexTypeName]; exists {
 		if machine, found := index.NameIndex[name]; found {
-			im.updateLookupMetrics(types.IndexTypeName, true)
+			im.updateLookupMetrics(spookytypesmachines.IndexTypeName, true)
 			return machine, true
 		}
 	}
-	im.updateLookupMetrics(types.IndexTypeName, false)
+	im.updateLookupMetrics(spookytypesmachines.IndexTypeName, false)
 	return nil, false
 }
 
 // LookupByHost looks up a machine by host
-func (im *Manager) LookupByHost(host string) (*configtypes.Machine, bool) {
+func (im *Manager) LookupByHost(host string) (*spookytypesconfig.Machine, bool) {
 	im.mutex.RLock()
 	defer im.mutex.RUnlock()
 
-	if index, exists := im.indexes[types.IndexTypeHost]; exists {
+	if index, exists := im.indexes[spookytypesmachines.IndexTypeHost]; exists {
 		if machine, found := index.HostIndex[host]; found {
-			im.updateLookupMetrics(types.IndexTypeHost, true)
+			im.updateLookupMetrics(spookytypesmachines.IndexTypeHost, true)
 			return machine, true
 		}
 	}
-	im.updateLookupMetrics(types.IndexTypeHost, false)
+	im.updateLookupMetrics(spookytypesmachines.IndexTypeHost, false)
 	return nil, false
 }
 
 // LookupByTag looks up machines by tag key
-func (im *Manager) LookupByTag(tagKey string) ([]*configtypes.Machine, bool) {
+func (im *Manager) LookupByTag(tagKey string) ([]*spookytypesconfig.Machine, bool) {
 	im.mutex.RLock()
 	defer im.mutex.RUnlock()
 
-	if index, exists := im.indexes[types.IndexTypeTag]; exists {
+	if index, exists := im.indexes[spookytypesmachines.IndexTypeTag]; exists {
 		if machines, found := index.TagIndex[tagKey]; found {
-			im.updateLookupMetrics(types.IndexTypeTag, true)
+			im.updateLookupMetrics(spookytypesmachines.IndexTypeTag, true)
 			return machines, true
 		}
 	}
-	im.updateLookupMetrics(types.IndexTypeTag, false)
+	im.updateLookupMetrics(spookytypesmachines.IndexTypeTag, false)
 	return nil, false
 }
 
 // LookupByTagValue looks up machines by tag key and value
-func (im *Manager) LookupByTagValue(tagKey, tagValue string) ([]*configtypes.Machine, bool) {
+func (im *Manager) LookupByTagValue(tagKey, tagValue string) ([]*spookytypesconfig.Machine, bool) {
 	im.mutex.RLock()
 	defer im.mutex.RUnlock()
 
-	if index, exists := im.indexes[types.IndexTypeTag]; exists {
+	if index, exists := im.indexes[spookytypesmachines.IndexTypeTag]; exists {
 		key := fmt.Sprintf("%s:%s", tagKey, tagValue)
 		if machines, found := index.TagValueIndex[key]; found {
-			im.updateLookupMetrics(types.IndexTypeTag, true)
+			im.updateLookupMetrics(spookytypesmachines.IndexTypeTag, true)
 			return machines, true
 		}
 	}
-	im.updateLookupMetrics(types.IndexTypeTag, false)
+	im.updateLookupMetrics(spookytypesmachines.IndexTypeTag, false)
 	return nil, false
 }
 
 // LookupByGroup looks up machines by group name
-func (im *Manager) LookupByGroup(groupName string) ([]*configtypes.Machine, bool) {
+func (im *Manager) LookupByGroup(groupName string) ([]*spookytypesconfig.Machine, bool) {
 	im.mutex.RLock()
 	defer im.mutex.RUnlock()
 
-	if index, exists := im.indexes[types.IndexTypeGroup]; exists {
+	if index, exists := im.indexes[spookytypesmachines.IndexTypeGroup]; exists {
 		if machines, found := index.GroupIndex[groupName]; found {
-			im.updateLookupMetrics(types.IndexTypeGroup, true)
+			im.updateLookupMetrics(spookytypesmachines.IndexTypeGroup, true)
 			return machines, true
 		}
 	}
-	im.updateLookupMetrics(types.IndexTypeGroup, false)
+	im.updateLookupMetrics(spookytypesmachines.IndexTypeGroup, false)
 	return nil, false
 }
 
 // LookupByMetadata looks up machines by metadata key
-func (im *Manager) LookupByMetadata(metadataKey string) ([]*configtypes.Machine, bool) {
+func (im *Manager) LookupByMetadata(metadataKey string) ([]*spookytypesconfig.Machine, bool) {
 	im.mutex.RLock()
 	defer im.mutex.RUnlock()
 
-	if index, exists := im.indexes[types.IndexTypeMetadata]; exists {
+	if index, exists := im.indexes[spookytypesmachines.IndexTypeMetadata]; exists {
 		if machines, found := index.MetadataIndex[metadataKey]; found {
-			im.updateLookupMetrics(types.IndexTypeMetadata, true)
+			im.updateLookupMetrics(spookytypesmachines.IndexTypeMetadata, true)
 			return machines, true
 		}
 	}
-	im.updateLookupMetrics(types.IndexTypeMetadata, false)
+	im.updateLookupMetrics(spookytypesmachines.IndexTypeMetadata, false)
 	return nil, false
 }
 
 // FilterByGroups filters machines by multiple groups
-func (im *Manager) FilterByGroups(groups []string) []*configtypes.Machine {
-	var result []*configtypes.Machine
-	seen := make(map[*configtypes.Machine]bool)
+func (im *Manager) FilterByGroups(groups []string) []*spookytypesconfig.Machine {
+	var result []*spookytypesconfig.Machine
+	seen := make(map[*spookytypesconfig.Machine]bool)
 
 	for _, group := range groups {
 		if machines, found := im.LookupByGroup(group); found {
@@ -186,13 +186,13 @@ func (im *Manager) FilterByGroups(groups []string) []*configtypes.Machine {
 }
 
 // FilterByTags filters machines by tag criteria
-func (im *Manager) FilterByTags(criteria map[string]string) []*configtypes.Machine {
+func (im *Manager) FilterByTags(criteria map[string]string) []*spookytypesconfig.Machine {
 	if len(criteria) == 0 {
 		return nil
 	}
 
-	var result []*configtypes.Machine
-	seen := make(map[*configtypes.Machine]bool)
+	var result []*spookytypesconfig.Machine
+	seen := make(map[*spookytypesconfig.Machine]bool)
 
 	// Start with the first criterion
 	var firstKey, firstValue string
@@ -216,7 +216,7 @@ func (im *Manager) FilterByTags(criteria map[string]string) []*configtypes.Machi
 
 		if machines, found := im.LookupByTagValue(key, value); found {
 			// Intersect with current result
-			newResult := []*configtypes.Machine{}
+			newResult := []*spookytypesconfig.Machine{}
 			for _, machine := range machines {
 				if seen[machine] {
 					newResult = append(newResult, machine)
@@ -225,7 +225,7 @@ func (im *Manager) FilterByTags(criteria map[string]string) []*configtypes.Machi
 			result = newResult
 
 			// Update seen map
-			seen = make(map[*configtypes.Machine]bool)
+			seen = make(map[*spookytypesconfig.Machine]bool)
 			for _, machine := range result {
 				seen[machine] = true
 			}
@@ -239,13 +239,13 @@ func (im *Manager) FilterByTags(criteria map[string]string) []*configtypes.Machi
 }
 
 // GetMetrics returns performance metrics for all indexes
-func (im *Manager) GetMetrics() *types.IndexMetrics {
+func (im *Manager) GetMetrics() *spookytypesmachines.IndexMetrics {
 	im.mutex.RLock()
 	defer im.mutex.RUnlock()
 
 	// Aggregate metrics from all indexes
-	aggregateMetrics := &types.IndexMetrics{
-		IndexTypeStats: make(map[types.IndexType]*types.IndexTypeStats),
+	aggregateMetrics := &spookytypesmachines.IndexMetrics{
+		IndexTypeStats: make(map[spookytypesmachines.IndexType]*spookytypesmachines.IndexTypeStats),
 	}
 
 	for indexType, index := range im.indexes {
@@ -290,34 +290,34 @@ func (im *Manager) OptimizeIndexes() {
 }
 
 // buildIndex builds a specific index type
-func (im *Manager) buildIndex(indexType types.IndexType, machines []configtypes.Machine) error {
+func (im *Manager) buildIndex(indexType spookytypesmachines.IndexType, machines []spookytypesconfig.Machine) error {
 	startTime := time.Now()
 
-	index := &types.MachineIndex{
-		Metrics: &types.IndexMetrics{
-			IndexTypeStats: make(map[types.IndexType]*types.IndexTypeStats),
+	index := &spookytypesmachines.MachineIndex{
+		Metrics: &spookytypesmachines.IndexMetrics{
+			IndexTypeStats: make(map[spookytypesmachines.IndexType]*spookytypesmachines.IndexTypeStats),
 		},
 	}
 
 	switch indexType {
-	case types.IndexTypeName:
-		index.NameIndex = make(map[string]*configtypes.Machine)
+	case spookytypesmachines.IndexTypeName:
+		index.NameIndex = make(map[string]*spookytypesconfig.Machine)
 		for i := range machines {
 			index.NameIndex[machines[i].Name] = &machines[i]
 		}
 
-	case types.IndexTypeHost:
-		index.HostIndex = make(map[string]*configtypes.Machine)
+	case spookytypesmachines.IndexTypeHost:
+		index.HostIndex = make(map[string]*spookytypesconfig.Machine)
 		for i := range machines {
 			if machines[i].Host != "" {
 				index.HostIndex[machines[i].Host] = &machines[i]
 			}
 		}
 
-	case types.IndexTypeTag:
-		index.TagIndex = make(map[string][]*configtypes.Machine)
-		index.TagValueIndex = make(map[string][]*configtypes.Machine)
-		index.MachineTags = make(map[*configtypes.Machine]map[string]string)
+	case spookytypesmachines.IndexTypeTag:
+		index.TagIndex = make(map[string][]*spookytypesconfig.Machine)
+		index.TagValueIndex = make(map[string][]*spookytypesconfig.Machine)
+		index.MachineTags = make(map[*spookytypesconfig.Machine]map[string]string)
 		for i := range machines {
 			machine := &machines[i]
 			index.MachineTags[machine] = make(map[string]string)
@@ -332,9 +332,9 @@ func (im *Manager) buildIndex(indexType types.IndexType, machines []configtypes.
 			}
 		}
 
-	case types.IndexTypeGroup:
-		index.GroupIndex = make(map[string][]*configtypes.Machine)
-		index.MachineGroups = make(map[*configtypes.Machine][]string)
+	case spookytypesmachines.IndexTypeGroup:
+		index.GroupIndex = make(map[string][]*spookytypesconfig.Machine)
+		index.MachineGroups = make(map[*spookytypesconfig.Machine][]string)
 		for i := range machines {
 			machine := &machines[i]
 			for _, group := range machine.Groups {
@@ -343,22 +343,22 @@ func (im *Manager) buildIndex(indexType types.IndexType, machines []configtypes.
 			}
 		}
 
-	case types.IndexTypeUser:
-		index.UserIndex = make(map[string][]*configtypes.Machine)
+	case spookytypesmachines.IndexTypeUser:
+		index.UserIndex = make(map[string][]*spookytypesconfig.Machine)
 		for i := range machines {
 			if machines[i].User != "" {
 				index.UserIndex[machines[i].User] = append(index.UserIndex[machines[i].User], &machines[i])
 			}
 		}
 
-	case types.IndexTypePort:
-		index.PortIndex = make(map[int][]*configtypes.Machine)
+	case spookytypesmachines.IndexTypePort:
+		index.PortIndex = make(map[int][]*spookytypesconfig.Machine)
 		for i := range machines {
 			index.PortIndex[machines[i].Port] = append(index.PortIndex[machines[i].Port], &machines[i])
 		}
 
-	case types.IndexTypeMetadata:
-		index.MetadataIndex = make(map[string][]*configtypes.Machine)
+	case spookytypesmachines.IndexTypeMetadata:
+		index.MetadataIndex = make(map[string][]*spookytypesconfig.Machine)
 		for i := range machines {
 			machine := &machines[i]
 			for key := range machine.Metadata {
@@ -371,7 +371,7 @@ func (im *Manager) buildIndex(indexType types.IndexType, machines []configtypes.
 	buildTime := time.Since(startTime)
 	index.Metrics.BuildTime = buildTime
 	index.Metrics.MachineCount = len(machines)
-	index.Metrics.IndexTypeStats[indexType] = &types.IndexTypeStats{
+	index.Metrics.IndexTypeStats[indexType] = &spookytypesmachines.IndexTypeStats{
 		BuildTime:  buildTime,
 		EntryCount: im.countIndexEntries(index, indexType),
 	}
@@ -381,21 +381,21 @@ func (im *Manager) buildIndex(indexType types.IndexType, machines []configtypes.
 }
 
 // countIndexEntries counts the number of entries in an index
-func (im *Manager) countIndexEntries(index *types.MachineIndex, indexType types.IndexType) int {
+func (im *Manager) countIndexEntries(index *spookytypesmachines.MachineIndex, indexType spookytypesmachines.IndexType) int {
 	switch indexType {
-	case types.IndexTypeName:
+	case spookytypesmachines.IndexTypeName:
 		return len(index.NameIndex)
-	case types.IndexTypeHost:
+	case spookytypesmachines.IndexTypeHost:
 		return len(index.HostIndex)
-	case types.IndexTypeTag:
+	case spookytypesmachines.IndexTypeTag:
 		return len(index.TagIndex)
-	case types.IndexTypeGroup:
+	case spookytypesmachines.IndexTypeGroup:
 		return len(index.GroupIndex)
-	case types.IndexTypeUser:
+	case spookytypesmachines.IndexTypeUser:
 		return len(index.UserIndex)
-	case types.IndexTypePort:
+	case spookytypesmachines.IndexTypePort:
 		return len(index.PortIndex)
-	case types.IndexTypeMetadata:
+	case spookytypesmachines.IndexTypeMetadata:
 		return len(index.MetadataIndex)
 	default:
 		return 0
@@ -403,7 +403,7 @@ func (im *Manager) countIndexEntries(index *types.MachineIndex, indexType types.
 }
 
 // updateLookupMetrics updates lookup performance metrics
-func (im *Manager) updateLookupMetrics(indexType types.IndexType, hit bool) {
+func (im *Manager) updateLookupMetrics(indexType spookytypesmachines.IndexType, hit bool) {
 	if index, exists := im.indexes[indexType]; exists && index.Metrics != nil {
 		if stats, exists := index.Metrics.IndexTypeStats[indexType]; exists {
 			if hit {
@@ -416,7 +416,7 @@ func (im *Manager) updateLookupMetrics(indexType types.IndexType, hit bool) {
 }
 
 // optimizeIndex performs optimization on a specific index
-func (im *Manager) optimizeIndex(indexType types.IndexType, index *types.MachineIndex) {
+func (im *Manager) optimizeIndex(indexType spookytypesmachines.IndexType, index *spookytypesmachines.MachineIndex) {
 	// For now, just update the last updated time
 	// In a more sophisticated implementation, we could:
 	// - Reorder entries for better cache locality

@@ -9,7 +9,7 @@ import (
 	spookysecretsage "spooky/internal/secrets/age"
 	spookysecretskeys "spooky/internal/secrets/keys"
 	spookysecretsops "spooky/internal/secrets/operations"
-	spookysecretstypes "spooky/internal/secrets/types"
+	spookysecretstypes "spooky/internal/types/secrets"
 )
 
 // Manager implements the SecretsManager interface

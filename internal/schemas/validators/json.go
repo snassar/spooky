@@ -3,7 +3,7 @@ package validators
 import (
 	"encoding/json"
 	"fmt"
-	"spooky/internal/schemas/types"
+	spookytypesschemas "spooky/internal/types/schemas"
 )
 
 // JSONValidator implements JSON validation
@@ -15,8 +15,8 @@ func NewJSONValidator() *JSONValidator {
 }
 
 // Validate validates JSON data against a schema
-func (v *JSONValidator) Validate(data interface{}, schema *types.Schema) *types.ValidationResult {
-	result := &types.ValidationResult{
+func (v *JSONValidator) Validate(data interface{}, schema *spookytypesschemas.Schema) *spookytypesschemas.ValidationResult {
+	result := &spookytypesschemas.ValidationResult{
 		Valid:  true,
 		Schema: string(schema.Type),
 	}
@@ -25,7 +25,7 @@ func (v *JSONValidator) Validate(data interface{}, schema *types.Schema) *types.
 	if data != nil {
 		if _, err := json.Marshal(data); err != nil {
 			result.Valid = false
-			result.Errors = append(result.Errors, types.ValidationError{
+			result.Errors = append(result.Errors, spookytypesschemas.ValidationError{
 				File:     schema.Filename,
 				Message:  fmt.Sprintf("invalid JSON data: %v", err),
 				Severity: "error",

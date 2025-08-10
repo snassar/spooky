@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclparse"
 
-	spookyconfigtypes "spooky/internal/config/types"
+	spookyconfigtypes "spooky/internal/types/config"
 )
 
 // Parser implements ConfigParser interface

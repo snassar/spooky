@@ -2,7 +2,7 @@ package formatters
 
 import (
 	"encoding/json"
-	"spooky/internal/logging/types"
+	"spooky/internal/types/logging"
 )
 
 // JSONFormatter implements JSON formatting for log entries

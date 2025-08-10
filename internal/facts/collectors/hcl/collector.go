@@ -9,7 +9,7 @@ import (
 	"time"
 
 	spookyfactscollectors "spooky/internal/facts/collectors"
-	spookyfactstypes "spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/types/facts"
 
 	hcl2 "github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"

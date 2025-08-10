@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"spooky/internal/facts/types"
+	spookytypesfacts "spooky/internal/types/facts"
 )
 
 // FactsValidator validates facts using schemas
@@ -20,7 +20,7 @@ func NewFactsValidator() *FactsValidator {
 }
 
 // ValidateCustomFacts validates custom facts format
-func (fv *FactsValidator) ValidateCustomFacts(facts map[string]*types.FactCollection) *ValidationResult {
+func (fv *FactsValidator) ValidateCustomFacts(facts map[string]*spookytypesfacts.FactCollection) *ValidationResult {
 	result := &ValidationResult{
 		Valid:  true,
 		Schema: "custom-facts",

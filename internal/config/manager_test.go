@@ -5,10 +5,10 @@ import (
 
 	"spooky/internal/config/environment"
 	"spooky/internal/config/loading"
-	"spooky/internal/config/types"
+	"spooky/internal/types/config"
 	"spooky/internal/config/validation"
 	"spooky/internal/logging"
-	loggingtypes "spooky/internal/logging/types"
+	loggingtypes "spooky/internal/types/logging"
 )
 
 func TestNewManager(t *testing.T) {

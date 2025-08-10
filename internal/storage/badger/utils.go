@@ -1,7 +1,7 @@
 package badger
 
 import (
-	spookyfactstypes "spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/types/facts"
 )
 
 // matchesQuery checks if a fact collection matches the query criteria

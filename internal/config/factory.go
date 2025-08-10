@@ -3,7 +3,7 @@ package config
 import (
 	spookyconfigenvironment "spooky/internal/config/environment"
 	spookyconfigloading "spooky/internal/config/loading"
-	spookyconfigtypes "spooky/internal/config/types"
+	spookyconfigtypes "spooky/internal/types/config"
 	spookyconfigvalidation "spooky/internal/config/validation"
 	spookylogging "spooky/internal/logging"
 )

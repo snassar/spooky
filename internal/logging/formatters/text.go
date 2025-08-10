@@ -2,7 +2,7 @@ package formatters
 
 import (
 	"fmt"
-	"spooky/internal/logging/types"
+	"spooky/internal/types/logging"
 )
 
 // TextFormatter implements text formatting for log entries

@@ -3,7 +3,7 @@ package storage
 import (
 	"time"
 
-	spookyfactstypes "spooky/internal/facts/types"
+	spookyfactstypes "spooky/internal/types/facts"
 )
 
 // EncryptionHelper provides encryption utilities for storage

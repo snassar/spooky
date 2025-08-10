@@ -2,7 +2,7 @@ package config
 
 import (
 	spookyconfigloading "spooky/internal/config/loading"
-	spookyconfigtypes "spooky/internal/config/types"
+	spookyconfigtypes "spooky/internal/types/config"
 )
 
 // LoadActionsConfig loads actions configuration from a project

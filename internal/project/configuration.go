@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"spooky/internal/config"
-	"spooky/internal/config/types"
+	"spooky/internal/types/config"
 	"spooky/internal/logging"
 )
 

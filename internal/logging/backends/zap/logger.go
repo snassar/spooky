@@ -3,7 +3,7 @@ package zap
 import (
 	"context"
 	"spooky/internal/logging"
-	"spooky/internal/logging/types"
+	"spooky/internal/types/logging"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

@@ -2,7 +2,7 @@ package logging
 
 import (
 	"context"
-	spookyloggingtypes "spooky/internal/logging/types"
+	spookyloggingtypes "spooky/internal/types/logging"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

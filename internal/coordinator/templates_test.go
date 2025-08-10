@@ -6,7 +6,7 @@ import (
 
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
-	spookyloggingtypes "spooky/internal/logging/types"
+	spookyloggingtypes "spooky/internal/types/logging"
 	spookytemplatestypes "spooky/internal/templates/types"
 
 	"github.com/stretchr/testify/assert"

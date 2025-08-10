@@ -1,0 +1,34 @@
+# Terminology Rules
+
+## Banned Terminology
+
+The following terms and their variants (capitalized or otherwise) are banned from this codebase:
+
+- exec, execute, execution
+
+**Do not generate code, comments, variable names, function names, or any other content containing these terms.**
+
+## Desired Terminology
+
+### Core Concepts
+- **Actions** are "run" (not executed)
+- CLI commands: `spooky actions run` or `spooky run`
+- Actions are "orchestrated" by spooky
+
+### System Components
+- **Orchestrator** (instead of Executor) - the facility within spooky that orchestrates actions
+- **Action Orchestration** (instead of execution) - the process of coordinating and running actions
+
+### Process Terms
+- "run" instead of "execute"
+- "orchestrate" instead of "execute" 
+- "action orchestration" instead of "execution"
+- "orchestrator" instead of "executor"
+- "running" instead of "executing"
+
+### Summary
+The core concept is that spooky **orchestrates** actions in order to **run** them. The system component responsible for this is an **orchestrator**, not an executor. Actions are **run**, not executed, and the overall process is **action orchestration**.
+description:
+globs:
+alwaysApply: false
+---

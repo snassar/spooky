@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	spookyloggingtypes "spooky/internal/logging/types"
+	spookyloggingtypes "spooky/internal/types/logging"
 	"testing"
 	"time"
 

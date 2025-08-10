@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"spooky/internal/logging"
-	"spooky/internal/secrets/types"
+	"spooky/internal/types/secrets"
 )
 
 func TestSecretsManager(t *testing.T) {

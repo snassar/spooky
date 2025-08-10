@@ -5,24 +5,24 @@ import (
 	"os"
 	"path/filepath"
 
-	spookyconfigtypes "spooky/internal/config/types"
-	spookylogging "spooky/internal/logging"
+	spookyconfigtypes "spooky/internal/types/config"
+	spookytypeslogging "spooky/internal/types/logging"
 )
 
 // Manager implements LoadingManager interface
 type Manager struct {
 	config     *spookyconfigtypes.LoadingConfig
-	parser     ConfigParser
-	xdgManager XDGManager
-	logger     spookylogging.Logger
+	parser     spookytypesconfig.ConfigParser
+	xdgManager spookytypesconfig.XDGManager
+	logger     spookytypeslogging.Logger
 }
 
 // NewManager creates a new loading manager
-func NewManager(config *spookyconfigtypes.LoadingConfig, logger spookylogging.Logger) *Manager {
+func NewManager(config *spookyconfigtypes.LoadingConfig, logger spookytypeslogging.Logger) *Manager {
 	return &Manager{
 		config:     config,
-		parser:     NewConfigParser(),
-		xdgManager: NewXDGManager(),
+		parser:     Newspookytypesconfig.ConfigParser(),
+		xdgManager: Newspookytypesconfig.XDGManager(),
 		logger:     logger,
 	}
 }

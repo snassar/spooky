@@ -5,7 +5,7 @@ import (
 	"time"
 
 	spookyconfig "spooky/internal/config"
-	spookyconfigtypes "spooky/internal/config/types"
+	spookyconfigtypes "spooky/internal/types/config"
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
 )
