@@ -2,21 +2,21 @@ package secrets
 
 import (
 	"fmt"
+	spookyinterfaces "spooky/internal/interfaces"
 	"strings"
 
-	"spooky/internal/logging"
-	"spooky/internal/templates/types"
+	spookytypestemplates "spooky/internal/types/templates"
 )
 
 // Manager implements SecretsManager interface
 type Manager struct {
-	config             *types.SecretsConfig
-	encryptionProvider EncryptionProvider
-	logger             logging.Logger
+	config             *spookytypestemplates.SecretsConfig
+	encryptionProvider spookyinterfaces.EncryptionProvider
+	logger             spookyinterfaces.Logger
 }
 
 // NewManager creates a new secrets manager
-func NewManager(config *types.SecretsConfig, logger logging.Logger) *Manager {
+func NewManager(config *spookytypestemplates.SecretsConfig, logger spookyinterfaces.Logger) *Manager {
 	return &Manager{
 		config:             config,
 		encryptionProvider: NewAgeEncryptionProvider(),
@@ -84,7 +84,7 @@ func (m *Manager) SetEncryptionKey(key string) error {
 	}
 
 	if m.config == nil {
-		m.config = &types.SecretsConfig{}
+		m.config = &spookytypestemplates.SecretsConfig{}
 	}
 	m.config.EncryptionKey = key
 	return nil
@@ -93,7 +93,7 @@ func (m *Manager) SetEncryptionKey(key string) error {
 // SetEncryptionAlgorithm sets the encryption algorithm
 func (m *Manager) SetEncryptionAlgorithm(algorithm string) error {
 	if m.config == nil {
-		m.config = &types.SecretsConfig{}
+		m.config = &spookytypestemplates.SecretsConfig{}
 	}
 	m.config.EncryptionAlgorithm = algorithm
 	return nil
@@ -102,7 +102,7 @@ func (m *Manager) SetEncryptionAlgorithm(algorithm string) error {
 // EnableEncryption enables or disables encryption
 func (m *Manager) EnableEncryption(enabled bool) error {
 	if m.config == nil {
-		m.config = &types.SecretsConfig{}
+		m.config = &spookytypestemplates.SecretsConfig{}
 	}
 	m.config.Enabled = enabled
 	return nil

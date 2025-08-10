@@ -1,16 +1,17 @@
 package machines
 
 import (
+	spookylogging "spooky/internal/logging"
+	spookymachinestypes "spooky/internal/types/machines"
+	spookytypeslogging "spooky/internal/types/logging"
 	"context"
 	"fmt"
 	"sync"
 	"time"
 
 	spookyconfigtypes "spooky/internal/types/config"
-	spookylogging "spooky/internal/logging"
 	spookymachinesconnectivity "spooky/internal/machines/connectivity"
 	spookymachinesindexing "spooky/internal/machines/indexing"
-	spookymachinestypes "spooky/internal/machines/types"
 )
 
 // Manager implements the MachineManager interface and coordinates all machine operations
@@ -21,7 +22,7 @@ type Manager struct {
 
 	// Configuration
 	config *spookymachinestypes.IndexManagerConfig
-	logger spookylogging.Logger
+	logger spookytypeslogging.Logger
 
 	// State management
 	state *spookymachinestypes.IndexManagerState
@@ -34,7 +35,7 @@ type Manager struct {
 }
 
 // NewManager creates a new machine manager with the given configuration
-func NewManager(config *spookymachinestypes.IndexManagerConfig, logger spookylogging.Logger) *Manager {
+func NewManager(config *spookymachinestypes.IndexManagerConfig, logger spookytypeslogging.Logger) *Manager {
 	if config == nil {
 		config = spookymachinestypes.DefaultIndexManagerConfig()
 	}

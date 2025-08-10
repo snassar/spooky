@@ -6,12 +6,12 @@ import (
 	"time"
 )
 
-// ValidationError represents multiple validation errors
-type ValidationError struct {
+// ValidationErrorCollection represents multiple validation errors
+type ValidationErrorCollection struct {
 	Errors []error
 }
 
-func (ve *ValidationError) Error() string {
+func (ve *ValidationErrorCollection) Error() string {
 	var messages []string
 	for _, err := range ve.Errors {
 		messages = append(messages, err.Error())

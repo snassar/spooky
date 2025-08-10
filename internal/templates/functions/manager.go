@@ -6,21 +6,21 @@ import (
 	"text/template"
 	"time"
 
-	"spooky/internal/logging"
-	"spooky/internal/templates/types"
+	spookyinterfaces "spooky/internal/interfaces"
+	spookytypes "spooky/internal/types"
 )
 
 // Manager implements FunctionsManager interface
 type Manager struct {
-	config           *types.FunctionsConfig
+	config           *spookytypes.FunctionsConfig
 	builtinFunctions template.FuncMap
 	customFunctions  template.FuncMap
-	validator        FunctionValidator
-	logger           logging.Logger
+	validator        spookyinterfaces.FunctionValidator
+	logger           spookyinterfaces.Logger
 }
 
 // NewManager creates a new functions manager
-func NewManager(config *types.FunctionsConfig, logger logging.Logger) *Manager {
+func NewManager(config *spookytypes.FunctionsConfig, logger spookyinterfaces.Logger) *Manager {
 	return &Manager{
 		config:           config,
 		builtinFunctions: make(template.FuncMap),
@@ -129,7 +129,7 @@ func (m *Manager) RemoveFunction(name string) error {
 // EnableBuiltinFunctions enables or disables builtin functions
 func (m *Manager) EnableBuiltinFunctions(enabled bool) error {
 	if m.config == nil {
-		m.config = &types.FunctionsConfig{}
+		m.config = &spookytypes.FunctionsConfig{}
 	}
 	m.config.BuiltinFunctions = enabled
 	return nil
@@ -138,7 +138,7 @@ func (m *Manager) EnableBuiltinFunctions(enabled bool) error {
 // SetFunctionTimeout sets function timeout
 func (m *Manager) SetFunctionTimeout(timeout time.Duration) error {
 	if m.config == nil {
-		m.config = &types.FunctionsConfig{}
+		m.config = &spookytypes.FunctionsConfig{}
 	}
 	m.config.FunctionTimeout = timeout
 	return nil

@@ -1,18 +1,19 @@
 package acting
 
 import (
+	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
-	spookysshtypes "spooky/internal/ssh/types"
+	spookysshtypes "spooky/internal/types/ssh"
 )
 
 // Manager implements ActingEngine interface
 type Manager struct {
 	config *spookysshtypes.ActingConfig
-	logger spookylogging.Logger
+	logger spookyinterfaces.Logger
 }
 
 // NewManager creates a new acting manager
-func NewManager(config *spookysshtypes.ActingConfig, logger spookylogging.Logger) *Manager {
+func NewManager(config *spookysshtypes.ActingConfig, logger spookyinterfaces.Logger) *Manager {
 	return &Manager{
 		config: config,
 		logger: logger,
@@ -45,4 +46,24 @@ func (m *Manager) RunParallel(connection *spookysshtypes.SSHConnection, actions 
 	// TODO: Implement parallel running logic
 	m.logger.Info("Parallel running requested", spookylogging.String("host", connection.Host), spookylogging.Int("action_count", len(actions)))
 	return &spookysshtypes.ActionResult{}, nil
+}
+
+// ExecuteAction executes an action (interface compatibility)
+func (m *Manager) ExecuteAction(connection *spookysshtypes.SSHConnection, action *spookysshtypes.SSHAction) (*spookysshtypes.ActionResult, error) {
+	return m.RunAction(connection, action)
+}
+
+// ExecuteTemplate executes a template action (interface compatibility)
+func (m *Manager) ExecuteTemplate(connection *spookysshtypes.SSHConnection, template *spookysshtypes.TemplateAction) (*spookysshtypes.ActionResult, error) {
+	return m.RunTemplate(connection, template)
+}
+
+// ExecuteSequential executes actions sequentially (interface compatibility)
+func (m *Manager) ExecuteSequential(connection *spookysshtypes.SSHConnection, actions []*spookysshtypes.SSHAction) (*spookysshtypes.ActionResult, error) {
+	return m.RunSequential(connection, actions)
+}
+
+// ExecuteParallel executes actions in parallel (interface compatibility)
+func (m *Manager) ExecuteParallel(connection *spookysshtypes.SSHConnection, actions []*spookysshtypes.SSHAction) (*spookysshtypes.ActionResult, error) {
+	return m.RunParallel(connection, actions)
 }

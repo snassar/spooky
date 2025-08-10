@@ -1,18 +1,19 @@
 package connection_pool
 
 import (
-	"spooky/internal/logging"
-	"spooky/internal/ssh/types"
+	spookyinterfaces "spooky/internal/interfaces"
+	spookylogging "spooky/internal/logging"
+	spookysshtypes "spooky/internal/types/ssh"
 )
 
 // Manager implements ConnectionPool interface
 type Manager struct {
-	config *types.PoolConfig
-	logger logging.Logger
+	config *spookysshtypes.PoolConfig
+	logger spookyinterfaces.Logger
 }
 
 // NewManager creates a new connection pool manager
-func NewManager(config *types.PoolConfig, logger logging.Logger) *Manager {
+func NewManager(config *spookysshtypes.PoolConfig, logger spookyinterfaces.Logger) *Manager {
 	return &Manager{
 		config: config,
 		logger: logger,
@@ -20,23 +21,23 @@ func NewManager(config *types.PoolConfig, logger logging.Logger) *Manager {
 }
 
 // GetConnection gets a connection from the pool
-func (m *Manager) GetConnection(host string) (*types.SSHConnection, error) {
+func (m *Manager) GetConnection(host string) (*spookysshtypes.SSHConnection, error) {
 	// TODO: Implement connection pooling logic
-	m.logger.Info("Connection requested from pool", logging.String("host", host))
+	m.logger.Info("Connection requested from pool", spookylogging.String("host", host))
 	return nil, nil
 }
 
 // ReturnConnection returns a connection to the pool
-func (m *Manager) ReturnConnection(connection *types.SSHConnection) error {
+func (m *Manager) ReturnConnection(connection *spookysshtypes.SSHConnection) error {
 	// TODO: Implement connection return logic
-	m.logger.Info("Connection returned to pool", logging.String("host", connection.Host))
+	m.logger.Info("Connection returned to pool", spookylogging.String("host", connection.Host))
 	return nil
 }
 
 // CloseConnection closes a connection
-func (m *Manager) CloseConnection(connection *types.SSHConnection) error {
+func (m *Manager) CloseConnection(connection *spookysshtypes.SSHConnection) error {
 	// TODO: Implement connection close logic
-	m.logger.Info("Connection closed", logging.String("host", connection.Host))
+	m.logger.Info("Connection closed", spookylogging.String("host", connection.Host))
 	return nil
 }
 
@@ -48,7 +49,7 @@ func (m *Manager) CloseAllConnections() error {
 }
 
 // GetStats gets pool statistics
-func (m *Manager) GetStats() *types.PoolStats {
+func (m *Manager) GetStats() *spookysshtypes.PoolStats {
 	// TODO: Implement statistics collection
-	return &types.PoolStats{}
+	return &spookysshtypes.PoolStats{}
 }

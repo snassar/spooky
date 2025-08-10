@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"spooky/internal/types/facts"
 	"spooky/internal/schemas"
+	spookytypesfacts "spooky/internal/types/facts"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
@@ -37,11 +37,11 @@ func NewCustomFactsCollector(factsFile string) (*CustomFactsCollector, error) {
 }
 
 // Collect collects custom facts from the facts.hcl file
-func (cfc *CustomFactsCollector) Collect(server string) (*types.FactCollection, error) {
-	collection := &types.FactCollection{
+func (cfc *CustomFactsCollector) Collect(server string) (*spookytypesfacts.FactCollection, error) {
+	collection := &spookytypesfacts.FactCollection{
 		Server:      server,
 		Timestamp:   time.Now(),
-		Facts:       make(map[string]*types.Fact),
+		Facts:       make(map[string]*spookytypesfacts.Fact),
 		CustomFacts: make(map[string]map[string]interface{}),
 	}
 
@@ -69,11 +69,11 @@ func (cfc *CustomFactsCollector) Collect(server string) (*types.FactCollection, 
 }
 
 // CollectSpecific collects specific custom facts by keys
-func (cfc *CustomFactsCollector) CollectSpecific(server string, keys []string) (*types.FactCollection, error) {
-	collection := &types.FactCollection{
+func (cfc *CustomFactsCollector) CollectSpecific(server string, keys []string) (*spookytypesfacts.FactCollection, error) {
+	collection := &spookytypesfacts.FactCollection{
 		Server:      server,
 		Timestamp:   time.Now(),
-		Facts:       make(map[string]*types.Fact),
+		Facts:       make(map[string]*spookytypesfacts.Fact),
 		CustomFacts: make(map[string]map[string]interface{}),
 	}
 
@@ -117,7 +117,7 @@ func (cfc *CustomFactsCollector) CollectSpecific(server string, keys []string) (
 }
 
 // GetFact retrieves a specific custom fact
-func (cfc *CustomFactsCollector) GetFact(server, key string) (*types.Fact, error) {
+func (cfc *CustomFactsCollector) GetFact(server, key string) (*spookytypesfacts.Fact, error) {
 	// Use new format (custom.key) only
 	factKey := key
 	if strings.HasPrefix(key, "custom.") {
@@ -141,10 +141,10 @@ func (cfc *CustomFactsCollector) GetFact(server, key string) (*types.Fact, error
 	}
 
 	// Create a fact collection with just this fact
-	collection := &types.FactCollection{
+	collection := &spookytypesfacts.FactCollection{
 		Server:      server,
 		Timestamp:   time.Now(),
-		Facts:       make(map[string]*types.Fact),
+		Facts:       make(map[string]*spookytypesfacts.Fact),
 		CustomFacts: make(map[string]map[string]interface{}),
 	}
 
@@ -154,7 +154,7 @@ func (cfc *CustomFactsCollector) GetFact(server, key string) (*types.Fact, error
 	}
 
 	// Convert to fact with proper key format
-	fact := &types.Fact{
+	fact := &spookytypesfacts.Fact{
 		Key:       "custom." + factKey,
 		Value:     customFacts[factKey],
 		Source:    "custom",
@@ -378,7 +378,7 @@ func (cfc *CustomFactsCollector) validateCustomFact(customFact map[string]interf
 }
 
 // addCustomFactToCollection adds custom fact to collection
-func (cfc *CustomFactsCollector) addCustomFactToCollection(collection *types.FactCollection, customFact map[string]interface{}, filePath string) {
+func (cfc *CustomFactsCollector) addCustomFactToCollection(collection *spookytypesfacts.FactCollection, customFact map[string]interface{}, filePath string) {
 	// Extract filename from path
 	fileName := filepath.Base(filePath)
 	factKey := strings.TrimSuffix(fileName, ".fact")
@@ -393,7 +393,7 @@ func (cfc *CustomFactsCollector) addCustomFactToCollection(collection *types.Fac
 
 	// Also store a reference in the flat Facts map for backward compatibility
 	// This allows existing code to still access custom facts
-	fact := &types.Fact{
+	fact := &spookytypesfacts.Fact{
 		Key:       "custom." + factKey,
 		Value:     customFact,
 		Source:    "custom",
@@ -411,13 +411,13 @@ func (cfc *CustomFactsCollector) addCustomFactToCollection(collection *types.Fac
 }
 
 // addCustomFactsToCollection adds custom facts to collection from the single facts.hcl file
-func (cfc *CustomFactsCollector) addCustomFactsToCollection(collection *types.FactCollection, customFacts map[string]interface{}) {
+func (cfc *CustomFactsCollector) addCustomFactsToCollection(collection *spookytypesfacts.FactCollection, customFacts map[string]interface{}) {
 	// Store custom facts in the hierarchical structure
 	// Use "facts" as the filename since it's from /etc/spooky/facts.hcl
 	collection.CustomFacts["facts"] = customFacts
 
 	// Also store a reference in the flat Facts map for backward compatibility
-	fact := &types.Fact{
+	fact := &spookytypesfacts.Fact{
 		Key:       "custom.facts",
 		Value:     customFacts,
 		Source:    "custom",

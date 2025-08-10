@@ -3,7 +3,7 @@ package cli
 import (
 	"testing"
 
-	spookyclitypes "spooky/internal/cli/types"
+	spookyclitypes "spooky/internal/types/cli"
 	spookylogging "spooky/internal/logging"
 )
 

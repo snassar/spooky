@@ -1,0 +1,225 @@
+# Interface-Based Architecture Enforcement
+
+When working with the spooky codebase, ALWAYS maintain interface-based architecture. Never fall back to concrete types to solve compilation errors. Interfaces are the foundation of the system's architecture and must be preserved.
+
+## Core Principle: Interface-First Architecture
+
+**NEVER** solve compilation errors by:
+- ❌ Removing interface imports
+- ❌ Using concrete types instead of interfaces
+- ❌ Creating direct dependencies between packages
+- ❌ Breaking interface contracts
+
+**ALWAYS** solve compilation errors by:
+- ✅ Fixing interface implementations
+- ✅ Ensuring proper interface satisfaction
+- ✅ Using dependency injection with interfaces
+- ✅ Maintaining loose coupling through interfaces
+
+## Error Resolution Patterns
+
+### When Facing Compilation Errors:
+
+1. **Interface Implementation Errors**
+   ```go
+   // ❌ WRONG - Don't remove interface usage
+   func NewManager(config *spookyconfig.Manager) *Manager
+   
+   // ✅ CORRECT - Fix the interface implementation
+   func NewManager(config interfaces.ConfigManager) *Manager
+   ```
+
+2. **Missing Interface Methods**
+   ```go
+   // ❌ WRONG - Don't use concrete types
+   func (m *Manager) Process(data *spookytypes.Data) error
+   
+   // ✅ CORRECT - Implement missing interface methods
+   func (m *Manager) Process(data interfaces.DataInterface) error
+   ```
+
+3. **Import Cycle Issues**
+   ```go
+   // ❌ WRONG - Don't break interface contracts
+   import "spooky/internal/concrete"
+   
+   // ✅ CORRECT - Use interfaces to break cycles
+   import "spooky/internal/interfaces"
+   ```
+
+## Interface Contract Enforcement
+
+### Manager Pattern Requirements:
+- All managers MUST implement their respective interfaces
+- All managers MUST accept interfaces as dependencies
+- All managers MUST return interfaces where appropriate
+- All managers MUST delegate to specialized components through interfaces
+
+### Context Pattern Requirements:
+- All context objects MUST be passed as interfaces
+- All context operations MUST use interface types
+- All context validation MUST work with interface contracts
+
+### Integration Pattern Requirements:
+- All integrations MUST be accessed through IntegrationManager
+- All integrations MUST implement their respective interfaces
+- All integrations MUST handle their own error conditions through interfaces
+
+## Compilation Error Resolution Steps
+
+### Step 1: Identify the Root Cause
+- Check if interface methods are properly implemented
+- Verify interface contracts are satisfied
+- Ensure proper import structure
+
+### Step 2: Fix Interface Implementation
+- Implement missing interface methods
+- Fix method signatures to match interfaces
+- Ensure proper error handling through interfaces
+
+### Step 3: Use Dependency Injection
+- Pass interfaces as constructor parameters
+- Use interfaces in method signatures
+- Maintain loose coupling through interfaces
+
+### Step 4: Verify Interface Compliance
+- Ensure all implementations satisfy their interfaces
+- Check that interface contracts are maintained
+- Verify no concrete type dependencies are created
+
+## Common Anti-Patterns to Avoid
+
+### ❌ Anti-Pattern 1: Concrete Type Dependencies
+```go
+// ❌ WRONG - Direct concrete type dependency
+type Manager struct {
+    config *spookyconfig.Manager
+    facts  *spookyfacts.Manager
+}
+
+// ✅ CORRECT - Interface-based dependency
+type Manager struct {
+    config interfaces.ConfigManager
+    facts  interfaces.FactsManager
+}
+```
+
+### ❌ Anti-Pattern 2: Interface Removal
+```go
+// ❌ WRONG - Removing interface usage
+func (m *Manager) LoadConfig() (*spookyconfig.Config, error)
+
+// ✅ CORRECT - Maintaining interface usage
+func (m *Manager) LoadConfig() (interfaces.ConfigInterface, error)
+```
+
+### ❌ Anti-Pattern 3: Direct Package Imports
+```go
+// ❌ WRONG - Direct package dependency
+import "spooky/internal/config"
+import "spooky/internal/facts"
+
+// ✅ CORRECT - Interface-based dependency
+import "spooky/internal/interfaces"
+```
+
+## Interface Implementation Guidelines
+
+### When Adding New Features:
+1. **Define interfaces first** in `./internal/interfaces/`
+2. **Implement interfaces** in concrete packages
+3. **Use interfaces** in all public APIs
+4. **Maintain interface contracts** throughout
+
+### When Refactoring:
+1. **Preserve interface contracts** - don't break existing interfaces
+2. **Update implementations** to satisfy interfaces
+3. **Maintain loose coupling** through interfaces
+4. **Test interface compliance** after changes
+
+### When Fixing Errors:
+1. **Identify interface issues** first
+2. **Fix interface implementations** before changing architecture
+3. **Use dependency injection** with interfaces
+4. **Verify interface compliance** after fixes
+
+## Integration Points
+
+Always ensure new code integrates with:
+1. **IntegrationManager** - For system-wide coordination
+2. **Interface contracts** - For proper abstraction
+3. **Dependency injection** - For loose coupling
+4. **Error interfaces** - For proper error handling
+
+## Validation Checklist
+
+Before committing changes, verify:
+- [ ] All managers implement their interfaces
+- [ ] All dependencies use interfaces, not concrete types
+- [ ] No direct package imports between implementation packages
+- [ ] All public APIs use interface types
+- [ ] Interface contracts are maintained
+- [ ] No compilation errors related to interface usage
+- [ ] Loose coupling is preserved through interfaces
+
+## Error Resolution Examples
+
+### Example 1: Missing Interface Method
+```go
+// ❌ Problem: Missing interface method
+type Manager struct{}
+
+// ❌ WRONG - Don't remove interface requirement
+func NewManager() *Manager
+
+// ✅ CORRECT - Implement missing interface method
+func (m *Manager) RequiredMethod() error {
+    return nil
+}
+```
+
+### Example 2: Interface Type Mismatch
+```go
+// ❌ Problem: Wrong return type
+func (m *Manager) GetData() *spookytypes.Data
+
+// ❌ WRONG - Don't change interface contract
+func (m *Manager) GetData() *spookytypes.Data
+
+// ✅ CORRECT - Fix to match interface
+func (m *Manager) GetData() interfaces.DataInterface
+```
+
+### Example 3: Import Cycle
+```go
+// ❌ Problem: Import cycle between packages
+import "spooky/internal/config"
+import "spooky/internal/project"
+
+// ❌ WRONG - Don't use concrete types to break cycle
+type Manager struct {
+    config *spookyconfig.Manager
+}
+
+// ✅ CORRECT - Use interfaces to break cycle
+import "spooky/internal/interfaces"
+
+type Manager struct {
+    config interfaces.ConfigManager
+}
+```
+
+## Remember
+
+**Interfaces are the foundation of the spooky architecture. They enable:**
+- Loose coupling between components
+- Testability through mocking
+- Flexibility for future changes
+- Clear separation of concerns
+- Maintainable and extensible code
+
+**Never sacrifice interface-based architecture for quick compilation fixes. Always fix the root cause while maintaining the interface contracts.**
+description:
+globs:
+alwaysApply: false
+---

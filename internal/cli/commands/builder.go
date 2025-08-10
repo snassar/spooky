@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	spookyclitypes "spooky/internal/cli/types"
+	spookyclitypes "spooky/internal/types/cli"
 )
 
 // Builder implements CommandBuilder interface

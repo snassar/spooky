@@ -6,18 +6,18 @@ import (
 	"strings"
 	"time"
 
+	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
-	spookysecrets "spooky/internal/secrets"
 )
 
 // CoordinatorSecretsIntegration implements secrets system integration
 type CoordinatorSecretsIntegration struct {
-	cryptoManager *spookysecrets.Manager
-	logger        spookylogging.Logger
+	cryptoManager spookyinterfaces.SecretsManager
+	logger        spookyinterfaces.Logger
 }
 
 // NewCoordinatorSecretsIntegration creates a new secrets integration
-func NewCoordinatorSecretsIntegration(cryptoManager *spookysecrets.Manager, logger spookylogging.Logger) *CoordinatorSecretsIntegration {
+func NewCoordinatorSecretsIntegration(cryptoManager spookyinterfaces.SecretsManager, logger spookyinterfaces.Logger) *CoordinatorSecretsIntegration {
 	return &CoordinatorSecretsIntegration{
 		cryptoManager: cryptoManager,
 		logger:        logger,

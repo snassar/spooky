@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	spookyfactstypes "spooky/internal/types/facts"
-	spookylogging "spooky/internal/logging"
+	spookyinterfaces "spooky/internal/interfaces"
+	spookytypesfacts "spooky/internal/types/facts"
 )
 
 // CollectorType represents the type of fact collector
@@ -26,8 +26,8 @@ type CollectorConfig struct {
 	Source      string                       // File path, URL, etc.
 	Headers     map[string]string            // HTTP headers
 	Timeout     time.Duration                // Timeout for operations
-	MergePolicy spookyfactstypes.MergePolicy // How to merge facts
-	Logger      spookylogging.Logger         // Logger instance
+	MergePolicy spookytypesfacts.MergePolicy // How to merge facts
+	Logger      spookyinterfaces.Logger      // Logger instance
 	Metadata    map[string]interface{}       // Additional metadata
 	Parameters  map[string]interface{}       // Parameters for specific collectors
 }
@@ -39,8 +39,8 @@ func NewCollectorConfig(collectorType CollectorType, source string) *CollectorCo
 		Source:      source,
 		Headers:     make(map[string]string),
 		Timeout:     30 * time.Second,
-		MergePolicy: spookyfactstypes.MergePolicyReplace,
-		Logger:      spookylogging.GetLogger(),
+		MergePolicy: spookytypesfacts.MergePolicyReplace,
+		Logger:      nil, // TODO: Fix logger interface compatibility issue
 		Metadata:    make(map[string]interface{}),
 		Parameters:  make(map[string]interface{}),
 	}
@@ -59,13 +59,13 @@ func (c *CollectorConfig) WithTimeout(timeout time.Duration) *CollectorConfig {
 }
 
 // WithMergePolicy sets the merge policy for the collector
-func (c *CollectorConfig) WithMergePolicy(policy spookyfactstypes.MergePolicy) *CollectorConfig {
+func (c *CollectorConfig) WithMergePolicy(policy spookytypesfacts.MergePolicy) *CollectorConfig {
 	c.MergePolicy = policy
 	return c
 }
 
 // WithLogger sets the logger for the collector
-func (c *CollectorConfig) WithLogger(logger spookylogging.Logger) *CollectorConfig {
+func (c *CollectorConfig) WithLogger(logger spookyinterfaces.Logger) *CollectorConfig {
 	c.Logger = logger
 	return c
 }
@@ -100,7 +100,7 @@ func (c *CollectorConfig) Validate() error {
 }
 
 // NewCollector creates a new fact collector based on the configuration
-func NewCollector(config *CollectorConfig) (spookyfactstypes.FactCollector, error) {
+func NewCollector(config *CollectorConfig) (spookytypesfacts.FactCollector, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}

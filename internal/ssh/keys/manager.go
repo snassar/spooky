@@ -6,20 +6,21 @@ import (
 	"os"
 	"time"
 
-	"spooky/internal/logging"
-	"spooky/internal/ssh/types"
+	spookyinterfaces "spooky/internal/interfaces"
+	spookylogging "spooky/internal/logging"
+	spookysshtypes "spooky/internal/types/ssh"
 
 	"golang.org/x/crypto/ssh"
 )
 
 // Manager implements SSHKeyManager interface
 type Manager struct {
-	config *types.KeysConfig
-	logger logging.Logger
+	config *spookysshtypes.KeysConfig
+	logger spookyinterfaces.Logger
 }
 
 // NewManager creates a new keys manager
-func NewManager(config *types.KeysConfig, logger logging.Logger) *Manager {
+func NewManager(config *spookysshtypes.KeysConfig, logger spookyinterfaces.Logger) *Manager {
 	return &Manager{
 		config: config,
 		logger: logger,
@@ -27,7 +28,7 @@ func NewManager(config *types.KeysConfig, logger logging.Logger) *Manager {
 }
 
 // LoadPrivateKey loads a private key from file
-func (m *Manager) LoadPrivateKey(path string) (*types.SSHKey, error) {
+func (m *Manager) LoadPrivateKey(path string) (*spookysshtypes.SSHKey, error) {
 	if path == "" {
 		return nil, fmt.Errorf("private key path cannot be empty")
 	}
@@ -52,7 +53,7 @@ func (m *Manager) LoadPrivateKey(path string) (*types.SSHKey, error) {
 
 	publicKeyBytes := ssh.MarshalAuthorizedKey(signer.PublicKey())
 
-	sshKey := &types.SSHKey{
+	sshKey := &spookysshtypes.SSHKey{
 		Type:       "rsa", // Default type
 		PrivateKey: privateKeyBytes,
 		PublicKey:  publicKeyBytes,
@@ -60,7 +61,7 @@ func (m *Manager) LoadPrivateKey(path string) (*types.SSHKey, error) {
 		CreatedAt:  time.Now(),
 	}
 
-	m.logger.Info("Private key loaded", logging.String("path", path))
+	m.logger.Info("Private key loaded", spookylogging.String("path", path))
 	return sshKey, nil
 }
 
@@ -81,6 +82,6 @@ func (m *Manager) ValidateKeyFile(path string) error {
 		return fmt.Errorf("invalid key file: %w", err)
 	}
 
-	m.logger.Info("Key file validated", logging.String("path", path))
+	m.logger.Info("Key file validated", spookylogging.String("path", path))
 	return nil
 }

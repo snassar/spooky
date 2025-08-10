@@ -1,0 +1,164 @@
+---
+description: Development methods rule for maintaining working code and converting incomplete implementations
+globs: ["**/*.go", "**/*.hcl", "**/*.md"]
+alwaysApply: true
+---
+
+# Development Methods Rule
+
+When working with the spooky codebase, always prioritize working, functional code over incomplete implementations. Never remove working code in favor of placeholders, stubs, or TODOs.
+
+## Core Development Principles
+
+### 1. Working Code First
+- **Never remove working code**: If code is functional and tested, keep it
+- **Prefer complete implementations**: Always implement full functionality rather than partial solutions
+- **Maintain existing behavior**: Preserve working functionality when refactoring or extending
+
+### 2. Convert Incomplete Code to Working Code
+- **Placeholders**: Convert placeholder code into full implementations
+- **Stubs**: Expand stub functions into complete, working implementations
+- **TODOs**: Implement TODO items rather than leaving them as comments
+- **FIXMEs**: Address FIXME comments by implementing proper solutions
+
+### 3. Implementation Requirements
+- **Full functionality**: Implement complete features, not partial solutions
+- **Error handling**: Include proper error handling and validation
+- **Testing**: Provide tests for new implementations
+- **Documentation**: Document new functionality appropriately
+
+## Implementation Guidelines
+
+### When Encountering Placeholder Code:
+1. **Analyze the intent**: Understand what the placeholder is meant to do
+2. **Implement full functionality**: Create a complete, working implementation
+3. **Follow established patterns**: Use existing code patterns and interfaces
+4. **Add proper validation**: Include input validation and error handling
+5. **Write tests**: Create tests to verify the implementation works correctly
+
+### When Finding TODOs:
+1. **Assess priority**: Determine if the TODO is critical for functionality
+2. **Implement the feature**: Create a complete implementation of the TODO item
+3. **Remove the TODO comment**: Replace TODO comments with working code
+4. **Update documentation**: Ensure documentation reflects the new functionality
+5. **Test thoroughly**: Verify the implementation works as expected
+
+### When Working with Stubs:
+1. **Understand the interface**: Review the expected function signature and behavior
+2. **Implement complete logic**: Fill in the stub with full implementation
+3. **Handle edge cases**: Consider error conditions and edge cases
+4. **Follow project patterns**: Use established error handling and logging patterns
+5. **Validate implementation**: Test the stub implementation thoroughly
+
+### When Refactoring:
+1. **Preserve functionality**: Ensure refactored code maintains existing behavior
+2. **Test before and after**: Verify functionality is preserved through testing
+3. **Incremental changes**: Make small, testable changes rather than large rewrites
+4. **Maintain interfaces**: Keep existing interfaces stable unless necessary
+5. **Update documentation**: Reflect changes in documentation and comments
+
+### When Writing New Code:
+1. **Write the implementation first**: Focus on completing the functional code before managing imports/includes
+2. **Ignore import warnings initially**: Don't let the editor remove imports that will be needed once the implementation is complete
+3. **Add imports as needed**: Include necessary imports/includes as you write the code, even if they show as unused
+4. **Clean up imports after completion**: Only remove unused imports after the implementation is fully functional
+5. **Avoid import cycles**: Prevent the editor from repeatedly adding/removing imports during development
+6. **Use explicit imports**: Prefer explicit import statements over auto-generated ones to maintain control
+7. **Test with imports**: Ensure the code compiles and runs with all necessary imports before final cleanup
+
+## Code Quality Standards
+
+### For New Implementations:
+- **Complete functionality**: Implement all required features
+- **Proper error handling**: Use structured error types from interfaces package
+- **Input validation**: Validate all inputs and handle invalid cases
+- **Logging**: Include appropriate logging for debugging and monitoring
+- **Performance**: Consider performance implications and optimize where needed
+
+### For Existing Code:
+- **Don't break working code**: Preserve existing functionality
+- **Improve incrementally**: Enhance working code rather than replacing it
+- **Maintain compatibility**: Keep existing interfaces and APIs stable
+- **Add tests**: Ensure new code is properly tested
+- **Document changes**: Update documentation to reflect improvements
+
+## Anti-Patterns to Avoid
+
+### Never Do:
+- Remove working code to add placeholders
+- Leave TODO comments without implementing them
+- Create stub functions without implementing them
+- Replace functional code with "not implemented" errors
+- Use panic() or similar for unimplemented features
+- Leave FIXME comments without addressing them
+
+### Always Do:
+- Implement complete functionality
+- Test all new implementations
+- Handle error cases properly
+- Follow established code patterns
+- Update documentation for new features
+- Preserve existing working functionality
+
+## Integration with Other Rules
+
+This rule works in conjunction with:
+- **Interface Architecture**: Implement interfaces completely rather than with stubs
+- **Types System**: Use proper types rather than placeholder types
+- **Error Handling**: Implement proper error handling rather than panics
+- **Testing**: Write tests for all implementations
+- **Documentation**: Document new functionality appropriately
+
+## Examples
+
+### Good: Complete Implementation
+```go
+func ProcessData(data []byte) ([]byte, error) {
+    if len(data) == 0 {
+        return nil, fmt.Errorf("empty data provided")
+    }
+    
+    processed := make([]byte, len(data))
+    for i, b := range data {
+        processed[i] = b ^ 0xFF // Simple transformation
+    }
+    
+    return processed, nil
+}
+```
+
+### Bad: Placeholder Implementation
+```go
+func ProcessData(data []byte) ([]byte, error) {
+    // TODO: Implement data processing
+    return nil, fmt.Errorf("not implemented")
+}
+```
+
+### Good: Complete Error Handling
+```go
+func ValidateConfig(config *Config) error {
+    if config == nil {
+        return fmt.Errorf("config cannot be nil")
+    }
+    
+    if config.Name == "" {
+        return fmt.Errorf("config name is required")
+    }
+    
+    if config.Port <= 0 || config.Port > 65535 {
+        return fmt.Errorf("invalid port number: %d", config.Port)
+    }
+    
+    return nil
+}
+```
+
+### Bad: Stub with Panic
+```go
+func ValidateConfig(config *Config) error {
+    panic("not implemented")
+}
+```
+
+This rule ensures that the spooky codebase maintains high quality, functional code and avoids accumulating technical debt from incomplete implementations.

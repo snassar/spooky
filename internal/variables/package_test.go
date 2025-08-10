@@ -5,7 +5,7 @@ import (
 
 	"spooky/internal/logging"
 	loggingtypes "spooky/internal/types/logging"
-	vartypes "spooky/internal/variables/types"
+	vartypes "spooky/internal/types/variables"
 )
 
 // TestPackageStructure verifies that the package structure is correct

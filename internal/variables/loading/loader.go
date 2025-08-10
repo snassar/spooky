@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"spooky/internal/schemas"
-	"spooky/internal/variables/types"
+	spookytypesvariables "spooky/internal/types/variables"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
@@ -25,7 +25,7 @@ func NewHCLVariableLoader(validator *schemas.SchemaValidator) *HCLVariableLoader
 	}
 }
 
-func (l *HCLVariableLoader) Load(ctx context.Context, source interface{}) ([]*types.Variable, error) {
+func (l *HCLVariableLoader) Load(ctx context.Context, source interface{}) ([]*spookytypesvariables.Variable, error) {
 	filePath, ok := source.(string)
 	if !ok {
 		return nil, fmt.Errorf("HCL loader expects string file path")
@@ -95,7 +95,7 @@ func NewJSONVariableLoader(validator *schemas.SchemaValidator) *JSONVariableLoad
 	}
 }
 
-func (l *JSONVariableLoader) Load(ctx context.Context, source interface{}) ([]*types.Variable, error) {
+func (l *JSONVariableLoader) Load(ctx context.Context, source interface{}) ([]*spookytypesvariables.Variable, error) {
 	filePath, ok := source.(string)
 	if !ok {
 		return nil, fmt.Errorf("JSON loader expects string file path")
@@ -156,7 +156,7 @@ func (l *JSONVariableLoader) GetSupportedExtensions() []string {
 }
 
 // Helper methods for parsing
-func (l *HCLVariableLoader) parseHCLToVariables(content []byte) ([]*types.Variable, error) {
+func (l *HCLVariableLoader) parseHCLToVariables(content []byte) ([]*spookytypesvariables.Variable, error) {
 	// Parse HCL content using the proper HCL library
 	parser := hclparse.NewParser()
 	file, diags := parser.ParseHCL(content, "variables.hcl")
@@ -165,7 +165,7 @@ func (l *HCLVariableLoader) parseHCLToVariables(content []byte) ([]*types.Variab
 	}
 
 	// Extract variable blocks
-	variables := []*types.Variable{}
+	variables := []*spookytypesvariables.Variable{}
 	body := file.Body
 
 	// Find variables block
@@ -219,12 +219,12 @@ func findVariablesBlock(body hcl.Body) *hcl.Block {
 }
 
 // parseVariableBlock parses a single variable block
-func parseVariableBlock(block *hcl.Block) (*types.Variable, error) {
+func parseVariableBlock(block *hcl.Block) (*spookytypesvariables.Variable, error) {
 	if len(block.Labels) == 0 {
 		return nil, fmt.Errorf("variable block must have a name label")
 	}
 
-	variable := &types.Variable{
+	variable := &spookytypesvariables.Variable{
 		Name:      block.Labels[0],
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
@@ -239,7 +239,7 @@ func parseVariableBlock(block *hcl.Block) (*types.Variable, error) {
 }
 
 // parseVariableBlocks parses nested blocks in a variable
-func parseVariableBlocks(body hcl.Body, variable *types.Variable) error {
+func parseVariableBlocks(body hcl.Body, variable *spookytypesvariables.Variable) error {
 	content, diags := body.Content(&hcl.BodySchema{
 		Blocks: []hcl.BlockHeaderSchema{
 			{Type: "validation"},
@@ -304,13 +304,13 @@ func parseVariableBlocks(body hcl.Body, variable *types.Variable) error {
 }
 
 // parseValidationBlock parses a validation block
-func parseValidationBlock(block *hcl.Block) (*types.VariableValidation, error) {
+func parseValidationBlock(block *hcl.Block) (*spookytypesvariables.VariableValidation, error) {
 	attrs, diags := block.Body.JustAttributes()
 	if diags.HasErrors() {
 		return nil, fmt.Errorf("failed to parse validation attributes: %v", diags)
 	}
 
-	validation := &types.VariableValidation{}
+	validation := &spookytypesvariables.VariableValidation{}
 
 	for name, attr := range attrs {
 		switch name {
@@ -327,13 +327,13 @@ func parseValidationBlock(block *hcl.Block) (*types.VariableValidation, error) {
 }
 
 // parseConstraintsBlock parses a constraints block
-func parseConstraintsBlock(block *hcl.Block) (*types.VariableConstraints, error) {
+func parseConstraintsBlock(block *hcl.Block) (*spookytypesvariables.VariableConstraints, error) {
 	attrs, diags := block.Body.JustAttributes()
 	if diags.HasErrors() {
 		return nil, fmt.Errorf("failed to parse constraints attributes: %v", diags)
 	}
 
-	constraints := &types.VariableConstraints{}
+	constraints := &spookytypesvariables.VariableConstraints{}
 
 	for name, attr := range attrs {
 		switch name {
@@ -484,7 +484,7 @@ func extractFloatValue(expr hcl.Expression) *float64 {
 	return nil
 }
 
-func (l *JSONVariableLoader) parseJSONToVariables(jsonData map[string]interface{}) ([]*types.Variable, error) {
+func (l *JSONVariableLoader) parseJSONToVariables(jsonData map[string]interface{}) ([]*spookytypesvariables.Variable, error) {
 	// Check for export format
 	if _, ok := jsonData["metadata"]; ok {
 		// Export format with metadata
@@ -501,8 +501,8 @@ func (l *JSONVariableLoader) parseJSONToVariables(jsonData map[string]interface{
 }
 
 // parseExportFormat parses variables from export format
-func parseExportFormat(jsonData map[string]interface{}) ([]*types.Variable, error) {
-	variables := []*types.Variable{}
+func parseExportFormat(jsonData map[string]interface{}) ([]*spookytypesvariables.Variable, error) {
+	variables := []*spookytypesvariables.Variable{}
 
 	// Extract variables from export format
 	variablesObj, ok := jsonData["variables"].(map[string]interface{})
@@ -532,8 +532,8 @@ func parseExportFormat(jsonData map[string]interface{}) ([]*types.Variable, erro
 }
 
 // parseSimpleVariablesFormat parses variables from simple format
-func parseSimpleVariablesFormat(variablesObj interface{}) ([]*types.Variable, error) {
-	variables := []*types.Variable{}
+func parseSimpleVariablesFormat(variablesObj interface{}) ([]*spookytypesvariables.Variable, error) {
+	variables := []*spookytypesvariables.Variable{}
 
 	if variablesMap, ok := variablesObj.(map[string]interface{}); ok {
 		for name, varData := range variablesMap {
@@ -552,8 +552,8 @@ func parseSimpleVariablesFormat(variablesObj interface{}) ([]*types.Variable, er
 }
 
 // parseDirectVariablesFormat parses variables from direct format
-func parseDirectVariablesFormat(jsonData map[string]interface{}) ([]*types.Variable, error) {
-	variables := []*types.Variable{}
+func parseDirectVariablesFormat(jsonData map[string]interface{}) ([]*spookytypesvariables.Variable, error) {
+	variables := []*spookytypesvariables.Variable{}
 
 	for name, varData := range jsonData {
 		if varMap, ok := varData.(map[string]interface{}); ok {
@@ -570,8 +570,8 @@ func parseDirectVariablesFormat(jsonData map[string]interface{}) ([]*types.Varia
 }
 
 // parseVariableFromJSON parses a single variable from JSON
-func parseVariableFromJSON(varMap map[string]interface{}) (*types.Variable, error) {
-	variable := &types.Variable{
+func parseVariableFromJSON(varMap map[string]interface{}) (*spookytypesvariables.Variable, error) {
+	variable := &spookytypesvariables.Variable{
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -620,8 +620,8 @@ func parseVariableFromJSON(varMap map[string]interface{}) (*types.Variable, erro
 }
 
 // parseValidationFromJSON parses validation from JSON
-func parseValidationFromJSON(validationMap map[string]interface{}) *types.VariableValidation {
-	validation := &types.VariableValidation{}
+func parseValidationFromJSON(validationMap map[string]interface{}) *spookytypesvariables.VariableValidation {
+	validation := &spookytypesvariables.VariableValidation{}
 
 	if v, ok := validationMap["condition"].(string); ok {
 		validation.Condition = v
@@ -637,8 +637,8 @@ func parseValidationFromJSON(validationMap map[string]interface{}) *types.Variab
 }
 
 // parseConstraintsFromJSON parses constraints from JSON
-func parseConstraintsFromJSON(constraintsMap map[string]interface{}) *types.VariableConstraints {
-	constraints := &types.VariableConstraints{}
+func parseConstraintsFromJSON(constraintsMap map[string]interface{}) *spookytypesvariables.VariableConstraints {
+	constraints := &spookytypesvariables.VariableConstraints{}
 
 	if v, ok := constraintsMap["min_length"].(float64); ok {
 		val := int(v)

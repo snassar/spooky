@@ -2,34 +2,35 @@ package collectors
 
 import (
 	"fmt"
+	spookyfactstypes "spooky/internal/types/facts"
 )
 
 // Manager provides collector management functionality
 type Manager struct {
-	collector  Collector
-	collectors map[string]Collector
+	collector  spookyfactstypes.FactCollector
+	collectors map[string]spookyfactstypes.FactCollector
 }
 
 // NewManager creates a new collector manager
-func NewManager(collector Collector) *Manager {
+func NewManager(collector spookyfactstypes.FactCollector) *Manager {
 	return &Manager{
 		collector:  collector,
-		collectors: make(map[string]Collector),
+		collectors: make(map[string]spookyfactstypes.FactCollector),
 	}
 }
 
 // GetCollector returns the primary collector
-func (m *Manager) GetCollector() Collector {
+func (m *Manager) GetCollector() spookyfactstypes.FactCollector {
 	return m.collector
 }
 
 // SetCollector sets the primary collector
-func (m *Manager) SetCollector(collector Collector) {
+func (m *Manager) SetCollector(collector spookyfactstypes.FactCollector) {
 	m.collector = collector
 }
 
 // RegisterCollector registers a custom collector
-func (m *Manager) RegisterCollector(name string, collector Collector) {
+func (m *Manager) RegisterCollector(name string, collector spookyfactstypes.FactCollector) {
 	if collector == nil {
 		return
 	}
@@ -37,7 +38,7 @@ func (m *Manager) RegisterCollector(name string, collector Collector) {
 }
 
 // GetCustomCollector gets a custom collector by name
-func (m *Manager) GetCustomCollector(name string) (Collector, bool) {
+func (m *Manager) GetCustomCollector(name string) (spookyfactstypes.FactCollector, bool) {
 	collector, exists := m.collectors[name]
 	return collector, exists
 }

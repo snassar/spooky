@@ -82,14 +82,14 @@ type ActingManager interface {
 // Actor defines the interface for individual action execution
 type Actor interface {
 	// Core acting operations
-	Execute(ctx context.Context, context *spookytypesactions.ActionContext) (*spookytypesactions.ActingResult, error)
+	Execute(ctx context.Context, context *spookytypesactions.ActionContext) (*spookytypesactions.RunResult, error)
 	Prepare(context *spookytypesactions.ActionContext) error
 	Cancel() error
 
 	// State management
 	GetState() spookytypesactions.ActingState
 	GetProgress() float64
-	GetStatus() spookytypesactions.ActingStatus
+	GetStatus() spookytypesactions.RunStatus
 
 	// Configuration
 	SetTimeout(timeout time.Duration)
@@ -99,9 +99,9 @@ type Actor interface {
 // ActingExecutor defines the interface for executing actions on machines
 type ActingExecutor interface {
 	// Core execution operations
-	ExecuteCommand(ctx context.Context, command string, context *spookytypesactions.ActionContext) (*spookytypesactions.ActingResult, error)
-	ExecuteScript(ctx context.Context, script string, context *spookytypesactions.ActionContext) (*spookytypesactions.ActingResult, error)
-	ExecuteTemplate(ctx context.Context, template *spookytypesactions.TemplateConfig, context *spookytypesactions.ActionContext) (*spookytypesactions.ActingResult, error)
+	ExecuteCommand(ctx context.Context, command string, context *spookytypesactions.ActionContext) (*spookytypesactions.RunResult, error)
+	ExecuteScript(ctx context.Context, script string, context *spookytypesactions.ActionContext) (*spookytypesactions.RunResult, error)
+	ExecuteTemplate(ctx context.Context, template *spookytypesactions.TemplateConfig, context *spookytypesactions.ActionContext) (*spookytypesactions.RunResult, error)
 
 	// Machine management
 	GetMachine(machineID string) (Machine, error)
@@ -131,8 +131,8 @@ type Machine interface {
 	IsConnected() bool
 
 	// Execution operations
-	ExecuteCommand(ctx context.Context, command string) (*spookytypesactions.ActingResult, error)
-	ExecuteScript(ctx context.Context, script string) (*spookytypesactions.ActingResult, error)
+	ExecuteCommand(ctx context.Context, command string) (*spookytypesactions.RunResult, error)
+	ExecuteScript(ctx context.Context, script string) (*spookytypesactions.RunResult, error)
 	UploadFile(ctx context.Context, localPath, remotePath string) error
 	DownloadFile(ctx context.Context, remotePath, localPath string) error
 
@@ -166,20 +166,20 @@ type ActingSessionManager interface {
 // ActingResultProcessor defines the interface for processing acting results
 type ActingResultProcessor interface {
 	// Result processing
-	ProcessResult(result *spookytypesactions.ActingResult) error
-	ProcessResults(results []*spookytypesactions.ActingResult) error
+	ProcessResult(result *spookytypesactions.RunResult) error
+	ProcessResults(results []*spookytypesactions.RunResult) error
 
 	// Result aggregation
-	AggregateResults(results []*spookytypesactions.ActingResult) (*spookytypesactions.ActingSession, error)
-	CalculateSuccessRate(results []*spookytypesactions.ActingResult) float64
+	AggregateResults(results []*spookytypesactions.RunResult) (*spookytypesactions.ActingSession, error)
+	CalculateSuccessRate(results []*spookytypesactions.RunResult) float64
 
 	// Result validation
-	ValidateResult(result *spookytypesactions.ActingResult) error
-	ValidateResults(results []*spookytypesactions.ActingResult) error
+	ValidateResult(result *spookytypesactions.RunResult) error
+	ValidateResults(results []*spookytypesactions.RunResult) error
 
 	// Result transformation
-	TransformResult(result *spookytypesactions.ActingResult, format string) (interface{}, error)
-	TransformResults(results []*spookytypesactions.ActingResult, format string) (interface{}, error)
+	TransformResult(result *spookytypesactions.RunResult, format string) (interface{}, error)
+	TransformResults(results []*spookytypesactions.RunResult, format string) (interface{}, error)
 }
 
 // ActingProgressTracker defines the interface for tracking acting progress

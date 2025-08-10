@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	spookyactionstypes "spooky/internal/actions/types"
+	spookytypes "spooky/internal/types"
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
 	spookyloggingtypes "spooky/internal/types/logging"

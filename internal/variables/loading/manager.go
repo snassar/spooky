@@ -8,22 +8,38 @@ import (
 	"strings"
 
 	"spooky/internal/logging"
-	spookylogging "spooky/internal/logging"
 	"spooky/internal/schemas"
-	spookyschemas "spooky/internal/schemas"
-	"spooky/internal/variables/types"
-	spookyvariablestypes "spooky/internal/variables/types"
+	"spooky/internal/types"
+	spookytypeslogging "spooky/internal/types/logging"
+	spookytypesvariables "spooky/internal/types/variables"
 )
+
+// VariableLoader defines the interface for specific format loaders
+type VariableLoader interface {
+	Load(ctx context.Context, source interface{}) ([]*types.Variable, error)
+	GetName() string
+	GetSupportedExtensions() []string
+	ValidateSchema(content []byte) error
+}
+
+// Logger defines the interface for logging operations
+type Logger interface {
+	Debug(msg string, fields ...spookytypeslogging.Field)
+	Info(msg string, fields ...spookytypeslogging.Field)
+	Warn(msg string, fields ...spookytypeslogging.Field)
+	Error(msg string, fields ...spookytypeslogging.Field)
+	Fatal(msg string, fields ...spookytypeslogging.Field)
+}
 
 // Manager implements LoadingManager interface
 type Manager struct {
-	config  *spookyvariablestypes.LoadingConfig
+	config  *spookytypesvariables.LoadingConfig
 	loaders map[string]VariableLoader
-	logger  spookylogging.Logger
+	logger  Logger
 }
 
 // NewManager creates a new loading manager
-func NewManager(config *spookyvariablestypes.LoadingConfig, logger spookylogging.Logger) *Manager {
+func NewManager(config *spookytypesvariables.LoadingConfig, logger Logger) *Manager {
 	manager := &Manager{
 		config:  config,
 		loaders: make(map[string]VariableLoader),
@@ -31,7 +47,7 @@ func NewManager(config *spookyvariablestypes.LoadingConfig, logger spookylogging
 	}
 
 	// Register default loaders
-	validator := spookyschemas.NewSchemaValidator()
+	validator := schemas.NewSchemaValidator()
 	manager.RegisterLoader(".hcl", NewHCLVariableLoader(validator))
 	manager.RegisterLoader(".json", NewJSONVariableLoader(validator))
 
@@ -44,7 +60,7 @@ func (m *Manager) RegisterLoader(extension string, loader VariableLoader) {
 }
 
 // LoadFromFile loads variables from a single file
-func (m *Manager) LoadFromFile(ctx context.Context, path string) ([]*spookyvariablestypes.Variable, error) {
+func (m *Manager) LoadFromFile(ctx context.Context, path string) ([]*types.Variable, error) {
 	// 1. Validate file exists and is readable
 	if err := m.ValidateFile(path); err != nil {
 		return nil, fmt.Errorf("file validation failed: %w", err)
@@ -133,7 +149,7 @@ func (m *Manager) LoadFromJSON(ctx context.Context, content []byte) ([]*types.Va
 // SetDefaultEncoding sets the default encoding for file operations
 func (m *Manager) SetDefaultEncoding(encoding string) error {
 	if m.config == nil {
-		m.config = &types.LoadingConfig{}
+		m.config = &spookytypesvariables.LoadingConfig{}
 	}
 	m.config.DefaultEncoding = encoding
 	return nil
@@ -142,7 +158,7 @@ func (m *Manager) SetDefaultEncoding(encoding string) error {
 // SetMaxFileSize sets the maximum file size for loading
 func (m *Manager) SetMaxFileSize(maxSize int64) error {
 	if m.config == nil {
-		m.config = &types.LoadingConfig{}
+		m.config = &spookytypesvariables.LoadingConfig{}
 	}
 	m.config.MaxFileSize = maxSize
 	return nil
@@ -151,7 +167,7 @@ func (m *Manager) SetMaxFileSize(maxSize int64) error {
 // SetAllowedExtensions sets the allowed file extensions
 func (m *Manager) SetAllowedExtensions(extensions []string) error {
 	if m.config == nil {
-		m.config = &types.LoadingConfig{}
+		m.config = &spookytypesvariables.LoadingConfig{}
 	}
 	m.config.AllowedExtensions = extensions
 	return nil

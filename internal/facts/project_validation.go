@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"time"
 
-	"spooky/internal/types/facts"
+	spookytypesfacts "spooky/internal/types/facts"
 )
 
 // ProjectFactsValidator provides validation for project facts using schema
@@ -21,7 +21,7 @@ func NewProjectFactsValidator() *ProjectFactsValidator {
 }
 
 // ValidateProjectFacts validates facts against project schema structure
-func (pfv *ProjectFactsValidator) ValidateProjectFacts(facts *types.FactCollection) *ValidationResult {
+func (pfv *ProjectFactsValidator) ValidateProjectFacts(facts *spookytypesfacts.FactCollection) *ValidationResult {
 	result := &ValidationResult{
 		Valid:  true,
 		Schema: "facts-structure",
@@ -91,8 +91,8 @@ func (pfv *ProjectFactsValidator) ValidateProjectFacts(facts *types.FactCollecti
 }
 
 // ValidateProjectFactsConstraints validates project facts constraints
-func (pfv *ProjectFactsValidator) ValidateProjectFactsConstraints(facts *types.FactCollection) *ValidationResult {
-	validators := []func(*types.FactCollection) error{
+func (pfv *ProjectFactsValidator) ValidateProjectFactsConstraints(facts *spookytypesfacts.FactCollection) *ValidationResult {
+	validators := []func(*spookytypesfacts.FactCollection) error{
 		pfv.validateProjectTTL,
 		pfv.validateProjectIsolation,
 		pfv.validateProjectScope,
@@ -101,7 +101,7 @@ func (pfv *ProjectFactsValidator) ValidateProjectFactsConstraints(facts *types.F
 }
 
 // validateMachineID validates machine_id format and presence
-func (pfv *ProjectFactsValidator) validateMachineID(facts *types.FactCollection) error {
+func (pfv *ProjectFactsValidator) validateMachineID(facts *spookytypesfacts.FactCollection) error {
 	// Look for machine_id in facts
 	machineIDFact, exists := facts.Facts["machine_id"]
 	if !exists {
@@ -117,7 +117,7 @@ func (pfv *ProjectFactsValidator) validateMachineID(facts *types.FactCollection)
 }
 
 // validateProjectID validates project_id presence and format
-func (pfv *ProjectFactsValidator) validateProjectID(facts *types.FactCollection) error {
+func (pfv *ProjectFactsValidator) validateProjectID(facts *spookytypesfacts.FactCollection) error {
 	// Check if project_id is present in any fact's metadata
 	projectIDFound := false
 	var projectID string
@@ -153,7 +153,7 @@ func (pfv *ProjectFactsValidator) validateProjectID(facts *types.FactCollection)
 }
 
 // validateTimestamp validates collected_at timestamp
-func (pfv *ProjectFactsValidator) validateTimestamp(facts *types.FactCollection) error {
+func (pfv *ProjectFactsValidator) validateTimestamp(facts *spookytypesfacts.FactCollection) error {
 	// Check if timestamp is set
 	if facts.Timestamp.IsZero() {
 		return fmt.Errorf("collected_at timestamp is required")
@@ -163,7 +163,7 @@ func (pfv *ProjectFactsValidator) validateTimestamp(facts *types.FactCollection)
 }
 
 // validateTTLFormat validates TTL format
-func (pfv *ProjectFactsValidator) validateTTLFormat(facts *types.FactCollection) error {
+func (pfv *ProjectFactsValidator) validateTTLFormat(facts *spookytypesfacts.FactCollection) error {
 	// Check each fact's TTL
 	for key, fact := range facts.Facts {
 		if fact.TTL > 0 {
@@ -177,12 +177,12 @@ func (pfv *ProjectFactsValidator) validateTTLFormat(facts *types.FactCollection)
 }
 
 // validateFactsStructure validates the structure of facts
-func (pfv *ProjectFactsValidator) validateFactsStructure(facts *types.FactCollection) error {
+func (pfv *ProjectFactsValidator) validateFactsStructure(facts *spookytypesfacts.FactCollection) error {
 	return pfv.utils.ValidateFactStructure(facts.Facts)
 }
 
 // validateProjectTTL validates project facts TTL constraints
-func (pfv *ProjectFactsValidator) validateProjectTTL(facts *types.FactCollection) error {
+func (pfv *ProjectFactsValidator) validateProjectTTL(facts *spookytypesfacts.FactCollection) error {
 	// Project facts should have shorter TTL (1h default)
 	for key, fact := range facts.Facts {
 		if fact.TTL > 0 && fact.TTL > 7*24*time.Hour {
@@ -195,7 +195,7 @@ func (pfv *ProjectFactsValidator) validateProjectTTL(facts *types.FactCollection
 }
 
 // validateProjectIsolation validates project isolation constraints
-func (pfv *ProjectFactsValidator) validateProjectIsolation(facts *types.FactCollection) error {
+func (pfv *ProjectFactsValidator) validateProjectIsolation(facts *spookytypesfacts.FactCollection) error {
 	// All facts in a project should have the same project_id
 	var projectID string
 	projectIDSet := false
@@ -220,7 +220,7 @@ func (pfv *ProjectFactsValidator) validateProjectIsolation(facts *types.FactColl
 }
 
 // validateProjectScope validates project scope constraints
-func (pfv *ProjectFactsValidator) validateProjectScope(facts *types.FactCollection) error {
+func (pfv *ProjectFactsValidator) validateProjectScope(facts *spookytypesfacts.FactCollection) error {
 	// Project facts should not be shared across projects
 	// This is more of a logical validation - project facts should be isolated
 
@@ -239,7 +239,7 @@ func (pfv *ProjectFactsValidator) validateProjectScope(facts *types.FactCollecti
 }
 
 // ValidateProjectMachineIDUniqueness validates machine ID uniqueness within a project
-func (pfv *ProjectFactsValidator) ValidateProjectMachineIDUniqueness(machineID, projectID string, existingCollections []*types.FactCollection) error {
+func (pfv *ProjectFactsValidator) ValidateProjectMachineIDUniqueness(machineID, projectID string, existingCollections []*spookytypesfacts.FactCollection) error {
 	for _, collection := range existingCollections {
 		// Check if collection belongs to this project
 		if projectFact, exists := collection.Facts["project.id"]; exists {
@@ -257,7 +257,7 @@ func (pfv *ProjectFactsValidator) ValidateProjectMachineIDUniqueness(machineID, 
 }
 
 // ValidateProjectFactsImport validates facts for import into project storage
-func (pfv *ProjectFactsValidator) ValidateProjectFactsImport(facts *types.FactCollection, projectID, importSource string) *ValidationResult {
+func (pfv *ProjectFactsValidator) ValidateProjectFactsImport(facts *spookytypesfacts.FactCollection, projectID, importSource string) *ValidationResult {
 	result := pfv.ValidateProjectFacts(facts)
 
 	// Additional import-specific validations
@@ -292,7 +292,7 @@ func (pfv *ProjectFactsValidator) validateImportSource(source string) error {
 }
 
 // ValidateProjectFactsConsistency validates consistency across project facts
-func (pfv *ProjectFactsValidator) ValidateProjectFactsConsistency(facts *types.FactCollection) *ValidationResult {
+func (pfv *ProjectFactsValidator) ValidateProjectFactsConsistency(facts *spookytypesfacts.FactCollection) *ValidationResult {
 	result := &ValidationResult{
 		Valid:  true,
 		Schema: "facts-consistency",
@@ -322,7 +322,7 @@ func (pfv *ProjectFactsValidator) ValidateProjectFactsConsistency(facts *types.F
 }
 
 // validateServerConsistency validates server identifier consistency
-func (pfv *ProjectFactsValidator) validateServerConsistency(facts *types.FactCollection) error {
+func (pfv *ProjectFactsValidator) validateServerConsistency(facts *spookytypesfacts.FactCollection) error {
 	var serverID string
 	serverIDSet := false
 
@@ -340,7 +340,7 @@ func (pfv *ProjectFactsValidator) validateServerConsistency(facts *types.FactCol
 }
 
 // validateTimestampConsistency validates timestamp consistency
-func (pfv *ProjectFactsValidator) validateTimestampConsistency(facts *types.FactCollection) error {
+func (pfv *ProjectFactsValidator) validateTimestampConsistency(facts *spookytypesfacts.FactCollection) error {
 	// Check if all facts have similar timestamps (within 5 minutes)
 	if len(facts.Facts) < 2 {
 		return nil // No consistency check needed for single fact

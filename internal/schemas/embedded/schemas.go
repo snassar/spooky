@@ -2,7 +2,7 @@ package embedded
 
 import (
 	"fmt"
-	"spooky/internal/schemas/types"
+	"spooky/internal/types/schemas"
 )
 
 // SchemaDefinitions holds embedded schema definitions

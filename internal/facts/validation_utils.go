@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"time"
 
-	"spooky/internal/types/facts"
+	spookytypesfacts "spooky/internal/types/facts"
 )
 
 // ValidationResult represents validation result
@@ -79,7 +79,7 @@ func (v *ValidationUtils) ValidateTTL(ttl time.Duration) error {
 }
 
 // ValidateFactStructure validates fact structure and requirements
-func (v *ValidationUtils) ValidateFactStructure(facts map[string]*types.Fact) error {
+func (v *ValidationUtils) ValidateFactStructure(facts map[string]*spookytypesfacts.Fact) error {
 	if len(facts) == 0 {
 		return fmt.Errorf("facts collection cannot be empty")
 	}
@@ -115,7 +115,7 @@ func (v *ValidationUtils) ValidateFactStructure(facts map[string]*types.Fact) er
 }
 
 // ValidateFactsCollection validates a complete facts collection
-func (v *ValidationUtils) ValidateFactsCollection(facts *types.FactCollection) error {
+func (v *ValidationUtils) ValidateFactsCollection(facts *spookytypesfacts.FactCollection) error {
 	if facts == nil {
 		return fmt.Errorf("facts cannot be nil")
 	}
@@ -191,7 +191,7 @@ func (v *ValidationUtils) ValidateImportSource(source string) error {
 }
 
 // ValidateConstraints validates facts constraints with custom validation functions
-func (v *ValidationUtils) ValidateConstraints(facts *types.FactCollection, schema string, validators []func(*types.FactCollection) error) *ValidationResult {
+func (v *ValidationUtils) ValidateConstraints(facts *spookytypesfacts.FactCollection, schema string, validators []func(*spookytypesfacts.FactCollection) error) *ValidationResult {
 	result := &ValidationResult{
 		Valid:  true,
 		Schema: schema,
@@ -242,7 +242,7 @@ func (v *ValidationUtils) ParseKeyValueLines(lines []string) map[string]string {
 }
 
 // DeleteFactsFromMap deletes facts from a map based on query criteria
-func (v *ValidationUtils) DeleteFactsFromMap(facts map[string]*types.FactCollection, query *types.FactQuery, saveFunc func() error) (int, error) {
+func (v *ValidationUtils) DeleteFactsFromMap(facts map[string]*spookytypesfacts.FactCollection, query *spookytypesfacts.FactQuery, saveFunc func() error) (int, error) {
 	deletedCount := 0
 	for machineID, collection := range facts {
 		if v.matchesQuery(collection, query) {
@@ -261,7 +261,7 @@ func (v *ValidationUtils) DeleteFactsFromMap(facts map[string]*types.FactCollect
 }
 
 // matchesQuery checks if a fact collection matches the query criteria
-func (v *ValidationUtils) matchesQuery(collection *types.FactCollection, query *types.FactQuery) bool {
+func (v *ValidationUtils) matchesQuery(collection *spookytypesfacts.FactCollection, query *spookytypesfacts.FactQuery) bool {
 	if query.MachineName != "" && collection.Server != query.MachineName {
 		return false
 	}

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	spookyfactscollectors "spooky/internal/facts/collectors"
 	spookytypesfacts "spooky/internal/types/facts"
 
 	machinecpu "github.com/shirou/gopsutil/v4/cpu"
@@ -24,13 +23,13 @@ import (
 
 // Collector collects facts from the local system
 type Collector struct {
-	spookyfactscollectors.BaseCollector
+	source string
 }
 
 // NewCollector creates a new local fact collector
 func NewCollector() *Collector {
 	return &Collector{
-		BaseCollector: *spookyfactscollectors.NewBaseCollector(spookytypesfacts.SourceLocal, spookytypesfacts.MergePolicyReplace),
+		source: "local",
 	}
 }
 
@@ -121,6 +120,11 @@ func (c *Collector) GetFact(server, key string) (*spookytypesfacts.Fact, error) 
 func (c *Collector) Validate() error {
 	// Local collector doesn't require special validation
 	return nil
+}
+
+// GetSource returns the source of the collector
+func (c *Collector) GetSource() string {
+	return c.source
 }
 
 // collectSystemFacts collects basic system information

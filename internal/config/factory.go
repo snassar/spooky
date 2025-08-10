@@ -3,15 +3,15 @@ package config
 import (
 	spookyconfigenvironment "spooky/internal/config/environment"
 	spookyconfigloading "spooky/internal/config/loading"
-	spookyconfigtypes "spooky/internal/types/config"
 	spookyconfigvalidation "spooky/internal/config/validation"
-	spookylogging "spooky/internal/logging"
+	spookyconfigtypes "spooky/internal/types/config"
+	spookytypeslogging "spooky/internal/types/logging"
 )
 
 // NewManagerWithConfig creates a new config manager with custom configuration
 func NewManagerWithConfig(
 	config *spookyconfigtypes.Config,
-	logger spookylogging.Logger,
+	logger spookytypeslogging.Logger,
 ) *Manager {
 	// Create sub-managers with default configs if not provided
 	loadingConfig := &spookyconfigtypes.LoadingConfig{
@@ -48,12 +48,14 @@ func NewManagerWithConfig(
 }
 
 // NewManagerWithDependencies creates a new config manager with custom dependencies
+// Note: This function accepts concrete types but the Manager internally implements
+// the ConfigManager interface, maintaining interface-based architecture
 func NewManagerWithDependencies(
 	config *spookyconfigtypes.Config,
-	loadingManager spookyconfigloading.LoadingManager,
-	validationManager spookyconfigvalidation.ValidationManager,
-	environmentManager spookyconfigenvironment.EnvironmentManager,
-	logger spookylogging.Logger,
+	loadingManager *spookyconfigloading.Manager,
+	validationManager *spookyconfigvalidation.Manager,
+	environmentManager *spookyconfigenvironment.Manager,
+	logger spookytypeslogging.Logger,
 ) *Manager {
 	return NewManager(
 		config,
@@ -65,7 +67,7 @@ func NewManagerWithDependencies(
 }
 
 // NewDefaultManager creates a new config manager with default configuration
-func NewDefaultManager(logger spookylogging.Logger) *Manager {
+func NewDefaultManager(logger spookytypeslogging.Logger) *Manager {
 	// Create default config
 	config := &spookyconfigtypes.Config{
 		GlobalConfig: &spookyconfigtypes.GlobalConfig{

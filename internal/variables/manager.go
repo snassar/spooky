@@ -5,35 +5,31 @@ import (
 	"fmt"
 	"sync"
 
-	spookylogging "spooky/internal/logging"
-	spookyvariablesimportexport "spooky/internal/variables/importexport"
-	spookyvariablesloading "spooky/internal/variables/loading"
-	spookyvariablesresolution "spooky/internal/variables/resolution"
-	spookyvariablestypes "spooky/internal/variables/types"
-	spookyvariablesvalidation "spooky/internal/variables/validation"
+	spookyinterfaces "spooky/internal/interfaces"
+	spookytypes "spooky/internal/types"
 )
 
 // Manager implements VariableManager interface
 type Manager struct {
-	config              *spookyvariablestypes.Config
-	loadingManager      spookyvariablesloading.LoadingManager
-	resolutionManager   spookyvariablesresolution.ResolutionManager
-	validationManager   spookyvariablesvalidation.ValidationManager
-	importExportManager spookyvariablesimportexport.ImportExportManager
-	logger              spookylogging.Logger
-	variables           map[string]*spookyvariablestypes.Variable
+	config              *spookytypes.VariableValidationConfig
+	loadingManager      spookyinterfaces.VariableLoadingManager
+	resolutionManager   spookyinterfaces.ResolutionManager
+	validationManager   spookyinterfaces.VariableValidationManager
+	importExportManager spookyinterfaces.ImportExportManager
+	logger              spookyinterfaces.Logger
+	variables           map[string]*spookytypes.Variable
 	mu                  sync.RWMutex
 }
 
 // NewManager creates a new variable manager
 func NewManager(
-	config *spookyvariablestypes.Config,
-	loadingManager spookyvariablesloading.LoadingManager,
-	resolutionManager spookyvariablesresolution.ResolutionManager,
-	validationManager spookyvariablesvalidation.ValidationManager,
-	importExportManager spookyvariablesimportexport.ImportExportManager,
-	logger spookylogging.Logger,
-) VariableManager {
+	config *spookytypes.VariableValidationConfig,
+	loadingManager spookyinterfaces.VariableLoadingManager,
+	resolutionManager spookyinterfaces.ResolutionManager,
+	validationManager spookyinterfaces.VariableValidationManager,
+	importExportManager spookyinterfaces.ImportExportManager,
+	logger spookyinterfaces.Logger,
+) spookyinterfaces.VariableManager {
 	return &Manager{
 		config:              config,
 		loadingManager:      loadingManager,
@@ -41,17 +37,17 @@ func NewManager(
 		validationManager:   validationManager,
 		importExportManager: importExportManager,
 		logger:              logger,
-		variables:           make(map[string]*spookyvariablestypes.Variable),
+		variables:           make(map[string]*spookytypes.Variable),
 	}
 }
 
 // LoadVariables loads variables from the specified path
-func (m *Manager) LoadVariables(ctx context.Context, path string) (*spookyvariablestypes.VariableCollection, error) {
+func (m *Manager) LoadVariables(ctx context.Context, path string) (*spookytypes.VariableCollection, error) {
 	// Handle nil dependencies gracefully
 	if m.loadingManager == nil {
 		// Return empty collection if loading manager is nil
-		return &spookyvariablestypes.VariableCollection{
-			Variables: []*spookyvariablestypes.Variable{},
+		return &spookytypes.VariableCollection{
+			Variables: []*spookytypes.Variable{},
 			Path:      path,
 		}, nil
 	}
@@ -63,7 +59,7 @@ func (m *Manager) LoadVariables(ctx context.Context, path string) (*spookyvariab
 	}
 
 	// 2. Create collection
-	collection := &spookyvariablestypes.VariableCollection{
+	collection := &spookytypes.VariableCollection{
 		Variables: variables,
 		Path:      path,
 	}
@@ -91,7 +87,7 @@ func (m *Manager) LoadVariables(ctx context.Context, path string) (*spookyvariab
 }
 
 // GetVariable gets a variable by name
-func (m *Manager) GetVariable(ctx context.Context, name string) (*spookyvariablestypes.Variable, error) {
+func (m *Manager) GetVariable(ctx context.Context, name string) (*spookytypes.Variable, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -104,7 +100,7 @@ func (m *Manager) GetVariable(ctx context.Context, name string) (*spookyvariable
 }
 
 // SetVariable sets a variable
-func (m *Manager) SetVariable(ctx context.Context, variable *spookyvariablestypes.Variable) error {
+func (m *Manager) SetVariable(ctx context.Context, variable *spookytypes.Variable) error {
 	// Validate variable
 	result, err := m.validationManager.ValidateVariable(ctx, variable)
 	if err != nil {
@@ -136,11 +132,11 @@ func (m *Manager) DeleteVariable(ctx context.Context, name string) error {
 }
 
 // ListVariables lists all variables
-func (m *Manager) ListVariables(ctx context.Context) ([]*spookyvariablestypes.Variable, error) {
+func (m *Manager) ListVariables(ctx context.Context) ([]*spookytypes.Variable, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	variables := make([]*spookyvariablestypes.Variable, 0, len(m.variables))
+	variables := make([]*spookytypes.Variable, 0, len(m.variables))
 	for _, variable := range m.variables {
 		variables = append(variables, variable)
 	}
@@ -149,9 +145,9 @@ func (m *Manager) ListVariables(ctx context.Context) ([]*spookyvariablestypes.Va
 }
 
 // CreateContext creates a variable context from variables
-func (m *Manager) CreateContext(ctx context.Context, variables []*spookyvariablestypes.Variable) (*spookyvariablestypes.VariableContext, error) {
-	context := &spookyvariablestypes.VariableContext{
-		Variables: make(map[string]*spookyvariablestypes.Variable),
+func (m *Manager) CreateContext(ctx context.Context, variables []*spookytypes.Variable) (*spookytypes.VariableContext, error) {
+	context := &spookytypes.VariableContext{
+		Variables: make(map[string]*spookytypes.Variable),
 	}
 
 	for _, variable := range variables {
@@ -162,9 +158,9 @@ func (m *Manager) CreateContext(ctx context.Context, variables []*spookyvariable
 }
 
 // ResolveContext resolves all variables in a context
-func (m *Manager) ResolveContext(ctx context.Context, context *spookyvariablestypes.VariableContext) error {
+func (m *Manager) ResolveContext(ctx context.Context, context *spookytypes.VariableContext) error {
 	// 1. Get all variables from context
-	variables := make([]*spookyvariablestypes.Variable, 0, len(context.Variables))
+	variables := make([]*spookytypes.Variable, 0, len(context.Variables))
 	for _, variable := range context.Variables {
 		variables = append(variables, variable)
 	}
@@ -183,7 +179,7 @@ func (m *Manager) ResolveContext(ctx context.Context, context *spookyvariablesty
 }
 
 // ExportVariables exports variables to a file
-func (m *Manager) ExportVariables(ctx context.Context, format spookyvariablestypes.ExportFormat, path string) error {
+func (m *Manager) ExportVariables(ctx context.Context, format spookytypes.VariableExportFormat, path string) error {
 	// Get all variables
 	variables, err := m.ListVariables(ctx)
 	if err != nil {
@@ -192,9 +188,9 @@ func (m *Manager) ExportVariables(ctx context.Context, format spookyvariablestyp
 
 	// Export based on format
 	switch format {
-	case spookyvariablestypes.ExportFormatHCL:
+	case "hcl":
 		return m.importExportManager.ExportToHCL(ctx, variables, path)
-	case spookyvariablestypes.ExportFormatJSON:
+	case "json":
 		return m.importExportManager.ExportToJSON(ctx, variables, path)
 	default:
 		return fmt.Errorf("unsupported export format: %s", format)
@@ -202,15 +198,15 @@ func (m *Manager) ExportVariables(ctx context.Context, format spookyvariablestyp
 }
 
 // ImportVariables imports variables from a file
-func (m *Manager) ImportVariables(ctx context.Context, format spookyvariablestypes.ImportFormat, path string) error {
-	var variables []*spookyvariablestypes.Variable
+func (m *Manager) ImportVariables(ctx context.Context, format spookytypes.VariableImportFormat, path string) error {
+	var variables []*spookytypes.Variable
 	var err error
 
 	// Import based on format
 	switch format {
-	case spookyvariablestypes.ImportFormatHCL:
+	case "hcl":
 		variables, err = m.importExportManager.ImportFromHCL(ctx, path)
-	case spookyvariablestypes.ImportFormatJSON:
+	case "json":
 		variables, err = m.importExportManager.ImportFromJSON(ctx, path)
 	default:
 		return fmt.Errorf("unsupported import format: %s", format)
@@ -231,8 +227,8 @@ func (m *Manager) ImportVariables(ctx context.Context, format spookyvariablestyp
 }
 
 // ValidateVariables validates a list of variables
-func (m *Manager) ValidateVariables(ctx context.Context, variables []*spookyvariablestypes.Variable) (*spookyvariablestypes.ValidationResult, error) {
-	collection := &spookyvariablestypes.VariableCollection{
+func (m *Manager) ValidateVariables(ctx context.Context, variables []*spookytypes.Variable) (*spookytypes.VariableValidationResult, error) {
+	collection := &spookytypes.VariableCollection{
 		Variables: variables,
 	}
 
@@ -240,22 +236,22 @@ func (m *Manager) ValidateVariables(ctx context.Context, variables []*spookyvari
 }
 
 // ValidateContext validates a variable context
-func (m *Manager) ValidateContext(ctx context.Context, context *spookyvariablestypes.VariableContext) (*spookyvariablestypes.ValidationResult, error) {
+func (m *Manager) ValidateContext(ctx context.Context, context *spookytypes.VariableContext) (*spookytypes.VariableValidationResult, error) {
 	return m.validationManager.ValidateContext(ctx, context)
 }
 
 // Coordinator integration methods
-func (m *Manager) LoadVariablesForProject(projectPath string) (*spookyvariablestypes.VariableCollection, error) {
+func (m *Manager) LoadVariablesForProject(projectPath string) (*spookytypes.VariableCollection, error) {
 	// Load variables from project directory
 	variablesPath := fmt.Sprintf("%s/variables", projectPath)
 	return m.LoadVariables(context.Background(), variablesPath)
 }
 
-func (m *Manager) ResolveVariablesForContext(variableContext *spookyvariablestypes.VariableContext) error {
+func (m *Manager) ResolveVariablesForContext(variableContext *spookytypes.VariableContext) error {
 	return m.ResolveContext(context.Background(), variableContext)
 }
 
-func (m *Manager) ValidateVariablesForProject(projectPath string) (*spookyvariablestypes.ValidationResult, error) {
+func (m *Manager) ValidateVariablesForProject(projectPath string) (*spookytypes.VariableValidationResult, error) {
 	// Load and validate variables for project
 	collection, err := m.LoadVariablesForProject(projectPath)
 	if err != nil {
@@ -265,7 +261,7 @@ func (m *Manager) ValidateVariablesForProject(projectPath string) (*spookyvariab
 	return m.validationManager.ValidateCollection(context.Background(), collection)
 }
 
-func (m *Manager) ExportVariablesForProject(projectPath string, format spookyvariablestypes.ExportFormat, outputPath string) error {
+func (m *Manager) ExportVariablesForProject(projectPath string, format spookytypes.VariableExportFormat, outputPath string) error {
 	// Load variables and export them
 	collection, err := m.LoadVariablesForProject(projectPath)
 	if err != nil {
@@ -273,9 +269,9 @@ func (m *Manager) ExportVariablesForProject(projectPath string, format spookyvar
 	}
 
 	switch format {
-	case spookyvariablestypes.ExportFormatHCL:
+	case "hcl":
 		return m.importExportManager.ExportToHCL(context.Background(), collection.Variables, outputPath)
-	case spookyvariablestypes.ExportFormatJSON:
+	case "json":
 		return m.importExportManager.ExportToJSON(context.Background(), collection.Variables, outputPath)
 	default:
 		return fmt.Errorf("unsupported export format: %s", format)

@@ -9,7 +9,7 @@ import (
 	"spooky/internal/variables/importexport"
 	"spooky/internal/variables/loading"
 	"spooky/internal/variables/resolution"
-	"spooky/internal/variables/types"
+	"spooky/internal/types/variables"
 	"spooky/internal/variables/validation"
 )
 

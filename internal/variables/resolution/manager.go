@@ -3,29 +3,30 @@ package resolution
 import (
 	"context"
 	"fmt"
+	spookyinterfaces "spooky/internal/interfaces"
+	spookytypeslogging "spooky/internal/types/logging"
 
-	"spooky/internal/logging"
-	"spooky/internal/variables/types"
+	spookytypesvariables "spooky/internal/types/variables"
 )
 
 // Manager implements ResolutionManager interface
 type Manager struct {
-	config    *types.ResolutionConfig
-	resolvers map[string]VariableResolver
-	logger    logging.Logger
+	config    *spookytypesvariables.ResolutionConfig
+	resolvers map[string]spookyinterfaces.VariableResolver
+	logger    spookytypeslogging.Logger
 }
 
 // NewManager creates a new resolution manager
-func NewManager(config *types.ResolutionConfig, logger logging.Logger) *Manager {
+func NewManager(config *spookytypesvariables.ResolutionConfig, logger spookytypeslogging.Logger) *Manager {
 	return &Manager{
 		config:    config,
-		resolvers: make(map[string]VariableResolver),
+		resolvers: make(map[string]spookyinterfaces.VariableResolver),
 		logger:    logger,
 	}
 }
 
 // ResolveVariable resolves a single variable
-func (m *Manager) ResolveVariable(ctx context.Context, variable *types.Variable, context *types.VariableContext) error {
+func (m *Manager) ResolveVariable(ctx context.Context, variable *spookytypesvariables.Variable, context *spookytypesvariables.VariableContext) error {
 	// 1. Validate variable is not already resolved
 	if variable.Resolved {
 		return nil
@@ -48,7 +49,7 @@ func (m *Manager) ResolveVariable(ctx context.Context, variable *types.Variable,
 }
 
 // ResolveDependencies resolves all variables with dependency management
-func (m *Manager) ResolveDependencies(ctx context.Context, variables []*types.Variable) error {
+func (m *Manager) ResolveDependencies(ctx context.Context, variables []*spookytypesvariables.Variable) error {
 	// 1. Validate dependencies
 	if err := m.ValidateDependencies(ctx, variables); err != nil {
 		return fmt.Errorf("dependency validation failed: %w", err)
@@ -66,8 +67,8 @@ func (m *Manager) ResolveDependencies(ctx context.Context, variables []*types.Va
 	}
 
 	// 4. Resolve variables in order
-	context := &types.VariableContext{
-		Variables: make(map[string]*types.Variable),
+	context := &spookytypesvariables.VariableContext{
+		Variables: make(map[string]*spookytypesvariables.Variable),
 	}
 
 	for _, variable := range order {
@@ -83,9 +84,9 @@ func (m *Manager) ResolveDependencies(ctx context.Context, variables []*types.Va
 }
 
 // ResolveContext resolves all variables in a context
-func (m *Manager) ResolveContext(ctx context.Context, context *types.VariableContext) error {
+func (m *Manager) ResolveContext(ctx context.Context, context *spookytypesvariables.VariableContext) error {
 	// Get all variables from context
-	variables := make([]*types.Variable, 0, len(context.Variables))
+	variables := make([]*spookytypesvariables.Variable, 0, len(context.Variables))
 	for _, variable := range context.Variables {
 		variables = append(variables, variable)
 	}
@@ -95,9 +96,9 @@ func (m *Manager) ResolveContext(ctx context.Context, context *types.VariableCon
 }
 
 // ValidateDependencies validates variable dependencies
-func (m *Manager) ValidateDependencies(ctx context.Context, variables []*types.Variable) error {
+func (m *Manager) ValidateDependencies(ctx context.Context, variables []*spookytypesvariables.Variable) error {
 	// Validate all dependencies exist
-	variableMap := make(map[string]*types.Variable)
+	variableMap := make(map[string]*spookytypesvariables.Variable)
 	for _, variable := range variables {
 		variableMap[variable.Name] = variable
 	}
@@ -114,7 +115,7 @@ func (m *Manager) ValidateDependencies(ctx context.Context, variables []*types.V
 }
 
 // DetectCircularDependencies detects circular dependencies in variables
-func (m *Manager) DetectCircularDependencies(variables []*types.Variable) error {
+func (m *Manager) DetectCircularDependencies(variables []*spookytypesvariables.Variable) error {
 	// Build dependency graph
 	graph := make(map[string][]string)
 	for _, variable := range variables {
@@ -156,14 +157,14 @@ func (m *Manager) DetectCircularDependencies(variables []*types.Variable) error 
 }
 
 // GetDependencyGraph builds a dependency graph from variables
-func (m *Manager) GetDependencyGraph(variables []*types.Variable) (*types.DependencyGraph, error) {
-	graph := &types.DependencyGraph{
-		Nodes: make(map[string]*types.DependencyNode),
+func (m *Manager) GetDependencyGraph(variables []*spookytypesvariables.Variable) (*spookytypesvariables.DependencyGraph, error) {
+	graph := &spookytypesvariables.DependencyGraph{
+		Nodes: make(map[string]*spookytypesvariables.DependencyNode),
 		Edges: make(map[string][]string),
 	}
 
 	for _, variable := range variables {
-		graph.Nodes[variable.Name] = &types.DependencyNode{
+		graph.Nodes[variable.Name] = &spookytypesvariables.DependencyNode{
 			Name:         variable.Name,
 			Dependencies: variable.Dependencies,
 			Resolved:     variable.Resolved,
@@ -177,7 +178,7 @@ func (m *Manager) GetDependencyGraph(variables []*types.Variable) (*types.Depend
 // SetMaxRecursionDepth sets the maximum recursion depth for resolution
 func (m *Manager) SetMaxRecursionDepth(depth int) error {
 	if m.config == nil {
-		m.config = &types.ResolutionConfig{}
+		m.config = &spookytypesvariables.ResolutionConfig{}
 	}
 	m.config.MaxRecursionDepth = depth
 	return nil
@@ -186,7 +187,7 @@ func (m *Manager) SetMaxRecursionDepth(depth int) error {
 // SetDefaultValues sets default values for variables
 func (m *Manager) SetDefaultValues(defaults map[string]interface{}) error {
 	if m.config == nil {
-		m.config = &types.ResolutionConfig{}
+		m.config = &spookytypesvariables.ResolutionConfig{}
 	}
 	m.config.DefaultValues = defaults
 	return nil
@@ -195,15 +196,15 @@ func (m *Manager) SetDefaultValues(defaults map[string]interface{}) error {
 // EnableStrictMode enables or disables strict mode
 func (m *Manager) EnableStrictMode(strict bool) error {
 	if m.config == nil {
-		m.config = &types.ResolutionConfig{}
+		m.config = &spookytypesvariables.ResolutionConfig{}
 	}
 	m.config.StrictMode = strict
 	return nil
 }
 
 // GetUnresolvedVariables returns variables that are not yet resolved
-func (m *Manager) GetUnresolvedVariables(variables []*types.Variable) []*types.Variable {
-	var unresolved []*types.Variable
+func (m *Manager) GetUnresolvedVariables(variables []*spookytypesvariables.Variable) []*spookytypesvariables.Variable {
+	var unresolved []*spookytypesvariables.Variable
 	for _, variable := range variables {
 		if !variable.Resolved {
 			unresolved = append(unresolved, variable)
@@ -213,10 +214,10 @@ func (m *Manager) GetUnresolvedVariables(variables []*types.Variable) []*types.V
 }
 
 // GetResolutionOrder determines the order in which variables should be resolved
-func (m *Manager) GetResolutionOrder(variables []*types.Variable) ([]*types.Variable, error) {
+func (m *Manager) GetResolutionOrder(variables []*spookytypesvariables.Variable) ([]*spookytypesvariables.Variable, error) {
 	// Build dependency graph
 	graph := make(map[string][]string)
-	variableMap := make(map[string]*types.Variable)
+	variableMap := make(map[string]*spookytypesvariables.Variable)
 
 	for _, variable := range variables {
 		variableMap[variable.Name] = variable
@@ -234,12 +235,12 @@ func (m *Manager) Close() error {
 }
 
 // Helper method for topological sorting
-func (m *Manager) topologicalSort(graph map[string][]string, variableMap map[string]*types.Variable) ([]*types.Variable, error) {
+func (m *Manager) topologicalSort(graph map[string][]string, variableMap map[string]*spookytypesvariables.Variable) ([]*spookytypesvariables.Variable, error) {
 	// Implementation of topological sort algorithm
 	// Returns variables in dependency order
 	visited := make(map[string]bool)
 	temp := make(map[string]bool)
-	var result []*types.Variable
+	var result []*spookytypesvariables.Variable
 
 	var visit func(node string) error
 	visit = func(node string) error {

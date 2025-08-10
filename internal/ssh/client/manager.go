@@ -4,26 +4,27 @@ import (
 	"fmt"
 	"time"
 
-	"spooky/internal/logging"
-	"spooky/internal/ssh/types"
+	spookyinterfaces "spooky/internal/interfaces"
+	spookylogging "spooky/internal/logging"
+	spookytypes "spooky/internal/types"
 )
 
 // Manager implements ClientManager interface
 type Manager struct {
-	config            *types.ClientConfig
-	connectionManager ConnectionManager
-	executionManager  ExecutionManager
-	hostKeyManager    HostKeyManager
-	logger            logging.Logger
+	config            *spookytypes.ClientConfig
+	connectionManager spookyinterfaces.ConnectionManager
+	executionManager  spookyinterfaces.ExecutionManager
+	hostKeyManager    spookyinterfaces.HostKeyManager
+	logger            spookyinterfaces.Logger
 }
 
 // NewManager creates a new client manager
 func NewManager(
-	config *types.ClientConfig,
-	connectionManager ConnectionManager,
-	executionManager ExecutionManager,
-	hostKeyManager HostKeyManager,
-	logger logging.Logger,
+	config *spookytypes.ClientConfig,
+	connectionManager spookyinterfaces.ConnectionManager,
+	executionManager spookyinterfaces.ExecutionManager,
+	hostKeyManager spookyinterfaces.HostKeyManager,
+	logger spookyinterfaces.Logger,
 ) *Manager {
 	return &Manager{
 		config:            config,
@@ -35,7 +36,7 @@ func NewManager(
 }
 
 // Connect establishes an SSH connection
-func (m *Manager) Connect(host string, config *types.SSHConfig) (*types.SSHConnection, error) {
+func (m *Manager) Connect(host string, config *spookytypes.SSHConfig) (*spookytypes.SSHConnection, error) {
 	// 1. Validate host and config
 	if err := m.validateConnectionParams(host, config); err != nil {
 		return nil, fmt.Errorf("connection validation failed: %w", err)
@@ -58,12 +59,12 @@ func (m *Manager) Connect(host string, config *types.SSHConfig) (*types.SSHConne
 		return nil, fmt.Errorf("connection test failed: %w", err)
 	}
 
-	m.logger.Info("SSH connection established", logging.String("host", host))
+	m.logger.Info("SSH connection established", spookylogging.String("host", host))
 	return connection, nil
 }
 
 // ExecuteCommand executes a command on the SSH connection
-func (m *Manager) ExecuteCommand(connection *types.SSHConnection, command string) (*types.CommandResult, error) {
+func (m *Manager) ExecuteCommand(connection *spookytypes.SSHConnection, command string) (*spookytypes.CommandResult, error) {
 	// 1. Validate connection and command
 	if err := m.validateExecutionParams(connection, command); err != nil {
 		return nil, fmt.Errorf("execution validation failed: %w", err)
@@ -76,15 +77,15 @@ func (m *Manager) ExecuteCommand(connection *types.SSHConnection, command string
 	}
 
 	m.logger.Info("Command executed successfully",
-		logging.String("host", connection.Host),
-		logging.String("command", command),
-		logging.Int("exit_code", result.ExitCode))
+		spookylogging.String("host", connection.Host),
+		spookylogging.String("command", command),
+		spookylogging.Int("exit_code", result.ExitCode))
 
 	return result, nil
 }
 
 // ExecuteScript executes a script on the SSH connection
-func (m *Manager) ExecuteScript(connection *types.SSHConnection, script string) (*types.CommandResult, error) {
+func (m *Manager) ExecuteScript(connection *spookytypes.SSHConnection, script string) (*spookytypes.CommandResult, error) {
 	// 1. Validate connection and script
 	if err := m.validateExecutionParams(connection, script); err != nil {
 		return nil, fmt.Errorf("execution validation failed: %w", err)
@@ -97,14 +98,14 @@ func (m *Manager) ExecuteScript(connection *types.SSHConnection, script string) 
 	}
 
 	m.logger.Info("Script executed successfully",
-		logging.String("host", connection.Host),
-		logging.Int("exit_code", result.ExitCode))
+		spookylogging.String("host", connection.Host),
+		spookylogging.Int("exit_code", result.ExitCode))
 
 	return result, nil
 }
 
 // CloseConnection closes an SSH connection
-func (m *Manager) CloseConnection(connection *types.SSHConnection) error {
+func (m *Manager) CloseConnection(connection *spookytypes.SSHConnection) error {
 	if connection == nil {
 		return nil
 	}
@@ -113,7 +114,7 @@ func (m *Manager) CloseConnection(connection *types.SSHConnection) error {
 		return fmt.Errorf("failed to close connection: %w", err)
 	}
 
-	m.logger.Info("SSH connection closed", logging.String("host", connection.Host))
+	m.logger.Info("SSH connection closed", spookylogging.String("host", connection.Host))
 	return nil
 }
 
@@ -144,7 +145,7 @@ func (m *Manager) EnableHostKeyChecking(enabled bool) error {
 // TestConnection tests SSH connectivity
 func (m *Manager) TestConnection(host string) error {
 	// Create a temporary config for testing
-	config := &types.SSHConfig{
+	config := &spookytypes.SSHConfig{
 		Host:    host,
 		Port:    22,
 		Timeout: m.config.DefaultTimeout,
@@ -159,17 +160,17 @@ func (m *Manager) TestConnection(host string) error {
 	// Close the test connection
 	defer m.CloseConnection(connection)
 
-	m.logger.Info("Connection test successful", logging.String("host", host))
+	m.logger.Info("Connection test successful", spookylogging.String("host", host))
 	return nil
 }
 
 // GetConnectionInfo gets connection information
-func (m *Manager) GetConnectionInfo(connection *types.SSHConnection) *types.ConnectionInfo {
+func (m *Manager) GetConnectionInfo(connection *spookytypes.SSHConnection) *spookytypes.ConnectionInfo {
 	if connection == nil {
 		return nil
 	}
 
-	return &types.ConnectionInfo{
+	return &spookytypes.ConnectionInfo{
 		Host:      connection.Host,
 		Port:      connection.Port,
 		Username:  connection.Username,
@@ -186,7 +187,7 @@ func (m *Manager) Close() error {
 }
 
 // Helper methods
-func (m *Manager) validateConnectionParams(host string, config *types.SSHConfig) error {
+func (m *Manager) validateConnectionParams(host string, config *spookytypes.SSHConfig) error {
 	if host == "" {
 		return fmt.Errorf("host cannot be empty")
 	}
@@ -198,7 +199,7 @@ func (m *Manager) validateConnectionParams(host string, config *types.SSHConfig)
 	return nil
 }
 
-func (m *Manager) validateExecutionParams(connection *types.SSHConnection, command string) error {
+func (m *Manager) validateExecutionParams(connection *spookytypes.SSHConnection, command string) error {
 	if connection == nil {
 		return fmt.Errorf("connection cannot be nil")
 	}

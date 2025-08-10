@@ -1,8 +1,6 @@
 package interfaces
 
 import (
-	"io"
-
 	spookytypeslogging "spooky/internal/types/logging"
 )
 
@@ -21,8 +19,8 @@ type Logger interface {
 	WithError(err error) Logger
 
 	// Configuration
-	SetLevel(level spookytypeslogging.Level) error
-	GetLevel() spookytypeslogging.Level
+	SetLevel(level spookytypeslogging.LogLevel) error
+	GetLevel() spookytypeslogging.LogLevel
 	SetFormatter(formatter Formatter) error
 	SetOutput(output Output) error
 
@@ -33,7 +31,7 @@ type Logger interface {
 
 // Formatter defines the interface for log formatting
 type Formatter interface {
-	Format(entry *spookytypeslogging.Entry) ([]byte, error)
+	Format(entry *spookytypeslogging.LogEntry) ([]byte, error)
 	GetName() string
 }
 
@@ -52,7 +50,7 @@ type LogManager interface {
 	GetDefaultLogger() Logger
 
 	// Configuration
-	SetDefaultLevel(level spookytypeslogging.Level) error
+	SetDefaultLevel(level spookytypeslogging.LogLevel) error
 	SetDefaultFormatter(formatter Formatter) error
 	SetDefaultOutput(output Output) error
 

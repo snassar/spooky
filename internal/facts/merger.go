@@ -5,25 +5,27 @@ import (
 	"strings"
 	"time"
 
-	"spooky/internal/types/facts"
-	"spooky/internal/logging"
+	spookyinterfaces "spooky/internal/interfaces"
+	"spooky/internal/types"
+	spookyfactstypes "spooky/internal/types/facts"
+	spookytypesfacts "spooky/internal/types/facts"
 )
 
 // FactMerger handles merging of fact collections
 type FactMerger struct {
-	logger      logging.Logger
-	mergePolicy types.MergePolicy
+	logger      spookyinterfaces.Logger
+	mergePolicy spookyfactstypes.MergePolicy
 }
 
 // NewFactMerger creates a new fact merger with the specified policy
-func NewFactMerger(policy types.MergePolicy) *FactMerger {
+func NewFactMerger(policy spookyfactstypes.MergePolicy) *FactMerger {
 	return &FactMerger{
 		mergePolicy: policy,
 	}
 }
 
 // MergeCollections merges multiple fact collections according to the merge policy
-func (m *FactMerger) MergeCollections(existing, incoming *types.FactCollection) (*types.FactCollection, error) {
+func (m *FactMerger) MergeCollections(existing, incoming *spookytypesfacts.FactCollection) (*spookytypesfacts.FactCollection, error) {
 	if existing == nil {
 		return incoming, nil
 	}

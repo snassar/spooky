@@ -4,17 +4,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
-
 	"spooky/internal/logging"
 	"spooky/internal/secrets/age"
-	"spooky/internal/types/secrets"
+	spookytypeslogging "spooky/internal/types/logging"
+	"time"
+
+	spookytypessecrets "spooky/internal/types/secrets"
 )
 
 // FileManager handles file encryption and decryption operations
 type FileManager struct {
 	ageClient age.AgeClient
-	logger    logging.Logger
+	logger    spookytypeslogging.Logger
 }
 
 // NewFileManager creates a new file manager
@@ -39,7 +40,7 @@ func (fm *FileManager) EncryptFile(inputPath string, outputPath string, recipien
 
 	// Validate recipients
 	if len(recipients) == 0 {
-		return &types.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "validate_recipients",
 			Cause:     fmt.Errorf("no recipients provided"),
 		}
@@ -48,7 +49,7 @@ func (fm *FileManager) EncryptFile(inputPath string, outputPath string, recipien
 	// Open input file
 	inputFile, err := os.Open(inputPath)
 	if err != nil {
-		return &types.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "open_input_file",
 			Cause:     err,
 			Context: map[string]interface{}{
@@ -61,7 +62,7 @@ func (fm *FileManager) EncryptFile(inputPath string, outputPath string, recipien
 	// Create output directory if needed
 	outputDir := filepath.Dir(outputPath)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return &types.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "create_output_directory",
 			Cause:     err,
 			Context: map[string]interface{}{
@@ -73,7 +74,7 @@ func (fm *FileManager) EncryptFile(inputPath string, outputPath string, recipien
 	// Create output file
 	outputFile, err := os.Create(outputPath)
 	if err != nil {
-		return &types.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "create_output_file",
 			Cause:     err,
 			Context: map[string]interface{}{
@@ -85,7 +86,7 @@ func (fm *FileManager) EncryptFile(inputPath string, outputPath string, recipien
 
 	// Encrypt the file using streaming
 	if err := fm.ageClient.EncryptStream(inputFile, outputFile, recipients); err != nil {
-		return &types.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "encrypt_file_stream",
 			Cause:     err,
 		}
@@ -111,7 +112,7 @@ func (fm *FileManager) DecryptFile(inputPath string, outputPath string, identity
 
 	// Validate identity
 	if identity == "" {
-		return &types.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "validate_identity",
 			Cause:     fmt.Errorf("no identity provided"),
 		}
@@ -120,7 +121,7 @@ func (fm *FileManager) DecryptFile(inputPath string, outputPath string, identity
 	// Open input file
 	inputFile, err := os.Open(inputPath)
 	if err != nil {
-		return &types.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "open_input_file",
 			Cause:     err,
 			Context: map[string]interface{}{
@@ -133,7 +134,7 @@ func (fm *FileManager) DecryptFile(inputPath string, outputPath string, identity
 	// Create output directory if needed
 	outputDir := filepath.Dir(outputPath)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return &types.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "create_output_directory",
 			Cause:     err,
 			Context: map[string]interface{}{
@@ -145,7 +146,7 @@ func (fm *FileManager) DecryptFile(inputPath string, outputPath string, identity
 	// Create output file
 	outputFile, err := os.Create(outputPath)
 	if err != nil {
-		return &types.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "create_output_file",
 			Cause:     err,
 			Context: map[string]interface{}{
@@ -157,7 +158,7 @@ func (fm *FileManager) DecryptFile(inputPath string, outputPath string, identity
 
 	// Decrypt the file using streaming
 	if err := fm.ageClient.DecryptStream(inputFile, outputFile, identity); err != nil {
-		return &types.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "decrypt_file_stream",
 			Cause:     err,
 		}
@@ -176,7 +177,7 @@ func (fm *FileManager) EncryptValue(value string, recipients []string) (string, 
 
 	// Validate recipients
 	if len(recipients) == 0 {
-		return "", &types.SecretsError{
+		return "", &spookytypessecrets.SecretsError{
 			Operation: "validate_recipients",
 			Cause:     fmt.Errorf("no recipients provided"),
 		}
@@ -201,14 +202,14 @@ func (fm *FileManager) DecryptValue(encryptedValue string, identity string) (str
 
 	// Validate identity
 	if identity == "" {
-		return "", &types.SecretsError{
+		return "", &spookytypessecrets.SecretsError{
 			Operation: "validate_identity",
 			Cause:     fmt.Errorf("no identity provided"),
 		}
 	}
 
 	// Create encrypted value from string
-	encrypted := &types.EncryptedValue{
+	encrypted := &spookytypessecrets.EncryptedValue{
 		Data: []byte(encryptedValue),
 	}
 
@@ -228,7 +229,7 @@ func (fm *FileManager) DecryptValue(encryptedValue string, identity string) (str
 func (fm *FileManager) validateInputFile(path string) error {
 	// Check if file exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return &types.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "file_not_found",
 			Cause:     err,
 			Context: map[string]interface{}{
@@ -240,7 +241,7 @@ func (fm *FileManager) validateInputFile(path string) error {
 	// Check if file is readable
 	file, err := os.Open(path)
 	if err != nil {
-		return &types.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "file_not_readable",
 			Cause:     err,
 			Context: map[string]interface{}{
@@ -257,7 +258,7 @@ func (fm *FileManager) validateInputFile(path string) error {
 func (fm *FileManager) GetFileInfo(path string) (*FileInfo, error) {
 	info, err := os.Stat(path)
 	if err != nil {
-		return nil, &types.SecretsError{
+		return nil, &spookytypessecrets.SecretsError{
 			Operation: "get_file_info",
 			Cause:     err,
 			Context: map[string]interface{}{

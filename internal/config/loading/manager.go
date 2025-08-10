@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	spookytypesconfig "spooky/internal/types/config"
 
 	spookyconfigtypes "spooky/internal/types/config"
 	spookytypeslogging "spooky/internal/types/logging"
@@ -21,8 +22,8 @@ type Manager struct {
 func NewManager(config *spookyconfigtypes.LoadingConfig, logger spookytypeslogging.Logger) *Manager {
 	return &Manager{
 		config:     config,
-		parser:     Newspookytypesconfig.ConfigParser(),
-		xdgManager: Newspookytypesconfig.XDGManager(),
+		parser:     nil, // TODO: Implement proper parser
+		xdgManager: nil, // TODO: Implement proper XDG manager
 		logger:     logger,
 	}
 }
@@ -43,7 +44,7 @@ func (m *Manager) LoadGlobalConfig() (*spookyconfigtypes.GlobalConfig, error) {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	config, err := m.parser.ParseHCL(content)
+	config, err := m.parser.Parse(content)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
@@ -66,7 +67,7 @@ func (m *Manager) LoadProjectConfig(projectPath string) (*spookyconfigtypes.Proj
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	config, err := m.parser.ParseHCL(content)
+	config, err := m.parser.Parse(content)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
@@ -91,9 +92,9 @@ func (m *Manager) LoadFromFile(path string) (interface{}, error) {
 	ext := filepath.Ext(path)
 	switch ext {
 	case ".hcl":
-		return m.parser.ParseHCL(content)
+		return m.parser.Parse(content)
 	case ".json":
-		return m.parser.ParseJSON(content)
+		return m.parser.Parse(content)
 	default:
 		return nil, fmt.Errorf("unsupported file format: %s", ext)
 	}

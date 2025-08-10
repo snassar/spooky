@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"spooky/internal/schemas/types"
+	"spooky/internal/types/schemas"
 )
 
 // JSONReporter implements JSON reporting for validation results

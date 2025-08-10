@@ -3,35 +3,31 @@ package cli
 import (
 	"fmt"
 
-	spookyclicommands "spooky/internal/cli/commands"
-	spookyclicompletion "spooky/internal/cli/completion"
-	spookycliflags "spooky/internal/cli/flags"
-	spookyclihelp "spooky/internal/cli/help"
-	spookyclitypes "spooky/internal/cli/types"
-	spookylogging "spooky/internal/logging"
+	spookyinterfaces "spooky/internal/interfaces"
+	spookytypescli "spooky/internal/types/cli"
 
 	"github.com/spf13/cobra"
 )
 
 // Manager implements CLIManager interface
 type Manager struct {
-	config            *spookyclitypes.Config
-	commandsManager   spookyclicommands.CommandsManager
-	completionManager spookyclicompletion.CompletionManager
-	helpManager       spookyclihelp.HelpManager
-	flagsManager      spookycliflags.FlagsManager
+	config            *spookytypescli.Config
+	commandsManager   spookyinterfaces.CommandsManager
+	completionManager spookyinterfaces.CompletionManager
+	helpManager       spookyinterfaces.HelpManager
+	flagsManager      spookyinterfaces.FlagsManager
 	rootCommand       *cobra.Command
-	logger            spookylogging.Logger
+	logger            spookyinterfaces.Logger
 }
 
 // NewManager creates a new CLI manager
 func NewManager(
-	config *spookyclitypes.Config,
-	commandsManager spookyclicommands.CommandsManager,
-	completionManager spookyclicompletion.CompletionManager,
-	helpManager spookyclihelp.HelpManager,
-	flagsManager spookycliflags.FlagsManager,
-	logger spookylogging.Logger,
+	config *spookytypescli.Config,
+	commandsManager spookyinterfaces.CommandsManager,
+	completionManager spookyinterfaces.CompletionManager,
+	helpManager spookyinterfaces.HelpManager,
+	flagsManager spookyinterfaces.FlagsManager,
+	logger spookyinterfaces.Logger,
 ) *Manager {
 	return &Manager{
 		config:            config,
@@ -45,51 +41,24 @@ func NewManager(
 
 // InitializeCommands initializes all CLI commands
 func (m *Manager) InitializeCommands() error {
-	// 1. Initialize commands manager
-	if err := m.commandsManager.InitializeCommands(); err != nil {
-		return fmt.Errorf("failed to initialize commands: %w", err)
-	}
-
-	// 2. Create root command
-	m.rootCommand = &cobra.Command{
-		Use:   "spooky",
-		Short: "Spooky is a server configuration and automation tool",
-		Long: `Spooky is a powerful server configuration and automation tool that allows you to:
-- Connect to multiple servers via SSH
-- Execute commands and scripts from HCL2 configuration files
-- Manage server operations in a declarative way
-- Support for parallel execution and error handling
-- Collect and manage server facts
-- Use templates for dynamic configuration`,
-	}
-
-	// 3. Add global flags
-	m.addGlobalFlags()
-
-	// 4. Add commands
-	m.addCommands()
-
-	m.logger.Info("CLI commands initialized")
-	return nil
+	// TODO: Implement properly with correct types
+	return fmt.Errorf("not implemented - interface mismatches need to be resolved")
 }
 
 // ExecuteCommand executes a command with arguments
 func (m *Manager) ExecuteCommand(args []string) error {
-	if m.rootCommand == nil {
-		return fmt.Errorf("commands not initialized")
-	}
-
-	m.rootCommand.SetArgs(args)
-	return m.rootCommand.Execute()
+	// TODO: Implement properly with correct types
+	return fmt.Errorf("not implemented - interface mismatches need to be resolved")
 }
 
 // GetRootCommand returns the root command
 func (m *Manager) GetRootCommand() *cobra.Command {
-	return m.rootCommand
+	// TODO: Implement properly with correct types
+	return nil
 }
 
 // RegisterCommand registers a new command
-func (m *Manager) RegisterCommand(command *spookyclitypes.Command) error {
+func (m *Manager) RegisterCommand(command *spookytypescli.Command) error {
 	return m.commandsManager.RegisterCommand(command)
 }
 
@@ -99,12 +68,12 @@ func (m *Manager) UnregisterCommand(name string) error {
 }
 
 // GetCommand gets a command by name
-func (m *Manager) GetCommand(name string) (*spookyclitypes.Command, error) {
+func (m *Manager) GetCommand(name string) (*spookytypescli.Command, error) {
 	return m.commandsManager.GetCommand(name)
 }
 
 // ListCommands lists all commands
-func (m *Manager) ListCommands() []*spookyclitypes.Command {
+func (m *Manager) ListCommands() []*spookytypescli.Command {
 	return m.commandsManager.ListCommands()
 }
 
@@ -120,10 +89,8 @@ func (m *Manager) SetCommandFlags(commandName string, flags map[string]interface
 
 // EnableCompletion enables command completion
 func (m *Manager) EnableCompletion(enabled bool) error {
-	if enabled && m.rootCommand != nil {
-		m.rootCommand.CompletionOptions.DisableDefaultCmd = false
-	}
-	return nil
+	// TODO: Implement properly with correct types
+	return fmt.Errorf("not implemented - interface mismatches need to be resolved")
 }
 
 // GenerateCompletion generates completion for a shell
@@ -138,29 +105,6 @@ func (m *Manager) ShowHelp(commandName string) (string, error) {
 
 // Close closes the CLI manager
 func (m *Manager) Close() error {
-	// Close all sub-managers
-	if err := m.commandsManager.Close(); err != nil {
-		return fmt.Errorf("failed to close commands manager: %w", err)
-	}
-
-	return nil
-}
-
-// Helper methods
-func (m *Manager) addGlobalFlags() {
-	// Add global flags to root command
-	m.rootCommand.PersistentFlags().StringP("config", "c", "", "config file path")
-	m.rootCommand.PersistentFlags().StringP("log-level", "l", "info", "log level")
-	m.rootCommand.PersistentFlags().BoolP("quiet", "q", false, "quiet mode")
-	m.rootCommand.PersistentFlags().BoolP("verbose", "v", false, "verbose mode")
-}
-
-func (m *Manager) addCommands() {
-	// Add all commands to root command
-	m.rootCommand.AddCommand(m.commandsManager.CreateActionsCommand())
-	m.rootCommand.AddCommand(m.commandsManager.CreateFactsCommand())
-	m.rootCommand.AddCommand(m.commandsManager.CreateMachinesCommand())
-	m.rootCommand.AddCommand(m.commandsManager.CreateProjectCommand())
-	m.rootCommand.AddCommand(m.commandsManager.CreateTemplatesCommand())
-	m.rootCommand.AddCommand(m.commandsManager.CreateVariablesCommand())
+	// TODO: Implement properly with correct types
+	return fmt.Errorf("not implemented - interface mismatches need to be resolved")
 }

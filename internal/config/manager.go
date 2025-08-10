@@ -3,33 +3,33 @@ package config
 import (
 	"fmt"
 	"reflect"
+	spookyconfigenvironment "spooky/internal/config/environment"
+	spookyconfigloading "spooky/internal/config/loading"
+	spookyconfigvalidation "spooky/internal/config/validation"
 	"strings"
 	"sync"
 
-	spookyconfigenvironment "spooky/internal/config/environment"
-	spookyconfigloading "spooky/internal/config/loading"
-	spookyconfigtypes "spooky/internal/types/config"
-	spookyconfigvalidation "spooky/internal/config/validation"
-	spookylogging "spooky/internal/logging"
+	spookytypesconfig "spooky/internal/types/config"
+	spookytypeslogging "spooky/internal/types/logging"
 )
 
 // Manager implements ConfigManager interface
 type Manager struct {
-	config             *spookyconfigtypes.Config
-	loadingManager     spookyconfigloading.LoadingManager
-	validationManager  spookyconfigvalidation.ValidationManager
-	environmentManager spookyconfigenvironment.EnvironmentManager
-	logger             spookylogging.Logger
+	config             *spookytypesconfig.Config
+	loadingManager     *spookyconfigloading.Manager
+	validationManager  *spookyconfigvalidation.Manager
+	environmentManager *spookyconfigenvironment.Manager
+	logger             spookytypeslogging.Logger
 	mutex              sync.RWMutex
 }
 
 // NewManager creates a new configuration manager
 func NewManager(
-	config *spookyconfigtypes.Config,
-	loadingManager spookyconfigloading.LoadingManager,
-	validationManager spookyconfigvalidation.ValidationManager,
-	environmentManager spookyconfigenvironment.EnvironmentManager,
-	logger spookylogging.Logger,
+	config *spookytypesconfig.Config,
+	loadingManager *spookyconfigloading.Manager,
+	validationManager *spookyconfigvalidation.Manager,
+	environmentManager *spookyconfigenvironment.Manager,
+	logger spookytypeslogging.Logger,
 ) *Manager {
 	return &Manager{
 		config:             config,
@@ -63,10 +63,10 @@ func (m *Manager) LoadConfig() error {
 	}
 
 	// 4. Create configuration context
-	m.config = &spookyconfigtypes.Config{
+	m.config = &spookytypesconfig.Config{
 		GlobalConfig: globalConfig,
 		Environment:  envVars,
-		Source:       spookyconfigtypes.SourceGlobal,
+		Source:       spookytypesconfig.SourceGlobal,
 	}
 
 	return nil
@@ -78,31 +78,31 @@ func (m *Manager) ReloadConfig() error {
 }
 
 // GetConfig returns the current configuration
-func (m *Manager) GetConfig() *spookyconfigtypes.Config {
+func (m *Manager) GetConfig() *spookytypesconfig.Config {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 	return m.config
 }
 
 // GetValue gets a configuration value by dot-separated path
-func (m *Manager) GetValue(path string) (interface{}, spookyconfigtypes.ConfigSource, error) {
+func (m *Manager) GetValue(path string) (interface{}, spookytypesconfig.ConfigSource, error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
 	if m.config == nil {
-		return nil, spookyconfigtypes.SourceDefault, fmt.Errorf("no configuration loaded")
+		return nil, spookytypesconfig.SourceDefault, fmt.Errorf("no configuration loaded")
 	}
 
 	value, source, err := m.getValueByPath(m.config.GlobalConfig, path)
 	if err != nil {
-		return nil, spookyconfigtypes.SourceDefault, err
+		return nil, spookytypesconfig.SourceDefault, err
 	}
 
 	return value, source, nil
 }
 
 // SetValue sets a configuration value by dot-separated path
-func (m *Manager) SetValue(path string, value interface{}, source spookyconfigtypes.ConfigSource) error {
+func (m *Manager) SetValue(path string, value interface{}, source spookytypesconfig.ConfigSource) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -111,7 +111,7 @@ func (m *Manager) SetValue(path string, value interface{}, source spookyconfigty
 	}
 
 	// Set the source for tracking where the value came from
-	if m.config.Source == spookyconfigtypes.SourceDefault {
+	if m.config.Source == spookytypesconfig.SourceDefault {
 		m.config.Source = source
 	}
 
@@ -119,59 +119,59 @@ func (m *Manager) SetValue(path string, value interface{}, source spookyconfigty
 }
 
 // GetString gets a string configuration value
-func (m *Manager) GetString(path string) (string, spookyconfigtypes.ConfigSource, error) {
+func (m *Manager) GetString(path string) (string, spookytypesconfig.ConfigSource, error) {
 	value, source, err := m.GetValue(path)
 	if err != nil {
-		return "", spookyconfigtypes.SourceDefault, err
+		return "", spookytypesconfig.SourceDefault, err
 	}
 
 	if str, ok := value.(string); ok {
 		return str, source, nil
 	}
 
-	return "", spookyconfigtypes.SourceDefault, fmt.Errorf("value at path %s is not a string", path)
+	return "", spookytypesconfig.SourceDefault, fmt.Errorf("value at path %s is not a string", path)
 }
 
 // GetInt gets an integer configuration value
-func (m *Manager) GetInt(path string) (int, spookyconfigtypes.ConfigSource, error) {
+func (m *Manager) GetInt(path string) (int, spookytypesconfig.ConfigSource, error) {
 	value, source, err := m.GetValue(path)
 	if err != nil {
-		return 0, spookyconfigtypes.SourceDefault, err
+		return 0, spookytypesconfig.SourceDefault, err
 	}
 
 	if i, ok := value.(int); ok {
 		return i, source, nil
 	}
 
-	return 0, spookyconfigtypes.SourceDefault, fmt.Errorf("value at path %s is not an integer", path)
+	return 0, spookytypesconfig.SourceDefault, fmt.Errorf("value at path %s is not an integer", path)
 }
 
 // GetBool gets a boolean configuration value
-func (m *Manager) GetBool(path string) (bool, spookyconfigtypes.ConfigSource, error) {
+func (m *Manager) GetBool(path string) (bool, spookytypesconfig.ConfigSource, error) {
 	value, source, err := m.GetValue(path)
 	if err != nil {
-		return false, spookyconfigtypes.SourceDefault, err
+		return false, spookytypesconfig.SourceDefault, err
 	}
 
 	if b, ok := value.(bool); ok {
 		return b, source, nil
 	}
 
-	return false, spookyconfigtypes.SourceDefault, fmt.Errorf("value at path %s is not a boolean", path)
+	return false, spookytypesconfig.SourceDefault, fmt.Errorf("value at path %s is not a boolean", path)
 }
 
 // GetStringSlice gets a string slice configuration value
-func (m *Manager) GetStringSlice(path string) ([]string, spookyconfigtypes.ConfigSource, error) {
+func (m *Manager) GetStringSlice(path string) ([]string, spookytypesconfig.ConfigSource, error) {
 	value, source, err := m.GetValue(path)
 	if err != nil {
-		return nil, spookyconfigtypes.SourceDefault, err
+		return nil, spookytypesconfig.SourceDefault, err
 	}
 
 	if slice, ok := value.([]string); ok {
 		return slice, source, nil
 	}
 
-	return nil, spookyconfigtypes.SourceDefault, fmt.Errorf("value at path %s is not a string slice", path)
+	return nil, spookytypesconfig.SourceDefault, fmt.Errorf("value at path %s is not a string slice", path)
 }
 
 // LoadProjectConfig loads a project configuration
@@ -203,23 +203,23 @@ func (m *Manager) LoadProjectConfig(projectPath string) error {
 			return fmt.Errorf("failed to load environment variables: %w", err)
 		}
 
-		m.config = &spookyconfigtypes.Config{
+		m.config = &spookytypesconfig.Config{
 			GlobalConfig:  globalConfig,
 			ProjectConfig: projectConfig,
 			Environment:   envVars,
-			Source:        spookyconfigtypes.SourceProject,
+			Source:        spookytypesconfig.SourceProject,
 		}
 	} else {
 		// Update existing context
 		m.config.ProjectConfig = projectConfig
-		m.config.Source = spookyconfigtypes.SourceProject
+		m.config.Source = spookytypesconfig.SourceProject
 	}
 
 	return nil
 }
 
 // GetProjectConfig returns the current project configuration
-func (m *Manager) GetProjectConfig() *spookyconfigtypes.ProjectConfig {
+func (m *Manager) GetProjectConfig() *spookytypesconfig.ProjectConfig {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
@@ -241,7 +241,7 @@ func (m *Manager) ApplyCLIFlags(flags map[string]interface{}) error {
 
 	// Apply CLI overrides
 	m.config.CLIFlags = flags
-	m.config.Source = spookyconfigtypes.SourceCLI
+	m.config.Source = spookytypesconfig.SourceCLI
 
 	return nil
 }
@@ -299,10 +299,10 @@ func (m *Manager) Close() error {
 }
 
 // getValueByPath gets a value from a configuration object by dot-separated path
-func (m *Manager) getValueByPath(config *spookyconfigtypes.GlobalConfig, path string) (interface{}, spookyconfigtypes.ConfigSource, error) {
+func (m *Manager) getValueByPath(config *spookytypesconfig.GlobalConfig, path string) (interface{}, spookytypesconfig.ConfigSource, error) {
 	parts := strings.Split(path, ".")
 	if len(parts) < 2 {
-		return nil, spookyconfigtypes.SourceDefault, fmt.Errorf("invalid path format: %s", path)
+		return nil, spookytypesconfig.SourceDefault, fmt.Errorf("invalid path format: %s", path)
 	}
 
 	section := parts[0]
@@ -311,51 +311,51 @@ func (m *Manager) getValueByPath(config *spookyconfigtypes.GlobalConfig, path st
 	switch section {
 	case "storage":
 		if config.Storage == nil {
-			return nil, spookyconfigtypes.SourceDefault, fmt.Errorf("storage configuration not available")
+			return nil, spookytypesconfig.SourceDefault, fmt.Errorf("storage configuration not available")
 		}
-		return m.getStructField(config.Storage, field), spookyconfigtypes.SourceGlobal, nil
+		return m.getStructField(config.Storage, field), spookytypesconfig.SourceGlobal, nil
 	case "facts":
 		if config.Facts == nil {
-			return nil, spookyconfigtypes.SourceDefault, fmt.Errorf("facts configuration not available")
+			return nil, spookytypesconfig.SourceDefault, fmt.Errorf("facts configuration not available")
 		}
-		return m.getStructField(config.Facts, field), spookyconfigtypes.SourceGlobal, nil
+		return m.getStructField(config.Facts, field), spookytypesconfig.SourceGlobal, nil
 	case "ssh":
 		if config.SSH == nil {
-			return nil, spookyconfigtypes.SourceDefault, fmt.Errorf("SSH configuration not available")
+			return nil, spookytypesconfig.SourceDefault, fmt.Errorf("SSH configuration not available")
 		}
-		return m.getStructField(config.SSH, field), spookyconfigtypes.SourceGlobal, nil
+		return m.getStructField(config.SSH, field), spookytypesconfig.SourceGlobal, nil
 	case "templates":
 		if config.Templates == nil {
-			return nil, spookyconfigtypes.SourceDefault, fmt.Errorf("templates configuration not available")
+			return nil, spookytypesconfig.SourceDefault, fmt.Errorf("templates configuration not available")
 		}
-		return m.getStructField(config.Templates, field), spookyconfigtypes.SourceGlobal, nil
+		return m.getStructField(config.Templates, field), spookytypesconfig.SourceGlobal, nil
 	case "security":
 		if config.Security == nil {
-			return nil, spookyconfigtypes.SourceDefault, fmt.Errorf("security configuration not available")
+			return nil, spookytypesconfig.SourceDefault, fmt.Errorf("security configuration not available")
 		}
-		return m.getStructField(config.Security, field), spookyconfigtypes.SourceGlobal, nil
+		return m.getStructField(config.Security, field), spookytypesconfig.SourceGlobal, nil
 	case "age":
 		if config.Age == nil {
-			return nil, spookyconfigtypes.SourceDefault, fmt.Errorf("age configuration not available")
+			return nil, spookytypesconfig.SourceDefault, fmt.Errorf("age configuration not available")
 		}
-		return m.getStructField(config.Age, field), spookyconfigtypes.SourceGlobal, nil
+		return m.getStructField(config.Age, field), spookytypesconfig.SourceGlobal, nil
 	case "logging":
 		if config.Logging == nil {
-			return nil, spookyconfigtypes.SourceDefault, fmt.Errorf("logging configuration not available")
+			return nil, spookytypesconfig.SourceDefault, fmt.Errorf("logging configuration not available")
 		}
-		return m.getStructField(config.Logging, field), spookyconfigtypes.SourceGlobal, nil
+		return m.getStructField(config.Logging, field), spookytypesconfig.SourceGlobal, nil
 	case "performance":
 		if config.Performance == nil {
-			return nil, spookyconfigtypes.SourceDefault, fmt.Errorf("performance configuration not available")
+			return nil, spookytypesconfig.SourceDefault, fmt.Errorf("performance configuration not available")
 		}
-		return m.getStructField(config.Performance, field), spookyconfigtypes.SourceGlobal, nil
+		return m.getStructField(config.Performance, field), spookytypesconfig.SourceGlobal, nil
 	default:
-		return nil, spookyconfigtypes.SourceDefault, fmt.Errorf("unknown configuration section: %s", section)
+		return nil, spookytypesconfig.SourceDefault, fmt.Errorf("unknown configuration section: %s", section)
 	}
 }
 
 // setValueByPath sets a value in a configuration object by dot-separated path
-func (m *Manager) setValueByPath(config *spookyconfigtypes.GlobalConfig, path string, value interface{}) error {
+func (m *Manager) setValueByPath(config *spookytypesconfig.GlobalConfig, path string, value interface{}) error {
 	parts := strings.Split(path, ".")
 	if len(parts) < 2 {
 		return fmt.Errorf("invalid path format: %s", path)
@@ -367,42 +367,42 @@ func (m *Manager) setValueByPath(config *spookyconfigtypes.GlobalConfig, path st
 	switch section {
 	case "storage":
 		if config.Storage == nil {
-			config.Storage = &spookyconfigtypes.StorageConfig{}
+			config.Storage = &spookytypesconfig.StorageConfig{}
 		}
 		return m.setStructField(config.Storage, field, value)
 	case "facts":
 		if config.Facts == nil {
-			config.Facts = &spookyconfigtypes.FactsConfig{}
+			config.Facts = &spookytypesconfig.FactsConfig{}
 		}
 		return m.setStructField(config.Facts, field, value)
 	case "ssh":
 		if config.SSH == nil {
-			config.SSH = &spookyconfigtypes.SSHConfig{}
+			config.SSH = &spookytypesconfig.SSHConfig{}
 		}
 		return m.setStructField(config.SSH, field, value)
 	case "templates":
 		if config.Templates == nil {
-			config.Templates = &spookyconfigtypes.TemplatesConfig{}
+			config.Templates = &spookytypesconfig.TemplatesConfig{}
 		}
 		return m.setStructField(config.Templates, field, value)
 	case "security":
 		if config.Security == nil {
-			config.Security = &spookyconfigtypes.SecurityConfig{}
+			config.Security = &spookytypesconfig.SecurityConfig{}
 		}
 		return m.setStructField(config.Security, field, value)
 	case "age":
 		if config.Age == nil {
-			config.Age = &spookyconfigtypes.AgeConfig{}
+			config.Age = &spookytypesconfig.AgeConfig{}
 		}
 		return m.setStructField(config.Age, field, value)
 	case "logging":
 		if config.Logging == nil {
-			config.Logging = &spookyconfigtypes.LoggingConfig{}
+			config.Logging = &spookytypesconfig.LoggingConfig{}
 		}
 		return m.setStructField(config.Logging, field, value)
 	case "performance":
 		if config.Performance == nil {
-			config.Performance = &spookyconfigtypes.PerformanceConfig{}
+			config.Performance = &spookytypesconfig.PerformanceConfig{}
 		}
 		return m.setStructField(config.Performance, field, value)
 	default:

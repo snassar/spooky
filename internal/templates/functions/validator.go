@@ -3,13 +3,15 @@ package functions
 import (
 	"fmt"
 	"reflect"
+
+	spookyinterfaces "spooky/internal/interfaces"
 )
 
 // Validator implements FunctionValidator interface
 type Validator struct{}
 
 // NewFunctionValidator creates a new function validator
-func NewFunctionValidator() FunctionValidator {
+func NewFunctionValidator() spookyinterfaces.FunctionValidator {
 	return &Validator{}
 }
 

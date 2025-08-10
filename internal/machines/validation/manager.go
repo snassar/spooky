@@ -10,7 +10,7 @@ import (
 
 	spookyconfigtypes "spooky/internal/types/config"
 	spookylogging "spooky/internal/logging"
-	spookymachinestypes "spooky/internal/machines/types"
+	spookytypes "spooky/internal/types"
 	spookyschemas "spooky/internal/schemas"
 )
 

@@ -3,7 +3,7 @@ package reporters
 import (
 	"fmt"
 	"os"
-	"spooky/internal/schemas/types"
+	"spooky/internal/types/schemas"
 )
 
 // ConsoleReporter implements console reporting for validation results

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"spooky/internal/schemas/types"
+	"spooky/internal/types/schemas"
 )
 
 // FileLoader implements loading schemas from files

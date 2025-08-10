@@ -41,8 +41,8 @@ type TemplateEngine interface {
 	GetTemplateFunctions() template.FuncMap
 }
 
-// TemplateValidator defines the interface for template validation
-type TemplateValidator interface {
+// TemplateValidatorCore defines the interface for template validation
+type TemplateValidatorCore interface {
 	ValidateTemplate(path string) error
 	ValidateTemplates(projectPath string) ([]string, error)
 	ValidateSyntax(content []byte) error
@@ -121,8 +121,8 @@ type FunctionValidator interface {
 	ValidateFunctionReturnType(fn interface{}) error
 }
 
-// SecretsManager defines the interface for template secrets integration
-type SecretsManager interface {
+// TemplateSecretsManager defines the interface for template secrets integration
+type TemplateSecretsManager interface {
 	// Core secrets operations
 	EncryptValue(value string) (string, error)
 	DecryptValue(encryptedValue string) (string, error)
@@ -146,8 +146,8 @@ type EncryptionProvider interface {
 	GetAlgorithm() string
 }
 
-// ValidationManager defines the interface for template validation
-type ValidationManager interface {
+// TemplateValidationManager defines the interface for template validation
+type TemplateValidationManager interface {
 	// Core validation operations
 	ValidateTemplate(path string) error
 	ValidateTemplates(projectPath string) ([]string, error)

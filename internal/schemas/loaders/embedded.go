@@ -2,7 +2,7 @@ package loaders
 
 import (
 	"fmt"
-	"spooky/internal/schemas/types"
+	"spooky/internal/types/schemas"
 )
 
 // EmbeddedLoader implements loading schemas from embedded resources

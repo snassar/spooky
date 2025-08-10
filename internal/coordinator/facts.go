@@ -6,20 +6,20 @@ import (
 	"time"
 
 	spookyfacts "spooky/internal/facts"
-	spookyfactstypes "spooky/internal/types/facts"
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
 	spookystorage "spooky/internal/storage"
+	spookyfactstypes "spooky/internal/types/facts"
 )
 
 // CoordinatorFactsIntegration implements the FactsIntegration interface
 type CoordinatorFactsIntegration struct {
-	factsManager spookyfacts.FactManager
-	logger       spookylogging.Logger
+	factsManager spookyinterfaces.FactManager
+	logger       spookyinterfaces.Logger
 }
 
 // NewCoordinatorFactsIntegration creates a new facts integration coordinator
-func NewCoordinatorFactsIntegration(factsManager spookyfacts.FactManager, logger spookylogging.Logger) *CoordinatorFactsIntegration {
+func NewCoordinatorFactsIntegration(factsManager spookyinterfaces.FactManager, logger spookyinterfaces.Logger) *CoordinatorFactsIntegration {
 	return &CoordinatorFactsIntegration{
 		factsManager: factsManager,
 		logger:       logger,

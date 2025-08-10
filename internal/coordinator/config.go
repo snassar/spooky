@@ -4,20 +4,19 @@ import (
 	"fmt"
 	"time"
 
-	spookyconfig "spooky/internal/config"
-	spookyconfigtypes "spooky/internal/types/config"
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
+	spookyconfigtypes "spooky/internal/types/config"
 )
 
 // CoordinatorConfigIntegration implements config system integration
 type CoordinatorConfigIntegration struct {
-	configManager spookyconfig.ConfigManager
-	logger        spookylogging.Logger
+	configManager spookyinterfaces.ConfigManager
+	logger        spookyinterfaces.Logger
 }
 
 // NewCoordinatorConfigIntegration creates a new config integration
-func NewCoordinatorConfigIntegration(configManager spookyconfig.ConfigManager, logger spookylogging.Logger) *CoordinatorConfigIntegration {
+func NewCoordinatorConfigIntegration(configManager spookyinterfaces.ConfigManager, logger spookyinterfaces.Logger) *CoordinatorConfigIntegration {
 	return &CoordinatorConfigIntegration{
 		configManager: configManager,
 		logger:        logger,

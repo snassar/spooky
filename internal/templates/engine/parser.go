@@ -3,6 +3,7 @@ package engine
 import (
 	"fmt"
 	"os"
+	spookyinterfaces "spooky/internal/interfaces"
 	"text/template"
 )
 
@@ -10,7 +11,7 @@ import (
 type Parser struct{}
 
 // NewTemplateParser creates a new template parser
-func NewTemplateParser() TemplateParser {
+func NewTemplateParser() spookyinterfaces.TemplateParser {
 	return &Parser{}
 }
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	spookyinterfaces "spooky/internal/interfaces"
 	"text/template"
 	"time"
 )
@@ -12,7 +13,7 @@ import (
 type Renderer struct{}
 
 // NewTemplateRenderer creates a new template renderer
-func NewTemplateRenderer() TemplateRenderer {
+func NewTemplateRenderer() spookyinterfaces.TemplateRenderer {
 	return &Renderer{}
 }
 

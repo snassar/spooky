@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	spookytypesconfig "spooky/internal/types/config"
 	spookylogging "spooky/internal/logging"
+	spookytypesconfig "spooky/internal/types/config"
 	spookytypeslogging "spooky/internal/types/logging"
 )
 
@@ -21,7 +21,7 @@ type Manager struct {
 func NewManager(config *spookytypesconfig.EnvironmentConfig, logger spookytypeslogging.Logger) *Manager {
 	return &Manager{
 		config:    config,
-		validator: Newspookytypesconfig.EnvironmentValidator(),
+		validator: nil, // TODO: Implement proper validator
 		logger:    logger,
 	}
 }

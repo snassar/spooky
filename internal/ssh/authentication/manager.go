@@ -5,20 +5,21 @@ import (
 	"io/ioutil"
 	"time"
 
-	"spooky/internal/logging"
-	"spooky/internal/ssh/types"
+	spookyinterfaces "spooky/internal/interfaces"
+	spookylogging "spooky/internal/logging"
+	spookysshtypes "spooky/internal/types/ssh"
 
 	"golang.org/x/crypto/ssh"
 )
 
 // Manager implements AuthenticationEngine interface
 type Manager struct {
-	config *types.AuthenticationConfig
-	logger logging.Logger
+	config *spookysshtypes.AuthenticationConfig
+	logger spookyinterfaces.Logger
 }
 
 // NewManager creates a new authentication manager
-func NewManager(config *types.AuthenticationConfig, logger logging.Logger) *Manager {
+func NewManager(config *spookysshtypes.AuthenticationConfig, logger spookyinterfaces.Logger) *Manager {
 	return &Manager{
 		config: config,
 		logger: logger,
@@ -26,7 +27,7 @@ func NewManager(config *types.AuthenticationConfig, logger logging.Logger) *Mana
 }
 
 // Authenticate authenticates an SSH connection
-func (m *Manager) Authenticate(connection *types.SSHConnection, auth *types.AuthenticationConfig) error {
+func (m *Manager) Authenticate(connection *spookysshtypes.SSHConnection, auth *spookysshtypes.AuthenticationConfig) error {
 	if connection == nil {
 		return fmt.Errorf("connection cannot be nil")
 	}
@@ -35,7 +36,7 @@ func (m *Manager) Authenticate(connection *types.SSHConnection, auth *types.Auth
 		return fmt.Errorf("authentication config cannot be nil")
 	}
 
-	m.logger.Info("Authenticating SSH connection", logging.String("host", connection.Host))
+	m.logger.Info("Authenticating SSH connection", spookylogging.String("host", connection.Host))
 
 	// Create SSH client config
 	sshConfig := &ssh.ClientConfig{
@@ -64,12 +65,12 @@ func (m *Manager) Authenticate(connection *types.SSHConnection, auth *types.Auth
 	}
 	defer client.Close()
 
-	m.logger.Info("SSH authentication successful", logging.String("host", connection.Host))
+	m.logger.Info("SSH authentication successful", spookylogging.String("host", connection.Host))
 	return nil
 }
 
 // ValidateAuthentication validates authentication configuration
-func (m *Manager) ValidateAuthentication(auth *types.AuthenticationConfig) error {
+func (m *Manager) ValidateAuthentication(auth *spookysshtypes.AuthenticationConfig) error {
 	if auth == nil {
 		return fmt.Errorf("authentication config cannot be nil")
 	}

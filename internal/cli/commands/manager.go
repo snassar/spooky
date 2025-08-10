@@ -4,32 +4,33 @@ import (
 	"fmt"
 	"sync"
 
-	spookyclitypes "spooky/internal/cli/types"
+	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
+	spookytypescli "spooky/internal/types/cli"
 
 	"github.com/spf13/cobra"
 )
 
 // Manager implements CommandsManager interface
 type Manager struct {
-	config   *spookyclitypes.CommandsConfig
-	commands map[string]*spookyclitypes.Command
-	builder  CommandBuilder
-	executor CommandExecutor
-	logger   spookylogging.Logger
+	config   *spookytypescli.CommandsConfig
+	commands map[string]*spookytypescli.Command
+	builder  spookyinterfaces.CommandBuilder
+	executor spookyinterfaces.CommandExecutor
+	logger   spookyinterfaces.Logger
 	mutex    sync.RWMutex
 }
 
 // NewManager creates a new commands manager
 func NewManager(
-	config *spookyclitypes.CommandsConfig,
-	builder CommandBuilder,
-	executor CommandExecutor,
-	logger spookylogging.Logger,
+	config *spookytypescli.CommandsConfig,
+	builder spookyinterfaces.CommandBuilder,
+	executor spookyinterfaces.CommandExecutor,
+	logger spookyinterfaces.Logger,
 ) *Manager {
 	return &Manager{
 		config:   config,
-		commands: make(map[string]*spookyclitypes.Command),
+		commands: make(map[string]*spookytypescli.Command),
 		builder:  builder,
 		executor: executor,
 		logger:   logger,
@@ -37,7 +38,7 @@ func NewManager(
 }
 
 // RegisterCommand registers a new command
-func (m *Manager) RegisterCommand(command *spookyclitypes.Command) error {
+func (m *Manager) RegisterCommand(command *spookytypescli.Command) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -74,7 +75,7 @@ func (m *Manager) UnregisterCommand(name string) error {
 }
 
 // GetCommand gets a command by name
-func (m *Manager) GetCommand(name string) (*spookyclitypes.Command, error) {
+func (m *Manager) GetCommand(name string) (*spookytypescli.Command, error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
@@ -87,11 +88,11 @@ func (m *Manager) GetCommand(name string) (*spookyclitypes.Command, error) {
 }
 
 // ListCommands lists all registered commands
-func (m *Manager) ListCommands() []*spookyclitypes.Command {
+func (m *Manager) ListCommands() []*spookytypescli.Command {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	commands := make([]*spookyclitypes.Command, 0, len(m.commands))
+	commands := make([]*spookytypescli.Command, 0, len(m.commands))
 	for _, command := range m.commands {
 		commands = append(commands, command)
 	}
@@ -174,7 +175,7 @@ func (m *Manager) SetCommandExamples(commandName string, examples []string) erro
 }
 
 // ValidateCommand validates a command
-func (m *Manager) ValidateCommand(command *spookyclitypes.Command) error {
+func (m *Manager) ValidateCommand(command *spookytypescli.Command) error {
 	if command == nil {
 		return fmt.Errorf("command cannot be nil")
 	}
@@ -196,7 +197,7 @@ func (m *Manager) Close() error {
 	defer m.mutex.Unlock()
 
 	// Clear all commands
-	m.commands = make(map[string]*spookyclitypes.Command)
+	m.commands = make(map[string]*spookytypescli.Command)
 
 	m.logger.Info("Commands manager closed")
 	return nil

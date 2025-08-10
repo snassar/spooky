@@ -9,10 +9,9 @@ import (
 	"sync"
 	"time"
 
-	spookyfactstypes "spooky/internal/types/facts"
-	spookylogging "spooky/internal/logging"
-	spookyssh "spooky/internal/ssh"
+	spookyinterfaces "spooky/internal/interfaces"
 	spookystorage "spooky/internal/storage"
+	spookyfactstypes "spooky/internal/types/facts"
 )
 
 // Manager implements the FactManager interface
@@ -20,7 +19,7 @@ type Manager struct {
 	// Core components
 	collector spookyfactstypes.FactCollector
 	storage   spookystorage.FactStorage
-	logger    spookylogging.Logger
+	logger    spookyinterfaces.Logger
 
 	// Configuration
 	defaultTTL time.Duration
@@ -32,7 +31,7 @@ type Manager struct {
 }
 
 // NewManager creates a new fact collection manager
-func NewManager(sshClient *spookyssh.SSHClient, logger spookylogging.Logger) *Manager {
+func NewManager(sshClient spookyinterfaces.SSHClient, logger spookyinterfaces.Logger) *Manager {
 	return &Manager{
 		collector:        NewSSHCollector(sshClient),
 		storage:          nil, // Will be configured when storage is provided
@@ -44,7 +43,7 @@ func NewManager(sshClient *spookyssh.SSHClient, logger spookylogging.Logger) *Ma
 }
 
 // NewManagerWithStorage creates a new fact collection manager with storage
-func NewManagerWithStorage(sshClient *spookyssh.SSHClient, storage spookystorage.FactStorage, logger spookylogging.Logger) *Manager {
+func NewManagerWithStorage(sshClient spookyinterfaces.SSHClient, storage spookystorage.FactStorage, logger spookyinterfaces.Logger) *Manager {
 	manager := NewManager(sshClient, logger)
 	manager.storage = storage
 	return manager

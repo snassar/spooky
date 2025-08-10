@@ -10,7 +10,7 @@ import (
 	"spooky/internal/templates/engine"
 	"spooky/internal/templates/functions"
 	"spooky/internal/templates/secrets"
-	"spooky/internal/templates/types"
+	"spooky/internal/types/templates"
 	"spooky/internal/templates/validation"
 )
 

@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"spooky/internal/logging"
+	"spooky/internal/secrets/age"
+	spookytypeslogging "spooky/internal/types/logging"
 	"strings"
 	"time"
 
-	"spooky/internal/logging"
-	"spooky/internal/secrets/age"
-	"spooky/internal/types/secrets"
+	spookytypessecrets "spooky/internal/types/secrets"
 )
 
 // Manager implements the KeyManager interface
@@ -19,7 +20,7 @@ type Manager struct {
 	globalKeysPath  string
 	projectKeysPath string
 	ageClient       age.AgeClient
-	logger          logging.Logger
+	logger          spookytypeslogging.Logger
 }
 
 // NewManager creates a new key manager
@@ -33,10 +34,10 @@ func NewManager(globalKeysPath, projectKeysPath string) *Manager {
 }
 
 // ListKeys lists all available keys
-func (m *Manager) ListKeys() ([]*types.KeyMetadata, error) {
+func (m *Manager) ListKeys() ([]*spookytypessecrets.KeyMetadata, error) {
 	m.logger.Debug("Listing available keys")
 
-	var keys []*types.KeyMetadata
+	var keys []*spookytypessecrets.KeyMetadata
 
 	// List global keys
 	if m.globalKeysPath != "" {
@@ -60,7 +61,7 @@ func (m *Manager) ListKeys() ([]*types.KeyMetadata, error) {
 }
 
 // GetKey gets a key by name
-func (m *Manager) GetKey(name string) (*types.KeyMetadata, error) {
+func (m *Manager) GetKey(name string) (*spookytypessecrets.KeyMetadata, error) {
 	m.logger.Debug("Getting key", logging.String("name", name))
 
 	// Try global keys first
@@ -79,7 +80,7 @@ func (m *Manager) GetKey(name string) (*types.KeyMetadata, error) {
 		}
 	}
 
-	return nil, &types.SecretsError{
+	return nil, &spookytypessecrets.SecretsError{
 		Operation: "get_key",
 		Cause:     fmt.Errorf("key not found: %s", name),
 		Context: map[string]interface{}{
@@ -89,8 +90,8 @@ func (m *Manager) GetKey(name string) (*types.KeyMetadata, error) {
 }
 
 // listKeysFromPath lists all keys from a specific path
-func (m *Manager) listKeysFromPath(path string) ([]*types.KeyMetadata, error) {
-	var keys []*types.KeyMetadata
+func (m *Manager) listKeysFromPath(path string) ([]*spookytypessecrets.KeyMetadata, error) {
+	var keys []*spookytypessecrets.KeyMetadata
 
 	// Check if directory exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -101,7 +102,7 @@ func (m *Manager) listKeysFromPath(path string) ([]*types.KeyMetadata, error) {
 	// Read directory entries
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		return nil, &types.SecretsError{
+		return nil, &spookytypessecrets.SecretsError{
 			Operation: "read_keys_directory",
 			Cause:     err,
 			Context: map[string]interface{}{
@@ -111,7 +112,7 @@ func (m *Manager) listKeysFromPath(path string) ([]*types.KeyMetadata, error) {
 	}
 
 	// Process each key file
-	keyMap := make(map[string]*types.KeyMetadata)
+	keyMap := make(map[string]*spookytypessecrets.KeyMetadata)
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -143,7 +144,7 @@ func (m *Manager) listKeysFromPath(path string) ([]*types.KeyMetadata, error) {
 
 		// Create or update metadata
 		if keyMap[keyName] == nil {
-			keyMap[keyName] = &types.KeyMetadata{
+			keyMap[keyName] = &spookytypessecrets.KeyMetadata{
 				Name:    keyName,
 				Created: time.Now(), // Use file modification time if available
 			}
@@ -170,8 +171,8 @@ func (m *Manager) listKeysFromPath(path string) ([]*types.KeyMetadata, error) {
 }
 
 // listPublicKeysFromPath lists only public keys from a project path
-func (m *Manager) listPublicKeysFromPath(path string) ([]*types.KeyMetadata, error) {
-	var keys []*types.KeyMetadata
+func (m *Manager) listPublicKeysFromPath(path string) ([]*spookytypessecrets.KeyMetadata, error) {
+	var keys []*spookytypessecrets.KeyMetadata
 
 	// Check if directory exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -182,7 +183,7 @@ func (m *Manager) listPublicKeysFromPath(path string) ([]*types.KeyMetadata, err
 	// Read directory entries
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		return nil, &types.SecretsError{
+		return nil, &spookytypessecrets.SecretsError{
 			Operation: "read_project_keys_directory",
 			Cause:     err,
 			Context: map[string]interface{}{
@@ -222,7 +223,7 @@ func (m *Manager) listPublicKeysFromPath(path string) ([]*types.KeyMetadata, err
 
 		// Create metadata for public key
 		hash := sha256.Sum256([]byte(keyData))
-		key := &types.KeyMetadata{
+		key := &spookytypessecrets.KeyMetadata{
 			Name:        keyName,
 			Type:        "recipient",
 			Created:     time.Now(),
@@ -236,7 +237,7 @@ func (m *Manager) listPublicKeysFromPath(path string) ([]*types.KeyMetadata, err
 }
 
 // getKeyFromPath gets a key by name from a specific path
-func (m *Manager) getKeyFromPath(path, name string) (*types.KeyMetadata, error) {
+func (m *Manager) getKeyFromPath(path, name string) (*spookytypessecrets.KeyMetadata, error) {
 	// Try identity key first
 	identityPath := filepath.Join(path, fmt.Sprintf("%s.identity", name))
 	if _, err := os.Stat(identityPath); err == nil {
@@ -246,7 +247,7 @@ func (m *Manager) getKeyFromPath(path, name string) (*types.KeyMetadata, error) 
 		}
 
 		hash := sha256.Sum256([]byte(keyData))
-		return &types.KeyMetadata{
+		return &spookytypessecrets.KeyMetadata{
 			Name:        name,
 			Type:        "identity",
 			Created:     time.Now(),
@@ -263,7 +264,7 @@ func (m *Manager) getKeyFromPath(path, name string) (*types.KeyMetadata, error) 
 		}
 
 		hash := sha256.Sum256([]byte(keyData))
-		return &types.KeyMetadata{
+		return &spookytypessecrets.KeyMetadata{
 			Name:        name,
 			Type:        "recipient",
 			Created:     time.Now(),
@@ -271,7 +272,7 @@ func (m *Manager) getKeyFromPath(path, name string) (*types.KeyMetadata, error) 
 		}, nil
 	}
 
-	return nil, &types.SecretsError{
+	return nil, &spookytypessecrets.SecretsError{
 		Operation: "get_key_from_path",
 		Cause:     fmt.Errorf("key not found: %s", name),
 		Context: map[string]interface{}{
@@ -282,7 +283,7 @@ func (m *Manager) getKeyFromPath(path, name string) (*types.KeyMetadata, error) 
 }
 
 // getPublicKeyFromPath gets only a public key by name from a project path
-func (m *Manager) getPublicKeyFromPath(path, name string) (*types.KeyMetadata, error) {
+func (m *Manager) getPublicKeyFromPath(path, name string) (*spookytypessecrets.KeyMetadata, error) {
 	// Only look for recipient (public) keys in project paths
 	recipientPath := filepath.Join(path, fmt.Sprintf("%s.recipient", name))
 	if _, err := os.Stat(recipientPath); err == nil {
@@ -292,7 +293,7 @@ func (m *Manager) getPublicKeyFromPath(path, name string) (*types.KeyMetadata, e
 		}
 
 		hash := sha256.Sum256([]byte(keyData))
-		return &types.KeyMetadata{
+		return &spookytypessecrets.KeyMetadata{
 			Name:        name,
 			Type:        "recipient",
 			Created:     time.Now(),
@@ -300,7 +301,7 @@ func (m *Manager) getPublicKeyFromPath(path, name string) (*types.KeyMetadata, e
 		}, nil
 	}
 
-	return nil, &types.SecretsError{
+	return nil, &spookytypessecrets.SecretsError{
 		Operation: "get_public_key_from_path",
 		Cause:     fmt.Errorf("public key not found: %s", name),
 		Context: map[string]interface{}{

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	spookyactionstypes "spooky/internal/actions/types"
+	spookytypes "spooky/internal/types"
 	spookylogging "spooky/internal/logging"
 )
 

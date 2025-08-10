@@ -7,15 +7,22 @@ import (
 	"strings"
 	"time"
 
-	"spooky/internal/config"
-	"spooky/internal/types/config"
-	"spooky/internal/logging"
+	spookyconfig "spooky/internal/config"
+	spookytypesconfig "spooky/internal/types/config"
 )
+
+// Loader defines the interface for configuration loading
+type Loader interface {
+	LoadGlobalConfig() (*spookytypesconfig.GlobalConfig, error)
+	LoadProjectConfig(projectPath string) (*spookytypesconfig.ProjectConfig, error)
+	LoadFromFile(path string) (interface{}, error)
+	LoadFromEnvironment() (map[string]interface{}, error)
+}
 
 // ProjectConfigurationEngine manages project-specific configuration
 type ProjectConfigurationEngine struct {
-	configManager config.ConfigManager
-	loader        config.Loader
+	configManager *spookyconfig.Manager
+	loader        Loader
 }
 
 // NewProjectConfigurationEngine creates a new project configuration engine
@@ -28,7 +35,7 @@ func NewProjectConfigurationEngine() *ProjectConfigurationEngine {
 // ConfigurationContext represents the resolved configuration context for a project
 type ConfigurationContext struct {
 	Project     *Project
-	Global      *types.GlobalConfig
+	Global      *spookytypesconfig.GlobalConfig
 	Environment map[string]string
 	CLI         map[string]interface{}
 	Resolved    *ResolvedConfiguration
@@ -96,7 +103,7 @@ type ResolvedConfiguration struct {
 
 // LoadProjectConfiguration loads and resolves project configuration with precedence
 func (ce *ProjectConfigurationEngine) LoadProjectConfiguration(projectPath string) (*ConfigurationContext, error) {
-	logger := logging.GetLogger()
+	// TODO: Add proper logging
 
 	// 1. Load global configuration (base)
 	globalConfig, err := ce.loadGlobalConfiguration()
@@ -129,9 +136,7 @@ func (ce *ProjectConfigurationEngine) LoadProjectConfiguration(projectPath strin
 
 	context.Resolved = resolved
 
-	logger.Info("Project configuration loaded",
-		logging.String("project", project.Name),
-		logging.String("environment", resolved.Environment))
+	// TODO: Add proper logging
 
 	return context, nil
 }
@@ -252,10 +257,10 @@ func (ce *ProjectConfigurationEngine) GetConfigurationSummary(context *Configura
 }
 
 // loadGlobalConfiguration loads the global configuration
-func (ce *ProjectConfigurationEngine) loadGlobalConfiguration() (*types.GlobalConfig, error) {
+func (ce *ProjectConfigurationEngine) loadGlobalConfiguration() (*spookytypesconfig.GlobalConfig, error) {
 	// For now, return a default global config
 	// In a real implementation, this would use the config manager
-	globalConfig := &types.GlobalConfig{
+	globalConfig := &spookytypesconfig.GlobalConfig{
 		LogLevel:   "info",
 		Quiet:      false,
 		Verbose:    false,
@@ -385,7 +390,7 @@ func (ce *ProjectConfigurationEngine) applyDefaults(resolved *ResolvedConfigurat
 }
 
 // applyGlobalConfiguration applies global configuration settings
-func (ce *ProjectConfigurationEngine) applyGlobalConfiguration(resolved *ResolvedConfiguration, global *types.GlobalConfig) error {
+func (ce *ProjectConfigurationEngine) applyGlobalConfiguration(resolved *ResolvedConfiguration, global *spookytypesconfig.GlobalConfig) error {
 	if global == nil {
 		return nil
 	}

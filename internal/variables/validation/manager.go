@@ -5,41 +5,48 @@ import (
 	"fmt"
 	"strings"
 
-	"spooky/internal/logging"
+	"spooky/internal/interfaces"
 	"spooky/internal/schemas"
-	"spooky/internal/variables/types"
+	spookytypesvariables "spooky/internal/types/variables"
 )
+
+// VariableValidator defines the interface for custom validators
+type VariableValidator interface {
+	Validate(ctx context.Context, variable *spookytypesvariables.Variable) error
+	GetName() string
+	GetDescription() string
+}
 
 // Manager implements ValidationManager interface
 type Manager struct {
-	config           *types.ValidationConfig
+	config           *spookytypesvariables.ValidationConfig
 	customValidators map[string]VariableValidator
-	logger           logging.Logger
-	errors           []types.ValidationError
+	logger           interfaces.Logger
+	errors           []spookytypesvariables.ValidationError
 }
 
 // NewManager creates a new validation manager
-func NewManager(config *types.ValidationConfig, logger logging.Logger) *Manager {
+func NewManager(config *spookytypesvariables.ValidationConfig, logger interfaces.Logger) *Manager {
 	return &Manager{
 		config:           config,
 		customValidators: make(map[string]VariableValidator),
 		logger:           logger,
-		errors:           make([]types.ValidationError, 0),
+		errors:           make([]spookytypesvariables.ValidationError, 0),
 	}
 }
 
 // ValidateVariable validates a single variable
-func (m *Manager) ValidateVariable(ctx context.Context, variable *types.Variable) (*types.ValidationResult, error) {
-	result := &types.ValidationResult{
+func (m *Manager) ValidateVariable(ctx context.Context, variable *spookytypesvariables.Variable) (*spookytypesvariables.ValidationResult, error) {
+	result := &spookytypesvariables.ValidationResult{
 		Valid:    true,
-		Errors:   make([]types.ValidationError, 0),
-		Warnings: make([]types.ValidationWarning, 0),
+		Errors:   make([]spookytypesvariables.ValidationError, 0),
+		Warnings: make([]spookytypesvariables.ValidationWarning, 0),
 	}
 
 	// 1. Basic validation
 	if err := m.validateBasic(variable); err != nil {
 		result.Valid = false
-		result.Errors = append(result.Errors, types.ValidationError{
+		result.Errors = append(result.Errors, spookytypesvariables.ValidationError{
 			Field:   "basic",
 			Message: err.Error(),
 		})
@@ -48,7 +55,7 @@ func (m *Manager) ValidateVariable(ctx context.Context, variable *types.Variable
 	// 2. Schema validation
 	if err := m.validateAgainstSchema(variable, "variables-hcl"); err != nil {
 		result.Valid = false
-		result.Errors = append(result.Errors, types.ValidationError{
+		result.Errors = append(result.Errors, spookytypesvariables.ValidationError{
 			Field:   "schema",
 			Message: err.Error(),
 		})
@@ -58,7 +65,7 @@ func (m *Manager) ValidateVariable(ctx context.Context, variable *types.Variable
 	for name, validator := range m.customValidators {
 		if err := validator.Validate(ctx, variable); err != nil {
 			result.Valid = false
-			result.Errors = append(result.Errors, types.ValidationError{
+			result.Errors = append(result.Errors, spookytypesvariables.ValidationError{
 				Field:   name,
 				Message: err.Error(),
 			})
@@ -72,11 +79,11 @@ func (m *Manager) ValidateVariable(ctx context.Context, variable *types.Variable
 }
 
 // ValidateCollection validates a collection of variables
-func (m *Manager) ValidateCollection(ctx context.Context, collection *types.VariableCollection) (*types.ValidationResult, error) {
-	result := &types.ValidationResult{
+func (m *Manager) ValidateCollection(ctx context.Context, collection *spookytypesvariables.VariableCollection) (*spookytypesvariables.ValidationResult, error) {
+	result := &spookytypesvariables.ValidationResult{
 		Valid:    true,
-		Errors:   make([]types.ValidationError, 0),
-		Warnings: make([]types.ValidationWarning, 0),
+		Errors:   make([]spookytypesvariables.ValidationError, 0),
+		Warnings: make([]spookytypesvariables.ValidationWarning, 0),
 	}
 
 	// Validate each variable in collection
@@ -97,7 +104,7 @@ func (m *Manager) ValidateCollection(ctx context.Context, collection *types.Vari
 	// Validate collection-level constraints
 	if err := m.validateCollectionConstraints(collection); err != nil {
 		result.Valid = false
-		result.Errors = append(result.Errors, types.ValidationError{
+		result.Errors = append(result.Errors, spookytypesvariables.ValidationError{
 			Field:   "collection",
 			Message: err.Error(),
 		})
@@ -107,14 +114,14 @@ func (m *Manager) ValidateCollection(ctx context.Context, collection *types.Vari
 }
 
 // ValidateContext validates a variable context
-func (m *Manager) ValidateContext(ctx context.Context, context *types.VariableContext) (*types.ValidationResult, error) {
+func (m *Manager) ValidateContext(ctx context.Context, context *spookytypesvariables.VariableContext) (*spookytypesvariables.ValidationResult, error) {
 	// Convert context variables to collection for validation
-	variables := make([]*types.Variable, 0, len(context.Variables))
+	variables := make([]*spookytypesvariables.Variable, 0, len(context.Variables))
 	for _, variable := range context.Variables {
 		variables = append(variables, variable)
 	}
 
-	collection := &types.VariableCollection{
+	collection := &spookytypesvariables.VariableCollection{
 		Variables: variables,
 	}
 
@@ -122,18 +129,18 @@ func (m *Manager) ValidateContext(ctx context.Context, context *types.VariableCo
 }
 
 // ValidateAgainstSchema validates a variable against a schema
-func (m *Manager) ValidateAgainstSchema(variable *types.Variable, schemaName string) (*types.ValidationResult, error) {
-	result := &types.ValidationResult{
+func (m *Manager) ValidateAgainstSchema(variable *spookytypesvariables.Variable, schemaName string) (*spookytypesvariables.ValidationResult, error) {
+	result := &spookytypesvariables.ValidationResult{
 		Valid:    true,
-		Errors:   make([]types.ValidationError, 0),
-		Warnings: make([]types.ValidationWarning, 0),
+		Errors:   make([]spookytypesvariables.ValidationError, 0),
+		Warnings: make([]spookytypesvariables.ValidationWarning, 0),
 	}
 
 	// Load schema if not already loaded
 	validator := schemas.NewSchemaValidator()
 	if err := validator.LoadSchema(schemas.SchemaTypeVariablesHCL); err != nil {
 		result.Valid = false
-		result.Errors = append(result.Errors, types.ValidationError{
+		result.Errors = append(result.Errors, spookytypesvariables.ValidationError{
 			Field:   "schema",
 			Message: fmt.Sprintf("failed to load schema: %v", err),
 		})
@@ -147,11 +154,11 @@ func (m *Manager) ValidateAgainstSchema(variable *types.Variable, schemaName str
 }
 
 // ValidateCollectionAgainstSchema validates a collection against a schema
-func (m *Manager) ValidateCollectionAgainstSchema(collection *types.VariableCollection, schemaName string) (*types.ValidationResult, error) {
-	result := &types.ValidationResult{
+func (m *Manager) ValidateCollectionAgainstSchema(collection *spookytypesvariables.VariableCollection, schemaName string) (*spookytypesvariables.ValidationResult, error) {
+	result := &spookytypesvariables.ValidationResult{
 		Valid:    true,
-		Errors:   make([]types.ValidationError, 0),
-		Warnings: make([]types.ValidationWarning, 0),
+		Errors:   make([]spookytypesvariables.ValidationError, 0),
+		Warnings: make([]spookytypesvariables.ValidationWarning, 0),
 	}
 
 	// Validate each variable against schema
@@ -206,9 +213,9 @@ func (m *Manager) GetCustomValidators() []string {
 }
 
 // SetValidationRules sets validation rules
-func (m *Manager) SetValidationRules(rules *types.ValidationRules) error {
+func (m *Manager) SetValidationRules(rules *spookytypesvariables.ValidationRules) error {
 	if m.config == nil {
-		m.config = &types.ValidationConfig{}
+		m.config = &spookytypesvariables.ValidationConfig{}
 	}
 	m.config.ValidationRules = rules
 	return nil
@@ -217,7 +224,7 @@ func (m *Manager) SetValidationRules(rules *types.ValidationRules) error {
 // EnableStrictValidation enables or disables strict validation
 func (m *Manager) EnableStrictValidation(strict bool) error {
 	if m.config == nil {
-		m.config = &types.ValidationConfig{}
+		m.config = &spookytypesvariables.ValidationConfig{}
 	}
 	m.config.StrictValidation = strict
 	return nil
@@ -226,20 +233,20 @@ func (m *Manager) EnableStrictValidation(strict bool) error {
 // SetMaxValidationErrors sets the maximum number of validation errors
 func (m *Manager) SetMaxValidationErrors(max int) error {
 	if m.config == nil {
-		m.config = &types.ValidationConfig{}
+		m.config = &spookytypesvariables.ValidationConfig{}
 	}
 	m.config.MaxValidationErrors = max
 	return nil
 }
 
 // GetValidationErrors returns all validation errors
-func (m *Manager) GetValidationErrors() []types.ValidationError {
+func (m *Manager) GetValidationErrors() []spookytypesvariables.ValidationError {
 	return m.errors
 }
 
 // ClearValidationErrors clears all validation errors
 func (m *Manager) ClearValidationErrors() error {
-	m.errors = make([]types.ValidationError, 0)
+	m.errors = make([]spookytypesvariables.ValidationError, 0)
 	return nil
 }
 
@@ -250,7 +257,7 @@ func (m *Manager) Close() error {
 }
 
 // Helper methods
-func (m *Manager) validateBasic(variable *types.Variable) error {
+func (m *Manager) validateBasic(variable *spookytypesvariables.Variable) error {
 	if variable.Name == "" {
 		return fmt.Errorf("variable name cannot be empty")
 	}
@@ -266,7 +273,7 @@ func (m *Manager) validateBasic(variable *types.Variable) error {
 	return nil
 }
 
-func (m *Manager) validateAgainstSchema(variable *types.Variable, schemaName string) error {
+func (m *Manager) validateAgainstSchema(variable *spookytypesvariables.Variable, schemaName string) error {
 	// Load schema if not already loaded
 	validator := schemas.NewSchemaValidator()
 	if err := validator.LoadSchema(schemas.SchemaTypeVariablesHCL); err != nil {
@@ -278,7 +285,7 @@ func (m *Manager) validateAgainstSchema(variable *types.Variable, schemaName str
 	return nil
 }
 
-func (m *Manager) validateCollectionConstraints(collection *types.VariableCollection) error {
+func (m *Manager) validateCollectionConstraints(collection *spookytypesvariables.VariableCollection) error {
 	// Check for duplicate variable names
 	names := make(map[string]bool)
 	for _, variable := range collection.Variables {

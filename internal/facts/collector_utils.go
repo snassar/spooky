@@ -5,23 +5,25 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"spooky/internal/types/facts"
-	"spooky/internal/logging"
 	"time"
+
+	spookyinterfaces "spooky/internal/interfaces"
+	spookylogging "spooky/internal/logging"
+	spookytypesfacts "spooky/internal/types/facts"
 )
 
 // parseJSONFromReader handles JSON parsing with shared logic
-func parseJSONFromReader(r io.Reader, server string, sourceInfo map[string]interface{}) (*types.FactCollection, error) {
+func parseJSONFromReader(r io.Reader, server string, sourceInfo map[string]interface{}) (*spookytypesfacts.FactCollection, error) {
 	// Try to parse as different JSON formats
 	var data interface{}
 	if err := json.NewDecoder(r).Decode(&data); err != nil {
 		return nil, fmt.Errorf("failed to decode JSON: %w", err)
 	}
 
-	collection := &types.FactCollection{
+	collection := &spookytypesfacts.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookytypesfacts.Fact),
 	}
 
 	// Handle different JSON formats
@@ -38,20 +40,20 @@ func parseJSONFromReader(r io.Reader, server string, sourceInfo map[string]inter
 }
 
 // parseArrayJSON handles array-based JSON format with shared logic
-func parseArrayJSON(data []interface{}, collection *types.FactCollection, sourceInfo map[string]interface{}) (*types.FactCollection, error) {
+func parseArrayJSON(data []interface{}, collection *spookytypesfacts.FactCollection, sourceInfo map[string]interface{}) (*spookytypesfacts.FactCollection, error) {
 	for _, item := range data {
 		if factObj, ok := item.(map[string]interface{}); ok {
 			key, keyOk := factObj["key"].(string)
 			value, valueOk := factObj["value"]
 
 			if keyOk && valueOk {
-				fact := &types.Fact{
+				fact := &spookytypesfacts.Fact{
 					Key:       key,
 					Value:     value,
-					Source:    string(types.SourceCustom),
+					Source:    string(spookytypesfacts.SourceCustom),
 					Server:    collection.Server,
 					Timestamp: collection.Timestamp,
-					TTL:       types.DefaultTTL,
+					TTL:       spookytypesfacts.DefaultTTL,
 					Metadata:  make(map[string]interface{}),
 				}
 
@@ -81,15 +83,15 @@ func parseArrayJSON(data []interface{}, collection *types.FactCollection, source
 }
 
 // parseFlatJSON handles flat key-value JSON format with shared logic
-func parseFlatJSON(data map[string]interface{}, collection *types.FactCollection, sourceInfo map[string]interface{}) (*types.FactCollection, error) {
+func parseFlatJSON(data map[string]interface{}, collection *spookytypesfacts.FactCollection, sourceInfo map[string]interface{}) (*spookytypesfacts.FactCollection, error) {
 	for key, value := range data {
-		fact := &types.Fact{
+		fact := &spookytypesfacts.Fact{
 			Key:       key,
 			Value:     value,
-			Source:    string(types.SourceCustom),
+			Source:    string(spookytypesfacts.SourceCustom),
 			Server:    collection.Server,
 			Timestamp: collection.Timestamp,
-			TTL:       types.DefaultTTL,
+			TTL:       spookytypesfacts.DefaultTTL,
 			Metadata:  make(map[string]interface{}),
 		}
 
@@ -104,11 +106,11 @@ func parseFlatJSON(data map[string]interface{}, collection *types.FactCollection
 }
 
 // filterFactCollection filters a fact collection to only include specified keys
-func filterFactCollection(collection *types.FactCollection, keys []string, logger logging.Logger, source string) *types.FactCollection {
-	filtered := &types.FactCollection{
+func filterFactCollection(collection *spookytypesfacts.FactCollection, keys []string, logger spookyinterfaces.Logger, source string) *spookytypesfacts.FactCollection {
+	filtered := &spookytypesfacts.FactCollection{
 		Server:    collection.Server,
 		Timestamp: collection.Timestamp,
-		Facts:     make(map[string]*types.Fact),
+		Facts:     make(map[string]*spookytypesfacts.Fact),
 	}
 
 	for _, key := range keys {
@@ -116,16 +118,16 @@ func filterFactCollection(collection *types.FactCollection, keys []string, logge
 			filtered.Facts[key] = fact
 		} else {
 			logger.Warn("Requested fact not found",
-				logging.String("key", key),
-				logging.String("source", source))
+				spookylogging.String("key", key),
+				spookylogging.String("source", source))
 		}
 	}
 
 	logger.Debug("Completed fact filtering",
-		logging.String("source", source),
-		logging.String("server", collection.Server),
-		logging.Int("requested_count", len(keys)),
-		logging.Int("found_count", len(filtered.Facts)))
+		spookylogging.String("source", source),
+		spookylogging.String("server", collection.Server),
+		spookylogging.Int("requested_count", len(keys)),
+		spookylogging.Int("found_count", len(filtered.Facts)))
 
 	return filtered
 }
@@ -160,11 +162,11 @@ func validateKeys(keys []string) error {
 }
 
 // collectSpecificFacts is a common implementation for CollectSpecific
-func collectSpecificFacts(collector types.FactCollector, server string, keys []string, logger logging.Logger, source string) (*types.FactCollection, error) {
+func collectSpecificFacts(collector spookytypesfacts.FactCollector, server string, keys []string, logger spookyinterfaces.Logger, source string) (*spookytypesfacts.FactCollection, error) {
 	logger.Debug("Starting specific fact collection",
-		logging.String("server", server),
-		logging.String("requested_keys", fmt.Sprintf("%v", keys)),
-		logging.String("source", source))
+		spookylogging.String("server", server),
+		spookylogging.String("requested_keys", fmt.Sprintf("%v", keys)),
+		spookylogging.String("source", source))
 
 	// Validate inputs
 	if err := validateServer(server); err != nil {
@@ -183,11 +185,11 @@ func collectSpecificFacts(collector types.FactCollector, server string, keys []s
 }
 
 // getSpecificFact is a common implementation for GetFact
-func getSpecificFact(collector types.FactCollector, server, key string, logger logging.Logger, source string) (*types.Fact, error) {
+func getSpecificFact(collector spookytypesfacts.FactCollector, server, key string, logger spookyinterfaces.Logger, source string) (*spookytypesfacts.Fact, error) {
 	logger.Debug("Getting specific fact",
-		logging.String("server", server),
-		logging.String("key", key),
-		logging.String("source", source))
+		spookylogging.String("server", server),
+		spookylogging.String("key", key),
+		spookylogging.String("source", source))
 
 	// Validate inputs
 	if err := validateServer(server); err != nil {
@@ -204,16 +206,16 @@ func getSpecificFact(collector types.FactCollector, server, key string, logger l
 
 	if fact, exists := collection.Facts[key]; exists {
 		logger.Debug("Successfully retrieved fact",
-			logging.String("server", server),
-			logging.String("key", key),
-			logging.String("source", source))
+			spookylogging.String("server", server),
+			spookylogging.String("key", key),
+			spookylogging.String("source", source))
 		return fact, nil
 	}
 
 	logger.Warn("Fact not found",
-		logging.String("server", server),
-		logging.String("key", key),
-		logging.String("source", source))
+		spookylogging.String("server", server),
+		spookylogging.String("key", key),
+		spookylogging.String("source", source))
 
 	return nil, ErrFactNotFoundInSource(key, server, source)
 }
@@ -229,14 +231,14 @@ func buildStandardMetadata(collectorType, source, format string) map[string]inte
 }
 
 // collectFromFile is a common implementation for file-based collectors
-func collectFromFile(filePath, server, sourceType string, logger logging.Logger,
+func collectFromFile(filePath, server, sourceType string, logger spookyinterfaces.Logger,
 	parseFunc func() (interface{}, error),
-	extractFunc func(interface{}, string) map[string]*types.Fact) (*types.FactCollection, error) {
+	extractFunc func(interface{}, string) map[string]*spookytypesfacts.Fact) (*spookytypesfacts.FactCollection, error) {
 
 	logger.Debug("Starting file-based fact collection",
-		logging.String("file", filePath),
-		logging.String("server", server),
-		logging.String("source_type", sourceType))
+		spookylogging.String("file", filePath),
+		spookylogging.String("server", server),
+		spookylogging.String("source_type", sourceType))
 
 	// Validate inputs
 	if err := validateServer(server); err != nil {
@@ -245,33 +247,35 @@ func collectFromFile(filePath, server, sourceType string, logger logging.Logger,
 
 	// Check if file exists
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		logger.Error("File not found", err,
-			logging.String("file", filePath))
+		logger.Error("File not found",
+			spookylogging.String("file", filePath),
+			spookylogging.Error(err))
 		return nil, fmt.Errorf("invalid source %s: file not found", filePath)
 	}
 
 	// Parse file
 	data, err := parseFunc()
 	if err != nil {
-		logger.Error("Failed to parse file", err,
-			logging.String("file", filePath))
+		logger.Error("Failed to parse file",
+			spookylogging.String("file", filePath),
+			spookylogging.Error(err))
 		return nil, fmt.Errorf("failed to parse %s file: %w", sourceType, err)
 	}
 
 	// Extract facts from data
 	facts := extractFunc(data, server)
 
-	collection := &types.FactCollection{
+	collection := &spookytypesfacts.FactCollection{
 		Server:    server,
 		Timestamp: time.Now(),
 		Facts:     facts,
 	}
 
 	logger.Info("Successfully collected facts from file",
-		logging.String("file", filePath),
-		logging.String("server", server),
-		logging.Int("fact_count", len(facts)),
-		logging.String("source_type", sourceType))
+		spookylogging.String("file", filePath),
+		spookylogging.String("server", server),
+		spookylogging.Int("fact_count", len(facts)),
+		spookylogging.String("source_type", sourceType))
 
 	return collection, nil
 }

@@ -48,6 +48,20 @@ type TemplatesContext struct {
 	Functions     map[string]interface{}
 }
 
+// MachinesContext provides machines data for integrations
+type MachinesContext struct {
+	BaseContext
+	Machines []*spookytypesconfig.Machine
+	Indexes  map[string]interface{}
+}
+
+// ActionsContext provides actions data for integrations
+type ActionsContext struct {
+	BaseContext
+	Actions []*spookytypesactions.Action
+	Plans   map[string]*spookytypesactions.ActionPlan
+}
+
 // ActionExecutionContext provides all context for action execution
 type ActionExecutionContext struct {
 	BaseContext

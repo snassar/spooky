@@ -4,33 +4,32 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
-	"time"
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
 	spookytemplates "spooky/internal/templates"
-	spookytemplatestypes "spooky/internal/templates/types"
-
+	spookytypestemplates "spooky/internal/types/templates"
+	"strings"
+	"time"
 )
 
 // CoordinatorTemplatesIntegration implements templates system integration
 type CoordinatorTemplatesIntegration struct {
-	templatesManager spookytemplates.TemplateManager
-	logger           spookylogging.Logger
-	templateCache    map[string]*spookytemplatestypes.Template // Add this field
+	templatesManager spookyinterfaces.TemplateManager
+	logger           spookyinterfaces.Logger
+	templateCache    map[string]*spookytypestemplates.Template // Add this field
 }
 
 // NewCoordinatorTemplatesIntegration creates a new templates integration
-func NewCoordinatorTemplatesIntegration(templatesManager spookytemplates.TemplateManager, logger spookylogging.Logger) *CoordinatorTemplatesIntegration {
+func NewCoordinatorTemplatesIntegration(templatesManager spookyinterfaces.TemplateManager, logger spookyinterfaces.Logger) *CoordinatorTemplatesIntegration {
 	return &CoordinatorTemplatesIntegration{
 		templatesManager: templatesManager,
 		logger:           logger,
-		templateCache:    make(map[string]*spookytemplatestypes.Template), // Initialize cache
+		templateCache:    make(map[string]*spookytypestemplates.Template), // Initialize cache
 	}
 }
 
 // NewDefaultCoordinatorTemplatesIntegration creates a templates integration with default manager
-func NewDefaultCoordinatorTemplatesIntegration(logger spookylogging.Logger) (*CoordinatorTemplatesIntegration, error) {
+func NewDefaultCoordinatorTemplatesIntegration(logger spookyinterfaces.Logger) (*CoordinatorTemplatesIntegration, error) {
 	templatesManager, err := spookytemplates.NewDefaultTemplateManager(logger)
 	if err != nil {
 		return nil, err
@@ -46,7 +45,7 @@ func (ti *CoordinatorTemplatesIntegration) LoadTemplates(projectPath string) (*s
 			ProjectPath: projectPath,
 			Timestamp:   time.Now(),
 		},
-		Templates:     make(map[string]*spookytemplatestypes.Template),
+		Templates:     make(map[string]*spookytypestemplates.Template),
 		RenderedCache: make(map[string]string),
 		Functions:     make(map[string]interface{}),
 	}
@@ -86,7 +85,7 @@ func (ti *CoordinatorTemplatesIntegration) LoadTemplates(projectPath string) (*s
 				relPath, _ := filepath.Rel(templatesDir, path)
 				templateName := strings.TrimSuffix(relPath, ext)
 
-				template := &spookytemplatestypes.Template{
+				template := &spookytypestemplates.Template{
 					Name:    templateName,
 					Source:  string(content),
 					Content: string(content),
@@ -121,7 +120,7 @@ func (ti *CoordinatorTemplatesIntegration) LoadTemplates(projectPath string) (*s
 }
 
 // ValidateTemplate validates a template using the context
-func (ti *CoordinatorTemplatesIntegration) ValidateTemplate(template *spookytemplatestypes.Template, context *spookyinterfaces.TemplatesContext) error {
+func (ti *CoordinatorTemplatesIntegration) ValidateTemplate(template *spookytypestemplates.Template, context *spookyinterfaces.TemplatesContext) error {
 	if template == nil {
 		return fmt.Errorf("template cannot be nil")
 	}
@@ -180,7 +179,7 @@ func (ti *CoordinatorTemplatesIntegration) ValidateTemplate(template *spookytemp
 }
 
 // RenderTemplate renders a template with enhanced features
-func (ti *CoordinatorTemplatesIntegration) RenderTemplate(template *spookytemplatestypes.Template, context *spookyinterfaces.TemplatesContext) (string, error) {
+func (ti *CoordinatorTemplatesIntegration) RenderTemplate(template *spookytypestemplates.Template, context *spookyinterfaces.TemplatesContext) (string, error) {
 	if template == nil {
 		return "", fmt.Errorf("template cannot be nil")
 	}
@@ -246,7 +245,7 @@ func (ti *CoordinatorTemplatesIntegration) RenderTemplate(template *spookytempla
 }
 
 // CacheTemplate caches a template for later use
-func (ti *CoordinatorTemplatesIntegration) CacheTemplate(template *spookytemplatestypes.Template) error {
+func (ti *CoordinatorTemplatesIntegration) CacheTemplate(template *spookytypestemplates.Template) error {
 	if template == nil {
 		return fmt.Errorf("template cannot be nil")
 	}
@@ -288,7 +287,7 @@ func (ti *CoordinatorTemplatesIntegration) CacheTemplate(template *spookytemplat
 }
 
 // GetTemplate gets a specific template by name
-func (ti *CoordinatorTemplatesIntegration) GetTemplate(name string, context *spookyinterfaces.TemplatesContext) (*spookytemplatestypes.Template, error) {
+func (ti *CoordinatorTemplatesIntegration) GetTemplate(name string, context *spookyinterfaces.TemplatesContext) (*spookytypestemplates.Template, error) {
 	if name == "" {
 		return nil, fmt.Errorf("template name cannot be empty")
 	}
@@ -306,13 +305,13 @@ func (ti *CoordinatorTemplatesIntegration) GetTemplate(name string, context *spo
 }
 
 // ListTemplates lists all available templates
-func (ti *CoordinatorTemplatesIntegration) ListTemplates(context *spookyinterfaces.TemplatesContext) (map[string]*spookytemplatestypes.Template, error) {
+func (ti *CoordinatorTemplatesIntegration) ListTemplates(context *spookyinterfaces.TemplatesContext) (map[string]*spookytypestemplates.Template, error) {
 	if context == nil {
 		return nil, fmt.Errorf("templates context cannot be nil")
 	}
 
 	// Return all templates in context
-	result := make(map[string]*spookytemplatestypes.Template)
+	result := make(map[string]*spookytypestemplates.Template)
 	for name, template := range context.Templates {
 		result[name] = template
 	}
@@ -321,7 +320,7 @@ func (ti *CoordinatorTemplatesIntegration) ListTemplates(context *spookyinterfac
 }
 
 // AddTemplate adds a new template to the project with persistence
-func (ti *CoordinatorTemplatesIntegration) AddTemplate(name string, template *spookytemplatestypes.Template, context *spookyinterfaces.TemplatesContext) error {
+func (ti *CoordinatorTemplatesIntegration) AddTemplate(name string, template *spookytypestemplates.Template, context *spookyinterfaces.TemplatesContext) error {
 	if name == "" {
 		return fmt.Errorf("template name cannot be empty")
 	}
@@ -405,7 +404,7 @@ func (ti *CoordinatorTemplatesIntegration) RemoveTemplate(name string, context *
 }
 
 // generateCacheKey generates a cache key for template rendering
-func (ti *CoordinatorTemplatesIntegration) generateCacheKey(template *spookytemplatestypes.Template, context *spookyinterfaces.TemplatesContext) string {
+func (ti *CoordinatorTemplatesIntegration) generateCacheKey(template *spookytypestemplates.Template, context *spookyinterfaces.TemplatesContext) string {
 	params := map[string]interface{}{
 		"template_name": template.Name,
 		"template_hash": fmt.Sprintf("%d", len(template.Source)), // Simple hash for now
@@ -415,14 +414,14 @@ func (ti *CoordinatorTemplatesIntegration) generateCacheKey(template *spookytemp
 }
 
 // generateTemplateCacheKey generates a cache key for template storage
-func (ti *CoordinatorTemplatesIntegration) generateTemplateCacheKey(template *spookytemplatestypes.Template) string {
+func (ti *CoordinatorTemplatesIntegration) generateTemplateCacheKey(template *spookytypestemplates.Template) string {
 	// Create a unique cache key based on template name and content hash
 	contentHash := fmt.Sprintf("%d", len(template.Source)) // Simplified hash
 	return fmt.Sprintf("template_%s_%s", template.Name, contentHash)
 }
 
 // persistTemplate persists a template to the project file system
-func (ti *CoordinatorTemplatesIntegration) persistTemplate(name string, template *spookytemplatestypes.Template, projectPath string) error {
+func (ti *CoordinatorTemplatesIntegration) persistTemplate(name string, template *spookytypestemplates.Template, projectPath string) error {
 	// Create templates directory if it doesn't exist
 	templatesDir := filepath.Join(projectPath, "templates")
 	if err := os.MkdirAll(templatesDir, 0755); err != nil {
@@ -511,7 +510,7 @@ func (ti *CoordinatorTemplatesIntegration) renderTemplateWithRecovery(templatePa
 	rendered, err := ti.templatesManager.RenderTemplate(templatePath, projectPath, additionalData)
 	if err != nil {
 		// Log the error for debugging
-		ti.logger.Error("Template rendering failed", err,
+		ti.logger.Error("Template rendering failed", spookylogging.Error(err),
 			spookylogging.String("template", templatePath))
 
 		// In a real implementation, you might:

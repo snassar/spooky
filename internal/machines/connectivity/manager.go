@@ -7,21 +7,22 @@ import (
 	"os"
 	"time"
 
-	configtypes "spooky/internal/types/config"
-	"spooky/internal/machines/types"
+	"spooky/internal/types"
+	spookytypesconfig "spooky/internal/types/config"
+	spookytypesmachines "spooky/internal/types/machines"
 
 	"golang.org/x/crypto/ssh"
 )
 
 // Manager provides comprehensive connectivity testing capabilities
 type Manager struct {
-	options *types.ConnectivityTestOptions
+	options *spookytypesmachines.ConnectivityTestOptions
 }
 
 // NewManager creates a new connectivity manager with the given options
-func NewManager(options *types.ConnectivityTestOptions) *Manager {
+func NewManager(options *spookytypesmachines.ConnectivityTestOptions) *Manager {
 	if options == nil {
-		options = types.DefaultConnectivityTestOptions()
+		options = spookytypesmachines.DefaultConnectivityTestOptions()
 	}
 
 	// Validate and fix options
@@ -38,7 +39,7 @@ func NewManager(options *types.ConnectivityTestOptions) *Manager {
 		options.SSHCommand = "echo 'SSH connectivity test'"
 	}
 	if len(options.Phases) == 0 {
-		options.Phases = []types.ConnectivityTestPhase{types.PhaseDNS, types.PhaseSSH}
+		options.Phases = []spookytypesmachines.ConnectivityTestPhase{spookytypesmachines.PhaseDNS, spookytypesmachines.PhaseSSH}
 	}
 
 	return &Manager{
@@ -47,8 +48,8 @@ func NewManager(options *types.ConnectivityTestOptions) *Manager {
 }
 
 // TestMachineConnectivity performs comprehensive connectivity testing on a single machine
-func (cm *Manager) TestMachineConnectivity(ctx context.Context, machine *configtypes.Machine) []types.ConnectivityTestResult {
-	var results []types.ConnectivityTestResult
+func (cm *Manager) TestMachineConnectivity(ctx context.Context, machine *spookytypesconfig.Machine) []spookytypesmachines.ConnectivityTestResult {
+	var results []spookytypesmachines.ConnectivityTestResult
 
 	// Get relevant phases for this machine
 	phases := cm.getRelevantPhases(machine)
@@ -63,8 +64,8 @@ func (cm *Manager) TestMachineConnectivity(ctx context.Context, machine *configt
 }
 
 // TestMachinesConnectivity performs connectivity testing on multiple machines
-func (cm *Manager) TestMachinesConnectivity(ctx context.Context, machines []*configtypes.Machine) map[string][]types.ConnectivityTestResult {
-	results := make(map[string][]types.ConnectivityTestResult)
+func (cm *Manager) TestMachinesConnectivity(ctx context.Context, machines []*spookytypesconfig.Machine) map[string][]spookytypesmachines.ConnectivityTestResult {
+	results := make(map[string][]spookytypesmachines.ConnectivityTestResult)
 
 	// Test each machine
 	for _, machine := range machines {
@@ -76,13 +77,13 @@ func (cm *Manager) TestMachinesConnectivity(ctx context.Context, machines []*con
 }
 
 // TestSpecificPhase tests a specific connectivity phase for a machine
-func (cm *Manager) TestSpecificPhase(ctx context.Context, machine *configtypes.Machine, phase types.ConnectivityTestPhase) types.ConnectivityTestResult {
+func (cm *Manager) TestSpecificPhase(ctx context.Context, machine *spookytypesconfig.Machine, phase spookytypesmachines.ConnectivityTestPhase) spookytypesmachines.ConnectivityTestResult {
 	return cm.testPhase(ctx, machine, phase)
 }
 
 // TestPhases tests specific phases for a machine
-func (cm *Manager) TestPhases(ctx context.Context, machine *configtypes.Machine, phases []types.ConnectivityTestPhase) []types.ConnectivityTestResult {
-	var results []types.ConnectivityTestResult
+func (cm *Manager) TestPhases(ctx context.Context, machine *spookytypesconfig.Machine, phases []spookytypesmachines.ConnectivityTestPhase) []spookytypesmachines.ConnectivityTestResult {
+	var results []spookytypesmachines.ConnectivityTestResult
 
 	for _, phase := range phases {
 		result := cm.testPhase(ctx, machine, phase)
@@ -93,7 +94,7 @@ func (cm *Manager) TestPhases(ctx context.Context, machine *configtypes.Machine,
 }
 
 // GetTestSummary provides a summary of connectivity test results
-func (cm *Manager) GetTestSummary(results map[string][]types.ConnectivityTestResult) *types.ConnectivityTestSummary {
+func (cm *Manager) GetTestSummary(results map[string][]spookytypesmachines.ConnectivityTestResult) *spookytypesmachines.ConnectivityTestSummary {
 	summary := &types.ConnectivityTestSummary{
 		PhaseResults: make(map[types.ConnectivityTestPhase]*types.PhaseSummary),
 	}
@@ -129,7 +130,7 @@ func (cm *Manager) GetTestSummary(results map[string][]types.ConnectivityTestRes
 }
 
 // getRelevantPhases determines which phases are relevant for a machine
-func (cm *Manager) getRelevantPhases(machine *configtypes.Machine) []types.ConnectivityTestPhase {
+func (cm *Manager) getRelevantPhases(machine *spookytypesconfig.Machine) []types.ConnectivityTestPhase {
 	var phases []types.ConnectivityTestPhase
 
 	// Always test DNS if the machine has a hostname
@@ -146,7 +147,7 @@ func (cm *Manager) getRelevantPhases(machine *configtypes.Machine) []types.Conne
 }
 
 // testPhase tests a specific connectivity phase
-func (cm *Manager) testPhase(ctx context.Context, machine *configtypes.Machine, phase types.ConnectivityTestPhase) types.ConnectivityTestResult {
+func (cm *Manager) testPhase(ctx context.Context, machine *spookytypesconfig.Machine, phase types.ConnectivityTestPhase) types.ConnectivityTestResult {
 	start := time.Now()
 	result := types.ConnectivityTestResult{
 		Machine:   machine,
@@ -174,7 +175,7 @@ func (cm *Manager) testPhase(ctx context.Context, machine *configtypes.Machine, 
 }
 
 // testDNSResolution tests DNS resolution for a machine
-func (cm *Manager) testDNSResolution(ctx context.Context, machine *configtypes.Machine) error {
+func (cm *Manager) testDNSResolution(ctx context.Context, machine *spookytypesconfig.Machine) error {
 	if machine.Host == "" {
 		return fmt.Errorf("no hostname specified for machine")
 	}
@@ -198,7 +199,7 @@ func (cm *Manager) testDNSResolution(ctx context.Context, machine *configtypes.M
 }
 
 // testSSHConnectivity tests SSH connectivity to a machine
-func (cm *Manager) testSSHConnectivity(ctx context.Context, machine *configtypes.Machine) error {
+func (cm *Manager) testSSHConnectivity(ctx context.Context, machine *spookytypesconfig.Machine) error {
 	if machine.User == "" {
 		return fmt.Errorf("no user specified for machine")
 	}

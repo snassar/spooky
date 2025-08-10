@@ -139,7 +139,7 @@ func (pm *ProjectManager) convertProjectConfig(config *spookyconfigtypes.Project
 	// Set fields from config.ProjectConfig
 	project.Execution.DefaultTimeout = config.DefaultTimeout
 	project.Execution.DryRunDefault = config.DryRunDefault
-	project.Execution.ValidateBeforeExecute = config.ValidateBeforeExecute
+	project.Execution.ValidateBeforeExecute = config.ValidateBeforeAct
 	project.Execution.BackupBeforeChanges = config.BackupBeforeChanges
 
 	// Set MaxParallel based on DefaultParallel (since config uses bool, project uses int)

@@ -7,25 +7,25 @@ import (
 	"strings"
 	"text/template"
 
-	"spooky/internal/logging"
-	"spooky/internal/templates/types"
+	spookyinterfaces "spooky/internal/interfaces"
+	spookytypes "spooky/internal/types"
 )
 
 // Manager implements ValidationManager interface
 type Manager struct {
-	config     *types.ValidationConfig
-	validators map[string]TemplateValidator
-	logger     logging.Logger
-	errors     []types.ValidationError
+	config     *spookytypes.TemplateValidationConfig
+	validators map[string]spookyinterfaces.TemplateValidator
+	logger     spookyinterfaces.Logger
+	errors     []spookytypes.TemplateValidationError
 }
 
 // NewManager creates a new validation manager
-func NewManager(config *types.ValidationConfig, logger logging.Logger) *Manager {
+func NewManager(config *spookytypes.TemplateValidationConfig, logger spookyinterfaces.Logger) *Manager {
 	return &Manager{
 		config:     config,
-		validators: make(map[string]TemplateValidator),
+		validators: make(map[string]spookyinterfaces.TemplateValidator),
 		logger:     logger,
-		errors:     make([]types.ValidationError, 0),
+		errors:     make([]spookytypes.TemplateValidationError, 0),
 	}
 }
 
@@ -123,7 +123,7 @@ func (m *Manager) ValidateFunctions(tmpl *template.Template) error {
 }
 
 // ValidateAgainstSchema validates a template against a schema
-func (m *Manager) ValidateAgainstSchema(template *types.Template, _ string) error {
+func (m *Manager) ValidateAgainstSchema(template *spookytypes.Template, _ string) error {
 	// Basic schema validation
 	if template == nil {
 		return fmt.Errorf("template is nil")
@@ -141,9 +141,9 @@ func (m *Manager) ValidateAgainstSchema(template *types.Template, _ string) erro
 }
 
 // SetValidationRules sets validation rules
-func (m *Manager) SetValidationRules(rules *types.ValidationRules) error {
+func (m *Manager) SetValidationRules(rules *spookytypes.TemplateValidationRules) error {
 	if m.config == nil {
-		m.config = &types.ValidationConfig{}
+		m.config = &spookytypes.TemplateValidationConfig{}
 	}
 	m.config.ValidationRules = rules
 	return nil
@@ -152,20 +152,20 @@ func (m *Manager) SetValidationRules(rules *types.ValidationRules) error {
 // EnableStrictValidation enables strict validation
 func (m *Manager) EnableStrictValidation(strict bool) error {
 	if m.config == nil {
-		m.config = &types.ValidationConfig{}
+		m.config = &spookytypes.TemplateValidationConfig{}
 	}
 	m.config.StrictValidation = strict
 	return nil
 }
 
 // GetValidationErrors returns validation errors
-func (m *Manager) GetValidationErrors() []types.ValidationError {
+func (m *Manager) GetValidationErrors() []spookytypes.TemplateValidationError {
 	return m.errors
 }
 
 // ClearValidationErrors clears validation errors
 func (m *Manager) ClearValidationErrors() error {
-	m.errors = make([]types.ValidationError, 0)
+	m.errors = make([]spookytypes.TemplateValidationError, 0)
 	return nil
 }
 

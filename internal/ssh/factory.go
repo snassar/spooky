@@ -1,20 +1,21 @@
 package ssh
 
 import (
-	spookylogging "spooky/internal/logging"
+	"time"
+
+	spookyinterfaces "spooky/internal/interfaces"
 	spookysshacting "spooky/internal/ssh/acting"
 	spookysshauthentication "spooky/internal/ssh/authentication"
 	spookysshclient "spooky/internal/ssh/client"
 	spookysshconnectionpool "spooky/internal/ssh/connection_pool"
 	spookysshkeys "spooky/internal/ssh/keys"
-	spookysshtypes "spooky/internal/ssh/types"
-	"time"
+	spookytypes "spooky/internal/types"
 )
 
 // NewManagerWithConfig creates a new SSH manager with custom configuration
 func NewManagerWithConfig(
-	config *spookysshtypes.Config,
-	logger spookylogging.Logger,
+	config *spookytypes.SSHClientConfig,
+	logger spookyinterfaces.Logger,
 ) *Manager {
 	// Create subpackage managers with default implementations
 	clientManager := spookysshclient.NewManager(
@@ -58,13 +59,13 @@ func NewManagerWithConfig(
 
 // NewManagerWithDependencies creates a new SSH manager with custom dependencies
 func NewManagerWithDependencies(
-	config *spookysshtypes.Config,
-	clientManager spookysshclient.ClientManager,
-	authenticationManager spookysshauthentication.AuthenticationEngine,
-	connectionPoolManager spookysshconnectionpool.ConnectionPool,
-	actingManager spookysshacting.ActingEngine,
-	keyManager spookysshkeys.SSHKeyManager,
-	logger spookylogging.Logger,
+	config *spookytypes.SSHClientConfig,
+	clientManager spookyinterfaces.ClientManager,
+	authenticationManager spookyinterfaces.AuthenticationEngine,
+	connectionPoolManager spookyinterfaces.ConnectionPool,
+	actingManager spookyinterfaces.ActingEngine,
+	keyManager spookyinterfaces.SSHKeyManager,
+	logger spookyinterfaces.Logger,
 ) *Manager {
 	return &Manager{
 		config:                config,
@@ -78,34 +79,34 @@ func NewManagerWithDependencies(
 }
 
 // NewDefaultManager creates a new SSH manager with sensible defaults
-func NewDefaultManager(logger spookylogging.Logger) *Manager {
-	config := &spookysshtypes.Config{
+func NewDefaultManager(logger spookyinterfaces.Logger) *Manager {
+	config := &spookytypes.SSHClientConfig{
 		DefaultTimeout:          30 * time.Second,
 		MaxConnections:          10,
 		EnableConnectionPooling: true,
-		ClientConfig: &spookysshtypes.ClientConfig{
+		ClientConfig: &spookytypes.ClientConfig{
 			DefaultTimeout:  30 * time.Second,
 			MaxRetries:      3,
 			HostKeyChecking: true,
 		},
-		AuthenticationConfig: &spookysshtypes.AuthenticationConfig{
-			Method:  spookysshtypes.AuthMethodKey,
+		AuthenticationConfig: &spookytypes.AuthenticationConfig{
+			Method:  spookytypes.AuthMethodKey,
 			Timeout: 30 * time.Second,
 		},
-		PoolConfig: &spookysshtypes.PoolConfig{
+		PoolConfig: &spookytypes.PoolConfig{
 			MaxConnections:      10,
 			MaxIdleTime:         5 * time.Minute,
 			ConnectionTimeout:   30 * time.Second,
 			HealthCheckInterval: 1 * time.Minute,
 		},
-		ActingConfig: &spookysshtypes.ActingConfig{
+		ActingConfig: &spookytypes.ActingConfig{
 			DefaultTimeout: 30 * time.Second,
 			MaxParallel:    5,
 			EnableRetries:  true,
 			MaxRetries:     3,
 			RetryDelay:     1 * time.Second,
 		},
-		KeysConfig: &spookysshtypes.KeysConfig{
+		KeysConfig: &spookytypes.KeysConfig{
 			DefaultKeyPath: "~/.ssh/id_rsa",
 			KeyCacheTTL:    1 * time.Hour,
 			EnableCaching:  true,

@@ -6,25 +6,26 @@ import (
 
 	"spooky/internal/logging"
 	"spooky/internal/schemas"
-	"spooky/internal/variables/types"
+	spookylogging "spooky/internal/types/logging"
+	spookytypesvariables "spooky/internal/types/variables"
 
 	"github.com/hashicorp/hcl/v2/hclparse"
 )
 
 // VariableParser implements the Parser interface
 type VariableParser struct {
-	logger logging.Logger
+	logger spookylogging.Logger
 }
 
 // NewParser creates a new parser
-func NewParser(logger logging.Logger) *VariableParser {
+func NewParser(logger spookylogging.Logger) *VariableParser {
 	return &VariableParser{
 		logger: logger,
 	}
 }
 
 // ParseHCL parses HCL content into variables
-func (p *VariableParser) ParseHCL(content []byte) ([]*types.Variable, error) {
+func (p *VariableParser) ParseHCL(content []byte) ([]*spookytypesvariables.Variable, error) {
 	p.logger.Debug("Parsing HCL content", logging.Int("length", len(content)))
 
 	// Use schema system for HCL parsing
@@ -40,7 +41,7 @@ func (p *VariableParser) ParseHCL(content []byte) ([]*types.Variable, error) {
 	}
 
 	// Convert validated content to variables
-	var collection types.VariableCollection
+	var collection spookytypesvariables.VariableCollection
 	parser := hclparse.NewParser()
 	_, diags := parser.ParseHCL(content, "variables.hcl")
 	if diags.HasErrors() {
@@ -72,10 +73,10 @@ func (p *VariableParser) ParseHCL(content []byte) ([]*types.Variable, error) {
 }
 
 // ParseJSON parses JSON content into variables
-func (p *VariableParser) ParseJSON(content []byte) ([]*types.Variable, error) {
+func (p *VariableParser) ParseJSON(content []byte) ([]*spookytypesvariables.Variable, error) {
 	p.logger.Debug("Parsing JSON content", logging.Int("length", len(content)))
 
-	var collection types.VariableCollection
+	var collection spookytypesvariables.VariableCollection
 	if err := json.Unmarshal(content, &collection); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}

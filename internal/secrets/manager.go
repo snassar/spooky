@@ -9,22 +9,23 @@ import (
 	spookysecretsage "spooky/internal/secrets/age"
 	spookysecretskeys "spooky/internal/secrets/keys"
 	spookysecretsops "spooky/internal/secrets/operations"
-	spookysecretstypes "spooky/internal/types/secrets"
+	spookytypeslogging "spooky/internal/types/logging"
+	spookytypessecrets "spooky/internal/types/secrets"
 )
 
 // Manager implements the SecretsManager interface
 type Manager struct {
-	config      *spookysecretstypes.SecretsConfig
-	ageClient   AgeClient
-	keyManager  KeyManager
+	config      *spookytypessecrets.SecretsConfig
+	ageClient   spookysecretsage.AgeClient
+	keyManager  *spookysecretskeys.Manager
 	fileManager *spookysecretsops.FileManager
-	logger      spookylogging.Logger
+	logger      spookytypeslogging.Logger
 }
 
 // NewManager creates a new secrets manager
-func NewManager(config *spookysecretstypes.SecretsConfig) (*Manager, error) {
+func NewManager(config *spookytypessecrets.SecretsConfig) (*Manager, error) {
 	if config == nil {
-		config = &spookysecretstypes.SecretsConfig{
+		config = &spookytypessecrets.SecretsConfig{
 			Enabled: true,
 		}
 	}
@@ -42,7 +43,7 @@ func NewManager(config *spookysecretstypes.SecretsConfig) (*Manager, error) {
 	if globalKeysPath == "" {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			return nil, &spookysecretstypes.SecretsError{
+			return nil, &spookytypessecrets.SecretsError{
 				Operation: "get_home_directory",
 				Cause:     err,
 			}
@@ -72,7 +73,7 @@ func NewManager(config *spookysecretstypes.SecretsConfig) (*Manager, error) {
 }
 
 // EncryptVariable encrypts a variable value
-func (m *Manager) EncryptVariable(name string, value string, recipients []string) (*spookysecretstypes.EncryptedValue, error) {
+func (m *Manager) EncryptVariable(name string, value string, recipients []string) (*spookytypessecrets.EncryptedValue, error) {
 	m.logger.Info("Encrypting variable", spookylogging.String("name", name))
 
 	// Use default recipients if none provided
@@ -82,7 +83,7 @@ func (m *Manager) EncryptVariable(name string, value string, recipients []string
 
 	// Validate recipients
 	if len(recipients) == 0 {
-		return nil, &spookysecretstypes.SecretsError{
+		return nil, &spookytypessecrets.SecretsError{
 			Operation: "validate_recipients",
 			Cause:     fmt.Errorf("no recipients specified"),
 		}
@@ -91,7 +92,7 @@ func (m *Manager) EncryptVariable(name string, value string, recipients []string
 	// Encrypt the value
 	encrypted, err := m.ageClient.Encrypt([]byte(value), recipients)
 	if err != nil {
-		return nil, &spookysecretstypes.SecretsError{
+		return nil, &spookytypessecrets.SecretsError{
 			Operation: "encrypt_variable",
 			Cause:     err,
 			Context: map[string]interface{}{
@@ -105,12 +106,12 @@ func (m *Manager) EncryptVariable(name string, value string, recipients []string
 }
 
 // DecryptVariable decrypts a variable value
-func (m *Manager) DecryptVariable(encrypted *spookysecretstypes.EncryptedValue, identity string) (string, error) {
+func (m *Manager) DecryptVariable(encrypted *spookytypessecrets.EncryptedValue, identity string) (string, error) {
 	m.logger.Info("Decrypting variable")
 
 	// Validate identity
 	if identity == "" {
-		return "", &spookysecretstypes.SecretsError{
+		return "", &spookytypessecrets.SecretsError{
 			Operation: "validate_identity",
 			Cause:     fmt.Errorf("no identity specified"),
 		}
@@ -119,7 +120,7 @@ func (m *Manager) DecryptVariable(encrypted *spookysecretstypes.EncryptedValue, 
 	// Decrypt the value
 	decrypted, err := m.ageClient.Decrypt(encrypted, identity)
 	if err != nil {
-		return "", &spookysecretstypes.SecretsError{
+		return "", &spookytypessecrets.SecretsError{
 			Operation: "decrypt_variable",
 			Cause:     err,
 		}
@@ -180,12 +181,12 @@ func (m *Manager) DecryptValue(encryptedValue string, identity string) (string, 
 }
 
 // GetKeyManager returns the key manager
-func (m *Manager) GetKeyManager() KeyManager {
+func (m *Manager) GetKeyManager() *spookysecretskeys.Manager {
 	return m.keyManager
 }
 
 // GetConfig returns the secrets configuration
-func (m *Manager) GetConfig() *spookysecretstypes.SecretsConfig {
+func (m *Manager) GetConfig() *spookytypessecrets.SecretsConfig {
 	return m.config
 }
 
@@ -193,7 +194,7 @@ func (m *Manager) GetConfig() *spookysecretstypes.SecretsConfig {
 func (m *Manager) Validate() error {
 	// Validate algorithm
 	if m.config.Encryption.Algorithm != "age" {
-		return &spookysecretstypes.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "validate_algorithm",
 			Cause:     fmt.Errorf("unsupported algorithm: %s", m.config.Encryption.Algorithm),
 		}
@@ -212,7 +213,7 @@ func (m *Manager) TestEncryption() error {
 	// Get test identity and recipient
 	testIdentity := m.config.Keys.DefaultIdentity
 	if testIdentity == "" {
-		return &spookysecretstypes.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "test_encryption",
 			Cause:     fmt.Errorf("no default identity configured for testing"),
 		}
@@ -220,7 +221,7 @@ func (m *Manager) TestEncryption() error {
 
 	testRecipients := m.config.Keys.DefaultRecipients
 	if len(testRecipients) == 0 {
-		return &spookysecretstypes.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "test_encryption",
 			Cause:     fmt.Errorf("no default recipients configured for testing"),
 		}
@@ -229,7 +230,7 @@ func (m *Manager) TestEncryption() error {
 	// Encrypt test data
 	encrypted, err := m.ageClient.Encrypt([]byte(testData), testRecipients)
 	if err != nil {
-		return &spookysecretstypes.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "test_encrypt",
 			Cause:     err,
 		}
@@ -238,7 +239,7 @@ func (m *Manager) TestEncryption() error {
 	// Decrypt the test data
 	decrypted, err := m.ageClient.Decrypt(encrypted, testIdentity)
 	if err != nil {
-		return &spookysecretstypes.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "test_decrypt",
 			Cause:     err,
 		}
@@ -246,7 +247,7 @@ func (m *Manager) TestEncryption() error {
 
 	// Verify decrypted data matches original
 	if string(decrypted) != testData {
-		return &spookysecretstypes.SecretsError{
+		return &spookytypessecrets.SecretsError{
 			Operation: "test_verify",
 			Cause:     fmt.Errorf("decrypted data does not match original"),
 			Context: map[string]interface{}{
@@ -261,8 +262,8 @@ func (m *Manager) TestEncryption() error {
 }
 
 // GetStatus returns the secrets system status
-func (m *Manager) GetStatus() *spookysecretstypes.SecretsStatus {
-	status := &spookysecretstypes.SecretsStatus{
+func (m *Manager) GetStatus() *spookytypessecrets.SecretsStatus {
+	status := &spookytypessecrets.SecretsStatus{
 		Enabled:      m.config.Enabled,
 		Algorithm:    m.config.Encryption.Algorithm,
 		AuditLogging: m.config.Security.AuditLogging,

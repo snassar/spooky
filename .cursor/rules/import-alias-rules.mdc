@@ -1,0 +1,414 @@
+# Spooky Import Alias Rules
+
+When working with the spooky codebase, always follow the established import alias patterns to maintain consistency and avoid confusion. This rule defines the canonical import alias patterns for all packages.
+
+## Core Import Alias Patterns
+
+### 1. Types Package Aliases
+The `spooky/internal/types/` package uses domain-specific aliases for subpackages:
+
+```go
+// ✅ CORRECT - Domain-specific type aliases
+import (
+    spookytypesactions "spooky/internal/types/actions"
+    spookytypescli "spooky/internal/types/cli"
+    spookytypescommon "spooky/internal/types/common"
+    spookytypesconfig "spooky/internal/types/config"
+    spookytypesfacts "spooky/internal/types/facts"
+    spookytypeslogging "spooky/internal/types/logging"
+    spookytypesmachines "spooky/internal/types/machines"
+    spookytypesproject "spooky/internal/types/project"
+    spookytypesschemas "spooky/internal/types/schemas"
+    spookytypessecrets "spooky/internal/types/secrets"
+    spookytypesssh "spooky/internal/types/ssh"
+    spookytypestemplates "spooky/internal/types/templates"
+    spookytypesvariables "spooky/internal/types/variables"
+)
+```
+
+**Pattern**: `spookytypes<domain>` where `<domain>` is the subpackage name
+
+### 2. Main Types Package Alias
+For unified access to all types, use the main types package:
+
+```go
+// ✅ CORRECT - Unified types access
+import (
+    spookytypes "spooky/internal/types"
+)
+
+// Usage examples
+config := &spookytypes.Config{}
+facts := &spookytypes.FactCollection{}
+machine := &spookytypes.Machine{}
+```
+
+### 3. Internal Package Aliases
+Internal packages use the `spooky<package>` pattern:
+
+```go
+// ✅ CORRECT - Internal package aliases
+import (
+    spookyactions "spooky/internal/actions"
+    spookycli "spooky/internal/cli"
+    spookyconfig "spooky/internal/config"
+    spookycoordinator "spooky/internal/coordinator"
+    spookydependency "spooky/internal/dependency"
+    spookyfacts "spooky/internal/facts"
+    spookyinterfaces "spooky/internal/interfaces"
+    spookylogging "spooky/internal/logging"
+    spookymachines "spooky/internal/machines"
+    spookyproject "spooky/internal/project"
+    spookyschemas "spooky/internal/schemas"
+    spookysecrets "spooky/internal/secrets"
+    spookyssh "spooky/internal/ssh"
+    spookystorage "spooky/internal/storage"
+    spookytemplates "spooky/internal/templates"
+    spookyvariables "spooky/internal/variables"
+)
+```
+
+**Pattern**: `spooky<package>` where `<package>` is the package name
+
+### 4. Subpackage Aliases
+Subpackages within internal packages use the `spooky<package><subpackage>` pattern:
+
+```go
+// ✅ CORRECT - Subpackage aliases
+import (
+    spookyfactscollectors "spooky/internal/facts/collectors"
+    spookyfactscollectorslocal "spooky/internal/facts/collectors/local"
+    spookyfactscollectorsssh "spooky/internal/facts/collectors/ssh"
+    spookyfactscollectorscustom "spooky/internal/facts/collectors/custom"
+    spookyfactsprocessors "spooky/internal/facts/processors"
+    spookysshclient "spooky/internal/ssh/client"
+    spookysshkeys "spooky/internal/ssh/keys"
+    spookysshauthentication "spooky/internal/ssh/authentication"
+    spookysshconnectionpool "spooky/internal/ssh/connection_pool"
+    spookytemplatesengine "spooky/internal/templates/engine"
+    spookytemplatesfunctions "spooky/internal/templates/functions"
+    spookytemplatesvalidation "spooky/internal/templates/validation"
+    spookytemplatessecrets "spooky/internal/templates/secrets"
+    spookyvariablesloading "spooky/internal/variables/loading"
+    spookyvariablesresolution "spooky/internal/variables/resolution"
+    spookyvariablesvalidation "spooky/internal/variables/validation"
+    spookyvariablesimportexport "spooky/internal/variables/importexport"
+    spookyconfigloading "spooky/internal/config/loading"
+    spookyconfigenvironment "spooky/internal/config/environment"
+    spookyconfigvalidation "spooky/internal/config/validation"
+    spookyloggingformatters "spooky/internal/logging/formatters"
+    spookyloggingoutputs "spooky/internal/logging/outputs"
+    spookyloggingbackends "spooky/internal/logging/backends"
+    spookymachinesconnectivity "spooky/internal/machines/connectivity"
+    spookymachinesimportexport "spooky/internal/machines/importexport"
+    spookymachinesvalidation "spooky/internal/machines/validation"
+    spookymachinessecrets "spooky/internal/machines/secrets"
+    spookyclicommands "spooky/internal/cli/commands"
+    spookycliflags "spooky/internal/cli/flags"
+    spookyclihelp "spooky/internal/cli/help"
+    spookyclicompletion "spooky/internal/cli/completion"
+    spookysecretskeys "spooky/internal/secrets/keys"
+    spookysecretsoperations "spooky/internal/secrets/operations"
+    spookystoragebackends "spooky/internal/storage/backends"
+)
+```
+
+**Pattern**: `spooky<package><subpackage>` where `<package>` is the main package and `<subpackage>` is the subdirectory
+
+## Forbidden Import Patterns
+
+### ❌ DO NOT USE - Old Type Aliases
+```go
+// ❌ DEPRECATED - Old type aliases (DO NOT USE)
+import (
+    spookyconfigtypes "spooky/internal/config/types"
+    spookyfactstypes "spooky/internal/facts/types"
+    spookyactionstypes "spooky/internal/actions/types"
+    spookymachinestypes "spooky/internal/machines/types"
+    spookysshtypes "spooky/internal/ssh/types"
+    spookytemplatestypes "spooky/internal/templates/types"
+    spookyvariablestypes "spooky/internal/variables/types"
+)
+```
+
+### ❌ DO NOT USE - Naked Imports
+```go
+// ❌ AVOID - Naked imports (use aliases instead)
+import (
+    "spooky/internal/types"
+    "spooky/internal/interfaces"
+    "spooky/internal/facts"
+)
+```
+
+### ❌ DO NOT USE - Inconsistent Aliases
+```go
+// ❌ AVOID - Inconsistent naming
+import (
+    types "spooky/internal/types"
+    interfaces "spooky/internal/interfaces"
+    facts "spooky/internal/facts"
+)
+```
+
+## Usage Guidelines
+
+### 1. When to Use Domain-Specific Type Aliases
+Use domain-specific aliases when you need types from a specific domain:
+
+```go
+// ✅ When working with facts-specific types
+import (
+    spookytypesfacts "spooky/internal/types/facts"
+)
+
+func ProcessFacts(collection *spookytypesfacts.FactCollection) error {
+    // Use facts-specific types
+    return nil
+}
+```
+
+### 2. When to Use Unified Types Alias
+Use the unified types alias for general type access:
+
+```go
+// ✅ When working with multiple type domains
+import (
+    spookytypes "spooky/internal/types"
+)
+
+func ProcessData(config *spookytypes.Config, facts *spookytypes.FactCollection) error {
+    // Use unified types access
+    return nil
+}
+```
+
+### 3. When to Use Internal Package Aliases
+Use internal package aliases for package functionality:
+
+```go
+// ✅ When using package functionality
+import (
+    spookyinterfaces "spooky/internal/interfaces"
+    spookylogging "spooky/internal/logging"
+)
+
+func NewManager() spookyinterfaces.FactManager {
+    logger := spookylogging.GetLogger()
+    // ...
+}
+```
+
+### 4. When to Use Subpackage Aliases
+Use subpackage aliases for specific functionality:
+
+```go
+// ✅ When using specific subpackage functionality
+import (
+    spookyfactscollectorsssh "spooky/internal/facts/collectors/ssh"
+    spookysshclient "spooky/internal/ssh/client"
+)
+
+func NewSSHCollector() *spookyfactscollectorsssh.Collector {
+    client := spookysshclient.NewClient()
+    // ...
+}
+```
+
+## Import Organization
+
+### Standard Import Order
+Organize imports in the following order:
+
+```go
+import (
+    // 1. Standard library imports
+    "fmt"
+    "io"
+    "time"
+
+    // 2. Third-party imports
+    "github.com/some/package"
+
+    // 3. Internal package imports (alphabetical)
+    spookyactions "spooky/internal/actions"
+    spookyconfig "spooky/internal/config"
+    spookyinterfaces "spooky/internal/interfaces"
+    spookylogging "spooky/internal/logging"
+
+    // 4. Type imports (alphabetical)
+    spookytypes "spooky/internal/types"
+    spookytypesfacts "spooky/internal/types/facts"
+    spookytypesmachines "spooky/internal/types/machines"
+)
+```
+
+### Grouping Guidelines
+- Group imports by type (stdlib, third-party, internal, types)
+- Sort alphabetically within each group
+- Use blank lines to separate groups
+- Keep related imports together
+
+## Common Import Scenarios
+
+### 1. Interface Definitions
+```go
+import (
+    spookyinterfaces "spooky/internal/interfaces"
+    spookytypes "spooky/internal/types"
+)
+
+type FactManager interface {
+    CollectFacts(server string) (*spookytypes.FactCollection, error)
+    ValidateFacts(collection *spookytypes.FactCollection) error
+}
+```
+
+### 2. Implementation Files
+```go
+import (
+    spookyinterfaces "spooky/internal/interfaces"
+    spookylogging "spooky/internal/logging"
+    spookytypes "spooky/internal/types"
+    spookytypesfacts "spooky/internal/types/facts"
+)
+
+type Manager struct {
+    logger spookylogging.Logger
+    config *spookytypes.Config
+}
+```
+
+### 3. Test Files
+```go
+import (
+    "testing"
+
+    spookytypes "spooky/internal/types"
+    spookytypesfacts "spooky/internal/types/facts"
+)
+
+func TestFactCollection(t *testing.T) {
+    collection := &spookytypesfacts.FactCollection{}
+    // ...
+}
+```
+
+### 4. CLI Commands
+```go
+import (
+    spookycli "spooky/internal/cli"
+    spookyinterfaces "spooky/internal/interfaces"
+    spookylogging "spooky/internal/logging"
+    spookytypes "spooky/internal/types"
+)
+
+func NewCommand() spookyinterfaces.Command {
+    // ...
+}
+```
+
+## Migration Guidelines
+
+### From Old Patterns
+When migrating from old import patterns:
+
+1. **Replace old type aliases**:
+   ```go
+   // ❌ OLD
+   import spookyconfigtypes "spooky/internal/config/types"
+   
+   // ✅ NEW
+   import spookytypesconfig "spooky/internal/types/config"
+   ```
+
+2. **Update usage**:
+   ```go
+   // ❌ OLD
+   config := &spookyconfigtypes.Config{}
+   
+   // ✅ NEW
+   config := &spookytypesconfig.Config{}
+   ```
+
+3. **Use unified types when possible**:
+   ```go
+   // ✅ PREFERRED
+   import spookytypes "spooky/internal/types"
+   
+   config := &spookytypes.Config{}
+   ```
+
+## Validation Rules
+
+### 1. Alias Consistency
+- All imports must use the established alias patterns
+- No naked imports of internal packages
+- No inconsistent alias naming
+
+### 2. Type Access
+- Use `spookytypes` for general type access
+- Use domain-specific aliases only when needed
+- Prefer unified types over domain-specific when possible
+
+### 3. Package Organization
+- Group imports by type and sort alphabetically
+- Use blank lines to separate groups
+- Keep related imports together
+
+### 4. Naming Conventions
+- All aliases must start with `spooky`
+- Use lowercase for package names
+- Use camelCase for subpackage names
+- Maintain consistent casing across the codebase
+
+## Enforcement
+
+This rule is enforced through:
+1. **Code review**: All code changes must follow these patterns
+2. **Linting**: Use linters to catch violations
+3. **Documentation**: Keep this rule updated with new patterns
+4. **Examples**: Provide clear examples in code comments
+
+## Integration with Other Rules
+
+This rule works in conjunction with:
+- **Types System**: Aligns with unified types package structure
+- **Interface Architecture**: Supports interface-based design patterns
+- **Development Methods**: Ensures consistent code quality
+- **Terminology**: Uses consistent naming conventions
+
+## Examples
+
+### Complete Import Example
+```go
+package facts
+
+import (
+    "fmt"
+    "time"
+
+    spookyinterfaces "spooky/internal/interfaces"
+    spookylogging "spooky/internal/logging"
+    spookystorage "spooky/internal/storage"
+    spookytypes "spooky/internal/types"
+    spookytypesfacts "spooky/internal/types/facts"
+)
+
+type Manager struct {
+    logger spookylogging.Logger
+    storage spookystorage.FactStorage
+    config *spookytypes.Config
+}
+
+func (m *Manager) CollectFacts(server string) (*spookytypesfacts.FactCollection, error) {
+    // Implementation
+    return nil, nil
+}
+```
+
+This rule ensures consistent, maintainable, and clear import patterns throughout the spooky codebase.
+description:
+globs:
+alwaysApply: false
+---

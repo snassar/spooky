@@ -5,8 +5,8 @@ import (
 	spookytypesschemas "spooky/internal/types/schemas"
 )
 
-// Validator interface defines the core validation functionality
-type Validator interface {
+// SchemaValidator interface defines the core validation functionality
+type SchemaValidator interface {
 	LoadSchema(schemaType spookyschemas.SchemaType) error
 	LoadAllSchemas() error
 	ValidateFile(filePath, schemaName string) *spookyschemas.ValidationResult
@@ -32,10 +32,10 @@ type ValidationReporter interface {
 	GetName() string
 }
 
-// Manager interface defines the schema manager functionality
-type Manager interface {
-	Configure(config *spookyschemas.Config) error
-	GetValidator() Validator
+// SchemaManager interface defines the schema manager functionality
+type SchemaManager interface {
+	Configure(config *spookytypesschemas.Config) error
+	GetValidator() SchemaValidator
 	GetLoader() SchemaLoader
 	GetReporter() ValidationReporter
 	ValidateFile(filePath, schemaName string) *spookyschemas.ValidationResult
@@ -43,21 +43,21 @@ type Manager interface {
 	Close() error
 }
 
-// Loader interface defines schema loading strategies
-type Loader interface {
+// SchemaLoaderAlt interface defines schema loading strategies
+type SchemaLoaderAlt interface {
 	LoadSchema(schemaType spookyschemas.SchemaType) (*spookyschemas.Schema, error)
 	LoadAllSchemas() (map[spookyschemas.SchemaType]*spookyschemas.Schema, error)
 	GetName() string
 }
 
-// Reporter interface defines validation reporting strategies
-type Reporter interface {
+// SchemaReporter interface defines validation reporting strategies
+type SchemaReporter interface {
 	Report(result *spookyschemas.ValidationResult) error
 	GetName() string
 }
 
-// Validator interface defines validation strategies
-type SchemaValidator interface {
+// SchemaValidatorAlt interface defines validation strategies
+type SchemaValidatorAlt interface {
 	Validate(data interface{}, schema *spookytypesschemas.Schema) *spookytypesschemas.ValidationResult
 	GetName() string
 }

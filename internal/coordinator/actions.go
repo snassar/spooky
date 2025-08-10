@@ -6,20 +6,20 @@ import (
 	"time"
 
 	spookyactions "spooky/internal/actions"
-	spookyactionstypes "spooky/internal/actions/types"
-	spookyconfig "spooky/internal/config"
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
+	spookyactionstypes "spooky/internal/types/actions"
+	spookytypeslogging "spooky/internal/types/logging"
 )
 
 // CoordinatorActionsIntegration implements actions system integration
 type CoordinatorActionsIntegration struct {
-	actionsManager spookyactions.ActionManager
-	logger         spookylogging.Logger
+	actionsManager *spookyactions.Manager
+	logger         spookytypeslogging.Logger
 }
 
 // NewCoordinatorActionsIntegration creates a new actions integration
-func NewCoordinatorActionsIntegration(actionsManager spookyactions.ActionManager, logger spookylogging.Logger) *CoordinatorActionsIntegration {
+func NewCoordinatorActionsIntegration(actionsManager *spookyactions.Manager, logger spookytypeslogging.Logger) *CoordinatorActionsIntegration {
 	return &CoordinatorActionsIntegration{
 		actionsManager: actionsManager,
 		logger:         logger,
@@ -27,33 +27,25 @@ func NewCoordinatorActionsIntegration(actionsManager spookyactions.ActionManager
 }
 
 // LoadActions loads actions from the project
-func (ai *CoordinatorActionsIntegration) LoadActions(projectPath string) (*spookyinterfaces.ActionsContext, error) {
-	actionsContext := &spookyinterfaces.ActionsContext{
-		BaseContext: spookyinterfaces.BaseContext{
-			ProjectPath: projectPath,
-			Timestamp:   time.Now(),
-		},
-		Actions: make(map[string]*spookyactionstypes.Action),
+func (ai *CoordinatorActionsIntegration) LoadActions(projectPath string) (*spookyactionstypes.ActionCollection, error) {
+	// Use the actions manager to load actions
+	if ai.actionsManager != nil {
+		return ai.actionsManager.LoadActions(projectPath)
 	}
 
-	// Load actions from project using config parser
-	actionsConfig, err := spookyconfig.LoadActionsConfig(projectPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load actions from project: %w", err)
+	// Fallback: return empty collection
+	collection := &spookyactionstypes.ActionCollection{
+		Actions:   make([]*spookyactionstypes.Action, 0),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Metadata:  make(map[string]interface{}),
 	}
 
-	// Convert config actions to interface actions
-	for i := range actionsConfig.Actions {
-		configAction := &actionsConfig.Actions[i]
-		action := spookyactionstypes.NewAction(configAction)
-		actionsContext.Actions[action.Name] = action
-	}
-
-	ai.logger.Info("Loaded actions from project",
+	ai.logger.Info("Loaded actions from project (fallback)",
 		spookylogging.String("project", projectPath),
-		spookylogging.Int("actions_count", len(actionsContext.Actions)))
+		spookylogging.Int("actions_count", 0))
 
-	return actionsContext, nil
+	return collection, nil
 }
 
 // ValidateAction validates an action using the execution context
@@ -183,9 +175,10 @@ func (ai *CoordinatorActionsIntegration) ExecuteAction(action *spookyactionstype
 	// Create action context for execution
 	actionContext := &spookyactionstypes.ActionContext{
 		ProjectPath: execContext.ProjectPath,
-		// TODO: Convert interface types to concrete types
-		// Facts:     execContext.FactsContext,
-		// Variables: execContext.VariablesContext,
+		// Convert interface types to concrete types for ActionContext
+		// TODO: Implement proper type conversion utilities
+		// Facts:     convertFactsContextToConcrete(execContext.FactsContext),
+		// Variables: convertVariablesContextToConcrete(execContext.VariablesContext),
 	}
 
 	// Execute the action using the actions manager
@@ -206,7 +199,7 @@ func (ai *CoordinatorActionsIntegration) ExecuteAction(action *spookyactionstype
 		}
 
 		// Check execution results
-		if session.Status == spookyactionstypes.ActingStatusFailed {
+		if session.Status == spookyactionstypes.RunStatusFailed {
 			action.State.Status = spookyactionstypes.ActionStatusFailed
 			action.State.LastError = session.Error
 			return fmt.Errorf("action execution failed: %w", session.Error)
@@ -260,9 +253,11 @@ func (ai *CoordinatorActionsIntegration) GetAction(name string) (*spookyactionst
 		}
 
 		// Look up action in loaded context
-		if action, exists := actionsContext.Actions[name]; exists {
-			ai.logger.Debug("Found action in project context", spookylogging.String("action", name))
-			return action, nil
+		for _, action := range actionsContext.Actions {
+			if action.Name == name {
+				ai.logger.Debug("Found action in project context", spookylogging.String("action", name))
+				return action, nil
+			}
 		}
 	}
 

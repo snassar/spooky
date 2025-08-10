@@ -53,7 +53,7 @@ type ConnectivityManager interface {
 	EnableConnectionPooling(enabled bool) error
 
 	// Utility operations
-	GetConnectionStats() *spookytypesmachines.ConnectionStats
+	GetConnectionStats() *spookytypesmachines.IndexMetrics
 	Close() error
 }
 
@@ -74,8 +74,8 @@ type Connection interface {
 	SetRetryAttempts(attempts int) error
 }
 
-// ImportExportManager defines the interface for machine import/export operations
-type ImportExportManager interface {
+// MachineImportExportManager defines the interface for machine import/export operations
+type MachineImportExportManager interface {
 	// Export operations
 	ExportToJSON(w io.Writer, machines []*spookytypesconfig.Machine) error
 	ExportToHCL(w io.Writer, machines []*spookytypesconfig.Machine) error
@@ -116,19 +116,19 @@ type IndexingManager interface {
 
 	// Utility operations
 	RebuildIndex() error
-	GetIndexStats() *spookytypesmachines.IndexStats
+	GetIndexStats() *spookytypesmachines.IndexMetrics
 	Close() error
 }
 
-// ValidationManager defines the interface for machine validation operations
-type ValidationManager interface {
+// MachineValidationManager defines the interface for machine validation operations
+type MachineValidationManager interface {
 	// Core validation operations
 	ValidateMachine(ctx context.Context, machine *spookytypesconfig.Machine) (*spookytypesmachines.ValidationResult, error)
 	ValidateMachines(ctx context.Context, machines []*spookytypesconfig.Machine) ([]*spookytypesmachines.ValidationResult, error)
 	ValidateMachineData(ctx context.Context, machine *spookytypesconfig.Machine) error
 
 	// Validation configuration
-	SetValidationRules(rules *spookytypesmachines.ValidationRules) error
+	SetValidationRules(rules *spookytypesmachines.ValidationConfig) error
 	EnableStrictValidation(strict bool) error
 	SetValidationTimeout(timeout time.Duration) error
 

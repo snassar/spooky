@@ -7,6 +7,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+
+	spookyinterfaces "spooky/internal/interfaces"
 )
 
 // AgeEncryptionProvider implements EncryptionProvider interface
@@ -15,7 +17,7 @@ type AgeEncryptionProvider struct {
 }
 
 // NewAgeEncryptionProvider creates a new age encryption provider
-func NewAgeEncryptionProvider() EncryptionProvider {
+func NewAgeEncryptionProvider() spookyinterfaces.EncryptionProvider {
 	return &AgeEncryptionProvider{
 		algorithm: "age",
 	}
