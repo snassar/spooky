@@ -1,0 +1,233 @@
+---
+description: Configuration management standards and patterns for HCL-based configuration with validation and environment integration
+globs: ["**/*.go", "**/*.hcl"]
+alwaysApply: true
+---
+
+When working with configuration in the spooky codebase, follow established patterns for HCL-based configuration management with proper validation and environment integration.
+
+## Core Configuration Standards
+
+### 1. HCL Configuration
+- **Schema-First Development**: Define HCL schemas before implementation
+- **Configuration Validation**: Use embedded schemas for validation
+- **Type Safety**: Ensure configuration types match schema definitions
+- **Documentation**: Document all configuration options and their purposes
+
+### 2. Environment Management
+- **XDG Standards**: Follow XDG base directory specification
+- **Environment Variables**: Support configuration through environment variables
+- **Configuration Hierarchy**: Support global, project, and local configuration levels
+- **Override Mechanisms**: Provide clear override precedence rules
+
+### 3. Configuration Loading
+- **Validation at Load**: Validate configuration immediately upon loading
+- **Error Handling**: Provide clear error messages for configuration issues
+- **Default Values**: Provide sensible defaults with clear documentation
+- **Configuration Reloading**: Support hot-reload where appropriate
+
+## Implementation Guidelines
+
+When implementing configuration management:
+- Define HCL schemas before writing configuration loading code
+- Implement proper validation using project schemas
+- Support XDG_CONFIG_HOME and environment variables
+- Provide clear error messages for configuration validation failures
+- Include comprehensive logging for configuration operations
+
+When creating configuration files:
+- Use consistent HCL syntax and structure
+- Include validation rules in schemas
+- Provide clear documentation for all options
+- Support both simple and complex configuration scenarios
+- Include examples in configuration documentation
+
+Configuration requirements:
+- All configuration must be validated against schemas
+- Support multiple configuration sources (files, environment, CLI)
+- Provide clear error messages for invalid configuration
+- Include comprehensive logging for debugging
+- Support configuration reloading where appropriate
+
+## Spooky-Specific Requirements
+
+### Project Configuration
+- **project.hcl**: Main project configuration with metadata and settings
+- **Schema Validation**: Use project-directory.hcl schema for validation
+- **Required Fields**: Ensure all required fields are present and valid
+- **Optional Fields**: Provide sensible defaults for optional fields
+
+### Inventory Configuration
+- **machines.hcl**: Machine inventory with connectivity and authentication
+- **Machine Validation**: Validate machine configurations before use
+- **Authentication Methods**: Support multiple authentication methods
+- **Connection Settings**: Include timeout and retry configurations
+
+### Actions Configuration
+- **actions.hcl**: Action definitions with templates and scripts
+- **Action Validation**: Validate action configurations before execution
+- **Template Integration**: Support template-based action definitions
+- **Script Management**: Handle external script files properly
+
+### Variables Configuration
+- **variables.hcl**: Project-level variable definitions
+- **variables/*.hcl**: Modular variable definitions
+- **Variable Resolution**: Implement proper variable resolution order
+- **Dependency Management**: Handle variable dependencies correctly
+
+### Template Configuration
+- **Template Functions**: Configure template functions and helpers
+- **Rendering Options**: Support template rendering configuration
+- **Data Integration**: Configure data sources for templates
+- **Output Formatting**: Support multiple output formats
+
+### CLI Configuration
+- **$XDG_CONFIG_HOME/spooky/spooky.hcl**: CLI-specific configuration
+- **Global Settings**: Support global CLI configuration
+- **Command Overrides**: Allow command-specific configuration
+- **Environment Integration**: Support environment variable overrides
+
+## Configuration Patterns
+
+### Validation Patterns
+```go
+// Configuration validation pattern
+func ValidateConfig(config *Config) error {
+    if config == nil {
+        return fmt.Errorf("configuration cannot be nil")
+    }
+    
+    if err := config.Validate(); err != nil {
+        return fmt.Errorf("configuration validation failed: %w", err)
+    }
+    
+    return nil
+}
+```
+
+### Loading Patterns
+```go
+// Configuration loading pattern
+func LoadConfig(path string) (*Config, error) {
+    data, err := os.ReadFile(path)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read config file: %w", err)
+    }
+    
+    var config Config
+    if err := hcl.Unmarshal(data, &config); err != nil {
+        return nil, fmt.Errorf("failed to parse config: %w", err)
+    }
+    
+    if err := ValidateConfig(&config); err != nil {
+        return nil, fmt.Errorf("config validation failed: %w", err)
+    }
+    
+    return &config, nil
+}
+```
+
+### Environment Integration
+```go
+// Environment variable integration
+func LoadConfigWithEnv(path string) (*Config, error) {
+    config, err := LoadConfig(path)
+    if err != nil {
+        return nil, err
+    }
+    
+    // Override with environment variables
+    if envValue := os.Getenv("SPOOKY_CONFIG_OVERRIDE"); envValue != "" {
+        if err := config.ApplyOverride(envValue); err != nil {
+            return nil, fmt.Errorf("failed to apply environment override: %w", err)
+        }
+    }
+    
+    return config, nil
+}
+```
+
+## Configuration File Examples
+
+### Project Configuration (project.hcl)
+```hcl
+project {
+  name = "my-spooky-project"
+  description = "A sample spooky project"
+  
+  metadata {
+    version = "1.0.0"
+    author = "spooky-user"
+    tags = ["example", "testing"]
+  }
+  
+  settings {
+    parallel_workers = 4
+    timeout_seconds = 300
+    log_level = "info"
+  }
+}
+```
+
+### Machine Inventory (machines.hcl)
+```hcl
+machines {
+  machine "web-server" {
+    hostname = "web.example.com"
+    port = 22
+    user = "admin"
+    
+    authentication {
+      method = "ssh_key"
+      key_path = "~/.ssh/id_rsa"
+    }
+    
+    tags = ["web", "production"]
+  }
+}
+```
+
+### Actions Configuration (actions.hcl)
+```hcl
+actions {
+  action "deploy-web" {
+    description = "Deploy web application"
+    
+    machines = ["web-server"]
+    parallel = true
+    
+    template {
+      source = "templates/deploy.sh.tmpl"
+      destination = "/tmp/deploy.sh"
+      permissions = "0755"
+    }
+    
+    command = "/tmp/deploy.sh"
+  }
+}
+```
+
+## Never Do
+- Use hardcoded configuration values in code
+- Skip configuration validation
+- Ignore environment variable overrides
+- Use inconsistent configuration formats
+- Leave configuration options undocumented
+
+## Always Do
+- Validate all configuration against schemas
+- Support environment variable overrides
+- Provide clear error messages for configuration issues
+- Document all configuration options
+- Use consistent HCL syntax and structure
+- Include comprehensive logging for configuration operations
+- Support configuration reloading where appropriate
+
+## Integration with Other Rules
+
+This rule works in conjunction with:
+- **Interface Architecture**: Use interfaces for configuration management
+- **Error Handling**: Proper error handling for configuration issues
+- **Documentation**: Document all configuration options and examples
+- **Testing**: Test configuration loading and validation
+- **Code Quality**: Ensure configuration code meets quality standards

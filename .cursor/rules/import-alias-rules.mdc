@@ -1,6 +1,40 @@
+---
+description: Import alias patterns and conventions for the spooky codebase
+globs: **/*.go
+alwaysApply: true
+---
+
 # Spooky Import Alias Rules
 
 When working with the spooky codebase, always follow the established import alias patterns to maintain consistency and avoid confusion. This rule defines the canonical import alias patterns for all packages.
+
+## Quick Reference for AI Assistants
+
+### Decision Tree: Which Import Alias to Use?
+
+1. **Are you importing types?**
+   - **Yes** → Use `spookytypes "spooky/internal/types"` for general access
+   - **Need domain-specific types?** → Use `spookytypes<domain>` (e.g., `spookytypesfacts`)
+
+2. **Are you importing internal package functionality?**
+   - **Yes** → Use `spooky<package>` (e.g., `spookyactions`, `spookyconfig`)
+
+3. **Are you importing subpackage functionality?**
+   - **Yes** → Use `spooky<package><subpackage>` (e.g., `spookyfactscollectors`)
+
+### AI Action Items
+
+**ALWAYS DO:**
+- Use `spookytypes` for general type access
+- Use `spooky<package>` for internal packages
+- Use `spooky<package><subpackage>` for subpackages
+- Group imports: stdlib → third-party → internal → types
+- Sort alphabetically within groups
+
+**NEVER DO:**
+- Use naked imports of internal packages
+- Use old type aliases (spookyconfigtypes, etc.)
+- Mix inconsistent alias patterns
 
 ## Core Import Alias Patterns
 
@@ -151,7 +185,7 @@ import (
 )
 ```
 
-## Usage Guidelines
+## AI Usage Guidelines
 
 ### 1. When to Use Domain-Specific Type Aliases
 Use domain-specific aliases when you need types from a specific domain:
@@ -407,8 +441,17 @@ func (m *Manager) CollectFacts(server string) (*spookytypesfacts.FactCollection,
 }
 ```
 
-This rule ensures consistent, maintainable, and clear import patterns throughout the spooky codebase.
-description:
-globs:
-alwaysApply: false
----
+## AI Assistant Checklist
+
+When writing or reviewing code, ensure:
+
+- [ ] All internal package imports use `spooky<package>` pattern
+- [ ] All type imports use `spookytypes` or `spookytypes<domain>`
+- [ ] All subpackage imports use `spooky<package><subpackage>` pattern
+- [ ] No naked imports of internal packages
+- [ ] No old type aliases (spookyconfigtypes, etc.)
+- [ ] Imports are grouped: stdlib → third-party → internal → types
+- [ ] Imports are sorted alphabetically within groups
+- [ ] Blank lines separate import groups
+- [ ] Consistent alias naming throughout the file
+```

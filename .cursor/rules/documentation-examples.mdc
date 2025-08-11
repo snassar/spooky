@@ -1,0 +1,131 @@
+---
+description: Documentation standards and working examples for interfaces, implementations, and features
+globs: ["**/*.go", "**/*.md", "**/*.hcl"]
+alwaysApply: true
+---
+
+When working with the spooky codebase, provide comprehensive documentation and working examples for all interfaces, implementations, and features.
+
+## Core Documentation Standards
+
+### 1. Interface Documentation
+- **Interface Contracts**: Document interface contracts and expected behaviors
+- **Usage Examples**: Provide practical examples of interface usage
+- **Implementation Notes**: Document implementation decisions and trade-offs
+- **Migration Guides**: Document interface changes and migration paths
+
+### 2. Code Documentation
+- **Inline Documentation**: Comprehensive inline documentation for all public APIs
+- **Function Documentation**: Clear documentation for all exported functions
+- **Type Documentation**: Document all public types and their purposes
+- **Package Documentation**: Package-level documentation explaining purpose and usage
+
+### 3. Example Implementation
+- **Working Examples**: Provide working examples for all features
+- **Real-world Scenarios**: Include real-world usage scenarios
+- **Error Handling Examples**: Show proper error handling patterns
+- **Integration Examples**: Demonstrate component integration patterns
+
+## Implementation Guidelines
+
+When documenting interfaces:
+- Document interface contracts and expected behaviors clearly
+- Provide practical examples of interface usage
+- Document implementation decisions and trade-offs
+- Include interface evolution and migration paths
+- Keep documentation updated with interface changes
+
+When creating examples:
+- Provide complete, working code examples
+- Include realistic usage scenarios
+- Demonstrate proper error handling
+- Show how components work together
+- Include performance considerations
+
+Documentation requirements:
+- All public interfaces must be documented
+- Include usage examples for all interfaces
+- Document error handling patterns
+- Provide migration guides for interface changes
+- Keep documentation current with code changes
+
+Interface documentation template:
+```go
+// ManagerInterface provides high-level management operations
+// for system components and integrations.
+//
+// Usage:
+//   manager := NewManager(config)
+//   if err := manager.Initialize(); err != nil {
+//       return err
+//   }
+//
+// Implementation Notes:
+// - Thread-safe for concurrent access
+// - Graceful error handling with context
+// - Automatic resource cleanup
+type ManagerInterface interface {
+    // Initialize sets up the manager with required resources
+    // Returns error if initialization fails
+    Initialize() error
+    
+    // Process handles the main processing logic
+    // data: Input data to process
+    // Returns processed result or error
+    Process(data interfaces.DataInterface) (interfaces.ResultInterface, error)
+}
+```
+
+Example implementation template:
+```go
+// Example usage of ManagerInterface
+func ExampleManagerUsage() {
+    // Create manager instance
+    config := &Config{...}
+    manager := NewManager(config)
+    
+    // Initialize manager
+    if err := manager.Initialize(); err != nil {
+        log.Fatalf("Failed to initialize manager: %v", err)
+    }
+    
+    // Process data
+    data := &MyData{...}
+    result, err := manager.Process(data)
+    if err != nil {
+        log.Printf("Processing failed: %v", err)
+        return
+    }
+    
+    // Use result
+    fmt.Printf("Processing result: %v", result)
+}
+```
+
+Never do:
+- Leave interfaces undocumented
+- Provide non-working examples
+- Skip error handling in examples
+- Use outdated documentation
+- Write unclear or incomplete documentation
+
+Always do:
+- Document all public interfaces
+- Provide working, tested examples
+- Include error handling in examples
+- Keep documentation up-to-date
+- Write clear, comprehensive documentation
+
+## Integration with Other Rules
+
+This rule works in conjunction with:
+- **Interface Architecture**: Document interface contracts and evolution
+- **Development Methods**: Document implementation decisions
+- **Error Handling**: Include error handling examples
+- **Testing**: Provide testable examples
+- **Code Quality**: Ensure documentation quality standards
+- **Interface Architecture**: Document interface contracts and evolution
+- **Development Methods**: Document implementation decisions
+- **Error Handling**: Include error handling examples
+- **Testing**: Provide testable examples
+- **Code Quality**: Ensure documentation quality standards
