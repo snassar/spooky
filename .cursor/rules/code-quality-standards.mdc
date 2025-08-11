@@ -6,7 +6,33 @@ alwaysApply: true
 
 # Code Quality Standards
 
-When working with the spooky codebase, maintain high code quality through comprehensive review gates and measurable metrics. This rule combines review processes with quality thresholds to ensure consistent, maintainable code.
+
+
+## Core Principles
+
+### 1. Interface Implementation Standards
+- **100% interface method implementation** (no stubs or "not implemented" errors)
+- **Zero type compatibility issues** with interface contracts
+- **100% interface method coverage** in tests
+- **Comprehensive error handling coverage** through interfaces
+- **100% public interface documentation** completeness
+
+### 2. Code Quality Metrics
+- **Maximum cyclomatic complexity**: 10 per function
+- **Maximum function size**: 50 lines per function
+- **Test coverage thresholds**:
+  - 75% overall project coverage
+  - 70% per package coverage
+  - 100% interface method coverage
+  - 100% error path coverage
+- **Documentation completeness**: 100% for public interfaces
+
+### 3. Performance Standards
+- **Interface implementations must meet performance benchmarks**
+- **Efficient memory allocation patterns**
+- **Proper resource cleanup and management**
+- **Design for horizontal scaling**
+- **Monitor performance in production-like scenarios**
 
 ## Quick Reference for AI Assistants
 
@@ -206,3 +232,19 @@ When reviewing or writing code, ensure:
 - Clear and complete documentation
 
 **Always apply both review gates and measurable metrics to maintain high code quality across the spooky codebase.**
+
+## Integration with Other Rules
+
+This rule works in conjunction with:
+- **Interface Architecture**: Ensures interface-based design patterns
+- **Interface Definitions**: Validates interface contract compliance
+- **Testing Standards**: Enforces test coverage requirements
+- **Error Handling Standards**: Ensures proper error handling patterns
+- **Development Methods**: Maintains working code standards
+
+### Cross-References
+- **See [Interface Architecture](mdc:interface-architecture)**: For architectural patterns
+- **See [Interface Definitions](mdc:interface-definitions)**: For interface contracts
+- **See [Testing Standards](mdc:testing)**: For testing requirements
+- **See [Error Handling Standards](mdc:error-handling-standards)**: For error patterns
+- **See [Development Methods](mdc:development-methods)**: For development standards

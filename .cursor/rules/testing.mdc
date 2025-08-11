@@ -426,8 +426,30 @@ When writing or reviewing tests, ensure:
 - Maintainable and extensible code
 
 **Always write comprehensive tests that validate both functionality and quality across the spooky codebase.**
-- Use [tests/integration/](mdc:tests/integration/) for SSH integration tests
-- Mock SSH connections for unit tests
-- Test authentication failures and timeouts
-- Validate connection pooling behavior
-- Test SSH command execution and result handling
+
+## Integration with Other Rules
+
+This rule works in conjunction with:
+- **Interface Architecture**: Ensures interface contract testing
+- **Code Quality Standards**: Enforces test coverage requirements
+- **Error Handling Standards**: Tests error handling paths
+- **Development Methods**: Ensures testable implementations
+- **Practical Examples**: Provides testable code examples
+
+### Cross-References
+- **See [Interface Architecture](mdc:interface-architecture)**: For architectural patterns
+- **See [Code Quality Standards](mdc:code-quality-standards)**: For quality requirements
+- **See [Error Handling Standards](mdc:error-handling-standards)**: For error patterns
+- **See [Development Methods](mdc:development-methods)**: For development standards
+- **See [Practical Examples](mdc:practical-examples)**: For implementation examples
+
+## Remember
+
+**Good testing enables:**
+- Reliable and maintainable code
+- Interface contract compliance
+- Performance and scalability validation
+- Error handling robustness
+- Faster development cycles
+
+**Always write comprehensive tests that validate both functionality and quality across the spooky codebase.**

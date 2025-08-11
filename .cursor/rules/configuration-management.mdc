@@ -4,7 +4,41 @@ globs: ["**/*.go", "**/*.hcl"]
 alwaysApply: true
 ---
 
-When working with configuration in the spooky codebase, follow established patterns for HCL-based configuration management with proper validation and environment integration.
+# Configuration Management
+
+## Quick Reference for AI Assistants
+
+### Decision Tree: Which Configuration Pattern to Apply?
+
+1. **Are you defining configuration schemas?**
+   - **Yes** → Use HCL schema-first development
+   - **No** → Continue to step 2
+
+2. **Are you implementing configuration loading?**
+   - **Yes** → Use validation at load patterns
+   - **No** → Continue to step 3
+
+3. **Are you managing environment variables?**
+   - **Yes** → Use XDG standards and environment integration
+   - **No** → Use file-based configuration patterns
+
+### AI Action Items
+
+**ALWAYS DO:**
+- Define HCL schemas before implementation
+- Validate configuration immediately upon loading
+- Support XDG_CONFIG_HOME and environment variables
+- Provide clear error messages for configuration issues
+- Include comprehensive logging for configuration operations
+
+**NEVER DO:**
+- Use hardcoded configuration values in code
+- Skip configuration validation
+- Ignore environment variable overrides
+- Use inconsistent configuration formats
+- Leave configuration options undocumented
+
+## Core Principles
 
 ## Core Configuration Standards
 
@@ -223,6 +257,19 @@ actions {
 - Include comprehensive logging for configuration operations
 - Support configuration reloading where appropriate
 
+## AI Assistant Checklist
+
+When working with configuration, ensure:
+
+- [ ] HCL schemas are defined before implementation
+- [ ] Configuration validation is implemented
+- [ ] Environment variables are supported
+- [ ] Error messages are clear and actionable
+- [ ] Configuration options are documented
+- [ ] HCL syntax is consistent
+- [ ] Logging is comprehensive
+- [ ] Configuration reloading is supported where appropriate
+
 ## Integration with Other Rules
 
 This rule works in conjunction with:
@@ -231,3 +278,21 @@ This rule works in conjunction with:
 - **Documentation**: Document all configuration options and examples
 - **Testing**: Test configuration loading and validation
 - **Code Quality**: Ensure configuration code meets quality standards
+
+### Cross-References
+- **See [Interface Architecture](mdc:interface-architecture)**: For interface-based design patterns
+- **See [Error Handling Standards](mdc:error-handling-standards)**: For error handling patterns
+- **See [Documentation Examples](mdc:documentation-examples)**: For documentation standards
+- **See [Testing Standards](mdc:testing)**: For testing strategies
+- **See [Code Quality Standards](mdc:code-quality-standards)**: For quality requirements
+
+## Remember
+
+**Good configuration management enables:**
+- Consistent and maintainable configuration
+- Environment-specific customization
+- Clear validation and error reporting
+- Flexible deployment scenarios
+- Reduced configuration errors
+
+**Always follow schema-first development and validate all configuration before use.**

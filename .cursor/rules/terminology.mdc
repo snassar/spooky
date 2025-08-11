@@ -192,3 +192,28 @@ When writing or reviewing code, ensure:
 The core concept is that spooky **orchestrates** actions in order to **run** them. The system component responsible for this is an **orchestrator**, not an executor. Actions are **run**, not executed, and the overall process is **action orchestration**.
 
 **Remember: Never use "exec", "execute", or "execution" in any form. Always use the proper terminology that reflects spooky's role as an action orchestrator.**
+
+## Integration with Other Rules
+
+This rule works in conjunction with:
+- **Interface Architecture**: Ensures consistent terminology in interfaces
+- **Development Methods**: Maintains terminology in code development
+- **Documentation Examples**: Ensures consistent documentation terminology
+- **Code Quality Standards**: Maintains terminology quality standards
+
+### Cross-References
+- **See [Interface Architecture](mdc:interface-architecture)**: For architectural patterns
+- **See [Development Methods](mdc:development-methods)**: For development standards
+- **See [Documentation Examples](mdc:documentation-examples)**: For documentation standards
+- **See [Code Quality Standards](mdc:code-quality-standards)**: For quality requirements
+
+## Remember
+
+**Good terminology enables:**
+- Clear and consistent communication
+- Reduced confusion in code and documentation
+- Better understanding of system behavior
+- Maintainable and extensible code
+- Professional and polished codebase
+
+**Always use the correct terminology that reflects spooky's role as an action orchestrator.**

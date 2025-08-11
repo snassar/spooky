@@ -4,47 +4,56 @@ globs: ["**/*.go"]
 alwaysApply: true
 ---
 
-When handling interface errors:
-- **USE structured error types** from internal/interfaces/errors.go
-- **INCLUDE interface and method context** in error messages
-- **PROVIDE specific validation error details** with field information
-- **LOG errors with appropriate levels** and interface context
-- **CONSIDER interface recovery options** when possible
+# Error Handling Standards
 
-When propagating interface errors:
-- **WRAP errors with interface and method context** using fmt.Errorf
-- **PRESERVE original error information** in wrapped errors
-- **ADD interface operation and system context** to error messages
-- **AGGREGATE multiple interface errors** when appropriate
-- **HANDLE errors gracefully** at appropriate interface levels
+## Quick Reference for AI Assistants
 
-Interface error patterns:
-- **USE interfaces.NewValidationError** for validation failures
-- **INCLUDE operation context** in error messages
-- **WRAP errors with fmt.Errorf** for additional context
-- **USE structured logging** with interface error fields
-- **AVOID logging sensitive data** in interface error messages
+### Decision Tree: Which Error Handling Pattern to Apply?
 
-Error handling requirements:
-- **ALL interface methods MUST handle errors properly**
-- **ERROR messages MUST include interface context**
-- **ERROR propagation MUST preserve original errors**
-- **ERROR logging MUST use appropriate levels**
-- **ERROR recovery information MUST be provided** when possible
+1. **Are you handling interface errors?**
+   - **Yes** → Use structured error types with context
+   - **No** → Continue to step 2
 
-NEVER Do:
+2. **Are you propagating errors?**
+   - **Yes** → Wrap errors with context using fmt.Errorf
+   - **No** → Continue to step 3
+
+3. **Are you logging errors?**
+   - **Yes** → Use structured logging with appropriate levels
+   - **No** → Handle errors gracefully at appropriate levels
+
+### AI Action Items
+
+**ALWAYS DO:**
+- Use structured error types from interfaces package
+- Include interface and method context in error messages
+- Provide specific validation error details with field information
+- Log errors with appropriate levels and interface context
+- Handle errors gracefully at appropriate interface levels
+
+**NEVER DO:**
 - Use generic error messages without interface context
 - Ignore or suppress interface errors without proper handling
 - Log sensitive information in interface error messages
 - Use panic() for normal interface error conditions
 - Chain interface errors without proper wrapping
 
-ALWAYS Do:
-- **USE structured error types** from the interfaces package
-- **ADD meaningful interface context** to error messages
-- **HANDLE interface errors gracefully** and appropriately
-- **LOG interface errors with appropriate levels** and context
-- **PROVIDE recovery information** when possible
+## Core Principles
+
+## AI Assistant Checklist
+
+When handling errors, ensure:
+
+- [ ] Structured error types are used from interfaces package
+- [ ] Interface and method context is included in error messages
+- [ ] Validation error details include field information
+- [ ] Errors are logged with appropriate levels and context
+- [ ] Errors are handled gracefully at appropriate levels
+- [ ] Original error information is preserved when wrapping
+- [ ] Sensitive data is not logged in error messages
+- [ ] Panic() is not used for normal error conditions
+- [ ] Error recovery information is provided when possible
+- [ ] All interface methods handle errors properly
 
 ## Integration with Other Rules
 
@@ -54,3 +63,20 @@ This rule works in conjunction with:
 - **Test Coverage**: Test error handling paths and conditions
 - **Logging Standards**: Use appropriate logging for error conditions
 - **Security Standards**: Avoid logging sensitive information
+
+### Cross-References
+- **See [Development Methods](mdc:development-methods)**: For implementation standards
+- **See [Interface Definitions](mdc:interface-definitions)**: For interface contracts
+- **See [Testing Standards](mdc:testing)**: For testing requirements
+- **See [Code Quality Standards](mdc:code-quality-standards)**: For quality requirements
+
+## Remember
+
+**Good error handling enables:**
+- Better debugging and troubleshooting
+- Improved system reliability
+- Clear error reporting and recovery
+- Secure error logging practices
+- Maintainable error handling code
+
+**Always use structured error types with proper context and handle errors gracefully at appropriate levels.**

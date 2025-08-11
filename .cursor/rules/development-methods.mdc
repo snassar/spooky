@@ -4,9 +4,41 @@ globs: ["**/*.go", "**/*.hcl", "**/*.md"]
 alwaysApply: true
 ---
 
-# Development Methods Rule
+# Development Methods
 
-When working with the spooky codebase, ALWAYS prioritize working, functional code over incomplete implementations. NEVER remove working code in favor of placeholders, stubs, or TODOs.
+## Quick Reference for AI Assistants
+
+### Decision Tree: Which Development Approach to Use?
+
+1. **Are you encountering incomplete code?**
+   - **Yes** → Convert to working implementation immediately
+   - **No** → Continue to step 2
+
+2. **Are you refactoring existing code?**
+   - **Yes** → Preserve functionality and test thoroughly
+   - **No** → Continue to step 3
+
+3. **Are you writing new code?**
+   - **Yes** → Implement complete functionality with tests
+   - **No** → Follow established patterns
+
+### AI Action Items
+
+**ALWAYS DO:**
+- Prioritize working, functional code over incomplete implementations
+- Convert placeholders into full implementations immediately
+- Preserve existing behavior when refactoring
+- Implement complete functionality with proper error handling
+- Test all new implementations thoroughly
+
+**NEVER DO:**
+- Remove working code to add placeholders
+- Leave TODO comments without implementing them
+- Create stub functions without implementing them
+- Replace functional code with "not implemented" errors
+- Use panic() for unimplemented features
+
+## Core Principles
 
 ## Core Development Principles
 
@@ -162,3 +194,45 @@ func ValidateConfig(config *Config) error {
 ```
 
 This rule ensures that the spooky codebase maintains high quality, functional code and avoids accumulating technical debt from incomplete implementations.
+
+## AI Assistant Checklist
+
+When following development methods, ensure:
+
+- [ ] Working code is never removed for placeholders
+- [ ] Incomplete implementations are converted to working code
+- [ ] All TODO items are implemented and removed
+- [ ] Stub functions are fully implemented
+- [ ] FIXME comments are addressed with solutions
+- [ ] Existing functionality is preserved during refactoring
+- [ ] All new code includes proper error handling
+- [ ] All new implementations are tested
+- [ ] Documentation is updated for new features
+- [ ] Established patterns are followed
+
+## Integration with Other Rules
+
+This rule works in conjunction with:
+- **Code Quality Standards**: Ensures implementations meet quality requirements
+- **Interface Architecture**: Maintains interface-based design patterns
+- **Testing Standards**: Enforces testing requirements for new code
+- **Error Handling Standards**: Ensures proper error handling patterns
+- **Documentation Examples**: Maintains documentation standards
+
+### Cross-References
+- **See [Code Quality Standards](mdc:code-quality-standards)**: For quality requirements
+- **See [Interface Architecture](mdc:interface-architecture)**: For architectural patterns
+- **See [Testing Standards](mdc:testing)**: For testing requirements
+- **See [Error Handling Standards](mdc:error-handling-standards)**: For error patterns
+- **See [Documentation Examples](mdc:documentation-examples)**: For documentation standards
+
+## Remember
+
+**Good development methods enable:**
+- Maintainable and extensible code
+- Reduced technical debt
+- Consistent code quality
+- Faster development cycles
+- Reliable system behavior
+
+**Always prioritize working code and complete implementations over placeholders and stubs.**

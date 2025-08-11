@@ -412,6 +412,23 @@ This rule works in conjunction with:
 - **Development Methods**: Ensures consistent code quality
 - **Terminology**: Uses consistent naming conventions
 
+### Cross-References
+- **See [Types System](mdc:types)**: For type package structure
+- **See [Interface Architecture](mdc:interface-architecture)**: For architectural patterns
+- **See [Development Methods](mdc:development-methods)**: For development standards
+- **See [Code Quality Standards](mdc:code-quality-standards)**: For quality requirements
+
+## Remember
+
+**Good import aliases enable:**
+- Consistent and maintainable code
+- Clear package dependencies
+- Reduced import confusion
+- Better code organization
+- Easier refactoring and maintenance
+
+**Always follow established import alias patterns to maintain consistency across the spooky codebase.**
+
 ## Examples
 
 ### Complete Import Example

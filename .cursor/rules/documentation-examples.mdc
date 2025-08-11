@@ -4,7 +4,41 @@ globs: ["**/*.go", "**/*.md", "**/*.hcl"]
 alwaysApply: true
 ---
 
-When working with the spooky codebase, provide comprehensive documentation and working examples for all interfaces, implementations, and features.
+# Documentation Examples
+
+## Quick Reference for AI Assistants
+
+### Decision Tree: Which Documentation Pattern to Apply?
+
+1. **Are you documenting interfaces?**
+   - **Yes** → Use interface documentation templates
+   - **No** → Continue to step 2
+
+2. **Are you creating code examples?**
+   - **Yes** → Use working example templates
+   - **No** → Continue to step 3
+
+3. **Are you writing package documentation?**
+   - **Yes** → Use package documentation patterns
+   - **No** → Use general documentation standards
+
+### AI Action Items
+
+**ALWAYS DO:**
+- Document all public interfaces completely
+- Provide working, tested examples
+- Include error handling in examples
+- Keep documentation up-to-date
+- Write clear, comprehensive documentation
+
+**NEVER DO:**
+- Leave interfaces undocumented
+- Provide non-working examples
+- Skip error handling in examples
+- Use outdated documentation
+- Write unclear or incomplete documentation
+
+## Core Principles
 
 ## Core Documentation Standards
 
@@ -116,6 +150,21 @@ Always do:
 - Keep documentation up-to-date
 - Write clear, comprehensive documentation
 
+## AI Assistant Checklist
+
+When creating documentation, ensure:
+
+- [ ] All public interfaces are documented completely
+- [ ] Working, tested examples are provided
+- [ ] Error handling is included in examples
+- [ ] Documentation is kept up-to-date
+- [ ] Clear and comprehensive documentation is written
+- [ ] Interface contracts are documented
+- [ ] Implementation decisions are documented
+- [ ] Migration guides are provided for changes
+- [ ] Examples demonstrate real-world usage
+- [ ] Documentation follows established templates
+
 ## Integration with Other Rules
 
 This rule works in conjunction with:
@@ -124,8 +173,21 @@ This rule works in conjunction with:
 - **Error Handling**: Include error handling examples
 - **Testing**: Provide testable examples
 - **Code Quality**: Ensure documentation quality standards
-- **Interface Architecture**: Document interface contracts and evolution
-- **Development Methods**: Document implementation decisions
-- **Error Handling**: Include error handling examples
-- **Testing**: Provide testable examples
-- **Code Quality**: Ensure documentation quality standards
+
+### Cross-References
+- **See [Interface Architecture](mdc:interface-architecture)**: For architectural patterns
+- **See [Development Methods](mdc:development-methods)**: For implementation decisions
+- **See [Error Handling Standards](mdc:error-handling-standards)**: For error patterns
+- **See [Testing Standards](mdc:testing)**: For testing strategies
+- **See [Code Quality Standards](mdc:code-quality-standards)**: For quality requirements
+
+## Remember
+
+**Good documentation enables:**
+- Faster development and implementation
+- Better understanding of system behavior
+- Reduced debugging time
+- Improved code quality and maintainability
+- Easier onboarding for new developers
+
+**Always provide comprehensive documentation with working examples for all public interfaces and features.**

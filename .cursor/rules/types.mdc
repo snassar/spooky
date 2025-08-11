@@ -4,9 +4,41 @@ globs: ["internal/**/*.go"]
 alwaysApply: true
 ---
 
-# Spooky Types System Architecture
+# Types System
 
-When working with the spooky codebase, always consider the types defined in `./internal/types/` as the foundational data structures and domain models. The types system provides a unified, type-safe foundation for all spooky operations and must be respected in all implementations.
+## Quick Reference for AI Assistants
+
+### Decision Tree: Which Type Pattern to Apply?
+
+1. **Are you defining new types?**
+   - **Yes** → Place in appropriate domain subpackage
+   - **No** → Continue to step 2
+
+2. **Are you using types across domains?**
+   - **Yes** → Use common types from common/ package
+   - **No** → Continue to step 3
+
+3. **Are you importing types?**
+   - **Yes** → Use spookytypes for unified access
+   - **No** → Use domain-specific imports when needed
+
+### AI Action Items
+
+**ALWAYS DO:**
+- Place new types in appropriate domain subpackages
+- Use common types as building blocks
+- Follow established composition patterns
+- Maintain domain separation and boundaries
+- Use consistent import alias patterns
+
+**NEVER DO:**
+- Create types outside the types package structure
+- Duplicate common type functionality
+- Mix types from different domains inappropriately
+- Ignore established composition patterns
+- Use inconsistent import aliases
+
+## Core Principles
 
 ## Core Types Architecture
 
@@ -203,3 +235,45 @@ The types system works closely with the interfaces system:
 For all terminology requirements, refer to `@terminology.mdc`.
 
 This rule ensures consistent type definitions and maintainable code by enforcing type system patterns and conventions throughout the spooky codebase.
+
+## AI Assistant Checklist
+
+When working with types, ensure:
+
+- [ ] New types are placed in appropriate domain subpackages
+- [ ] Common types are used as building blocks
+- [ ] Established composition patterns are followed
+- [ ] Domain separation and boundaries are maintained
+- [ ] Consistent import alias patterns are used
+- [ ] Types are properly validated before use
+- [ ] Error types include context and operation information
+- [ ] HCL tags are used for serialization/deserialization
+- [ ] Types support encryption when needed
+- [ ] Documentation is clear and comprehensive
+
+## Integration with Other Rules
+
+This rule works in conjunction with:
+- **Interface Architecture**: Types must satisfy interface contracts
+- **Import Alias Rules**: Ensures consistent import patterns
+- **Code Quality Standards**: Maintains type safety and quality
+- **Error Handling Standards**: Aligns with error type patterns
+- **Configuration Management**: Supports configuration type patterns
+
+### Cross-References
+- **See [Interface Architecture](mdc:interface-architecture)**: For interface contracts
+- **See [Import Alias Rules](mdc:import-alias-rules)**: For import patterns
+- **See [Code Quality Standards](mdc:code-quality-standards)**: For quality requirements
+- **See [Error Handling Standards](mdc:error-handling-standards)**: For error patterns
+- **See [Configuration Management](mdc:configuration-management)**: For configuration patterns
+
+## Remember
+
+**Good type systems enable:**
+- Type-safe and maintainable code
+- Clear domain boundaries and responsibilities
+- Consistent data structures across the system
+- Flexible and extensible architectures
+- Reduced runtime errors and bugs
+
+**Always follow established type system patterns and maintain clear domain separation.**
