@@ -1,6 +1,6 @@
 {
     "makefile.configureOnOpen": false,
-    "terminal.integrated.shell.linux": "/bin/fish",
+    "terminal.integrated.shell.linux": "/bin/bash",
     "go.lintTool": "golangci-lint",
     "go.lintFlags": ["--fast"],
     "go.lintOnSave": "package",
