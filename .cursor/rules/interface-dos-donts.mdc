@@ -247,3 +247,19 @@ When writing or reviewing code, ensure:
 - Maintainable and extensible code
 
 **Never sacrifice interface-based architecture for quick compilation fixes. Always fix the root cause while maintaining the interface contracts.**
+
+## Integration with Other Rules
+
+This rule works in conjunction with:
+- **Interface Architecture**: Ensures interface-based design patterns
+- **Interface Definitions**: Validates interface contract compliance
+- **Development Methods**: Maintains working code standards
+- **Code Quality Standards**: Ensures interface implementation quality
+- **Error Handling Standards**: Uses interface-based error types
+
+### Cross-References
+- **See [Interface Architecture](mdc:interface-architecture)**: For architectural patterns
+- **See [Interface Definitions](mdc:interface-definitions)**: For interface contracts
+- **See [Development Methods](mdc:development-methods)**: For implementation standards
+- **See [Code Quality Standards](mdc:code-quality-standards)**: For quality requirements
+- **See [Error Handling Standards](mdc:error-handling-standards)**: For error patterns

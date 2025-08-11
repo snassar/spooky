@@ -1,6 +1,6 @@
 ---
-description:
-globs:
+description: Template for creating new cursor rules
+globs: **/*.mdc
 alwaysApply: false
 ---
 

@@ -1,64 +1,249 @@
 ---
-description: This rule explains how to create new .mdc project rule files for the Cursor agent.
-globs: 
+description: Guidelines for creating and managing cursor rules in the spooky codebase
+globs: **/*.mdc
 alwaysApply: true
 ---
 
-# Cursor Rules Location
+# Cursor Rules Management
 
-How to add new cursor rules to the project
+When working with cursor rules in the spooky codebase, follow established patterns for creating, organizing, and maintaining rule files. This rule defines the standards for cursor rule management and file organization.
 
-1. Always place rule files in PROJECT_ROOT/.cursor/rules/:
-    ```
-    .cursor/rules/
-    ├── your-rule-name.mdc
-    ├── another-rule.mdc
-    └── ...
-    ```
+## Quick Reference for AI Assistants
 
-2. Follow the naming convention:
-    - Use kebab-case for filenames
-    - Always use .mdc extension
-    - Make names descriptive of the rule's purpose
+### Decision Tree: Which Rule Management Pattern to Apply?
 
-3. Directory structure:
-    ```
-    PROJECT_ROOT/
-    ├── .cursor/
-    │   └── rules/
-    │       ├── your-rule-name.mdc
-    │       └── ...
-    └── ...
-    ```
+1. **Are you creating a new cursor rule?**
+   - **Yes** → Use standardized rule structure and proper file location
+   - **No** → Continue to step 2
 
-4. Never place rule files:
-    - In the project root
-    - In subdirectories outside .cursor/rules
-    - In any other location
+2. **Are you organizing existing rules?**
+   - **Yes** → Follow file naming and directory structure standards
+   - **No** → Continue to step 3
 
-5. Cursor rules have the following structure:
+3. **Are you updating rule content?**
+   - **Yes** → Maintain standardized structure and cross-references
+   - **No** → Follow general rule management patterns
 
+### AI Action Items
+
+**ALWAYS DO:**
+- Place rules in `.cursor/rules/` directory
+- Use kebab-case for filenames with `.mdc` extension
+- Follow standardized rule structure
+- Include proper frontmatter with description and globs
+- Cross-reference related rules
+
+**NEVER DO:**
+- Place rules outside `.cursor/rules/` directory
+- Use inconsistent naming conventions
+- Create rules without standardized structure
+- Skip cross-references to related rules
+- Use unclear or incomplete descriptions
+
+## Core Principles
+
+### 1. File Organization Standards
+- **Location**: All rules must be placed in `PROJECT_ROOT/.cursor/rules/`
+- **Naming**: Use kebab-case for filenames (e.g., `interface-architecture.mdc`)
+- **Extension**: Always use `.mdc` extension for rule files
+- **Descriptive Names**: Make filenames descriptive of the rule's purpose
+
+### 2. Rule Structure Standards
+- **Standardized Format**: All rules must follow the established template structure
+- **Frontmatter**: Include proper description, globs, and alwaysApply settings
+- **Sections**: Include Quick Reference, AI Action Items, Core Principles, Implementation Guidelines, Examples, AI Assistant Checklist, Integration with Other Rules, and Remember sections
+- **Cross-References**: Maintain proper links to related rules
+
+### 3. Content Quality Standards
+- **Clear Purpose**: Each rule should have a clear, focused purpose
+- **Practical Examples**: Include both good and bad examples
+- **AI-Friendly**: Provide decision trees and action items for AI assistants
+- **Comprehensive Coverage**: Ensure rules cover all necessary scenarios
+
+## Implementation Guidelines
+
+### When Creating New Rules:
+
+1. **Use Template Structure**
+   - Follow the standardized template from `./docs/00-rule-template.mdc`
+   - Include all required sections
+   - Use consistent formatting and structure
+
+2. **File Naming and Location**
+   ```bash
+   # ✅ CORRECT
+   .cursor/rules/my-new-rule.mdc
+   
+   # ❌ WRONG
+   .cursor/rules/myNewRule.mdc
+   .cursor/rules/my_new_rule.md
+   .cursor/my-new-rule.mdc
+   ```
+
+3. **Frontmatter Requirements**
+   ```yaml
+   ---
+   description: Clear description of the rule's purpose
+   globs: appropriate/path/pattern/**/*
+   alwaysApply: true/false
+   ---
+   ```
+
+4. **Content Organization**
+   - Start with Quick Reference for AI Assistants
+   - Include decision tree for pattern selection
+   - Provide clear AI Action Items
+   - Organize content into logical sections
+   - Include practical examples
+   - Add AI Assistant Checklist
+   - Include Integration with Other Rules
+   - End with Remember section
+
+### When Organizing Existing Rules:
+
+1. **File Naming Consistency**
+   - Ensure all files use kebab-case
+   - Use descriptive names that reflect content
+   - Maintain consistent `.mdc` extension
+
+2. **Directory Structure**
+   ```
+   .cursor/rules/
+   ├── code-quality-standards.mdc
+   ├── configuration-management.mdc
+   ├── development-methods.mdc
+   ├── documentation-examples.mdc
+   ├── error-handling-standards.mdc
+   ├── import-alias-rules.mdc
+   ├── interface-architecture.mdc
+   ├── interface-definitions.mdc
+   ├── interface-dos-donts.mdc
+   ├── practical-examples.mdc
+   ├── rules.mdc
+   ├── terminology.mdc
+   ├── testing.mdc
+   ├── troubleshooting-debugging.mdc
+   └── types.mdc
+   ```
+
+3. **Cross-Reference Maintenance**
+   - Keep cross-references up-to-date
+   - Ensure all related rules are properly linked
+   - Use consistent cross-reference format
+
+## Examples
+
+### Good Rule Creation
+```markdown
+---
+description: Guidelines for implementing caching patterns in the spooky codebase
+globs: ["internal/**/*.go", "internal/**/*_cache.go"]
+alwaysApply: true
+---
+
+# Caching Patterns
+
+## Quick Reference for AI Assistants
+
+### Decision Tree: Which Caching Pattern to Apply?
+
+1. **Are you implementing data caching?**
+   - **Yes** → Use structured caching with TTL
+   - **No** → Continue to step 2
+
+### AI Action Items
+
+**ALWAYS DO:**
+- Use structured caching with TTL
+- Implement cache invalidation
+- Handle cache misses gracefully
+
+**NEVER DO:**
+- Cache sensitive data without encryption
+- Skip cache invalidation
+- Use unbounded cache sizes
+
+## Core Principles
+...
 ```
----
-description: Short description of the rule's purpose
-globs: optional/path/pattern/**/* 
-alwaysApply: false
----
-# Rule Title
 
-Main content explaining the rule with markdown formatting.
+### Bad Rule Creation
+```markdown
+# Caching
 
-1. Step-by-step instructions
-2. Code examples
-3. Guidelines
+Some caching guidelines.
 
-Example:
-```typescript
-// Good example
-function goodExample() {
-  // Implementation following guidelines
-}
+- Cache data
+- Don't cache everything
+- Use TTL
 
+More content here.
+```
+
+### Good File Organization
+```bash
+# ✅ CORRECT - Proper naming and location
+.cursor/rules/caching-patterns.mdc
+.cursor/rules/performance-optimization.mdc
+.cursor/rules/security-guidelines.mdc
+
+# ❌ WRONG - Inconsistent naming and location
+.cursor/rules/cachingPatterns.mdc
+.cursor/rules/performance_optimization.md
+.cursor/security-guidelines.mdc
+```
+
+### Bad File Organization
+```bash
+# ❌ WRONG - Inconsistent naming and wrong location
+.cursor/rules/cachingPatterns.mdc
+.cursor/rules/performance_optimization.md
+.cursor/security-guidelines.mdc
+```
+
+## AI Assistant Checklist
+
+When creating or managing cursor rules, ensure:
+
+- [ ] Rule is placed in `.cursor/rules/` directory
+- [ ] Filename uses kebab-case with `.mdc` extension
+- [ ] Frontmatter includes description, globs, and alwaysApply
+- [ ] Rule follows standardized structure
+- [ ] Quick Reference section is included
+- [ ] AI Action Items are clearly defined
+- [ ] Core Principles are documented
+- [ ] Implementation Guidelines are provided
+- [ ] Practical examples are included
+- [ ] AI Assistant Checklist is present
+- [ ] Integration with Other Rules is documented
+- [ ] Cross-references are maintained
+- [ ] Remember section is included
+- [ ] Rule content is under 500 lines
+- [ ] Examples are realistic and actionable
+
+## Integration with Other Rules
+
+This rule works in conjunction with:
+- **Code Quality Standards**: Ensures rule quality and consistency
+- **Documentation Examples**: Maintains documentation standards
+- **Development Methods**: Follows established development patterns
+- **Interface Architecture**: Maintains architectural consistency
+
+### Cross-References
+- **See [Code Quality Standards](mdc:code-quality-standards)**: For quality requirements
+- **See [Documentation Examples](mdc:documentation-examples)**: For documentation standards
+- **See [Development Methods](mdc:development-methods)**: For development standards
+- **See [Interface Architecture](mdc:interface-architecture)**: For architectural patterns
+
+## Remember
+
+**Good cursor rule management enables:**
+- Consistent development practices across the codebase
+- Clear guidance for AI assistants and developers
+- Maintainable and organized rule structure
+- Quality assurance through standardized patterns
+
+**Always follow established cursor rule management patterns to maintain consistency and quality across the spooky codebase.**
 // Bad example
 function badExample() {
   // Implementation not following guidelines
