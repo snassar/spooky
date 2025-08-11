@@ -1,151 +1,142 @@
+// Package common provides foundational types used across multiple domains in the spooky codebase.
+// These types serve as building blocks for domain-specific types and ensure consistency
+// in data structures throughout the system.
 package common
 
 import (
 	"time"
 )
 
-// EncryptionMetadata contains information about encryption
-// Used across secrets, facts, variables, and other encrypted data
-type EncryptionMetadata struct {
-	EncryptedAt       string   `json:"encrypted_at"`
-	EncryptionVersion string   `json:"encryption_version"`
-	Recipients        []string `json:"recipients"`
-	Algorithm         string   `json:"algorithm,omitempty"`
-}
-
-// TimestampedEntity provides common timestamp fields
-// Used across all entities that need creation/update tracking
+// TimestampedEntity provides creation and update tracking for entities
 type TimestampedEntity struct {
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	CreatedAt time.Time `json:"created_at" hcl:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" hcl:"updated_at"`
 }
 
-// NamedEntity provides common name and description fields
-// Used across actions, templates, variables, etc.
+// NamedEntity provides name and description fields for entities
 type NamedEntity struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
+	Name        string `json:"name" hcl:"name"`
+	Description string `json:"description,omitempty" hcl:"description,optional"`
 }
 
-// MetadataEntity provides common metadata fields
-// Used across all entities that need additional metadata
+// MetadataEntity provides tags and metadata support for entities
 type MetadataEntity struct {
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
-	Tags     []string               `json:"tags,omitempty"`
+	Tags        []string          `json:"tags,omitempty" hcl:"tags,optional"`
+	Metadata    map[string]string `json:"metadata,omitempty" hcl:"metadata,optional"`
+	Labels      map[string]string `json:"labels,omitempty" hcl:"labels,optional"`
+	Annotations map[string]string `json:"annotations,omitempty" hcl:"annotations,optional"`
 }
 
-// ValidationEntity provides common validation fields
-// Used across configurable entities that need validation
+// ValidationEntity provides validation state and results for entities
 type ValidationEntity struct {
-	Validated   bool      `json:"validated"`
-	ValidatedAt time.Time `json:"validated_at,omitempty"`
-	Errors      []string  `json:"errors,omitempty"`
-	Warnings    []string  `json:"warnings,omitempty"`
+	ValidatedAt time.Time         `json:"validated_at,omitempty" hcl:"validated_at,optional"`
+	Valid       bool              `json:"valid" hcl:"valid"`
+	Errors      []ValidationError `json:"errors,omitempty" hcl:"errors,optional"`
+	Warnings    []ValidationError `json:"warnings,omitempty" hcl:"warnings,optional"`
 }
 
-// StatusEntity provides common status tracking
-// Used across entities that have operational status
+// ValidationError represents a validation error with context
+type ValidationError struct {
+	Field   string      `json:"field" hcl:"field"`
+	Message string      `json:"message" hcl:"message"`
+	Code    string      `json:"code,omitempty" hcl:"code,optional"`
+	Value   interface{} `json:"value,omitempty" hcl:"value,optional"`
+}
+
+// StatusEntity provides operational status tracking for entities
 type StatusEntity struct {
-	Status   string    `json:"status"`
-	StatusAt time.Time `json:"status_at"`
-	Message  string    `json:"message,omitempty"`
-	Details  string    `json:"details,omitempty"`
+	Status    string    `json:"status" hcl:"status"`
+	StatusAt  time.Time `json:"status_at" hcl:"status_at"`
+	StatusMsg string    `json:"status_msg,omitempty" hcl:"status_msg,optional"`
 }
 
-// CompleteEntity combines all common entity types
-// Used for entities that need all common functionality
+// CompleteEntity combines all common entity types for comprehensive entities
 type CompleteEntity struct {
-	NamedEntity
 	TimestampedEntity
+	NamedEntity
 	MetadataEntity
 	ValidationEntity
 	StatusEntity
 }
 
-// ErrorDetails provides common error information
-// Used across all error types for consistent error reporting
+// ErrorDetails provides structured error information with context and stack traces
 type ErrorDetails struct {
-	Code        string                 `json:"code"`
-	Message     string                 `json:"message"`
-	Operation   string                 `json:"operation"`
-	Context     map[string]interface{} `json:"context,omitempty"`
-	Timestamp   time.Time              `json:"timestamp"`
-	Stack       []string               `json:"stack,omitempty"`
-	Recoverable bool                   `json:"recoverable"`
+	Code        string                 `json:"code" hcl:"code"`
+	Message     string                 `json:"message" hcl:"message"`
+	Context     map[string]interface{} `json:"context,omitempty" hcl:"context,optional"`
+	Stack       []string               `json:"stack,omitempty" hcl:"stack,optional"`
+	Recoverable bool                   `json:"recoverable" hcl:"recoverable"`
+	Timestamp   time.Time              `json:"timestamp" hcl:"timestamp"`
 }
 
-// ExportOptions provides common export configuration
-// Used across facts, variables, machines, etc. for data export
+// ExportOptions provides configuration for data export operations
 type ExportOptions struct {
-	Format      string            `json:"format"`       // "json", "hcl", "yaml"
-	Compress    bool              `json:"compress"`     // Whether to compress output
-	IncludeMeta bool              `json:"include_meta"` // Include metadata
-	Filter      map[string]string `json:"filter"`       // Filter criteria
-	SortBy      string            `json:"sort_by"`      // Sort field
-	SortOrder   string            `json:"sort_order"`   // "asc" or "desc"
-	Limit       int               `json:"limit"`        // Limit results
-	Offset      int               `json:"offset"`       // Offset for pagination
-	Encrypt     bool              `json:"encrypt"`      // Whether to encrypt sensitive data
-	Recipients  []string          `json:"recipients"`   // Encryption recipients
+	Format      string            `json:"format" hcl:"format"`
+	Compression string            `json:"compression,omitempty" hcl:"compression,optional"`
+	Encryption  EncryptionOptions `json:"encryption,omitempty" hcl:"encryption,optional"`
+	Filter      map[string]string `json:"filter,omitempty" hcl:"filter,optional"`
+	Include     []string          `json:"include,omitempty" hcl:"include,optional"`
+	Exclude     []string          `json:"exclude,omitempty" hcl:"exclude,optional"`
 }
 
-// ImportOptions provides common import configuration
-// Used across facts, variables, machines, etc. for data import
+// EncryptionOptions provides encryption configuration
+type EncryptionOptions struct {
+	Enabled    bool     `json:"enabled" hcl:"enabled"`
+	Algorithm  string   `json:"algorithm" hcl:"algorithm"`
+	Recipients []string `json:"recipients,omitempty" hcl:"recipients,optional"`
+	KeyFile    string   `json:"key_file,omitempty" hcl:"key_file,optional"`
+}
+
+// ImportOptions provides configuration for data import operations
 type ImportOptions struct {
-	Format     string            `json:"format"`      // "json", "hcl", "yaml"
-	Validate   bool              `json:"validate"`    // Validate imported data
-	Overwrite  bool              `json:"overwrite"`   // Overwrite existing data
-	Merge      bool              `json:"merge"`       // Merge with existing data
-	Decrypt    bool              `json:"decrypt"`     // Decrypt encrypted data
-	Identity   string            `json:"identity"`    // Decryption identity
-	Transform  map[string]string `json:"transform"`   // Field transformations
-	SkipErrors bool              `json:"skip_errors"` // Skip import errors
-	DryRun     bool              `json:"dry_run"`     // Preview import without applying
+	Format      string            `json:"format" hcl:"format"`
+	Compression string            `json:"compression,omitempty" hcl:"compression,optional"`
+	Encryption  EncryptionOptions `json:"encryption,omitempty" hcl:"encryption,optional"`
+	Validate    bool              `json:"validate" hcl:"validate"`
+	Overwrite   bool              `json:"overwrite" hcl:"overwrite"`
+	DryRun      bool              `json:"dry_run" hcl:"dry_run"`
 }
 
-// TimeRange provides common time range filtering
-// Used across facts, logs, actions, etc. for time-based queries
-type TimeRange struct {
-	Start time.Time `json:"start"`
-	End   time.Time `json:"end"`
-}
-
-// Pagination provides common pagination support
-// Used across all list operations for consistent pagination
-type Pagination struct {
-	Page     int `json:"page"`
-	PageSize int `json:"page_size"`
-	Total    int `json:"total"`
-	Pages    int `json:"pages"`
-}
-
-// Query provides common query parameters
-// Used across all search and filter operations
+// Query provides standardized query structure for data operations
 type Query struct {
-	Search     string            `json:"search"`     // Text search
-	Filters    map[string]string `json:"filters"`    // Field filters
-	SortBy     string            `json:"sort_by"`    // Sort field
-	SortOrder  string            `json:"sort_order"` // Sort direction
-	TimeRange  *TimeRange        `json:"time_range"` // Time filtering
-	Pagination *Pagination       `json:"pagination"` // Pagination
-	Limit      int               `json:"limit"`      // Result limit
-	Offset     int               `json:"offset"`     // Result offset
+	Filters    map[string]interface{} `json:"filters,omitempty" hcl:"filters,optional"`
+	Sort       []SortField            `json:"sort,omitempty" hcl:"sort,optional"`
+	Pagination Pagination             `json:"pagination,omitempty" hcl:"pagination,optional"`
+	Fields     []string               `json:"fields,omitempty" hcl:"fields,optional"`
 }
 
-// Result provides common result structure
-// Used across all operations that return data with metadata
+// SortField represents a sort field with direction
+type SortField struct {
+	Field     string `json:"field" hcl:"field"`
+	Direction string `json:"direction" hcl:"direction"` // "asc" or "desc"
+}
+
+// Result provides standardized result structure for data operations
 type Result struct {
-	Data      interface{} `json:"data"`
-	Count     int         `json:"count"`
-	Total     int         `json:"total"`
-	Page      int         `json:"page"`
-	PageSize  int         `json:"page_size"`
-	Pages     int         `json:"pages"`
-	Query     *Query      `json:"query,omitempty"`
-	Timestamp time.Time   `json:"timestamp"`
-	Duration  string      `json:"duration"`
-	Success   bool        `json:"success"`
-	Message   string      `json:"message,omitempty"`
-	Errors    []string    `json:"errors,omitempty"`
-	Warnings  []string    `json:"warnings,omitempty"`
+	Data       interface{}            `json:"data" hcl:"data"`
+	Total      int64                  `json:"total" hcl:"total"`
+	Pagination Pagination             `json:"pagination,omitempty" hcl:"pagination,optional"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty" hcl:"metadata,optional"`
+}
+
+// TimeRange provides time-based range for queries
+type TimeRange struct {
+	Start time.Time `json:"start" hcl:"start"`
+	End   time.Time `json:"end" hcl:"end"`
+}
+
+// Pagination provides pagination information for queries
+type Pagination struct {
+	Page     int   `json:"page" hcl:"page"`
+	PageSize int   `json:"page_size" hcl:"page_size"`
+	Total    int64 `json:"total" hcl:"total"`
+}
+
+// EncryptionMetadata provides cross-domain encryption information and recipient management
+type EncryptionMetadata struct {
+	Algorithm  string                 `json:"algorithm" hcl:"algorithm"`
+	Recipients []string               `json:"recipients" hcl:"recipients"`
+	KeyID      string                 `json:"key_id,omitempty" hcl:"key_id,optional"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty" hcl:"metadata,optional"`
+	CreatedAt  time.Time              `json:"created_at" hcl:"created_at"`
 }

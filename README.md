@@ -1,138 +1,119 @@
 # Spooky
 
-[![Test Coverage](coverage.svg)](https://github.com/snassar/spooky)
-[![Go Version](https://img.shields.io/badge/go-1.24+-blue.svg)](https://golang.org)
-[![License](https://img.shields.io/badge/license-AGPL%203.0-green.svg)](LICENSE)
+A powerful automation and orchestration tool built with Go.
 
-> Remote configuration tool written in Go that executes commands and scripts on multiple remote servers using HCL2 configuration files.
+## Current Status
 
-Spooky provides agent-less automation with declarative configuration, parallel execution capabilities, and intelligent fact-driven decision making for heterogeneous environments.
+This is a work-in-progress implementation of spooky. The CLI is now built using [Cobra](https://github.com/spf13/cobra), the de facto standard for Go CLI applications, providing a robust and feature-rich command-line interface.
 
-## ✨ Features
+### ✅ What's Working
 
-- 🚀 **Declarative Configuration** - Use HCL2 files to define servers and actions
-- 🔗 **SSH Connectivity** - Secure connections with password or key-based authentication  
-- ⚡ **Parallel Execution** - Run actions on multiple servers simultaneously
-- 🏷️ **Tag-based Targeting** - Target servers using tags for flexible grouping
-- 📝 **Script Support** - Execute both inline commands and external script files
-- ✅ **Validation** - Built-in configuration validation and syntax checking
-- 🧠 **Fact-Driven Decisions** - Collect machine facts to inform configuration in heterogeneous environments
-- 🔍 **Multi-Source Facts** - Gather facts from SSH, local access, HCL configs, and OpenTofu
+The basic CLI structure is in place and supports the following commands:
 
-## 🚀 Quick Start
+- `spooky --version` - Show version information
+- `spooky --help` - Show comprehensive help information
+- `spooky project init <project>` - Initialize a new spooky project (placeholder implementation)
+- `spooky project validate <project>` - Validate a spooky project (placeholder implementation)
 
-### Install
+### 🚀 Enhanced Features with Cobra
+
+The CLI now includes advanced features provided by Cobra:
+
+- **Subcommand-based CLI** with proper nesting (`spooky project init`, `spooky project validate`)
+- **POSIX-compliant flags** with short and long versions (`-h`, `--help`, `-v`, `--version`)
+- **Automatic help generation** for all commands and subcommands
+- **Shell autocomplete** support (bash, zsh, fish, powershell)
+- **Intelligent suggestions** for command typos
+- **Command aliases** for backward compatibility
+- **Proper error handling** with meaningful error messages
+- **Argument validation** with clear usage instructions
+
+## Building
+
+To build spooky:
 
 ```bash
-git clone https://github.com/snassar/spooky.git
-cd spooky
-go build -o spooky
+go build -o spooky .
 ```
 
-### Basic Usage
+## Running
+
+To run spooky:
 
 ```bash
-# Execute actions from configuration file
-./spooky execute config.hcl
+# Show help
+./spooky --help
 
-# Validate configuration file
-./spooky validate config.hcl
+# Show version
+./spooky --version
 
-# List servers and actions in configuration
-./spooky list config.hcl
+# Project commands
+./spooky project init my-project
+./spooky project validate my-project
+
+# Get help for specific commands
+./spooky project --help
+./spooky project init --help
 ```
 
-### Example Configuration
+## Shell Completion
 
-```hcl
-# Define servers
-server "web-server-1" {
-  host     = "192.168.1.10"
-  user     = "admin"
-  password = "your-password"
-  tags = {
-    environment = "production"
-    role        = "web"
-  }
-}
+Spooky supports shell completion for better user experience:
 
-# Define actions
-action "check-status" {
-  description = "Check system status"
-  command     = "uptime && df -h"
-  servers     = ["web-server-1"]
-  parallel    = true
-}
+```bash
+# Generate bash completion
+./spooky completion bash > ~/.local/share/bash-completion/completions/spooky
 
-# Use facts to make intelligent decisions
-action "configure-web" {
-  description = "Configure web server based on OS facts"
-  command     = "if [ \"$(cat /etc/os-release | grep -i ubuntu)\" ]; then apt update; else yum update; fi"
-  servers     = ["web-server-1"]
-  parallel    = true
-}
+# Generate zsh completion
+./spooky completion zsh > ~/.zsh/completions/_spooky
+
+# Generate fish completion
+./spooky completion fish > ~/.config/fish/completions/spooky.fish
 ```
 
-## 📖 Documentation
+## Architecture
 
-- **[Detailed Documentation](docs/misc.md)** - Installation, configuration, testing, and more
-- **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
-- **[Test Environment](docs/test-environment.md)** - Setting up test environments
-- **[Tools](docs/tools.md)** - Development tools and utilities
-- **[Testing](docs/coverage.md)** - Testing guidelines and coverage requirements
-- **[Coverage](docs/coverage.md)** - Test coverage analysis and requirements
-- **[CLI Specification](docs/cli-specification.md)** - Command-line interface reference
-- **[Configuration Guide](docs/configuration.md)** - HCL2 configuration syntax and examples
+The project follows interface-based architecture patterns with the following structure:
 
-## 🛠️ Development
+- `cmd/` - Cobra command implementations
+  - `root.go` - Root command and CLI setup
+  - `project.go` - Project management commands
+- `internal/types/` - Type definitions organized by domain
+- `internal/interfaces/` - Core system interfaces
+- `internal/cli/` - CLI implementation (planned)
+- `internal/logging/` - Logging implementation (planned)
+- `internal/schemas/` - Schema management (planned)
+- `internal/storage/` - Storage implementation (planned)
 
-### Prerequisites
+## Development
+
+This project is built following established patterns and rules:
+
+- **Interface-first architecture** with Cobra command structure
+- **Type safety and validation** with proper argument handling
+- **Comprehensive error handling** with meaningful error messages
+- **Structured logging** (planned)
+- **Schema-driven configuration** (planned)
+- **Component-based design** with proper separation of concerns
+
+## Next Steps
+
+The following components need to be implemented:
+
+1. **Project Management** - Actual project initialization and validation logic
+2. **Schema System** - HCL schema loading and validation using the existing schemas
+3. **Configuration Management** - Configuration loading and validation
+4. **Logging System** - Structured logging implementation
+5. **Storage System** - Data persistence layer
+6. **Integration Layer** - Component coordination
+
+## Requirements
 
 - Go 1.24 or later
-- Target systems accessible via SSH
+- HCL v2 for configuration parsing
+- Cobra v1.9+ for CLI framework
 
-### Testing
+## Dependencies
 
-```bash
-# Run all tests
-go test ./... -tags=integration
-
-# Run with coverage
-make check-coverage
-
-# Generate coverage report
-make coverage-html
-```
-
-### Test Environment
-
-```bash
-# Check requirements
-go run tools/spooky-test-env/main.go preflight
-
-# Start test environment
-go run tools/spooky-test-env/main.go start
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass
-6. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the GNU Affero General Public License v3 - see the [LICENSE](LICENSE) file for details.
-
-## 🔗 Links
-
-- **[Issues](https://github.com/snassar/spooky/issues)** - Report bugs or request features
-- **[Discussions](https://github.com/snassar/spooky/discussions)** - Ask questions and share ideas
-- **[Releases](https://github.com/snassar/spooky/releases)** - Latest releases and changelog
-
----
-
-**Notice**: This project is influenced heavily by agentic coding as part of the process of learning Go.
+- [Cobra](https://github.com/spf13/cobra) - CLI framework
+- [HCL v2](https://github.com/hashicorp/hcl) - Configuration parsing

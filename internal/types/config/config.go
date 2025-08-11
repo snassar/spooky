@@ -1,103 +1,246 @@
+// Package config provides types for configuration management in the spooky codebase.
+// These types define the structure for spooky configuration and environment settings.
 package config
 
-// No imports needed
-
-// Config represents the main configuration structure
-type Config struct {
-	GlobalConfig  *GlobalConfig          `hcl:"global,optional"`
-	ProjectConfig *ProjectConfig         `hcl:"project,optional"`
-	Environment   map[string]interface{} `hcl:"environment,optional"`
-	Source        ConfigSource           `hcl:"source,optional"`
-	CLIFlags      map[string]interface{} `hcl:"cli_flags,optional"`
-}
-
-// GlobalConfig represents global configuration
-type GlobalConfig struct {
-	LogLevel   string `hcl:"log_level,optional"`
-	LogFile    string `hcl:"log_file,optional"`
-	Quiet      bool   `hcl:"quiet,optional"`
-	Verbose    bool   `hcl:"verbose,optional"`
-	ConfigPath string `hcl:"config_path,optional"`
-
-	// Configuration blocks
-	Storage     *StorageConfig     `hcl:"storage,block"`
-	Facts       *FactsConfig       `hcl:"facts,block"`
-	SSH         *SSHConfig         `hcl:"ssh,block"`
-	Templates   *TemplatesConfig   `hcl:"templates,block"`
-	Security    *SecurityConfig    `hcl:"security,block"`
-	Age         *AgeConfig         `hcl:"age,block"`
-	Logging     *LoggingConfig     `hcl:"logging,block"`
-	Performance *PerformanceConfig `hcl:"performance,block"`
-}
-
-// ProjectConfig represents project configuration
-type ProjectConfig struct {
-	Name        string `hcl:"name,label" validate:"required"`
-	Description string `hcl:"description,optional"`
-	Version     string `hcl:"version,optional"`
-	Environment string `hcl:"environment,optional"`
-
-	// File references
-	InventoryFile string `hcl:"inventory_file,optional"`
-	ActionsFile   string `hcl:"actions_file,optional"`
-
-	// Project settings
-	DefaultTimeout      int  `hcl:"default_timeout,optional" validate:"omitempty,min=1,max=3600"`
-	DefaultParallel     bool `hcl:"default_parallel,optional"`
-	DryRunDefault       bool `hcl:"dry_run_default,optional"`
-	ValidateBeforeAct   bool `hcl:"validate_before_act,optional"`
-	BackupBeforeChanges bool `hcl:"backup_before_changes,optional"`
-
-	// Configuration blocks
-	Storage   *StorageConfig   `hcl:"storage,block"`
-	Logging   *LoggingConfig   `hcl:"logging,block"`
-	SSH       *SSHConfig       `hcl:"ssh,block"`
-	Isolation *IsolationConfig `hcl:"isolation,block"`
-
-	// Project-wide tags
-	Tags map[string]string `hcl:"tags,optional"`
-}
-
-// Configuration types
-type LoadingConfig struct {
-	ConfigPath    string        `hcl:"config_path,optional"`
-	DefaultConfig *GlobalConfig `hcl:"default_config,optional"`
-	AutoReload    bool          `hcl:"auto_reload,optional"`
-}
-
-type ValidationConfig struct {
-	ValidationRules  *ValidationRules `hcl:"validation_rules,optional"`
-	StrictValidation bool             `hcl:"strict_validation,optional"`
-}
-
-type EnvironmentConfig struct {
-	EnvironmentFile   string `hcl:"environment_file,optional"`
-	ValidateVariables bool   `hcl:"validate_variables,optional"`
-}
-
-type ValidationRules struct {
-	RequiredFields  []string `hcl:"required_fields,optional"`
-	ForbiddenFields []string `hcl:"forbidden_fields,optional"`
-}
-
-// ConfigSource represents the source of configuration
-type ConfigSource string
-
-const (
-	SourceDefault     ConfigSource = "default"
-	SourceGlobal      ConfigSource = "global"
-	SourceProject     ConfigSource = "project"
-	SourceEnvironment ConfigSource = "environment"
-	SourceCLI         ConfigSource = "cli"
+import (
+	"time"
 )
 
-// Error types
-type ValidationError struct {
-	Field   string `hcl:"field"`
-	Message string `hcl:"message"`
+// Config represents the main spooky configuration
+type Config struct {
+	// Configuration metadata
+	Version   string    `json:"version" hcl:"version"`
+	CreatedAt time.Time `json:"created_at" hcl:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" hcl:"updated_at"`
+
+	// Global settings
+	Global *GlobalConfig `json:"global" hcl:"global"`
+
+	// CLI settings
+	CLI *CLIConfig `json:"cli" hcl:"cli"`
+
+	// Logging settings
+	Logging *LoggingConfig `json:"logging" hcl:"logging"`
+
+	// SSH settings
+	SSH *SSHConfig `json:"ssh" hcl:"ssh"`
+
+	// Storage settings
+	Storage *StorageConfig `json:"storage" hcl:"storage"`
+
+	// Security settings
+	Security *SecurityConfig `json:"security" hcl:"security"`
 }
 
+// GlobalConfig provides global configuration settings
+type GlobalConfig struct {
+	// Default project path
+	DefaultProjectPath string `json:"default_project_path,omitempty" hcl:"default_project_path,optional"`
+
+	// Default parallel workers
+	DefaultParallelWorkers int `json:"default_parallel_workers,omitempty" hcl:"default_parallel_workers,optional"`
+
+	// Default timeout in seconds
+	DefaultTimeout int `json:"default_timeout,omitempty" hcl:"default_timeout,optional"`
+
+	// Default log level
+	DefaultLogLevel string `json:"default_log_level,omitempty" hcl:"default_log_level,optional"`
+
+	// Whether to enable dry-run by default
+	DefaultDryRun bool `json:"default_dry_run,omitempty" hcl:"default_dry_run,optional"`
+
+	// Whether to enable verbose output by default
+	DefaultVerbose bool `json:"default_verbose,omitempty" hcl:"default_verbose,optional"`
+}
+
+// CLIConfig provides CLI-specific configuration
+type CLIConfig struct {
+	// CLI theme
+	Theme string `json:"theme,omitempty" hcl:"theme,optional"`
+
+	// CLI colors
+	Colors bool `json:"colors,omitempty" hcl:"colors,optional"`
+
+	// CLI progress bars
+	ProgressBars bool `json:"progress_bars,omitempty" hcl:"progress_bars,optional"`
+
+	// CLI confirmation prompts
+	ConfirmPrompts bool `json:"confirm_prompts,omitempty" hcl:"confirm_prompts,optional"`
+
+	// CLI output format
+	OutputFormat string `json:"output_format,omitempty" hcl:"output_format,optional"`
+}
+
+// LoggingConfig provides logging configuration
+type LoggingConfig struct {
+	// Log level
+	Level string `json:"level" hcl:"level"`
+
+	// Log format
+	Format string `json:"format" hcl:"format"`
+
+	// Log output
+	Output string `json:"output" hcl:"output"`
+
+	// Log file path
+	FilePath string `json:"file_path,omitempty" hcl:"file_path,optional"`
+
+	// Log file permissions
+	FilePermissions string `json:"file_permissions,omitempty" hcl:"file_permissions,optional"`
+
+	// Log file max size in MB
+	FileMaxSize int `json:"file_max_size,omitempty" hcl:"file_max_size,optional"`
+
+	// Log file max age in days
+	FileMaxAge int `json:"file_max_age,omitempty" hcl:"file_max_age,optional"`
+
+	// Log file max backups
+	FileMaxBackups int `json:"file_max_backups,omitempty" hcl:"file_max_backups,optional"`
+
+	// Whether to compress log files
+	FileCompress bool `json:"file_compress,omitempty" hcl:"file_compress,optional"`
+}
+
+// SSHConfig provides SSH configuration
+type SSHConfig struct {
+	// Default SSH port
+	DefaultPort int `json:"default_port,omitempty" hcl:"default_port,optional"`
+
+	// Default SSH user
+	DefaultUser string `json:"default_user,omitempty" hcl:"default_user,optional"`
+
+	// Default SSH key path
+	DefaultKeyPath string `json:"default_key_path,omitempty" hcl:"default_key_path,optional"`
+
+	// SSH connection timeout in seconds
+	ConnectionTimeout int `json:"connection_timeout,omitempty" hcl:"connection_timeout,optional"`
+
+	// SSH command timeout in seconds
+	CommandTimeout int `json:"command_timeout,omitempty" hcl:"command_timeout,optional"`
+
+	// SSH connection pool size
+	ConnectionPoolSize int `json:"connection_pool_size,omitempty" hcl:"connection_pool_size,optional"`
+
+	// SSH connection pool timeout in seconds
+	ConnectionPoolTimeout int `json:"connection_pool_timeout,omitempty" hcl:"connection_pool_timeout,optional"`
+
+	// Whether to enable SSH connection pooling
+	EnableConnectionPool bool `json:"enable_connection_pool,omitempty" hcl:"enable_connection_pool,optional"`
+
+	// Whether to enable SSH host key verification
+	EnableHostKeyVerification bool `json:"enable_host_key_verification,omitempty" hcl:"enable_host_key_verification,optional"`
+
+	// SSH known hosts file path
+	KnownHostsPath string `json:"known_hosts_path,omitempty" hcl:"known_hosts_path,optional"`
+}
+
+// StorageConfig provides storage configuration
+type StorageConfig struct {
+	// Storage type
+	Type string `json:"type" hcl:"type"`
+
+	// Storage path
+	Path string `json:"path" hcl:"path"`
+
+	// Storage format
+	Format string `json:"format" hcl:"format"`
+
+	// Storage compression
+	Compression bool `json:"compression,omitempty" hcl:"compression,optional"`
+
+	// Storage encryption
+	Encryption bool `json:"encryption,omitempty" hcl:"encryption,optional"`
+
+	// Storage encryption key path
+	EncryptionKeyPath string `json:"encryption_key_path,omitempty" hcl:"encryption_key_path,optional"`
+
+	// Storage backup enabled
+	BackupEnabled bool `json:"backup_enabled,omitempty" hcl:"backup_enabled,optional"`
+
+	// Storage backup path
+	BackupPath string `json:"backup_path,omitempty" hcl:"backup_path,optional"`
+
+	// Storage backup retention in days
+	BackupRetention int `json:"backup_retention,omitempty" hcl:"backup_retention,optional"`
+}
+
+// SecurityConfig provides security configuration
+type SecurityConfig struct {
+	// Whether to enable audit logging
+	AuditLogging bool `json:"audit_logging,omitempty" hcl:"audit_logging,optional"`
+
+	// Audit log path
+	AuditLogPath string `json:"audit_log_path,omitempty" hcl:"audit_log_path,optional"`
+
+	// Whether to enable sensitive data masking
+	SensitiveDataMasking bool `json:"sensitive_data_masking,omitempty" hcl:"sensitive_data_masking,optional"`
+
+	// Sensitive data patterns
+	SensitiveDataPatterns []string `json:"sensitive_data_patterns,omitempty" hcl:"sensitive_data_patterns,optional"`
+
+	// Whether to enable certificate verification
+	CertificateVerification bool `json:"certificate_verification,omitempty" hcl:"certificate_verification,optional"`
+
+	// Certificate authority path
+	CAPath string `json:"ca_path,omitempty" hcl:"ca_path,optional"`
+}
+
+// ConfigDefaults provides default configuration values
+type ConfigDefaults struct {
+	// Default configuration values
+	Defaults map[string]interface{} `json:"defaults" hcl:"defaults"`
+}
+
+// ConfigSupporting provides supporting configuration structures
+type ConfigSupporting struct {
+	// Supporting configuration
+	Support map[string]interface{} `json:"support" hcl:"support"`
+}
+
+// ConfigEnvironment provides environment-specific configuration
+type ConfigEnvironment struct {
+	// Environment name
+	Environment string `json:"environment" hcl:"environment"`
+
+	// Environment-specific settings
+	Settings map[string]interface{} `json:"settings" hcl:"settings"`
+}
+
+// ConfigError represents a configuration-related error
 type ConfigError struct {
-	Operation string `hcl:"operation"`
-	Error     string `hcl:"error"`
+	// Error details
+	Code        string                 `json:"code" hcl:"code"`
+	Message     string                 `json:"message" hcl:"message"`
+	Context     map[string]interface{} `json:"context,omitempty" hcl:"context,optional"`
+	Stack       []string               `json:"stack,omitempty" hcl:"stack,optional"`
+	Recoverable bool                   `json:"recoverable" hcl:"recoverable"`
+
+	// Configuration path where the error occurred
+	ConfigPath string `json:"config_path" hcl:"config_path"`
+
+	// Configuration key where the error occurred
+	ConfigKey string `json:"config_key,omitempty" hcl:"config_key,optional"`
+
+	// Configuration value that caused the error
+	ConfigValue interface{} `json:"config_value,omitempty" hcl:"config_value,optional"`
+}
+
+// NewConfigError creates a new configuration error
+func NewConfigError(configPath, message string) *ConfigError {
+	return &ConfigError{
+		Code:        "config_error",
+		Message:     message,
+		Recoverable: true,
+		ConfigPath:  configPath,
+	}
+}
+
+// Error implements the error interface
+func (e *ConfigError) Error() string {
+	return e.Message
+}
+
+// Unwrap returns the underlying error
+func (e *ConfigError) Unwrap() error {
+	return nil
 }
