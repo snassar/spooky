@@ -3,3 +3,202 @@ description:
 globs:
 alwaysApply: false
 ---
+
+# Rule Template
+
+## Quick Reference for AI Assistants
+
+### Decision Tree: Which Pattern to Apply?
+
+1. **Are you defining a new development pattern?**
+   - **Yes** → Use this template structure
+   - **No** → Continue to step 2
+
+2. **Are you extending existing functionality?**
+   - **Yes** → Follow established rule patterns
+   - **No** → Use this template for new rules
+
+### AI Action Items
+
+**ALWAYS DO:**
+- Follow the established rule structure
+- Include quick reference decision trees
+- Provide practical examples and anti-patterns
+- Include AI assistant checklists
+- Cross-reference related rules
+
+**NEVER DO:**
+- Create rules without clear structure
+- Skip practical examples
+- Ignore established patterns
+- Create rules longer than 500 lines
+
+## Core Rule Structure
+
+### 1. Frontmatter Section
+```yaml
+---
+description: Clear description of the rule's purpose
+globs: optional/path/pattern/**/* 
+alwaysApply: false
+---
+```
+
+### 2. Rule Title
+Use a clear, descriptive title that explains the rule's purpose.
+
+### 3. Quick Reference Section
+Include a decision tree to help AI assistants quickly determine when to apply the rule.
+
+### 4. AI Action Items
+Provide clear "ALWAYS DO" and "NEVER DO" guidelines.
+
+### 5. Core Content Sections
+Organize content into logical sections with clear headings.
+
+### 6. Examples Section
+Include both good and bad examples to illustrate the rule.
+
+### 7. AI Assistant Checklist
+Provide a checklist for AI assistants to verify compliance.
+
+## Implementation Guidelines
+
+When creating new rules:
+
+1. **Start with the template structure** - Use this exact format
+2. **Define clear decision trees** - Help AI assistants choose the right approach
+3. **Include practical examples** - Show real-world usage scenarios
+4. **Cross-reference related rules** - Maintain consistency across the codebase
+5. **Keep under 500 lines** - Break complex rules into focused components
+6. **Follow established patterns** - Maintain consistency with existing rules
+
+## Rule Content Examples
+
+### Good Rule Structure
+```markdown
+# Rule Title
+
+## Quick Reference for AI Assistants
+
+### Decision Tree: Which Pattern to Apply?
+
+1. **Are you...?**
+   - **Yes** → Apply pattern A
+   - **No** → Continue to step 2
+
+## Core Principles
+
+### 1. First Principle
+- Description of principle
+- Implementation guidelines
+- Examples
+
+## Implementation Guidelines
+
+When implementing this pattern:
+- Guideline 1
+- Guideline 2
+- Guideline 3
+
+## Examples
+
+### Good Example
+```go
+// Implementation following guidelines
+```
+
+### Bad Example
+```go
+// Implementation not following guidelines
+```
+
+## AI Assistant Checklist
+
+- [ ] Checklist item 1
+- [ ] Checklist item 2
+```
+
+### Bad Rule Structure
+```markdown
+# Rule Title
+
+Some content without clear structure.
+
+More content scattered throughout.
+
+No clear sections or examples.
+```
+
+## Cross-Reference Guidelines
+
+### 1. Related Rules Section
+Include a section that references related rules:
+
+```markdown
+## Related Rules
+
+This rule works in conjunction with:
+- **Rule Name**: Brief description of relationship
+- **Another Rule**: Brief description of relationship
+```
+
+### 2. See Also References
+Use inline references to other rules:
+
+```markdown
+For more details, see [Rule Name](mdc:rule-name).
+```
+
+## Practical Examples Guidelines
+
+### 1. Code Examples
+- Include complete, working code examples
+- Show both good and bad implementations
+- Use realistic scenarios from the spooky codebase
+- Include error handling examples
+
+### 2. Real-World Scenarios
+- Describe common use cases
+- Include troubleshooting guidance
+- Show integration patterns
+- Provide migration examples
+
+### 3. Anti-Patterns
+- Clearly identify what not to do
+- Explain why patterns are problematic
+- Provide alternatives
+- Include consequences of violations
+
+## AI Assistant Checklist
+
+When creating new rules, ensure:
+
+- [ ] Rule follows established template structure
+- [ ] Quick reference decision tree is included
+- [ ] AI action items are clearly defined
+- [ ] Practical examples are provided
+- [ ] Anti-patterns are documented
+- [ ] Cross-references to related rules are included
+- [ ] AI assistant checklist is provided
+- [ ] Rule content is under 500 lines
+- [ ] Examples are realistic and actionable
+- [ ] Rule integrates with existing rule patterns
+
+## Integration with Other Rules
+
+This template works in conjunction with:
+- **Code Quality Standards**: Ensures rule quality and consistency
+- **Interface Architecture**: Maintains architectural consistency
+- **Development Methods**: Follows established development patterns
+- **Testing Standards**: Ensures rules are testable and verifiable
+
+## Remember
+
+**Good rules enable:**
+- Consistent development practices
+- Clear decision-making for AI assistants
+- Maintainable and extensible code
+- Quality assurance across the codebase
+
+**Always use this template structure when creating new rules to maintain consistency and quality across the spooky codebase.**

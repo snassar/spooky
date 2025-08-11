@@ -288,3 +288,19 @@ When designing or implementing architecture, ensure:
 **Always design with interfaces first, implement with concrete types second, and coordinate through well-defined architectural patterns.**
 
 **Never sacrifice interface-based architecture for quick compilation fixes. Always fix the root cause while maintaining the interface contracts.**
+
+## Integration with Other Rules
+
+This rule works in conjunction with:
+- **Interface Definitions**: Use interfaces for all public APIs
+- **Types System**: Use interface types for type safety
+- **Error Handling**: Use interface-based error types
+- **Testing**: Test interfaces through mocking
+- **Code Quality**: Ensure interface compliance
+
+### Cross-References
+- **See [Interface Definitions](mdc:interface-definitions)**: For complete interface contract specifications
+- **See [Types System](mdc:types)**: For interface-compatible type definitions
+- **See [Error Handling Standards](mdc:error-handling-standards)**: For interface error patterns
+- **See [Testing Standards](mdc:testing)**: For interface testing strategies
+- **See [Code Quality Standards](mdc:code-quality-standards)**: For interface quality requirements

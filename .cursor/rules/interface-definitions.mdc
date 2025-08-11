@@ -213,3 +213,20 @@ When working with interfaces, ensure:
 - Validation and storage operations
 
 **Always reference the actual interface definitions in `./internal/interfaces/` for the complete contract specifications.**
+
+## Integration with Other Rules
+
+This rule works in conjunction with:
+- **Interface Architecture**: Use interface-based design patterns
+- **Types System**: Use interface-compatible types
+- **Error Handling**: Use interface-based error types
+- **Testing**: Test interface implementations
+- **Code Quality**: Ensure interface compliance
+
+### Cross-References
+- **See [Interface Architecture](mdc:interface-architecture)**: For architectural patterns and principles
+- **See [Types System](mdc:types)**: For interface-compatible type definitions
+- **See [Error Handling Standards](mdc:error-handling-standards)**: For interface error handling patterns
+- **See [Testing Standards](mdc:testing)**: For interface testing strategies
+- **See [Code Quality Standards](mdc:code-quality-standards)**: For interface quality requirements
+- **See [Interface Dos and Don'ts](mdc:interface-dos-donts)**: For common interface anti-patterns

@@ -1,0 +1,427 @@
+---
+description: Practical examples and real-world scenarios for the spooky codebase
+globs: **/*.go
+alwaysApply: true
+---
+
+# Practical Examples and Real-World Scenarios
+
+## Quick Reference for AI Assistants
+
+### Decision Tree: Which Examples to Use?
+
+1. **Are you implementing a new feature?**
+   - **Yes** → Use relevant examples from this rule
+   - **No** → Continue to step 2
+
+2. **Are you troubleshooting an issue?**
+   - **Yes** → Check troubleshooting examples
+   - **No** → Continue to step 3
+
+3. **Are you integrating components?**
+   - **Yes** → Use integration examples
+   - **No** → Use general implementation examples
+
+### AI Action Items
+
+**ALWAYS DO:**
+- Use examples that match your specific use case
+- Adapt examples to your implementation needs
+- Test examples before using in production
+- Follow established patterns from examples
+
+**NEVER DO:**
+- Copy examples without understanding the context
+- Use examples that don't match your requirements
+- Ignore error handling in examples
+- Skip validation in examples
+
+## Common Implementation Patterns
+
+### 1. Manager Pattern Implementation
+
+#### Basic Manager Structure
+```go
+// Good: Complete manager implementation
+type FactManager struct {
+    logger   spookylogging.Logger
+    storage  spookystorage.FactStorage
+    config   *spookytypes.Config
+    cache    spookyinterfaces.CacheManager
+}
+
+func NewFactManager(
+    logger spookylogging.Logger,
+    storage spookystorage.FactStorage,
+    config *spookytypes.Config,
+    cache spookyinterfaces.CacheManager,
+) spookyinterfaces.FactManager {
+    return &FactManager{
+        logger:  logger,
+        storage: storage,
+        config:  config,
+        cache:   cache,
+    }
+}
+
+// Implement all interface methods
+func (m *FactManager) CollectFacts(server string) (*spookytypes.FactCollection, error) {
+    m.logger.Info("Collecting facts", "server", server)
+    
+    // Check cache first
+    if cached, err := m.cache.Get("facts:" + server); err == nil {
+        if facts, ok := cached.(*spookytypes.FactCollection); ok {
+            m.logger.Debug("Returning cached facts", "server", server)
+            return facts, nil
+        }
+    }
+    
+    // Collect fresh facts
+    facts, err := m.storage.GetFacts(server)
+    if err != nil {
+        m.logger.Error("Failed to collect facts", "server", server, "error", err)
+        return nil, fmt.Errorf("failed to collect facts for %s: %w", server, err)
+    }
+    
+    // Cache the results
+    if err := m.cache.Set("facts:"+server, facts, time.Hour); err != nil {
+        m.logger.Warn("Failed to cache facts", "server", server, "error", err)
+    }
+    
+    return facts, nil
+}
+```
+
+#### Bad Manager Implementation
+```go
+// Bad: Incomplete implementation with stubs
+type FactManager struct {
+    logger spookylogging.Logger
+}
+
+func (m *FactManager) CollectFacts(server string) (*spookytypes.FactCollection, error) {
+    // TODO: Implement fact collection
+    return nil, fmt.Errorf("not implemented")
+}
+```
+
+### 2. Context Pattern Implementation
+
+#### Project Context Creation
+```go
+// Good: Complete context implementation
+type ProjectContext struct {
+    projectPath string
+    facts       spookyinterfaces.FactsContext
+    variables   spookyinterfaces.VariablesContext
+    templates   spookyinterfaces.TemplatesContext
+    machines    spookyinterfaces.MachinesContext
+    actions     spookyinterfaces.ActionsContext
+    metadata    map[string]interface{}
+}
+
+func NewProjectContext(projectPath string) (spookyinterfaces.ProjectContext, error) {
+    if projectPath == "" {
+        return nil, fmt.Errorf("project path cannot be empty")
+    }
+    
+    // Validate project path exists
+    if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+        return nil, fmt.Errorf("project path does not exist: %s", projectPath)
+    }
+    
+    // Create sub-contexts
+    facts, err := NewFactsContext(projectPath)
+    if err != nil {
+        return nil, fmt.Errorf("failed to create facts context: %w", err)
+    }
+    
+    variables, err := NewVariablesContext(projectPath)
+    if err != nil {
+        return nil, fmt.Errorf("failed to create variables context: %w", err)
+    }
+    
+    // ... create other contexts
+    
+    return &ProjectContext{
+        projectPath: projectPath,
+        facts:       facts,
+        variables:   variables,
+        // ... other fields
+    }, nil
+}
+
+func (c *ProjectContext) GetProjectPath() string {
+    return c.projectPath
+}
+
+func (c *ProjectContext) GetFactsContext() spookyinterfaces.FactsContext {
+    return c.facts
+}
+```
+
+### 3. Error Handling Patterns
+
+#### Structured Error Creation
+```go
+// Good: Comprehensive error handling
+func (m *FactManager) ValidateFacts(facts *spookytypes.FactCollection) error {
+    if facts == nil {
+        return spookyinterfaces.NewValidationError(
+            "facts collection cannot be nil",
+            "FactCollection",
+            "facts",
+            "required",
+        )
+    }
+    
+    var errors []error
+    
+    // Validate required fields
+    if facts.Name == "" {
+        errors = append(errors, spookyinterfaces.NewValidationError(
+            "fact collection name is required",
+            "FactCollection",
+            "name",
+            "required",
+        ))
+    }
+    
+    // Validate fact entries
+    for i, fact := range facts.Facts {
+        if err := m.validateFact(fact, i); err != nil {
+            errors = append(errors, fmt.Errorf("fact[%d]: %w", i, err))
+        }
+    }
+    
+    if len(errors) > 0 {
+        return spookyinterfaces.NewAggregateError("fact validation failed", errors)
+    }
+    
+    return nil
+}
+
+// Bad: Generic error handling
+func (m *FactManager) ValidateFacts(facts *spookytypes.FactCollection) error {
+    if facts == nil {
+        return fmt.Errorf("invalid facts")
+    }
+    return nil
+}
+```
+
+## Integration Examples
+
+### 1. SSH Connection Management
+
+#### Connection Pool Implementation
+```go
+// Good: Robust connection pooling
+type SSHConnectionPool struct {
+    connections map[string]*spookyssh.Connection
+    mutex       sync.RWMutex
+    maxConnections int
+    timeout       time.Duration
+}
+
+func (p *SSHConnectionPool) GetConnection(host string, config *spookytypes.SSHConfig) (*spookyssh.Connection, error) {
+    p.mutex.RLock()
+    if conn, exists := p.connections[host]; exists && conn.IsHealthy() {
+        p.mutex.RUnlock()
+        return conn, nil
+    }
+    p.mutex.RUnlock()
+    
+    // Create new connection
+    p.mutex.Lock()
+    defer p.mutex.Unlock()
+    
+    // Check if we're at capacity
+    if len(p.connections) >= p.maxConnections {
+        return nil, fmt.Errorf("connection pool at capacity (%d)", p.maxConnections)
+    }
+    
+    conn, err := spookyssh.NewConnection(host, config)
+    if err != nil {
+        return nil, fmt.Errorf("failed to create SSH connection to %s: %w", host, err)
+    }
+    
+    p.connections[host] = conn
+    return conn, nil
+}
+```
+
+### 2. Template Rendering
+
+#### Template Engine Integration
+```go
+// Good: Complete template rendering with error handling
+func (e *TemplateEngine) RenderTemplate(
+    templatePath string,
+    data map[string]interface{},
+    ctx spookyinterfaces.TemplatesContext,
+) (string, error) {
+    // Load template
+    template, err := e.loadTemplate(templatePath, ctx)
+    if err != nil {
+        return "", fmt.Errorf("failed to load template %s: %w", templatePath, err)
+    }
+    
+    // Validate template
+    if err := e.validateTemplate(template, ctx); err != nil {
+        return "", fmt.Errorf("template validation failed for %s: %w", templatePath, err)
+    }
+    
+    // Resolve variables
+    resolvedData, err := e.resolveVariables(data, ctx)
+    if err != nil {
+        return "", fmt.Errorf("failed to resolve variables for %s: %w", templatePath, err)
+    }
+    
+    // Render template
+    var buf bytes.Buffer
+    if err := template.Execute(&buf, resolvedData); err != nil {
+        return "", fmt.Errorf("failed to render template %s: %w", templatePath, err)
+    }
+    
+    return buf.String(), nil
+}
+```
+
+## Troubleshooting Examples
+
+### 1. Common Configuration Issues
+
+#### HCL Validation Errors
+```go
+// Problem: HCL parsing fails
+func troubleshootHCLParsing(data []byte) error {
+    var result interface{}
+    if err := hcl.Unmarshal(data, &result); err != nil {
+        // Provide helpful error message
+        return fmt.Errorf("HCL parsing failed: %w\n\n"+
+            "Common causes:\n"+
+            "- Missing required fields\n"+
+            "- Invalid syntax (check brackets, quotes)\n"+
+            "- Unsupported attribute types\n"+
+            "- File encoding issues", err)
+    }
+    return nil
+}
+```
+
+### 2. SSH Connection Issues
+
+#### Authentication Failures
+```go
+// Problem: SSH authentication fails
+func troubleshootSSHAuth(host string, config *spookytypes.SSHConfig) error {
+    // Test basic connectivity
+    if err := testConnectivity(host, config.Port); err != nil {
+        return fmt.Errorf("connectivity test failed: %w\n\n"+
+            "Check:\n"+
+            "- Host is reachable\n"+
+            "- Port is open\n"+
+            "- Firewall settings", err)
+    }
+    
+    // Test authentication
+    if err := testAuthentication(host, config); err != nil {
+        return fmt.Errorf("authentication failed: %w\n\n"+
+            "Check:\n"+
+            "- SSH key permissions (600)\n"+
+            "- Key is in authorized_keys\n"+
+            "- User has access", err)
+    }
+    
+    return nil
+}
+```
+
+## Performance Optimization Examples
+
+### 1. Caching Strategies
+
+#### Intelligent Caching
+```go
+// Good: Smart caching with TTL and invalidation
+type SmartCache struct {
+    data    map[string]cacheEntry
+    mutex   sync.RWMutex
+    maxSize int
+    ttl     time.Duration
+}
+
+type cacheEntry struct {
+    value      interface{}
+    expiresAt  time.Time
+    accessCount int
+}
+
+func (c *SmartCache) Get(key string) (interface{}, bool) {
+    c.mutex.RLock()
+    entry, exists := c.data[key]
+    c.mutex.RUnlock()
+    
+    if !exists {
+        return nil, false
+    }
+    
+    // Check expiration
+    if time.Now().After(entry.expiresAt) {
+        c.mutex.Lock()
+        delete(c.data, key)
+        c.mutex.Unlock()
+        return nil, false
+    }
+    
+    // Update access count
+    c.mutex.Lock()
+    entry.accessCount++
+    c.data[key] = entry
+    c.mutex.Unlock()
+    
+    return entry.value, true
+}
+```
+
+## AI Assistant Checklist
+
+When using examples from this rule, ensure:
+
+- [ ] Example matches your specific use case
+- [ ] Error handling is properly implemented
+- [ ] Validation is included where appropriate
+- [ ] Examples are tested before production use
+- [ ] Performance implications are considered
+- [ ] Security best practices are followed
+- [ ] Examples integrate with existing patterns
+- [ ] Error messages are user-friendly
+- [ ] Logging is appropriate for the context
+- [ ] Examples follow established architectural patterns
+
+## Integration with Other Rules
+
+This rule works in conjunction with:
+- **Interface Architecture**: Examples follow interface patterns
+- **Types System**: Examples use proper type definitions
+- **Error Handling Standards**: Examples demonstrate error patterns
+- **Testing Standards**: Examples are testable
+- **Code Quality Standards**: Examples meet quality requirements
+
+### Cross-References
+- **See [Interface Architecture](mdc:interface-architecture)**: For architectural patterns
+- **See [Types System](mdc:types)**: For type definitions
+- **See [Error Handling Standards](mdc:error-handling-standards)**: For error patterns
+- **See [Testing Standards](mdc:testing)**: For testing strategies
+- **See [Code Quality Standards](mdc:code-quality-standards)**: For quality requirements
+
+## Remember
+
+**Good examples enable:**
+- Faster development and implementation
+- Consistent patterns across the codebase
+- Reduced debugging time
+- Better code quality and maintainability
+
+**Always adapt examples to your specific needs while maintaining established patterns and quality standards.**
