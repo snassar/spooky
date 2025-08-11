@@ -1,0 +1,249 @@
+---
+description: Interface dos and don'ts for handling compilation errors and anti-patterns
+globs: ["internal/**/*.go"]
+alwaysApply: true
+---
+# Interface Dos and Don'ts
+
+When working with the spooky codebase, ALWAYS maintain interface-based architecture. Never fall back to concrete types to solve compilation errors. Interfaces are the foundation of the system's architecture and must be preserved.
+
+## Quick Reference for AI Assistants
+
+### Decision Tree: How to Handle Compilation Errors
+
+1. **Is there a compilation error?**
+   - **Yes** → Go to step 2
+   - **No** → Continue with interface-based design
+
+2. **What type of error is it?**
+   - **Interface implementation error** → Fix the implementation, don't remove interface usage
+   - **Missing interface method** → Implement the missing method
+   - **Import cycle** → Use interfaces to break the cycle
+   - **Type mismatch** → Fix types to match interface contracts
+
+3. **What should you NEVER do?**
+   - Remove interface imports
+   - Use concrete types instead of interfaces
+   - Create direct dependencies between packages
+   - Break interface contracts
+
+### AI Action Items
+
+**ALWAYS DO:**
+- Use interfaces in all public APIs
+- Accept interfaces as constructor parameters
+- Return interfaces where appropriate
+- Delegate to specialized components through interfaces
+- Fix interface implementations when errors occur
+- Use dependency injection with interfaces
+
+**NEVER DO:**
+- Remove interface usage to fix compilation errors
+- Use concrete types in function signatures
+- Create direct package dependencies
+- Break existing interface contracts
+- Use concrete types for dependency injection
+
+## Error Resolution Patterns
+
+### When Facing Compilation Errors:
+
+1. **Interface Implementation Errors**
+   ```go
+   // WRONG - Don't remove interface usage
+   func NewManager(config *spookyconfig.Manager) *Manager
+   
+   // CORRECT - Fix the interface implementation
+   func NewManager(config interfaces.ConfigManager) *Manager
+   ```
+
+2. **Missing Interface Methods**
+   ```go
+   // WRONG - Don't use concrete types
+   func (m *Manager) Process(data *spookytypes.Data) error
+   
+   // CORRECT - Implement missing interface methods
+   func (m *Manager) Process(data interfaces.DataInterface) error
+   ```
+
+3. **Import Cycle Issues**
+   ```go
+   // WRONG - Don't break interface contracts
+   import "spooky/internal/concrete"
+   
+   // CORRECT - Use interfaces to break cycles
+   import "spooky/internal/interfaces"
+   ```
+
+## Common Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Concrete Type Dependencies
+```go
+// WRONG - Direct concrete type dependency
+type Manager struct {
+    config *spookyconfig.Manager
+    facts  *spookyfacts.Manager
+}
+
+// CORRECT - Interface-based dependency
+type Manager struct {
+    config interfaces.ConfigManager
+    facts  interfaces.FactsManager
+}
+```
+
+### Anti-Pattern 2: Interface Removal
+```go
+// WRONG - Removing interface usage
+func (m *Manager) LoadConfig() (*spookyconfig.Config, error)
+
+// CORRECT - Maintaining interface usage
+func (m *Manager) LoadConfig() (interfaces.ConfigInterface, error)
+```
+
+### Anti-Pattern 3: Direct Package Imports
+```go
+// WRONG - Direct package dependency
+import "spooky/internal/config"
+import "spooky/internal/facts"
+
+// CORRECT - Interface-based dependency
+import "spooky/internal/interfaces"
+```
+
+### Anti-Pattern 4: Stub Implementations
+```go
+// WRONG - Stub with "not implemented" error
+func (m *Manager) RequiredMethod() error {
+    return fmt.Errorf("not implemented")
+}
+
+// CORRECT - Full implementation
+func (m *Manager) RequiredMethod() error {
+    // Actual implementation
+    return nil
+}
+```
+
+### Anti-Pattern 5: Concrete Type Returns
+```go
+// WRONG - Returning concrete types
+func (m *Manager) GetStorage() *spookystorage.Manager {
+    return m.storage
+}
+
+// CORRECT - Returning interfaces
+func (m *Manager) GetStorage() interfaces.StorageInterface {
+    return m.storage
+}
+```
+
+## Compilation Error Resolution Steps
+
+### Step 1: Identify the Root Cause
+- Check if interface methods are properly implemented
+- Verify interface contracts are satisfied
+- Ensure proper import structure
+
+### Step 2: Fix Interface Implementation
+- Implement missing interface methods
+- Fix method signatures to match interfaces
+- Ensure proper error handling through interfaces
+
+### Step 3: Use Dependency Injection
+- Pass interfaces as constructor parameters
+- Use interfaces in method signatures
+- Maintain loose coupling through interfaces
+
+### Step 4: Verify Interface Compliance
+- Ensure all implementations satisfy their interfaces
+- Check that interface contracts are maintained
+- Verify no concrete type dependencies are created
+
+## Error Resolution Examples
+
+### Example 1: Missing Interface Method
+```go
+// Problem: Missing interface method
+type Manager struct{}
+
+// WRONG - Don't remove interface requirement
+func NewManager() *Manager
+
+// CORRECT - Implement missing interface method
+func (m *Manager) RequiredMethod() error {
+    return nil
+}
+```
+
+### Example 2: Interface Type Mismatch
+```go
+// Problem: Wrong return type
+func (m *Manager) GetData() *spookytypes.Data
+
+// WRONG - Don't change interface contract
+func (m *Manager) GetData() *spookytypes.Data
+
+// CORRECT - Fix to match interface
+func (m *Manager) GetData() interfaces.DataInterface
+```
+
+### Example 3: Import Cycle
+```go
+// Problem: Import cycle between packages
+import "spooky/internal/config"
+import "spooky/internal/project"
+
+// WRONG - Don't use concrete types to break cycle
+type Manager struct {
+    config *spookyconfig.Manager
+}
+
+// CORRECT - Use interfaces to break cycle
+import "spooky/internal/interfaces"
+
+type Manager struct {
+    config interfaces.ConfigManager
+}
+```
+
+### Example 4: Constructor Dependencies
+```go
+// WRONG - Concrete type dependencies
+func NewManager(config *spookyconfig.Manager, facts *spookyfacts.Manager) *Manager {
+    return &Manager{config: config, facts: facts}
+}
+
+// CORRECT - Interface dependencies
+func NewManager(config interfaces.ConfigManager, facts interfaces.FactsManager) *Manager {
+    return &Manager{config: config, facts: facts}
+}
+```
+
+## AI Assistant Checklist
+
+When writing or reviewing code, ensure:
+
+- [ ] All function signatures use interface types, not concrete types
+- [ ] All struct fields use interface types for dependencies
+- [ ] All constructor functions accept interfaces as parameters
+- [ ] All public APIs return interfaces where appropriate
+- [ ] No direct imports between implementation packages
+- [ ] All managers implement their respective interfaces
+- [ ] Interface contracts are preserved when refactoring
+- [ ] Dependency injection uses interfaces, not concrete types
+- [ ] Error handling uses interface-based error types
+- [ ] No compilation errors are "fixed" by removing interface usage
+- [ ] No stub implementations with "not implemented" errors
+- [ ] All interface methods are fully implemented
+
+## Remember
+
+**Interfaces are the foundation of the spooky architecture. They enable:**
+- Loose coupling between components
+- Testability through mocking
+- Flexibility for future changes
+- Clear separation of concerns
+- Maintainable and extensible code
+
+**Never sacrifice interface-based architecture for quick compilation fixes. Always fix the root cause while maintaining the interface contracts.**

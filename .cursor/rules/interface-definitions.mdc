@@ -1,0 +1,215 @@
+---
+description: Interface definitions and contracts for the spooky codebase
+globs: ["internal/**/*.go"]
+alwaysApply: true
+---
+# Interface Definitions
+
+When working with the spooky codebase, understand the core interfaces defined in `./internal/interfaces/` as the primary contracts and architectural patterns. These interfaces define the system's core abstractions and must be respected in all implementations.
+
+## Quick Reference for AI Assistants
+
+### Decision Tree: Which Interface to Use?
+
+1. **Are you working with system coordination?**
+   - **Yes** → Use IntegrationManager interfaces
+   - **No** → Continue to step 2
+
+2. **Are you working with specific domain functionality?**
+   - **Facts** → Use FactManager, FactsIntegration
+   - **Actions** → Use ActionManager, ActionsIntegration
+   - **Machines** → Use MachineManager, MachinesIntegration
+   - **Templates** → Use TemplateManager, TemplatesIntegration
+   - **Variables** → Use VariableManager, VariablesIntegration
+   - **Secrets** → Use SecretsManager, SecretsIntegration
+   - **Config** → Use ConfigManager, ConfigIntegration
+
+3. **Are you working with execution/acting?**
+   - **Yes** → Use ActingManager, Actor, ActingExecutor
+   - **No** → Continue to step 4
+
+4. **Are you working with validation?**
+   - **Yes** → Use appropriate Validator interfaces
+   - **No** → Continue to step 5
+
+5. **Are you working with storage?**
+   - **Yes** → Use StorageBackend, ExportableStorage, FactStorage
+   - **No** → Use Context interfaces for state management
+
+### AI Action Items
+
+**ALWAYS DO:**
+- Reference interfaces from `./internal/interfaces/` package
+- Implement all required interface methods
+- Follow interface contracts exactly
+- Use interface types in function signatures
+- Respect interface patterns and conventions
+
+**NEVER DO:**
+- Create interfaces outside the `./internal/interfaces/` package
+- Modify existing interface contracts without updating all implementations
+- Ignore interface method requirements
+- Use concrete types instead of interface types
+
+## Core Interface Patterns
+
+### 1. Manager Pattern
+All major system components follow the Manager pattern:
+
+- **IntegrationManager**: Coordinates all system integrations (facts, actions, variables, templates, machines, secrets)
+- **ActionManager**: Manages action lifecycle (load, validate, plan, run, merge, optimize)
+- **FactManager**: Handles fact collection, storage, and processing
+- **MachineManager**: Manages machine inventory and connectivity
+- **TemplateManager**: Handles template loading, rendering, and validation
+- **VariableManager**: Manages variable loading, resolution, and validation
+- **ConfigManager**: Manages configuration loading, validation, and access
+- **CLIManager**: Manages command-line interface operations and command registration
+- **SSHManager**: Manages SSH connections, authentication, and acting
+- **LogManager**: Manages logging operations and logger instances
+- **SecretsManager**: Manages encryption, decryption, and key management
+
+**Key Requirements:**
+- All managers must implement their respective interfaces
+- Managers coordinate between different system components
+- Managers provide high-level operations and delegate to specialized components
+- Managers handle context creation and validation
+
+### 2. Context Pattern
+Context objects provide state and configuration for operations:
+
+- **BaseContext**: Provides base context for all integrations (project path, timestamp, metadata)
+- **ProjectContext**: Contains all project-related contexts (facts, variables, templates, machines, actions)
+- **ConfigContext**: Provides configuration data for integrations
+- **FactsContext**: Provides facts data for integrations
+- **VariablesContext**: Provides variables data for integrations
+- **TemplatesContext**: Provides templates data for integrations
+- **ActionExecutionContext**: Provides acting context for actions
+
+**Key Requirements:**
+- Contexts must be passed to operations that need state
+- Contexts should be immutable once created
+- Contexts should contain all necessary data for operations
+- Contexts should be validated before use
+
+### 3. Integration Pattern
+System components integrate through well-defined interfaces:
+
+- **FactsIntegration**: Provides fact collection and storage
+- **ActionsIntegration**: Provides action management and acting
+- **VariablesIntegration**: Provides variable management
+- **TemplatesIntegration**: Provides template management
+- **MachinesIntegration**: Provides machine management
+- **SecretsIntegration**: Provides secrets management
+- **ConfigIntegration**: Provides configuration management
+
+**Key Requirements:**
+- Integrations must be accessed through the IntegrationManager
+- Integrations should be loosely coupled
+- Integrations should handle their own error conditions
+- Integrations should provide health validation
+
+### 4. Acting Pattern (not "execution")
+All action acting follows the Acting pattern:
+
+- **ActingManager**: Manages action acting sessions
+- **Actor**: Represents individual action acting
+- **ActingExecutor**: Runs actions on machines
+- **ActingSessionManager**: Manages acting sessions
+- **ActingResultProcessor**: Processes acting results
+
+**Key Requirements:**
+- Use "acting" terminology instead of "execution"
+- Actions are run through Actors
+- Sessions track acting state and progress
+- Results are processed and aggregated
+
+### 5. Validation Pattern
+All components support comprehensive validation:
+
+- **ActionValidator**: Validates actions and collections
+- **FactValidator**: Validates facts and collections
+- **TemplateValidator**: Validates templates
+- **VariableValidator**: Validates variables
+- **MachineValidator**: Validates machines
+- **ConfigValidator**: Validates configuration data
+- **SchemaValidator**: Validates data against schemas
+- **EnvironmentValidator**: Validates environment variables
+
+**Key Requirements:**
+- All validators must implement their respective interfaces
+- Validation should be configurable (strict mode, validation level)
+- Validation should provide detailed error information
+- Validation should support custom rules
+
+### 6. Storage Pattern
+Storage operations follow consistent patterns:
+
+- **StorageBackend**: Basic storage operations (Set, Get, Delete)
+- **ExportableStorage**: Export/import operations
+- **FactStorage**: Fact-specific storage operations
+- **StorageFactory**: Creates storage instances
+
+**Key Requirements:**
+- Storage backends must implement StorageBackend interface
+- Storage should support multiple formats (JSON, HCL, BadgerDB)
+- Storage should support encryption/decryption
+- Storage should provide query capabilities
+
+## Interface Usage Examples
+
+### Manager Implementation
+```go
+type Manager struct {
+    logger spookylogging.Logger
+    storage spookystorage.FactStorage
+}
+
+func (m *Manager) CollectFacts(server string) (*spookytypes.FactCollection, error) {
+    // Implementation must satisfy FactManager interface
+    return nil, nil
+}
+```
+
+### Context Usage
+```go
+func ProcessData(ctx spookyinterfaces.FactsContext) error {
+    // Use context for state and configuration
+    projectPath := ctx.GetProjectPath()
+    facts := ctx.GetFacts()
+    return nil
+}
+```
+
+### Integration Usage
+```go
+func NewFactsIntegration(manager spookyinterfaces.IntegrationManager) spookyinterfaces.FactsIntegration {
+    // Access integration through manager
+    return manager.GetFactsIntegration()
+}
+```
+
+## AI Assistant Checklist
+
+When working with interfaces, ensure:
+
+- [ ] All interface methods are implemented
+- [ ] Interface contracts are followed exactly
+- [ ] Interface types are used in function signatures
+- [ ] Context objects are passed when needed
+- [ ] Integration patterns are followed
+- [ ] Acting patterns use correct terminology
+- [ ] Validation interfaces are implemented
+- [ ] Storage interfaces are used appropriately
+- [ ] Manager patterns are followed
+- [ ] Interface documentation is referenced
+
+## Remember
+
+**Interfaces are the foundation of the spooky architecture. They define:**
+- System contracts and abstractions
+- Component interactions and dependencies
+- State management through contexts
+- Integration patterns and coordination
+- Validation and storage operations
+
+**Always reference the actual interface definitions in `./internal/interfaces/` for the complete contract specifications.**

@@ -1,225 +1,291 @@
-# Interface-Based Architecture Enforcement
 
-When working with the spooky codebase, ALWAYS maintain interface-based architecture. Never fall back to concrete types to solve compilation errors. Interfaces are the foundation of the system's architecture and must be preserved.
+---
+description: Interface architectural principles and patterns for the spooky codebase
+globs: ["internal/**/*.go"]
+alwaysApply: true
+---
+# Interface Architecture
 
-## Core Principle: Interface-First Architecture
+When working with the spooky codebase, always follow interface-first architectural principles. Interfaces define the system's structure, enable loose coupling, and provide the foundation for maintainable and extensible code.
 
-**NEVER** solve compilation errors by:
-- ❌ Removing interface imports
-- ❌ Using concrete types instead of interfaces
-- ❌ Creating direct dependencies between packages
-- ❌ Breaking interface contracts
+## Quick Reference for AI Assistants
 
-**ALWAYS** solve compilation errors by:
-- ✅ Fixing interface implementations
-- ✅ Ensuring proper interface satisfaction
-- ✅ Using dependency injection with interfaces
-- ✅ Maintaining loose coupling through interfaces
+### Decision Tree: Which Architectural Pattern to Apply?
 
-## Error Resolution Patterns
+1. **Are you designing a new component?**
+   - **Yes** → Start with interface definition, then implement
+   - **No** → Continue to step 2
 
-### When Facing Compilation Errors:
+2. **Are you integrating components?**
+   - **Yes** → Use IntegrationManager and interface-based coordination
+   - **No** → Continue to step 3
 
-1. **Interface Implementation Errors**
-   ```go
-   // ❌ WRONG - Don't remove interface usage
-   func NewManager(config *spookyconfig.Manager) *Manager
-   
-   // ✅ CORRECT - Fix the interface implementation
-   func NewManager(config interfaces.ConfigManager) *Manager
-   ```
+3. **Are you managing state or context?**
+   - **Yes** → Use Context patterns with interface types
+   - **No** → Continue to step 4
 
-2. **Missing Interface Methods**
-   ```go
-   // ❌ WRONG - Don't use concrete types
-   func (m *Manager) Process(data *spookytypes.Data) error
-   
-   // ✅ CORRECT - Implement missing interface methods
-   func (m *Manager) Process(data interfaces.DataInterface) error
-   ```
+4. **Are you handling dependencies?**
+   - **Yes** → Use dependency injection with interfaces
+   - **No** → Use Manager patterns for coordination
 
-3. **Import Cycle Issues**
-   ```go
-   // ❌ WRONG - Don't break interface contracts
-   import "spooky/internal/concrete"
-   
-   // ✅ CORRECT - Use interfaces to break cycles
-   import "spooky/internal/interfaces"
-   ```
+### AI Action Items
 
-## Interface Contract Enforcement
+**ALWAYS DO:**
+- Design interfaces first, implementations second
+- Use dependency injection with interface types
+- Coordinate through IntegrationManager
+- Pass contexts as interfaces
+- Maintain loose coupling between components
+- Follow established architectural patterns
 
-### Manager Pattern Requirements:
-- All managers MUST implement their respective interfaces
-- All managers MUST accept interfaces as dependencies
-- All managers MUST return interfaces where appropriate
-- All managers MUST delegate to specialized components through interfaces
+**NEVER DO:**
+- Create tight coupling between concrete implementations
+- Bypass interface contracts for convenience
+- Create direct dependencies between packages
+- Ignore established architectural patterns
+- Use concrete types for coordination
 
-### Context Pattern Requirements:
-- All context objects MUST be passed as interfaces
-- All context operations MUST use interface types
-- All context validation MUST work with interface contracts
+## Core Architectural Principles
 
-### Integration Pattern Requirements:
-- All integrations MUST be accessed through IntegrationManager
-- All integrations MUST implement their respective interfaces
-- All integrations MUST handle their own error conditions through interfaces
+### 1. Interface-First Design
+- Define interfaces before implementations
+- Interfaces should be stable and well-documented
+- Implementations should satisfy interface contracts
+- Use interfaces for all public APIs
 
-## Compilation Error Resolution Steps
-
-### Step 1: Identify the Root Cause
-- Check if interface methods are properly implemented
-- Verify interface contracts are satisfied
-- Ensure proper import structure
-
-### Step 2: Fix Interface Implementation
-- Implement missing interface methods
-- Fix method signatures to match interfaces
-- Ensure proper error handling through interfaces
-
-### Step 3: Use Dependency Injection
+### 2. Dependency Injection
 - Pass interfaces as constructor parameters
-- Use interfaces in method signatures
-- Maintain loose coupling through interfaces
+- Use interfaces for all dependencies
+- Avoid direct instantiation of concrete types
+- Enable testing through interface mocking
 
-### Step 4: Verify Interface Compliance
-- Ensure all implementations satisfy their interfaces
-- Check that interface contracts are maintained
-- Verify no concrete type dependencies are created
+### 3. Loose Coupling
+- Components should depend on interfaces, not concrete types
+- Minimize direct dependencies between packages
+- Use interfaces to break import cycles
+- Coordinate through well-defined interfaces
 
-## Common Anti-Patterns to Avoid
+### 4. Separation of Concerns
+- Each component has a single responsibility
+- Interfaces define clear boundaries
+- Managers coordinate between specialized components
+- Contexts provide state without tight coupling
 
-### ❌ Anti-Pattern 1: Concrete Type Dependencies
+## Manager Pattern Architecture
+
+### IntegrationManager Coordination
+The IntegrationManager serves as the central coordinator for all system integrations:
+
 ```go
-// ❌ WRONG - Direct concrete type dependency
-type Manager struct {
-    config *spookyconfig.Manager
-    facts  *spookyfacts.Manager
+type IntegrationManager interface {
+    GetFactsIntegration() FactsIntegration
+    GetActionsIntegration() ActionsIntegration
+    GetVariablesIntegration() VariablesIntegration
+    GetTemplatesIntegration() TemplatesIntegration
+    GetMachinesIntegration() MachinesIntegration
+    GetSecretsIntegration() SecretsIntegration
+    GetConfigIntegration() ConfigIntegration
 }
+```
 
-// ✅ CORRECT - Interface-based dependency
-type Manager struct {
-    config interfaces.ConfigManager
-    facts  interfaces.FactsManager
+**Architectural Benefits:**
+- Centralized coordination
+- Loose coupling between integrations
+- Consistent access patterns
+- Simplified dependency management
+
+### Manager Responsibilities
+Each manager follows consistent architectural patterns:
+
+- **High-level coordination** between specialized components
+- **Interface-based delegation** to specialized services
+- **Context creation and validation** for operations
+- **Error handling and propagation** through interfaces
+- **Resource management** and lifecycle coordination
+
+## Context Pattern Architecture
+
+### Context as State Management
+Contexts provide immutable state and configuration:
+
+```go
+type ProjectContext interface {
+    GetProjectPath() string
+    GetFactsContext() FactsContext
+    GetVariablesContext() VariablesContext
+    GetTemplatesContext() TemplatesContext
+    GetMachinesContext() MachinesContext
+    GetActionsContext() ActionsContext
 }
 ```
 
-### ❌ Anti-Pattern 2: Interface Removal
-```go
-// ❌ WRONG - Removing interface usage
-func (m *Manager) LoadConfig() (*spookyconfig.Config, error)
+**Architectural Benefits:**
+- Immutable state management
+- Clear data flow through operations
+- Validation at context boundaries
+- Consistent state access patterns
 
-// ✅ CORRECT - Maintaining interface usage
-func (m *Manager) LoadConfig() (interfaces.ConfigInterface, error)
+### Context Validation
+All contexts should be validated before use:
+
+- **Required fields** must be present and valid
+- **Cross-field validation** for consistency
+- **Immutable once created** to prevent state corruption
+- **Interface-based access** for loose coupling
+
+## Integration Pattern Architecture
+
+### Integration Coordination
+Integrations are accessed through the IntegrationManager:
+
+```go
+func ProcessFacts(manager interfaces.IntegrationManager, ctx interfaces.FactsContext) error {
+    factsIntegration := manager.GetFactsIntegration()
+    return factsIntegration.CollectFacts(ctx)
+}
 ```
 
-### ❌ Anti-Pattern 3: Direct Package Imports
-```go
-// ❌ WRONG - Direct package dependency
-import "spooky/internal/config"
-import "spooky/internal/facts"
+**Architectural Benefits:**
+- Consistent access patterns
+- Centralized coordination
+- Loose coupling between components
+- Simplified testing and mocking
 
-// ✅ CORRECT - Interface-based dependency
-import "spooky/internal/interfaces"
+### Integration Responsibilities
+Each integration follows consistent patterns:
+
+- **Domain-specific operations** with clear boundaries
+- **Interface-based contracts** for consistency
+- **Error handling** through structured error types
+- **Health validation** for operational monitoring
+
+## Acting Pattern Architecture
+
+### Acting vs Execution
+All action processing follows the Acting pattern:
+
+```go
+type ActingManager interface {
+    CreateSession(ctx interfaces.ActionExecutionContext) (ActingSession, error)
+    RunAction(session ActingSession, action interfaces.Action) error
+    ProcessResults(session ActingSession) ([]ActingResult, error)
+}
 ```
 
-## Interface Implementation Guidelines
+**Architectural Benefits:**
+- Clear separation from "execution" terminology
+- Session-based state management
+- Result aggregation and processing
+- Consistent acting patterns across the system
 
-### When Adding New Features:
-1. **Define interfaces first** in `./internal/interfaces/`
-2. **Implement interfaces** in concrete packages
-3. **Use interfaces** in all public APIs
-4. **Maintain interface contracts** throughout
+### Acting Session Management
+Sessions provide stateful context for acting operations:
 
-### When Refactoring:
-1. **Preserve interface contracts** - don't break existing interfaces
-2. **Update implementations** to satisfy interfaces
-3. **Maintain loose coupling** through interfaces
-4. **Test interface compliance** after changes
+- **Session lifecycle** management
+- **State tracking** for acting progress
+- **Result collection** and aggregation
+- **Error handling** and recovery
 
-### When Fixing Errors:
-1. **Identify interface issues** first
-2. **Fix interface implementations** before changing architecture
-3. **Use dependency injection** with interfaces
-4. **Verify interface compliance** after fixes
+## Validation Pattern Architecture
+
+### Comprehensive Validation
+All components support validation through interfaces:
+
+```go
+type ActionValidator interface {
+    ValidateAction(action interfaces.Action) (ValidationResult, error)
+    ValidateCollection(actions []interfaces.Action) (ValidationResult, error)
+    ValidateContext(ctx interfaces.ActionExecutionContext) (ValidationResult, error)
+}
+```
+
+**Architectural Benefits:**
+- Consistent validation patterns
+- Configurable validation rules
+- Detailed error reporting
+- Interface-based validation contracts
+
+### Validation Configuration
+Validation should be configurable and extensible:
+
+- **Strict vs lenient** validation modes
+- **Custom validation rules** for specific domains
+- **Error aggregation** for comprehensive reporting
+- **Performance optimization** for large datasets
+
+## Storage Pattern Architecture
+
+### Interface-Based Storage
+Storage operations follow consistent patterns:
+
+```go
+type StorageBackend interface {
+    Set(key string, value interface{}) error
+    Get(key string) (interface{}, error)
+    Delete(key string) error
+    List(prefix string) ([]string, error)
+}
+```
+
+**Architectural Benefits:**
+- Pluggable storage backends
+- Consistent storage operations
+- Interface-based storage contracts
+- Simplified testing and mocking
+
+### Storage Specialization
+Domain-specific storage interfaces extend the base pattern:
+
+- **FactStorage** for fact-specific operations
+- **ExportableStorage** for import/export operations
+- **EncryptedStorage** for secure data storage
+- **QueryableStorage** for complex data queries
 
 ## Integration Points
 
+### System-Wide Coordination
 Always ensure new code integrates with:
+
 1. **IntegrationManager** - For system-wide coordination
 2. **Interface contracts** - For proper abstraction
 3. **Dependency injection** - For loose coupling
-4. **Error interfaces** - For proper error handling
+4. **Context patterns** - For state management
+5. **Validation interfaces** - For data validation
+6. **Storage interfaces** - For data persistence
 
-## Validation Checklist
+### Architectural Consistency
+Maintain consistency across all components:
 
-Before committing changes, verify:
-- [ ] All managers implement their interfaces
-- [ ] All dependencies use interfaces, not concrete types
-- [ ] No direct package imports between implementation packages
-- [ ] All public APIs use interface types
-- [ ] Interface contracts are maintained
-- [ ] No compilation errors related to interface usage
-- [ ] Loose coupling is preserved through interfaces
+- **Interface-based design** for all public APIs
+- **Dependency injection** for all dependencies
+- **Context-based state** for all operations
+- **Validation interfaces** for all data validation
+- **Error interfaces** for all error handling
 
-## Error Resolution Examples
+## AI Assistant Checklist
 
-### Example 1: Missing Interface Method
-```go
-// ❌ Problem: Missing interface method
-type Manager struct{}
+When designing or implementing architecture, ensure:
 
-// ❌ WRONG - Don't remove interface requirement
-func NewManager() *Manager
-
-// ✅ CORRECT - Implement missing interface method
-func (m *Manager) RequiredMethod() error {
-    return nil
-}
-```
-
-### Example 2: Interface Type Mismatch
-```go
-// ❌ Problem: Wrong return type
-func (m *Manager) GetData() *spookytypes.Data
-
-// ❌ WRONG - Don't change interface contract
-func (m *Manager) GetData() *spookytypes.Data
-
-// ✅ CORRECT - Fix to match interface
-func (m *Manager) GetData() interfaces.DataInterface
-```
-
-### Example 3: Import Cycle
-```go
-// ❌ Problem: Import cycle between packages
-import "spooky/internal/config"
-import "spooky/internal/project"
-
-// ❌ WRONG - Don't use concrete types to break cycle
-type Manager struct {
-    config *spookyconfig.Manager
-}
-
-// ✅ CORRECT - Use interfaces to break cycle
-import "spooky/internal/interfaces"
-
-type Manager struct {
-    config interfaces.ConfigManager
-}
-```
+- [ ] Interfaces are defined before implementations
+- [ ] Dependency injection uses interface types
+- [ ] IntegrationManager coordinates system components
+- [ ] Contexts provide immutable state management
+- [ ] Acting patterns use correct terminology
+- [ ] Validation follows interface contracts
+- [ ] Storage operations use interface patterns
+- [ ] Loose coupling is maintained throughout
+- [ ] Separation of concerns is respected
+- [ ] Architectural patterns are consistently applied
 
 ## Remember
 
-**Interfaces are the foundation of the spooky architecture. They enable:**
-- Loose coupling between components
-- Testability through mocking
-- Flexibility for future changes
-- Clear separation of concerns
+**Interface architecture enables:**
 - Maintainable and extensible code
+- Testable components through mocking
+- Flexible system evolution
+- Clear separation of concerns
+- Consistent system behavior
+
+**Always design with interfaces first, implement with concrete types second, and coordinate through well-defined architectural patterns.**
 
 **Never sacrifice interface-based architecture for quick compilation fixes. Always fix the root cause while maintaining the interface contracts.**
-description:
-globs:
-alwaysApply: false
----
