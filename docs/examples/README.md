@@ -14,8 +14,11 @@ docs/examples/
 │   └── machines-kubernetes-nodes.hcl
 ├── facts/                       # Facts collection examples (future)
 │   └── README.md
-├── variables/                   # Variables management examples (future)
-│   └── README.md
+├── variables/                   # Variables management examples
+│   ├── README.md               # Variables-specific documentation
+│   ├── variables-basic-config.hcl
+│   ├── variables-multi-file.hcl
+│   └── variables-with-dependencies.hcl
 ├── actions/                     # Actions and orchestration examples (future)
 │   └── README.md
 ├── templates/                   # Template rendering examples (future)
@@ -30,6 +33,10 @@ docs/examples/
 
 ### ✅ Machines System
 **Location:** [`machines/`](machines/)
+**Status:** Complete with comprehensive examples
+
+### ✅ Variables System
+**Location:** [`variables/`](variables/)
 **Status:** Complete with comprehensive examples
 
 **Examples Available:**
@@ -56,14 +63,19 @@ docs/examples/
 - Fact validation and processing
 
 #### Variables System
-**Location:** `variables/` (to be created)
-**Purpose:** Examples for variable management and resolution
+**Location:** [`variables/`](variables/)
+**Status:** Complete with comprehensive examples
 
-**Planned Examples:**
-- Basic variable definitions
-- Variable dependencies
-- Environment-specific variables
-- Variable validation and constraints
+**Examples Available:**
+- **Basic Configuration** - Simple variable setup for getting started
+- **Multi-File Organization** - Project-level variable management
+- **Complex Dependencies** - Advanced variable relationships and validation
+
+**Use Cases:**
+- Variable management and organization
+- Dependency resolution and validation
+- Environment-specific configuration
+- Sensitive data handling
 
 #### Actions System
 **Location:** `actions/` (to be created)

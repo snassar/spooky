@@ -173,16 +173,34 @@ type ActionsIntegration interface {
 	RunActions(ctx context.Context, actions []spookytypes.Action, machines []spookytypes.Machine) ([]spookytypes.ActingResult, error)
 }
 
+// VariableValidator provides variable validation
+type VariableValidator interface {
+	// ValidateVariables validates a collection of variables
+	ValidateVariables(ctx context.Context, variables map[string]*spookytypes.Variable) (*spookytypes.ValidationResult, error)
+
+	// ValidateVariable validates a single variable
+	ValidateVariable(ctx context.Context, variable *spookytypes.Variable) (*spookytypes.ValidationResult, error)
+}
+
+// VariableLoader provides variable loading
+type VariableLoader interface {
+	// LoadVariablesFromFile loads variables from a file
+	LoadVariablesFromFile(ctx context.Context, filePath string) (map[string]*spookytypes.Variable, error)
+
+	// LoadVariablesFromDirectory loads variables from a directory
+	LoadVariablesFromDirectory(ctx context.Context, dirPath string) (map[string]*spookytypes.Variable, error)
+}
+
 // VariablesIntegration provides variable management
 type VariablesIntegration interface {
 	// LoadVariables loads variables from the given source
-	LoadVariables(ctx context.Context, source string) (map[string]interface{}, error)
+	LoadVariables(ctx context.Context, source string) (map[string]*spookytypes.Variable, error)
 
 	// ResolveVariables resolves variables with the given context
-	ResolveVariables(ctx context.Context, variables map[string]interface{}, context map[string]interface{}) (map[string]interface{}, error)
+	ResolveVariables(ctx context.Context, variables map[string]*spookytypes.Variable, context *spookytypes.VariableContext) (*spookytypes.VariableResolutionResult, error)
 
 	// ValidateVariables validates variables
-	ValidateVariables(ctx context.Context, variables map[string]interface{}) (*spookytypes.ValidationResult, error)
+	ValidateVariables(ctx context.Context, variables map[string]*spookytypes.Variable) (*spookytypes.ValidationResult, error)
 }
 
 // TemplatesIntegration provides template management
