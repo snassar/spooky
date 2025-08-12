@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the implementation of the spooky project system, which provides isolated, portable, and configurable environments for infrastructure automation. Projects integrate with the global facts system and configuration while maintaining their own identity and settings.
+This document outlines the implementation of the spooky project system, which provides isolated, portable, and configurable environments for infrastructure automation. Projects integrate with the facts system and configuration while maintaining their own identity and settings.
 
 **Schema Integration**: This project system implements the schema validation patterns and project structure definitions defined in [Schema System](../schema-system.md) for comprehensive project validation, metadata schema enforcement, and schema-based project lifecycle management.
 

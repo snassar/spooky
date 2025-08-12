@@ -14,7 +14,7 @@ This facts system integrates with other core Spooky systems to provide comprehen
 
 ### **Project System Integration**
 - **Project Initialization**: Facts database creation during `spooky project init` (see [Project System](../project-system.md))
-- **Project Isolation**: Project-specific facts storage with global facts sharing
+- **Project Isolation**: Project-specific facts storage
 - **Project Configuration**: Facts storage settings in `project.hcl` configuration
 - **Project Context**: Facts available in project run context
 
@@ -96,14 +96,13 @@ internal/facts/
 
 ## Storage Architecture
 
-### **1. Hybrid Approach: Global + Project Facts**
+### **1. Project Facts Storage**
 
-Based on our analysis and the architectural principles outlined in [Spooky Design](../spooky-design.md), we've decided on a hybrid approach that combines the benefits of global fact sharing with project isolation:
+Based on our analysis and the architectural principles outlined in [Spooky Design](../spooky-design.md), we've decided on a project-focused approach for facts storage:
 
 ```
-$XDG_STATE_HOME/spooky/global-facts.db    # Global facts (gopsutil, hardware, system)
 project/
-├── facts.db/                                # Project-specific facts (optional)
+├── facts.db/                                # Project-specific facts
 ├── project.hcl                              # Project configuration
 ├── machines.hcl                             # Machine inventory
 ├── actions.hcl                              # Action definitions
@@ -113,7 +112,7 @@ project/
 
 ### **2. Fact Classification**
 
-**Global Facts** (stored in `$XDG_STATE_HOME/spooky/global-facts.db`):
+**Project Facts** (stored in `project/facts.db/`):
 - ✅ **gopsutil facts** (hardware, system, network)
 - ✅ **BIOS information** (vendor, version, date)
 - ✅ **SSH host keys** (public keys)
@@ -121,12 +120,10 @@ project/
 - ✅ **Service manager detection** (systemd, upstart, etc.)
 - ✅ **SELinux status** (enabled, mode, type)
 - ✅ **System identification** (machine-id, hostname, IPs)
-
-**Project Facts** (stored in `project/facts.db/` - optional):
-- ❌ **Application versions** (nginx, postgres, etc.)
-- ❌ **Deployment states** (installed, configured, running)
-- ❌ **Configuration values** (custom app configs)
-- ❌ **Project-specific variables** (environment-specific data)
+- ✅ **Application versions** (nginx, postgres, etc.)
+- ✅ **Deployment states** (installed, configured, running)
+- ✅ **Configuration values** (custom app configs)
+- ✅ **Project-specific variables** (environment-specific data)
 
 ### **3. Enhanced Fact Collection**
 
@@ -258,35 +255,35 @@ func getBIOSInfo() map[string]string {
 ### **4. Fact Access Patterns**
 
 ```hcl
-# In any project, global facts are always available
+# Project facts are available in the project context
 action "use-hardware" {
   command = "setup.sh {{.facts.server1.cpu.cores}} {{.facts.server1.memory.total}}"
 }
 
-# Project-specific facts are isolated
+# Project-specific facts are available
 action "deploy-app" {
-  command = "deploy.sh {{.facts.server1.projects.myapp.app_version}}"
+  command = "deploy.sh {{.facts.server1.app_version}}"
 }
 
-# Facts merge automatically in templates
+# Facts are available in templates
 template "config.tmpl" {
-  # Global facts available everywhere
-  # {{.facts.server1.os}} - always available
-  # {{.facts.server1.cpu.cores}} - always available
+  # Project facts available in project context
+  # {{.facts.server1.os}} - available in project
+  # {{.facts.server1.cpu.cores}} - available in project
   
-  # Project facts only in project context
-  # {{.facts.server1.projects.myapp.app_version}} - project-specific
+  # Project facts in project context
+  # {{.facts.server1.app_version}} - project-specific
 }
 ```
 
 ### **5. Benefits of This Approach**
 
-1. **No Duplication**: gopsutil facts stored once, referenced everywhere
-2. **Clear Boundaries**: Global vs project facts are explicit
-3. **Performance**: No re-gathering of expensive system information
-4. **Simplicity**: One global database, clear access patterns
+1. **Project Isolation**: Facts stored per project, no cross-project leakage
+2. **Clear Boundaries**: Project facts are explicit and isolated
+3. **Performance**: Efficient fact collection and storage per project
+4. **Simplicity**: One project database, clear access patterns
 5. **Project Isolation**: Project facts don't leak between projects
-6. **Cross-Project Intelligence**: Hardware facts shared across projects
+6. **Project Intelligence**: Facts available within project context
 
 ### **6. Storage Types**
 
@@ -813,10 +810,7 @@ spooky facts list <project directory>       # List available facts
 spooky facts validate <project directory>   # Validate facts data
 spooky facts export <project directory>     # Export facts to various formats
 
-# Global facts operations
-spooky facts gather --global                # Collect facts to global storage
-spooky facts list --global                  # List facts from global storage
-spooky facts export --global --format json  # Export global facts
+
 ```
 
 ### Project Integration
@@ -1033,8 +1027,8 @@ Collision history:
 
 ## Implementation Phases
 
-### **Phase 1: Global Facts Database Foundation (Week 1)**
-**Goal**: Create global facts database with automatic initialization
+### **Phase 1: Project Facts Database Foundation (Week 1)**
+**Goal**: Create project facts database with automatic initialization
 
 #### Tasks:
 1. **Add BadgerDB dependency**
@@ -1042,18 +1036,18 @@ Collision history:
    go get github.com/dgraph-io/badger/v4
    ```
 
-2. **Create global facts storage** (`internal/facts/global_storage.go`)
-   - Implement `ensureGlobalFactsDB()` function
-   - Add XDG Base Directory compliance
+2. **Create project facts storage** (`internal/facts/project_storage.go`)
+   - Implement `ensureProjectFactsDB()` function
+   - Add project directory compliance
    - Create BadgerDB initialization
 
 3. **Update fact manager** (`internal/facts/manager.go`)
-   - Add global storage integration
-   - Implement fact persistence to global database
-   - Add fact retrieval from global database
+   - Add project storage integration
+   - Implement fact persistence to project database
+   - Add fact retrieval from project database
 
 4. **Schema validation integration**
-   - Integrate facts schema validation with global storage
+   - Integrate facts schema validation with project storage
    - Add self-checking database creation
    - Implement clear error handling
 
@@ -1073,28 +1067,28 @@ Collision history:
    - SSH host keys
    - BIOS information
 
-3. **Integrate with global storage**
-   - Store all enhanced facts in global database
-   - Make facts available across all projects
+3. **Integrate with project storage**
+   - Store all enhanced facts in project database
+   - Make facts available within project context
 
 4. **Enhanced fact collection**
    - Implement dynamic fact sources (JSON, scripts, YAML, HCL)
    - Add priority-based collision resolution
    - Create fact merging strategies
 
-### **Phase 3: Project Facts and Hybrid Storage (Week 3)**
-**Goal**: Add optional project-specific fact storage with hybrid approach
+### **Phase 3: Enhanced Project Facts Storage (Week 3)**
+**Goal**: Add enhanced project-specific fact storage
 
 #### Tasks:
-1. **Project facts storage** (`internal/facts/project_storage.go`)
-   - Implement project-specific fact storage
+1. **Enhanced project facts storage** (`internal/facts/project_storage.go`)
+   - Implement enhanced project-specific fact storage
    - Add project isolation
    - Create project fact access patterns
 
-2. **Fact merging** (`internal/facts/merger.go`)
-   - Merge global and project facts
+2. **Fact organization** (`internal/facts/organizer.go`)
+   - Organize project facts efficiently
    - Implement clear access patterns
-   - Add fact precedence rules
+   - Add fact categorization rules
 
 3. **Collision detection and resolution**
    - Implement machine ID collision detection
@@ -1111,16 +1105,12 @@ Collision history:
 
 #### Tasks:
 1. **Add facts commands** (`internal/cli/facts.go`)
-   - `spooky facts list` - List facts in global database
+   - `spooky facts list` - List facts in project database
    - `spooky facts show <machine>` - Show facts for specific machine
-   - `spooky facts export` - Export facts to JSON
-   - `spooky facts import` - Import facts from JSON
-   - `spooky facts delete` - Delete facts with filtering
-   - `spooky facts refresh` - Force refresh facts
-   - `spooky facts ttl` - TTL management
-   - `spooky facts config` - Configuration management
-   - `spooky facts dynamic` - Dynamic facts management
-   - `spooky facts collisions` - Collision management
+   - `spooky facts export` - Export facts to HCL/JSON
+   - `spooky facts import` - Import facts from HCL/JSON
+   - `spooky facts gather` - gather facts from the machines and save to facts.db
+
 
 2. **Configuration integration**
    - Use global configuration for storage settings
@@ -1150,7 +1140,7 @@ Collision history:
    - CLI command testing
 
 3. **Documentation**
-   - Global facts database usage
+   - Project facts database usage
    - Enhanced fact collection
    - CLI usage examples
    - Configuration examples
@@ -1218,10 +1208,10 @@ func OpenFactStorage(opts StorageOptions) (FactStorage, error) // For reading ex
 
 ### 🔄 **In Progress Features**
 
-#### **1. Global Facts Database**
-- 🔄 Global facts storage initialization
-- 🔄 Cross-project fact sharing
-- 🔄 XDG Base Directory compliance
+#### **1. Project Facts Database**
+- 🔄 Project facts storage initialization
+- 🔄 Project fact storage
+- 🔄 Project directory compliance
 
 #### **2. Enhanced Fact Collection**
 - 🔄 Package manager detection
@@ -1530,20 +1520,7 @@ spooky facts export ./my-project --format hcl --output facts.hcl
 spooky facts export ./my-project --machine "web-001" --format json --output web-001-facts.json
 ```
 
-### **Global Facts Operations**
-```bash
-# Gather facts to global storage
-spooky facts gather --global
 
-# List facts from global storage
-spooky facts list --global
-
-# Export global facts
-spooky facts export --global --format json --output global-facts.json
-
-# Validate global facts
-spooky facts validate --global
-```
 
 ### **Storage Configuration Examples**
 ```bash
@@ -1565,11 +1542,11 @@ spooky facts gather ./my-project
 ### **Immediate Benefits**
 - **Persistent fact storage** across spooky sessions
 - **Automatic deduplication** using machine IDs
-- **Cross-project fact sharing** with portable project names
+- **Project-specific fact storage** with portable project names
 - **Efficient querying** with BadgerDB backend
 - **Data portability** with JSON export/import
 - **Project isolation** for application-specific facts
-- **Global fact sharing** for system-level information
+- **Project fact storage** for system-level information
 - **Enhanced fact collection** with package managers, service managers, etc.
 
 ### **Long-term Benefits**
@@ -1583,9 +1560,9 @@ spooky facts gather ./my-project
 - **Change impact assessment** for intelligent updates
 
 ### **Architectural Benefits**
-- **Hybrid approach** solves the "Ansible variable passing problem"
-- **Clear boundaries** between global and project facts
-- **No duplication** of expensive system information
+- **Project-focused approach** solves the "Ansible variable passing problem"
+- **Clear boundaries** for project facts
+- **Efficient storage** of system information
 - **Performance optimization** through intelligent caching
 - **Flexible storage** with multiple backend options
 - **Schema validation** ensures data integrity
@@ -1603,7 +1580,7 @@ spooky facts gather ./my-project
 - [ ] Export/import functionality preserves data integrity
 - [ ] XDG Base Directory compliance is maintained
 - [ ] CLI commands provide clear feedback and error messages
-- [ ] Global facts are shared across projects
+- [ ] Project facts are stored per project
 - [ ] Project facts are isolated per project
 - [ ] Dynamic fact sources work correctly
 - [ ] TTL-based caching functions properly
@@ -1617,7 +1594,7 @@ spooky facts gather ./my-project
 - [ ] Memory usage stays reasonable for large fact collections
 - [ ] Export/import operations complete within acceptable timeframes
 - [ ] Fact collection with TTL caching reduces collection time by 80%
-- [ ] Global fact sharing reduces duplicate collection by 90%
+- [ ] Project fact storage reduces duplicate collection by 90%
 
 ### **User Experience Metrics**
 - [ ] Storage configuration is intuitive and follows XDG standards
@@ -1633,7 +1610,7 @@ spooky facts gather ./my-project
 - [ ] Facts storage integrates seamlessly with project initialization
 - [ ] Schema validation works during project creation
 - [ ] Export safety prevents accidental database creation
-- [ ] Global facts are available in all project contexts
+- [ ] Project facts are available in project context
 - [ ] Project facts are properly isolated
 - [ ] CLI integration follows noun-verb patterns
 - [ ] Configuration precedence works correctly
@@ -1853,9 +1830,9 @@ func buildTemplateContext(server string, manager *facts.Manager, projectPath str
         context["data"] = dataVars
     }
     
-    // 2. Load global facts (system facts from global storage)
-    if globalFacts, err := manager.GetGlobalFacts(server); err == nil {
-        context["facts"] = globalFacts
+    // 2. Load project facts (system facts from project storage)
+    if projectFacts, err := manager.GetProjectFacts(server); err == nil {
+        context["facts"] = projectFacts
     }
     
     // 3. Load custom facts (project-specific facts)

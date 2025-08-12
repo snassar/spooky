@@ -76,9 +76,9 @@ This schema system provides the foundation for all other Spooky systems through 
 - Self-contained binary distribution
 
 **Composed Schema Types:**
-- `global-facts-hcl-composed.hcl` - HCL format global facts schema
-- `global-facts-json-composed.hcl` - JSON format global facts schema  
-- `global-facts-badger-composed.hcl` - BadgerDB format global facts schema
+- `facts-hcl-composed.hcl` - HCL format facts schema
+- `facts-json-composed.hcl` - JSON format facts schema
+- `facts-badger-composed.hcl` - BadgerDB format facts schema
 
 **API Functions:**
 - `ComposeSchemas()` - Compose all schema combinations
@@ -104,9 +104,9 @@ internal/schemas/schemas/
 │   ├── hcl.hcl                  # HCL-specific validation rules
 │   ├── json.hcl                 # JSON-specific validation rules
 │   └── badger.hcl               # BadgerDB-specific validation rules
-├── global-facts-hcl.hcl         # Composed schema (includes base + format)
-├── global-facts-json.hcl        # Composed schema (includes base + format)
-└── global-facts-badger.hcl      # Composed schema (includes base + format)
+├── facts-hcl.hcl         # Composed schema (includes base + format)
+├── facts-json.hcl        # Composed schema (includes base + format)
+└── facts-badger.hcl      # Composed schema (includes base + format)
 ```
 
 #### **Build Integration**
@@ -255,7 +255,7 @@ Validates variable definitions and file merging (see [Variables System](../varia
 
 #### 4. **Global Configuration Schema**
 - XDG Base Directory configuration
-- Global facts database configuration
+- Facts database configuration
 - Global SSH defaults
 - Environment variable overrides
 

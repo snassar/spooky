@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the compatibility update made to `facts-export.hcl` to ensure it works seamlessly with the enhanced `global-facts-structure.hcl` and `project-facts-structure.hcl` schemas.
+This document describes the compatibility update made to `facts-export.hcl` to ensure it works seamlessly with the enhanced `facts-structure.hcl` schema.
 
 ## Problem Statement
 
@@ -88,8 +88,8 @@ facts_export = {
 - **Added**: Fact count information
 - **Added**: Export format validation (json/hcl only)
 
-### **2. Global Facts Compatibility**
-- **Updated**: Complete structure to match `global-facts-structure.hcl`
+### **2. Facts Compatibility**
+- **Updated**: Complete structure to match `facts-structure.hcl`
 - **Added**: All missing fields (custom facts, detailed hardware info)
 - **Added**: Proper validation rules and constraints
 - **Added**: Enhanced system information support
@@ -245,7 +245,7 @@ spooky facts import test.json
 
 ## Conclusion
 
-The `facts-export.hcl` schema is now **fully compatible** with the enhanced `global-facts-structure.hcl` and `project-facts-structure.hcl` schemas. This ensures:
+The `facts-export.hcl` schema is now **fully compatible** with the enhanced `facts-structure.hcl` schema. This ensures:
 
 - **Seamless Import/Export**: Exported files can be imported without issues
 - **Enhanced Validation**: Better data validation and error reporting
