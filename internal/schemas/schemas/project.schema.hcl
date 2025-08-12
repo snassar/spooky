@@ -194,6 +194,129 @@ project {
     additional_properties = "string"
   }
   
+  # Project-specific logging configuration (overrides global logging settings)
+  logging = {
+    type = "object"
+    required = false
+    description = "Project-specific logging configuration that overrides global settings"
+    
+    properties = {
+      level = {
+        type = "string"
+        required = false
+        enum = ["debug", "info", "warn", "error", "fatal"]
+        description = "Log level for this project (overrides global setting)"
+      }
+      
+      format = {
+        type = "string"
+        required = false
+        enum = ["json", "text", "structured"]
+        description = "Log format for this project (overrides global setting)"
+      }
+      
+      output = {
+        type = "string"
+        required = false
+        enum = ["stdout", "stderr", "file", "null"]
+        description = "Log output destination for this project (overrides global setting)"
+      }
+      
+      file = {
+        type = "object"
+        required = false
+        description = "File output configuration for this project"
+        
+        properties = {
+          path = {
+            type = "string"
+            required = false
+            description = "Path to log file (relative to project directory or absolute)"
+          }
+          
+          permissions = {
+            type = "string"
+            required = false
+            pattern = "^[0-7]{3,4}$"
+            default = "0644"
+            description = "File permissions in octal format (e.g., 0644)"
+          }
+          
+          append = {
+            type = "boolean"
+            required = false
+            default = true
+            description = "Append to existing log file instead of overwriting"
+          }
+        }
+      }
+      
+      filtering = {
+        type = "object"
+        required = false
+        description = "Component-specific filtering for this project"
+        
+        properties = {
+          components = {
+            type = "object"
+            required = false
+            additional_properties = "string"
+            description = "Component-specific log levels (e.g., 'ssh' = 'debug')"
+          }
+          
+          patterns = {
+            type = "array"
+            required = false
+            items = "string"
+            description = "Pattern-based filtering rules"
+          }
+        }
+      }
+      
+      rotation = {
+        type = "object"
+        required = false
+        description = "Log rotation configuration for this project"
+        
+        properties = {
+          enabled = {
+            type = "boolean"
+            required = false
+            default = false
+            description = "Enable log rotation for this project"
+          }
+          
+          max_size = {
+            type = "string"
+            required = false
+            description = "Maximum log file size (e.g., '100MB', '1GB')"
+          }
+          
+          max_age = {
+            type = "string"
+            required = false
+            description = "Maximum log file age (e.g., '24h', '7d', '30d')"
+          }
+          
+          max_backups = {
+            type = "integer"
+            required = false
+            min = 1
+            max = 100
+            description = "Maximum number of backup files to keep"
+          }
+          
+          compress = {
+            type = "boolean"
+            required = false
+            default = true
+            description = "Compress rotated log files"
+          }
+        }
+      }
+    }
+  }
+  
   # Validation rules
   validation = {
     # Project name validation
@@ -245,6 +368,45 @@ project {
       min = 1
       max = 100
       message = "Facts parallel collection must be between 1 and 100 workers"
+    }
+    
+    # Logging validation
+    logging_level_valid = {
+      rule = "enum"
+      values = ["debug", "info", "warn", "error", "fatal"]
+      message = "Log level must be one of: debug, info, warn, error, fatal"
+    }
+    
+    logging_format_valid = {
+      rule = "enum"
+      values = ["json", "text", "structured"]
+      message = "Log format must be one of: json, text, structured"
+    }
+    
+    logging_output_valid = {
+      rule = "enum"
+      values = ["stdout", "stderr", "file", "null"]
+      message = "Log output must be one of: stdout, stderr, file, null"
+    }
+    
+    logging_file_permissions_valid = {
+      rule = "regex"
+      pattern = "^[0-7]{3,4}$"
+      message = "File permissions must be in octal format (e.g., 0644)"
+    }
+    
+    logging_rotation_backups_reasonable = {
+      rule = "range"
+      min = 1
+      max = 100
+      message = "Maximum log backups must be between 1 and 100"
+    }
+    
+    logging_file_path_required = {
+      rule = "required_if"
+      condition = "output == 'file'"
+      field = "logging.file.path"
+      message = "File path is required when output is set to 'file'"
     }
   }
 } 

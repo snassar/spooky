@@ -123,6 +123,8 @@ project_directory "project_root" {
     "actions_file_or_directory_exists", 
     "variables_file_or_directory_exists",
     "facts_database_initialized",
-    "no_circular_references"
+    "no_circular_references",
+    "logging_file_output_requires_logs_directory",
+    "logging_file_path_validation"
   ]
 }
