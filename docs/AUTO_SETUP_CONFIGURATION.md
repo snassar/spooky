@@ -99,7 +99,7 @@ actions {
   dry_run_default = false
   
   # Validate actions before execution
-  validate_before_execute = true
+  validate_before_run = true
   
   # Create backups before making changes
   backup_before_changes = false

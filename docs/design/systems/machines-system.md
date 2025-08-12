@@ -15,7 +15,7 @@ This machines system integrates with other core Spooky systems to provide compre
 ### **Actions System Integration**
 - **Target Selection**: Actions use machine inventory for target selection via tags, names, or filters (see [Actions System](../actions-system.md))
 - **Machine Resolution**: Actions resolve machine targets through the machines system's indexing and lookup capabilities
-- **Execution Context**: Actions execute within machine-specific contexts with authentication and connection details
+- **Execution Context**: Actions run within machine-specific contexts with authentication and connection details
 - **Parallel Execution**: Machine inventory supports parallel action execution across multiple targets
 
 ### **Facts System Integration**
@@ -27,7 +27,7 @@ This machines system integrates with other core Spooky systems to provide compre
 ### **Project System Integration**
 - **Project Inventory**: Machine inventory is stored in project-specific `machines.hcl` files (see [Project System](../project-system.md))
 - **Project Isolation**: Each project maintains its own machine inventory with project-specific settings
-- **Project Context**: Machine operations execute within project context and configuration
+- **Project Context**: Machine operations run within project context and configuration
 - **Project Validation**: Machine inventory validation integrated with project validation
 
 ### **CLI System Integration**
@@ -539,8 +539,8 @@ func (cp *ConnectionPool) GetConnection(machine *Machine) (*ssh.Client, error) {
 
 **Parallel Machine Operations**:
 ```go
-// ExecuteParallel executes operations on machines in parallel
-func ExecuteParallel(machines []*Machine, operation func(*Machine) error, maxParallel int) error {
+// RunParallel runs operations on machines in parallel
+func RunParallel(machines []*Machine, operation func(*Machine) error, maxParallel int) error {
     semaphore := make(chan struct{}, maxParallel)
     var wg sync.WaitGroup
     errors := make(chan error, len(machines))

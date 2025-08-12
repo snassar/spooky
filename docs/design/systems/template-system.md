@@ -17,7 +17,7 @@ This document is the authoritative source for all template system implementation
 This template system integrates with other core Spooky systems to provide comprehensive template rendering and dynamic content generation:
 
 ### **Actions System Integration**
-- **Template Actions**: Actions can execute template rendering and deployment (see [Actions System](../actions-system.md))
+- **Template Actions**: Actions can run template rendering and deployment (see [Actions System](../actions-system.md))
 - **Template Context**: Actions provide template context with facts, variables, and machine data
 - **Template Deployment**: Actions can deploy rendered templates to target machines
 - **Template Validation**: Actions validate templates before execution
@@ -36,7 +36,7 @@ This template system integrates with other core Spooky systems to provide compre
 
 ### **Project System Integration**
 - **Project Templates**: Templates are stored in project-specific `templates/` directories (see [Project System](../project-system.md))
-- **Project Context**: Templates execute within project context and configuration
+- **Project Context**: Templates run within project context and configuration
 - **Project Data**: Templates have access to project-specific data and configuration
 - **Project Validation**: Template validation integrated with project validation
 

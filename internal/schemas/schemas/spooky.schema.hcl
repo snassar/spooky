@@ -199,7 +199,7 @@ spooky {
       type = "boolean"
       required = false
       default = true
-      description = "Enable sandbox mode for template execution"
+      description = "Enable sandbox mode for template running"
     }
     
     allowed_functions = {
@@ -332,7 +332,7 @@ spooky {
       min = 2
       max = 100
       default = 10
-      description = "Default parallel execution limit"
+      description = "Default parallel run limit"
     }
     
     max_memory = {

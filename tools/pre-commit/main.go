@@ -102,7 +102,7 @@ func runPreCommitChecks(cmdr Commander) error {
 		return fmt.Errorf("failed to print status: %w", err)
 	}
 	if err := cmdr.Run("go", "test", "./...", "-coverprofile=./tests/coverage.out", "-covermode=atomic", "-coverpkg=./...", "-v"); err != nil {
-		errorMsg := fmt.Sprintf("❌ Test execution failed: %v", err)
+		errorMsg := fmt.Sprintf("❌ Test run failed: %v", err)
 		if _, printErr := stdPrintln(errorMsg); printErr != nil {
 			return fmt.Errorf("failed to print error: %w", printErr)
 		}

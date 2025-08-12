@@ -443,7 +443,7 @@ type Session struct {
     PtyConfig *PtyConfig `json:"pty_config,omitempty" hcl:"pty_config,optional"`
 
     // Session metrics
-    CommandsExecuted int           `json:"commands_executed" hcl:"commands_executed"`
+    ActionsRun int           `json:"actions_run" hcl:"actions_run"`
     TotalExecutionTime time.Duration `json:"total_execution_time" hcl:"total_execution_time"`
     AverageCommandTime time.Duration `json:"average_command_time" hcl:"average_command_time"`
 }
@@ -898,7 +898,7 @@ transfer := &spookytypesssh.FileTransfer{
     Permissions: 0o644,
 }
 
-// Execute transfer
+// Run transfer
 result, err := ftm.TransferFile(ctx, connection, transfer)
 if err != nil {
     log.Printf("Transfer failed: %v", err)
@@ -923,7 +923,7 @@ transfer := &spookytypesssh.FileTransfer{
     Verify:      true,
 }
 
-// Execute transfer
+// Run transfer
 result, err := ftm.TransferFile(ctx, connection, transfer)
 ```
 

@@ -33,7 +33,7 @@ actions {
       type = "string"
       required = true
       enum = ["command", "script", "template_deploy", "template_evaluate", "template_validate", "template_cleanup", "file_copy", "service_control"]
-      description = "Action execution type"
+      description = "Action run type"
     }
     
     command = {
@@ -41,7 +41,7 @@ actions {
       required = false
       min_length = 1
       max_length = 1000
-      description = "Command to execute (for command type)"
+      description = "Command to run (for command type)"
       validation = {
         pattern = "^(?!.*[;&|`$]).*$"
         message = "Command cannot contain shell operators or special characters"
@@ -264,7 +264,7 @@ actions {
       type = "boolean"
       required = false
       default = false
-      description = "Execute action in parallel across machines"
+      description = "Run action in parallel across machines"
     }
     
     retries = {
@@ -306,7 +306,7 @@ actions {
       type = "string"
       required = false
       pattern = "^[a-zA-Z0-9/._-]+$"
-      description = "Working directory for command execution"
+      description = "Working directory for command running"
     }
     
     user = {
@@ -327,7 +327,7 @@ actions {
       type = "boolean"
       required = false
       default = false
-      description = "Show what would be executed without actually running"
+      description = "Show what would be run without actually running"
     }
     
     # Extended properties for action metadata and organization
@@ -351,7 +351,7 @@ actions {
       type = "boolean"
       required = false
       default = false
-      description = "Whether action failure should stop execution"
+      description = "Whether action failure should stop running"
     }
     
     metadata = {
@@ -366,14 +366,14 @@ actions {
       type = "boolean"
       required = false
       default = true
-      description = "Validate action before execution"
+      description = "Validate action before running"
     }
     
     allow_failure = {
       type = "boolean"
       required = false
       default = false
-      description = "Allow action to fail without stopping execution"
+      description = "Allow action to fail without stopping running"
     }
     
     # Performance and resource properties
@@ -383,13 +383,13 @@ actions {
       min = 1
       max = 100
       default = 1
-      description = "Maximum concurrent executions of this action"
+      description = "Maximum concurrent runs of this action"
     }
     
     resource_limits = {
       type = "object"
       required = false
-      description = "Resource limits for action execution"
+      description = "Resource limits for action running"
       
       properties = {
         memory_mb = {

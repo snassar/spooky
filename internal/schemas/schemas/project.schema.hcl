@@ -64,11 +64,11 @@ project {
     description = "Project website or documentation URL"
   }
   
-  # Project execution settings
-  execution = {
+  # Project run settings
+run = {
     type = "object"
     required = false
-    description = "Project execution configuration"
+          description = "Project run configuration"
     
     properties = {
       default_timeout = {
@@ -86,7 +86,7 @@ project {
         min = 1
         max = 100
         default = 10
-        description = "Maximum parallel executions"
+        description = "Maximum parallel runs"
       }
       
       dry_run_default = {
@@ -96,11 +96,11 @@ project {
         description = "Default dry-run mode for actions"
       }
       
-      validate_before_execute = {
+      validate_before_run = {
         type = "boolean"
         required = false
         default = true
-        description = "Validate project configuration before execution"
+        description = "Validate project configuration before running"
       }
       
       backup_before_changes = {
@@ -340,7 +340,7 @@ project {
       message = "Contact URL must be a valid URI"
     }
     
-    # Execution validation
+    # Run validation
     timeout_reasonable = {
       rule = "range"
       min = 1
@@ -352,7 +352,7 @@ project {
       rule = "range"
       min = 1
       max = 100
-      message = "Maximum parallel executions must be between 1 and 100"
+              message = "Maximum parallel runs must be between 1 and 100"
     }
     
     # Facts validation

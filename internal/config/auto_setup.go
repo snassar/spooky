@@ -10,7 +10,7 @@ import (
 )
 
 // AutoSetupConfig ensures spooky configuration directory exists and is properly configured
-// This function is called before any spooky command execution (except --version and --help)
+// This function is called before any spooky command run (except --version and --help)
 func AutoSetupConfig() error {
 	// Determine OS and get appropriate config directory
 	configDir, err := getConfigDirectory()
@@ -197,14 +197,14 @@ actions {
   # Default action timeout (in seconds)
   default_timeout = 300
   
-  # Maximum parallel action executions
+  # Maximum parallel action runs
   max_parallel = 10
   
   # Enable dry-run mode by default
   dry_run_default = false
   
-  # Validate actions before execution
-  validate_before_execute = true
+  # Validate actions before running
+  validate_before_run = true
   
   # Create backups before making changes
   backup_before_changes = false

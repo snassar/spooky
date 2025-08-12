@@ -242,7 +242,7 @@ const (
 	SessionStatusCreated   = spookytypesssh.SessionStatusCreated
 	SessionStatusStarting  = spookytypesssh.SessionStatusStarting
 	SessionStatusActive    = spookytypesssh.SessionStatusActive
-	SessionStatusExecuting = spookytypesssh.SessionStatusExecuting
+	SessionStatusRunning   = spookytypesssh.SessionStatusRunning
 	SessionStatusCompleted = spookytypesssh.SessionStatusCompleted
 	SessionStatusFailed    = spookytypesssh.SessionStatusFailed
 	SessionStatusClosed    = spookytypesssh.SessionStatusClosed
@@ -251,7 +251,7 @@ const (
 	ActingSessionStatusCreated   = spookytypesssh.ActingSessionStatusCreated
 	ActingSessionStatusStarting  = spookytypesssh.ActingSessionStatusStarting
 	ActingSessionStatusActive    = spookytypesssh.ActingSessionStatusActive
-	ActingSessionStatusExecuting = spookytypesssh.ActingSessionStatusExecuting
+	ActingSessionStatusRunning   = spookytypesssh.ActingSessionStatusRunning
 	ActingSessionStatusCompleted = spookytypesssh.ActingSessionStatusCompleted
 	ActingSessionStatusFailed    = spookytypesssh.ActingSessionStatusFailed
 	ActingSessionStatusClosed    = spookytypesssh.ActingSessionStatusClosed

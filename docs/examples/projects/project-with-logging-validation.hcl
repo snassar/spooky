@@ -15,7 +15,7 @@ project "example-project" {
     default_timeout = 300
     max_parallel = 10
     dry_run_default = false
-    validate_before_execute = true
+    validate_before_run = true
     backup_before_changes = false
   }
 

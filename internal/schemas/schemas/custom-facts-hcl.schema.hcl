@@ -249,7 +249,7 @@ facts {
     type = "string"
     required = true
     pattern = "^[0-7]{4}$"
-    description = "File permissions (e.g., 0644 for static files, 0755 for executable scripts)"
+    description = "File permissions (e.g., 0644 for static files, 0755 for runnable scripts)"
   }
   
   # File size limits
@@ -285,10 +285,10 @@ facts {
     }
     
     # Executable script validation
-    executable_validation = {
-      rule = "executable"
-      condition = "file_is_executable"
-      message = "Executable fact scripts must be valid shell scripts that output HCL"
+    runnable_validation = {
+      rule = "runnable"
+              condition = "file_is_runnable"
+              message = "Runnable fact scripts must be valid shell scripts that output HCL"
     }
     
     # Port number validation

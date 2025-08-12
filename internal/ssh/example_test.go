@@ -59,7 +59,7 @@ func Example() {
 		result.Connection.Port,
 		result.Connection.User)
 
-	// Execute a command
+	// Run a command
 	command := &spookytypes.SSHCommand{
 		Command:       "uname",
 		Args:          []string{"-a"},

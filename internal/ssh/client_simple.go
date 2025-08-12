@@ -1,5 +1,5 @@
 // Package ssh provides SSH client functionality for the spooky codebase.
-// This package implements SSH connections, authentication, and command execution.
+// This package implements SSH connections, authentication, and command running.
 package ssh
 
 import (

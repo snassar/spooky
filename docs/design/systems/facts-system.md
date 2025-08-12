@@ -437,8 +437,8 @@ func (c *LocalCollector) CollectCustomFacts() (map[string]interface{}, error) {
         
         // Check if file is executable
         if info, err := os.Stat(filePath); err == nil && info.Mode()&0111 != 0 {
-            // Execute dynamic fact script
-            customFacts[factName] = c.executeDynamicFact(filePath)
+            // Run dynamic fact script
+            customFacts[factName] = c.runDynamicFact(filePath)
         } else {
             // Parse static HCL fact file
             customFacts[factName] = c.parseStaticFact(filePath)

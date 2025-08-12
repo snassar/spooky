@@ -46,20 +46,20 @@ This project system integrates with other core Spooky systems to provide isolate
 ### **Machines System Integration**
 - **Project Inventory**: Machine inventory stored in project-specific `machines.hcl` files (see [Machines System](../machines-system.md))
 - **Project Isolation**: Each project maintains its own machine inventory
-- **Project Context**: Machine operations execute within project context
+- **Project Context**: Machine operations run within project context
 - **Project Validation**: Machine inventory validation integrated with project validation
 - **Enterprise Scale**: Project supports large machine inventories with efficient indexing
 
 ### **Actions System Integration**
 - **Project Actions**: Actions stored in project-specific `actions.hcl` and `actions/` directory (see [Actions System](../actions-system.md))
-- **Project Context**: Actions executed within project execution context
+- **Project Context**: Actions run within project execution context
 - **Project Configuration**: Action settings configured in project context
 - **Project Isolation**: Project actions isolated from global actions
 - **Dependency Management**: Project-level action dependency tracking
 
 ### **Template System Integration**
 - **Project Templates**: Templates stored in project-specific `templates/` directories (see [Template System](../template-system.md))
-- **Project Context**: Templates execute within project context and configuration
+- **Project Context**: Templates run within project context and configuration
 - **Project Data**: Templates have access to project-specific data and configuration
 - **Project Validation**: Template validation integrated with project validation
 - **Template Deployment**: Project supports template deployment workflows

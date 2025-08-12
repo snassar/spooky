@@ -218,12 +218,12 @@ template_functions {
               system = {
                 type = "boolean"
                 value = false
-                description = "Execute system commands (restricted)"
+                description = "Run system commands (restricted)"
               }
               custom = {
                 type = "boolean"
                 value = true
-                description = "Execute custom functions"
+                description = "Run custom functions"
               }
               default = {
                 type = "boolean"
@@ -235,10 +235,10 @@ template_functions {
         }
       }
       
-      # Function execution features
-      execution_features = {
+      # Function run features
+run_features = {
         type = "object"
-        description = "Function execution capabilities"
+                  description = "Function run capabilities"
         properties = {
           lazy_evaluation = {
             type = "boolean"
@@ -250,10 +250,10 @@ template_functions {
             value = true
             description = "Support for function result caching"
           }
-          parallel_execution = {
+                      parallel_run = {
             type = "boolean"
             value = false
-            description = "Support for parallel function execution"
+            description = "Support for parallel function running"
           }
           error_handling = {
             type = "boolean"
@@ -435,10 +435,10 @@ template_functions {
         type = "object"
         description = "Validation rules for function performance"
         properties = {
-          max_execution_time = {
+                      max_run_time = {
             type = "integer"
             value = 5000
-            description = "Maximum function execution time (ms)"
+            description = "Maximum function run time (ms)"
           }
           max_memory_usage = {
             type = "integer"
@@ -502,12 +502,12 @@ template_functions {
           max_concurrent_functions = {
             type = "integer"
             value = 20
-            description = "Maximum concurrent function executions"
+            description = "Maximum concurrent function runs"
           }
-          max_total_execution_time = {
+                      max_total_run_time = {
             type = "integer"
             value = 30000
-            description = "Maximum total function execution time (30s)"
+            description = "Maximum total function run time (30s)"
           }
           max_total_memory = {
             type = "integer"
@@ -863,7 +863,7 @@ template_functions {
               custom_function_sandboxing = {
                 type = "boolean"
                 value = true
-                description = "Sandbox custom function execution"
+                description = "Sandbox custom function running"
               }
               custom_function_caching = {
                 type = "boolean"
@@ -968,7 +968,7 @@ template_functions {
               parallel_timeout = {
                 type = "integer"
                 value = 10000
-                description = "Parallel execution timeout"
+                description = "Parallel run timeout"
               }
             }
           }
@@ -984,10 +984,10 @@ template_functions {
             type = "object"
             description = "Function metrics collection"
             properties = {
-              collect_execution_time = {
+              collect_run_time = {
                 type = "boolean"
                 value = true
-                description = "Collect function execution time"
+                description = "Collect function run time"
               }
               collect_memory_usage = {
                 type = "boolean"

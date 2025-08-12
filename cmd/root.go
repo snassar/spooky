@@ -21,7 +21,7 @@ var RootCmd = &cobra.Command{
 	Short: "A powerful automation and orchestration tool",
 	Long: `spooky is a powerful automation and orchestration tool built with Go.
 
-It provides declarative configuration, parallel execution capabilities, 
+It provides declarative configuration, parallel run capabilities, 
 and intelligent fact-driven decision making for heterogeneous environments.
 
 Examples:

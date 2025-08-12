@@ -274,7 +274,7 @@ func (m *Manager) createProjectHCL(project *spookytypes.Project) error {
 	defer file.Close()
 
 	if err := tmpl.Execute(file, project.Config); err != nil {
-		return fmt.Errorf("failed to execute project template: %w", err)
+		return fmt.Errorf("failed to run project template: %w", err)
 	}
 
 	return nil
@@ -297,7 +297,7 @@ This project follows the spooky project-directory.schema.hcl structure:
 
 ## Configuration
 
-Edit ` + "`" + `project.hcl` + "`" + ` to customize your project settings, execution parameters, and facts collection configuration.
+Edit ` + "`" + `project.hcl` + "`" + ` to customize your project settings, run parameters, and facts collection configuration.
 
 ## Usage
 
@@ -334,7 +334,7 @@ This project is validated against:
 	defer file.Close()
 
 	if err := tmpl.Execute(file, project.Config); err != nil {
-		return fmt.Errorf("failed to execute README template: %w", err)
+		return fmt.Errorf("failed to run README template: %w", err)
 	}
 
 	return nil

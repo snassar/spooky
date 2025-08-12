@@ -1,12 +1,12 @@
 // Package cli provides types for command-line interface operations in the spooky codebase.
-// These types define the structure for CLI commands, flags, and execution context.
+// These types define the structure for CLI commands, flags, and run context.
 package cli
 
 import (
 	"context"
 )
 
-// Command represents a CLI command with its execution logic
+// Command represents a CLI command with its run logic
 type Command interface {
 	// Name returns the command name
 	Name() string
@@ -17,14 +17,14 @@ type Command interface {
 	// Usage returns the command usage string
 	Usage() string
 
-	// Execute runs the command with the given context and arguments
+	// Run runs the command with the given context and arguments
 	Execute(ctx context.Context, args []string) error
 
 	// Validate validates the command arguments and flags
 	Validate(args []string) error
 }
 
-// CommandContext provides context for command execution
+// CommandContext provides context for command running
 type CommandContext struct {
 	// Command name
 	Name string `json:"name" hcl:"name"`
@@ -127,16 +127,16 @@ type CommandRegistry interface {
 	// List returns all registered commands
 	List() []Command
 
-	// Execute executes a command by name
-	Execute(ctx context.Context, name string, args []string) error
+	// Run runs a command by name
+	Run(ctx context.Context, name string, args []string) error
 }
 
-// CommandExecutor provides command execution functionality
+// CommandExecutor provides command run functionality
 type CommandExecutor interface {
-	// Execute executes a command with the given context
-	Execute(ctx context.Context, command Command, args []string) error
+	// Run runs a command with the given context
+	Run(ctx context.Context, command Command, args []string) error
 
-	// Validate validates command arguments before execution
+	// Validate validates command arguments before running
 	Validate(command Command, args []string) error
 
 	// Help provides help information for a command

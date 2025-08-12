@@ -28,9 +28,9 @@ type ActingSession struct {
 	Pty         *PtyConfig        `json:"pty,omitempty" hcl:"pty,optional"`
 
 	// Session metrics
-	CommandsExecuted int           `json:"commands_executed" hcl:"commands_executed"`
-	TotalExecTime    time.Duration `json:"total_exec_time" hcl:"total_exec_time"`
-	AverageExecTime  time.Duration `json:"average_exec_time" hcl:"average_exec_time"`
+	ActionsRun     int           `json:"actions_run" hcl:"actions_run"`
+	TotalRunTime   time.Duration `json:"total_run_time" hcl:"total_run_time"`
+	AverageRunTime time.Duration `json:"average_run_time" hcl:"average_run_time"`
 
 	// Session metadata
 	UserAgent    string `json:"user_agent,omitempty" hcl:"user_agent,optional"`
@@ -49,7 +49,7 @@ const (
 	ActingSessionStatusCreated   ActingSessionStatus = "created"
 	ActingSessionStatusStarting  ActingSessionStatus = "starting"
 	ActingSessionStatusActive    ActingSessionStatus = "active"
-	ActingSessionStatusExecuting ActingSessionStatus = "executing"
+	ActingSessionStatusRunning   ActingSessionStatus = "running"
 	ActingSessionStatusCompleted ActingSessionStatus = "completed"
 	ActingSessionStatusFailed    ActingSessionStatus = "failed"
 	ActingSessionStatusClosed    ActingSessionStatus = "closed"
@@ -65,7 +65,7 @@ const (
 	ActingModeCommand     ActingMode = "command"
 )
 
-// ActingCommand represents a command to be executed via SSH acting
+// ActingCommand represents a command to be run via SSH acting
 type ActingCommand struct {
 	spookytypescommon.CompleteEntity
 
@@ -96,7 +96,7 @@ type ActingCommand struct {
 	MaxRetries int        `json:"max_retries" hcl:"max_retries" default:"3"`
 }
 
-// ActingCommandResult represents the result of a command execution via SSH acting
+// ActingCommandResult represents the result of a command run via SSH acting
 type ActingCommandResult struct {
 	spookytypescommon.CompleteEntity
 
@@ -104,20 +104,20 @@ type ActingCommandResult struct {
 	Command *ActingCommand `json:"command" hcl:"command"`
 	Session *ActingSession `json:"session" hcl:"session"`
 
-	// Execution results
+	// Run results
 	Success  bool   `json:"success" hcl:"success"`
 	ExitCode int    `json:"exit_code" hcl:"exit_code"`
 	Stdout   string `json:"stdout,omitempty" hcl:"stdout,optional"`
 	Stderr   string `json:"stderr,omitempty" hcl:"stderr,optional"`
 	Error    string `json:"error,omitempty" hcl:"error,optional"`
 
-	// Execution metrics
+	// Run metrics
 	StartTime     time.Time     `json:"start_time" hcl:"start_time"`
 	EndTime       time.Time     `json:"end_time" hcl:"end_time"`
 	Duration      time.Duration `json:"duration" hcl:"duration"`
 	RetryAttempts int           `json:"retry_attempts" hcl:"retry_attempts"`
 
-	// Execution metadata
+	// Run metadata
 	Hostname    string            `json:"hostname,omitempty" hcl:"hostname,optional"`
 	Username    string            `json:"username,omitempty" hcl:"username,optional"`
 	WorkingDir  string            `json:"working_dir,omitempty" hcl:"working_dir,optional"`
@@ -133,7 +133,7 @@ type ActingCommandResult struct {
 	SequenceID int        `json:"sequence_id" hcl:"sequence_id"`
 }
 
-// ActingBatch represents a batch of commands to be executed via SSH acting
+// ActingBatch represents a batch of commands to be run via SSH acting
 type ActingBatch struct {
 	spookytypescommon.CompleteEntity
 
@@ -179,7 +179,7 @@ const (
 	ActingBatchStatusCancelled ActingBatchStatus = "cancelled"
 )
 
-// ActingBatchResult represents the result of a batch execution via SSH acting
+// ActingBatchResult represents the result of a batch run via SSH acting
 type ActingBatchResult struct {
 	spookytypescommon.CompleteEntity
 
@@ -211,7 +211,7 @@ type ActingBatchResult struct {
 	AuditTrail string `json:"audit_trail,omitempty" hcl:"audit_trail,optional"`
 }
 
-// ActingScript represents a script to be executed via SSH acting
+// ActingScript represents a script to be run via SSH acting
 type ActingScript struct {
 	spookytypescommon.CompleteEntity
 
@@ -245,7 +245,7 @@ type ActingScript struct {
 	ValidationError string `json:"validation_error,omitempty" hcl:"validation_error,optional"`
 }
 
-// ActingScriptResult represents the result of a script execution via SSH acting
+// ActingScriptResult represents the result of a script run via SSH acting
 type ActingScriptResult struct {
 	spookytypescommon.CompleteEntity
 
@@ -253,19 +253,19 @@ type ActingScriptResult struct {
 	Script  *ActingScript  `json:"script" hcl:"script"`
 	Session *ActingSession `json:"session" hcl:"session"`
 
-	// Execution results
+	// Run results
 	Success  bool   `json:"success" hcl:"success"`
 	ExitCode int    `json:"exit_code" hcl:"exit_code"`
 	Stdout   string `json:"stdout,omitempty" hcl:"stdout,optional"`
 	Stderr   string `json:"stderr,omitempty" hcl:"stderr,optional"`
 	Error    string `json:"error,omitempty" hcl:"error,optional"`
 
-	// Execution metrics
+	// Run metrics
 	StartTime time.Time     `json:"start_time" hcl:"start_time"`
 	EndTime   time.Time     `json:"end_time" hcl:"end_time"`
 	Duration  time.Duration `json:"duration" hcl:"duration"`
 
-	// Execution metadata
+	// Run metadata
 	Hostname    string            `json:"hostname,omitempty" hcl:"hostname,optional"`
 	Username    string            `json:"username,omitempty" hcl:"username,optional"`
 	WorkingDir  string            `json:"working_dir,omitempty" hcl:"working_dir,optional"`

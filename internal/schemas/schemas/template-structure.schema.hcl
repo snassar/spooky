@@ -65,7 +65,7 @@ template_structure {
     type = "string"
     required = true
     enum = ["restricted", "standard", "elevated", "trusted"]
-    description = "Security level for template execution"
+          description = "Security level for template running"
   }
 
   # Template rendering engine
@@ -379,10 +379,10 @@ template_structure {
         default = 10
       }
       
-      max_execution_time = {
+      max_run_time = {
         type = "integer"
         required = false
-        description = "Maximum template execution time in milliseconds"
+        description = "Maximum template run time in milliseconds"
         min = 100
         max = 30000
         default = 5000
@@ -611,12 +611,12 @@ template_structure {
       message = "Nesting depth must be between 1 and 50"
     }
     
-    # Execution time validation
-    execution_time_limits = {
+    # Run time validation
+run_time_limits = {
       rule = "range"
       min = 100
       max = 30000
-      message = "Execution time must be between 100ms and 30s"
+              message = "Run time must be between 100ms and 30s"
     }
     
     # Memory usage validation
@@ -729,10 +729,10 @@ template_structure {
               value = ["var", "varOrDefault", "upper", "lower", "trim"]
               description = "Functions allowed in restricted mode"
             }
-            max_execution_time = {
+            max_run_time = {
               type = "integer"
               value = 1000
-              description = "Maximum execution time in restricted mode (ms)"
+              description = "Maximum run time in restricted mode (ms)"
             }
           }
         }
@@ -746,10 +746,10 @@ template_structure {
               value = 25
               description = "Maximum functions allowed in standard mode"
             }
-            max_execution_time = {
+            max_run_time = {
               type = "integer"
               value = 5000
-              description = "Maximum execution time in standard mode (ms)"
+              description = "Maximum run time in standard mode (ms)"
             }
           }
         }
@@ -763,10 +763,10 @@ template_structure {
               value = 50
               description = "Maximum functions allowed in elevated mode"
             }
-            max_execution_time = {
+            max_run_time = {
               type = "integer"
               value = 15000
-              description = "Maximum execution time in elevated mode (ms)"
+              description = "Maximum run time in elevated mode (ms)"
             }
           }
         }
@@ -780,10 +780,10 @@ template_structure {
               value = 100
               description = "Maximum functions allowed in trusted mode"
             }
-            max_execution_time = {
+            max_run_time = {
               type = "integer"
               value = 30000
-              description = "Maximum execution time in trusted mode (ms)"
+              description = "Maximum run time in trusted mode (ms)"
             }
           }
         }
@@ -799,7 +799,7 @@ template_structure {
         max_concurrent_templates = {
           type = "integer"
           value = 10
-          description = "Maximum concurrent template executions"
+          description = "Maximum concurrent template runs"
         }
         
         max_total_memory = {
@@ -808,10 +808,10 @@ template_structure {
           description = "Maximum total memory usage for all templates (100MB)"
         }
         
-        max_total_execution_time = {
+        max_total_run_time = {
           type = "integer"
           value = 60000
-          description = "Maximum total execution time for all templates (60s)"
+          description = "Maximum total run time for all templates (60s)"
         }
         
         cache_size = {

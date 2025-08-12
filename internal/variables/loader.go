@@ -1,4 +1,4 @@
-// Package variables provides variable loading functionality for the spooky codebase.
+// Package variables provides variable loading and management functionality for the spooky codebase.
 package variables
 
 import (
@@ -16,12 +16,12 @@ import (
 	spookytypesvariables "spooky/internal/types/variables"
 )
 
-// Loader provides variable loading functionality
+// Loader provides functionality to load variables from HCL files
 type Loader struct {
 	logger spookytypeslogging.Logger
 }
 
-// NewLoader creates a new variable loader
+// NewLoader creates a new variable loader instance
 func NewLoader(logger spookytypeslogging.Logger) *Loader {
 	return &Loader{
 		logger: logger,
@@ -34,7 +34,7 @@ func (l *Loader) LoadVariablesFromFile(ctx context.Context, filePath string) (ma
 		"file_path": filePath,
 	})
 
-	// Read the file
+	// Read file content
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
@@ -44,7 +44,7 @@ func (l *Loader) LoadVariablesFromFile(ctx context.Context, filePath string) (ma
 	parser := hclparse.NewParser()
 	file, diags := parser.ParseHCL(data, filePath)
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to parse HCL file %s: %w", filePath, diags.Error())
+		return nil, fmt.Errorf("failed to parse HCL file %s: %s", filePath, diags.Error())
 	}
 
 	// Extract variables block
@@ -56,7 +56,7 @@ func (l *Loader) LoadVariablesFromFile(ctx context.Context, filePath string) (ma
 		},
 	})
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to parse variables block in %s: %w", filePath, diags.Error())
+		return nil, fmt.Errorf("failed to parse variables block in %s: %s", filePath, diags.Error())
 	}
 
 	if len(content.Blocks) == 0 {
@@ -146,15 +146,19 @@ func (l *Loader) parseVariablesBlock(block *hcl.Block, sourceFile string) (map[s
 		},
 	})
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to parse variable blocks: %w", diags.Error())
+		return nil, fmt.Errorf("failed to parse variable blocks: %s", diags.Error())
 	}
 
 	for _, variableBlock := range content.Blocks {
 		variable, err := l.parseVariableBlock(variableBlock, sourceFile)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse variable block %s: %w", variableBlock.Labels[0], err)
+			l.logger.Warn("Failed to parse variable block", map[string]interface{}{
+				"variable_name": variableBlock.Labels[0],
+				"source_file":   sourceFile,
+				"error":         err.Error(),
+			})
+			continue
 		}
-
 		variables[variable.Name] = variable
 	}
 
@@ -163,24 +167,19 @@ func (l *Loader) parseVariablesBlock(block *hcl.Block, sourceFile string) (map[s
 
 // parseVariableBlock parses a single variable block
 func (l *Loader) parseVariableBlock(block *hcl.Block, sourceFile string) (*spookytypesvariables.Variable, error) {
-	if len(block.Labels) == 0 {
-		return nil, fmt.Errorf("variable block missing name label")
-	}
-
 	variableName := block.Labels[0]
 
-	// Parse variable attributes
+	// Parse both attributes and blocks
 	content, diags := block.Body.Content(&hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
-			{Name: "type", Required: true},
-			{Name: "description", Required: false},
+			{Name: "type", Required: false},
 			{Name: "default", Required: false},
-			{Name: "required", Required: false},
+			{Name: "description", Required: false},
 			{Name: "sensitive", Required: false},
-			{Name: "encrypted", Required: false},
+			{Name: "validation", Required: false},
+			{Name: "constraints", Required: false},
 			{Name: "scope", Required: false},
 			{Name: "dependencies", Required: false},
-			{Name: "metadata", Required: false},
 		},
 		Blocks: []hcl.BlockHeaderSchema{
 			{Type: "validation"},
@@ -188,142 +187,95 @@ func (l *Loader) parseVariableBlock(block *hcl.Block, sourceFile string) (*spook
 		},
 	})
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to parse variable attributes: %w", diags.Error())
+		return nil, fmt.Errorf("failed to parse variable block: %s", diags.Error())
 	}
 
 	variable := &spookytypesvariables.Variable{
-		Name:       variableName,
-		SourceFile: sourceFile,
-		SourceLine: block.DefRange.Start.Line,
-		Metadata:   make(map[string]interface{}),
+		Name: variableName,
 	}
 
-	// Parse type attribute
-	if attr, exists := content.Attributes["type"]; exists {
-		typeVal, diags := attr.Expr.Value(nil)
+	// Add source file information
+	variable.SourceFile = sourceFile
+	variable.SourceLine = block.DefRange.Start.Line
+	variable.Metadata = make(map[string]interface{})
+	variable.Metadata["source_file"] = sourceFile
+
+	// Parse attributes
+	attrs := content.Attributes
+
+	// Parse type
+	if attr, exists := attrs["type"]; exists {
+		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse type attribute: %w", diags.Error())
+			return nil, fmt.Errorf("invalid type: %s", diags.Error())
 		}
-		if typeVal.Type() != cty.String {
-			return nil, fmt.Errorf("type attribute must be a string")
+		if val.Type() == cty.String {
+			variable.Type = spookytypesvariables.VariableType(val.AsString())
 		}
-		variable.Type = spookytypesvariables.VariableType(typeVal.AsString())
 	}
 
-	// Parse description attribute
-	if attr, exists := content.Attributes["description"]; exists {
-		descVal, diags := attr.Expr.Value(nil)
+	// Parse default value
+	if attr, exists := attrs["default"]; exists {
+		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse description attribute: %w", diags.Error())
+			return nil, fmt.Errorf("invalid default: %s", diags.Error())
 		}
-		if descVal.Type() != cty.String {
-			return nil, fmt.Errorf("description attribute must be a string")
-		}
-		variable.Description = descVal.AsString()
+		variable.Default = val
 	}
 
-	// Parse default attribute
-	if attr, exists := content.Attributes["default"]; exists {
-		defaultVal, diags := attr.Expr.Value(nil)
+	// Parse description
+	if attr, exists := attrs["description"]; exists {
+		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse default attribute: %w", diags.Error())
+			return nil, fmt.Errorf("invalid description: %s", diags.Error())
 		}
-		variable.Default = ctyToInterface(defaultVal)
+		if val.Type() == cty.String {
+			variable.Description = val.AsString()
+		}
 	}
 
-	// Parse required attribute
-	if attr, exists := content.Attributes["required"]; exists {
-		requiredVal, diags := attr.Expr.Value(nil)
+	// Parse sensitive flag
+	if attr, exists := attrs["sensitive"]; exists {
+		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse required attribute: %w", diags.Error())
+			return nil, fmt.Errorf("invalid sensitive: %s", diags.Error())
 		}
-		if requiredVal.Type() != cty.Bool {
-			return nil, fmt.Errorf("required attribute must be a boolean")
+		if val.Type() == cty.Bool {
+			variable.Sensitive = val.True()
 		}
-		variable.Required = requiredVal.True()
 	}
 
-	// Parse sensitive attribute
-	if attr, exists := content.Attributes["sensitive"]; exists {
-		sensitiveVal, diags := attr.Expr.Value(nil)
+	// Parse scope
+	if attr, exists := attrs["scope"]; exists {
+		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse sensitive attribute: %w", diags.Error())
+			return nil, fmt.Errorf("invalid scope: %s", diags.Error())
 		}
-		if sensitiveVal.Type() != cty.Bool {
-			return nil, fmt.Errorf("sensitive attribute must be a boolean")
-		}
-		variable.Sensitive = sensitiveVal.True()
-	}
-
-	// Parse encrypted attribute
-	if attr, exists := content.Attributes["encrypted"]; exists {
-		encryptedVal, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse encrypted attribute: %w", diags.Error())
-		}
-		if encryptedVal.Type() != cty.Bool {
-			return nil, fmt.Errorf("encrypted attribute must be a boolean")
-		}
-		variable.Encrypted = encryptedVal.True()
-	}
-
-	// Parse scope attribute
-	if attr, exists := content.Attributes["scope"]; exists {
-		scopeVal, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse scope attribute: %w", diags.Error())
-		}
-		if scopeVal.Type() != cty.String {
-			return nil, fmt.Errorf("scope attribute must be a string")
-		}
-		variable.Scope = spookytypesvariables.VariableScope(scopeVal.AsString())
-	}
-
-	// Parse dependencies attribute
-	if attr, exists := content.Attributes["dependencies"]; exists {
-		depsVal, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse dependencies attribute: %w", diags.Error())
-		}
-		if depsVal.Type() != cty.List(cty.String) {
-			return nil, fmt.Errorf("dependencies attribute must be a list of strings")
-		}
-		var deps []string
-		for _, dep := range depsVal.AsValueSlice() {
-			deps = append(deps, dep.AsString())
-		}
-		variable.Dependencies = deps
-	}
-
-	// Parse metadata attribute
-	if attr, exists := content.Attributes["metadata"]; exists {
-		metaVal, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse metadata attribute: %w", diags.Error())
-		}
-		if metaVal.Type() != cty.Map(cty.String) {
-			return nil, fmt.Errorf("metadata attribute must be a map of strings")
-		}
-		for key, value := range metaVal.AsValueMap() {
-			variable.Metadata[key] = value.AsString()
+		if val.Type() == cty.String {
+			variable.Scope = spookytypesvariables.VariableScope(val.AsString())
 		}
 	}
 
-	// Parse validation block
-	for _, validationBlock := range content.Blocks {
-		if validationBlock.Type == "validation" {
-			validation, err := l.parseValidationBlock(validationBlock)
+	// Parse dependencies
+	if attr, exists := attrs["dependencies"]; exists {
+		dependencies, err := l.parseArrayAttribute(attr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid dependencies: %w", err)
+		}
+		variable.Dependencies = dependencies
+	}
+
+	// Parse blocks
+	for _, block := range content.Blocks {
+		switch block.Type {
+		case "validation":
+			validation, err := l.parseValidationBlock(block)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse validation block: %w", err)
 			}
 			variable.Validation = validation
-		}
-	}
-
-	// Parse constraints block
-	for _, constraintsBlock := range content.Blocks {
-		if constraintsBlock.Type == "constraints" {
-			constraints, err := l.parseConstraintsBlock(constraintsBlock)
+		case "constraints":
+			constraints, err := l.parseConstraintsBlock(block)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse constraints block: %w", err)
 			}
@@ -334,55 +286,70 @@ func (l *Loader) parseVariableBlock(block *hcl.Block, sourceFile string) (*spook
 	return variable, nil
 }
 
+// parseArrayAttribute parses an array attribute into a []string
+func (l *Loader) parseArrayAttribute(attr *hcl.Attribute) ([]string, error) {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return nil, fmt.Errorf("failed to parse array attribute: %s", diags.Error())
+	}
+
+	if val.Type() != cty.List(cty.String) {
+		return nil, fmt.Errorf("expected list of strings, got %s", val.Type().FriendlyName())
+	}
+
+	var result []string
+	for _, item := range val.AsValueSlice() {
+		result = append(result, item.AsString())
+	}
+
+	return result, nil
+}
+
 // parseValidationBlock parses a validation block
 func (l *Loader) parseValidationBlock(block *hcl.Block) (*spookytypesvariables.VariableValidation, error) {
 	content, diags := block.Body.Content(&hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
-			{Name: "condition", Required: true},
-			{Name: "error_message", Required: true},
+			{Name: "condition", Required: false},
+			{Name: "error_message", Required: false},
 			{Name: "warning_message", Required: false},
 		},
 	})
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to parse validation block attributes: %w", diags.Error())
+		return nil, fmt.Errorf("failed to parse validation block: %s", diags.Error())
 	}
 
 	validation := &spookytypesvariables.VariableValidation{}
 
-	// Parse condition attribute
-	if attr, exists := content.Attributes["condition"]; exists {
-		conditionVal, diags := attr.Expr.Value(nil)
+	attrs := content.Attributes
+
+	if attr, exists := attrs["condition"]; exists {
+		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse condition attribute: %w", diags.Error())
+			return nil, fmt.Errorf("invalid condition: %s", diags.Error())
 		}
-		if conditionVal.Type() != cty.String {
-			return nil, fmt.Errorf("condition attribute must be a string")
+		if val.Type() == cty.String {
+			validation.Condition = val.AsString()
 		}
-		validation.Condition = conditionVal.AsString()
 	}
 
-	// Parse error_message attribute
-	if attr, exists := content.Attributes["error_message"]; exists {
-		errorMsgVal, diags := attr.Expr.Value(nil)
+	if attr, exists := attrs["error_message"]; exists {
+		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse error_message attribute: %w", diags.Error())
+			return nil, fmt.Errorf("invalid error_message: %s", diags.Error())
 		}
-		if errorMsgVal.Type() != cty.String {
-			return nil, fmt.Errorf("error_message attribute must be a string")
+		if val.Type() == cty.String {
+			validation.ErrorMessage = val.AsString()
 		}
-		validation.ErrorMessage = errorMsgVal.AsString()
 	}
 
-	// Parse warning_message attribute
-	if attr, exists := content.Attributes["warning_message"]; exists {
-		warningMsgVal, diags := attr.Expr.Value(nil)
+	if attr, exists := attrs["warning_message"]; exists {
+		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse warning_message attribute: %w", diags.Error())
+			return nil, fmt.Errorf("invalid warning_message: %s", diags.Error())
 		}
-		if warningMsgVal.Type() != cty.String {
-			return nil, fmt.Errorf("warning_message attribute must be a string")
+		if val.Type() == cty.String {
+			validation.WarningMessage = val.AsString()
 		}
-		validation.WarningMessage = warningMsgVal.AsString()
 	}
 
 	return validation, nil
@@ -394,230 +361,81 @@ func (l *Loader) parseConstraintsBlock(block *hcl.Block) (*spookytypesvariables.
 		Attributes: []hcl.AttributeSchema{
 			{Name: "min_length", Required: false},
 			{Name: "max_length", Required: false},
-			{Name: "pattern", Required: false},
 			{Name: "min_value", Required: false},
 			{Name: "max_value", Required: false},
-			{Name: "min_items", Required: false},
-			{Name: "max_items", Required: false},
-			{Name: "file_exists", Required: false},
-			{Name: "file_readable", Required: false},
-			{Name: "file_size_max", Required: false},
-			{Name: "path_exists", Required: false},
-			{Name: "path_absolute", Required: false},
-			{Name: "path_relative", Required: false},
+			{Name: "pattern", Required: false},
+			{Name: "allowed_values", Required: false},
 		},
 	})
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to parse constraints block attributes: %w", diags.Error())
+		return nil, fmt.Errorf("failed to parse constraints block: %s", diags.Error())
 	}
 
 	constraints := &spookytypesvariables.VariableConstraints{}
 
-	// Parse string constraints
-	if attr, exists := content.Attributes["min_length"]; exists {
-		minLengthVal, diags := attr.Expr.Value(nil)
+	attrs := content.Attributes
+
+	if attr, exists := attrs["min_length"]; exists {
+		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse min_length attribute: %w", diags.Error())
+			return nil, fmt.Errorf("invalid min_length: %s", diags.Error())
 		}
-		if minLengthVal.Type() != cty.Number {
-			return nil, fmt.Errorf("min_length attribute must be a number")
+		if val.Type() == cty.Number {
+			minInt, _ := val.AsBigFloat().Int64()
+			minLength := int(minInt)
+			constraints.MinLength = &minLength
 		}
-		minLengthInt, _ := minLengthVal.AsBigFloat().Int64()
-		minLength := int(minLengthInt)
-		constraints.MinLength = &minLength
 	}
 
-	if attr, exists := content.Attributes["max_length"]; exists {
-		maxLengthVal, diags := attr.Expr.Value(nil)
+	if attr, exists := attrs["max_length"]; exists {
+		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse max_length attribute: %w", diags.Error())
+			return nil, fmt.Errorf("invalid max_length: %s", diags.Error())
 		}
-		if maxLengthVal.Type() != cty.Number {
-			return nil, fmt.Errorf("max_length attribute must be a number")
+		if val.Type() == cty.Number {
+			maxInt, _ := val.AsBigFloat().Int64()
+			maxLength := int(maxInt)
+			constraints.MaxLength = &maxLength
 		}
-		maxLengthInt, _ := maxLengthVal.AsBigFloat().Int64()
-		maxLength := int(maxLengthInt)
-		constraints.MaxLength = &maxLength
 	}
 
-	if attr, exists := content.Attributes["pattern"]; exists {
-		patternVal, diags := attr.Expr.Value(nil)
+	if attr, exists := attrs["min_value"]; exists {
+		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse pattern attribute: %w", diags.Error())
+			return nil, fmt.Errorf("invalid min_value: %s", diags.Error())
 		}
-		if patternVal.Type() != cty.String {
-			return nil, fmt.Errorf("pattern attribute must be a string")
+		if val.Type() == cty.Number {
+			minFloat, _ := val.AsBigFloat().Float64()
+			constraints.MinValue = &minFloat
 		}
-		pattern := patternVal.AsString()
-		constraints.Pattern = &pattern
 	}
 
-	// Parse numeric constraints
-	if attr, exists := content.Attributes["min_value"]; exists {
-		minValueVal, diags := attr.Expr.Value(nil)
+	if attr, exists := attrs["max_value"]; exists {
+		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse min_value attribute: %w", diags.Error())
+			return nil, fmt.Errorf("invalid max_value: %s", diags.Error())
 		}
-		if minValueVal.Type() != cty.Number {
-			return nil, fmt.Errorf("min_value attribute must be a number")
+		if val.Type() == cty.Number {
+			maxFloat, _ := val.AsBigFloat().Float64()
+			constraints.MaxValue = &maxFloat
 		}
-		minValue, _ := minValueVal.AsBigFloat().Float64()
-		constraints.MinValue = &minValue
 	}
 
-	if attr, exists := content.Attributes["max_value"]; exists {
-		maxValueVal, diags := attr.Expr.Value(nil)
+	if attr, exists := attrs["pattern"]; exists {
+		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse max_value attribute: %w", diags.Error())
+			return nil, fmt.Errorf("invalid pattern: %s", diags.Error())
 		}
-		if maxValueVal.Type() != cty.Number {
-			return nil, fmt.Errorf("max_value attribute must be a number")
+		if val.Type() == cty.String {
+			pattern := val.AsString()
+			constraints.Pattern = &pattern
 		}
-		maxValue, _ := maxValueVal.AsBigFloat().Float64()
-		constraints.MaxValue = &maxValue
-	}
-
-	// Parse list constraints
-	if attr, exists := content.Attributes["min_items"]; exists {
-		minItemsVal, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse min_items attribute: %w", diags.Error())
-		}
-		if minItemsVal.Type() != cty.Number {
-			return nil, fmt.Errorf("min_items attribute must be a number")
-		}
-		minItemsInt, _ := minItemsVal.AsBigFloat().Int64()
-		minItems := int(minItemsInt)
-		constraints.MinItems = &minItems
-	}
-
-	if attr, exists := content.Attributes["max_items"]; exists {
-		maxItemsVal, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse max_items attribute: %w", diags.Error())
-		}
-		if maxItemsVal.Type() != cty.Number {
-			return nil, fmt.Errorf("max_items attribute must be a number")
-		}
-		maxItemsInt, _ := maxItemsVal.AsBigFloat().Int64()
-		maxItems := int(maxItemsInt)
-		constraints.MaxItems = &maxItems
-	}
-
-	// Parse file constraints
-	if attr, exists := content.Attributes["file_exists"]; exists {
-		fileExistsVal, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse file_exists attribute: %w", diags.Error())
-		}
-		if fileExistsVal.Type() != cty.Bool {
-			return nil, fmt.Errorf("file_exists attribute must be a boolean")
-		}
-		fileExists := fileExistsVal.True()
-		constraints.FileExists = &fileExists
-	}
-
-	if attr, exists := content.Attributes["file_readable"]; exists {
-		fileReadableVal, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse file_readable attribute: %w", diags.Error())
-		}
-		if fileReadableVal.Type() != cty.Bool {
-			return nil, fmt.Errorf("file_readable attribute must be a boolean")
-		}
-		fileReadable := fileReadableVal.True()
-		constraints.FileReadable = &fileReadable
-	}
-
-	if attr, exists := content.Attributes["file_size_max"]; exists {
-		fileSizeMaxVal, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse file_size_max attribute: %w", diags.Error())
-		}
-		if fileSizeMaxVal.Type() != cty.String {
-			return nil, fmt.Errorf("file_size_max attribute must be a string")
-		}
-		fileSizeMax := fileSizeMaxVal.AsString()
-		constraints.FileSizeMax = &fileSizeMax
-	}
-
-	// Parse path constraints
-	if attr, exists := content.Attributes["path_exists"]; exists {
-		pathExistsVal, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse path_exists attribute: %w", diags.Error())
-		}
-		if pathExistsVal.Type() != cty.Bool {
-			return nil, fmt.Errorf("path_exists attribute must be a boolean")
-		}
-		pathExists := pathExistsVal.True()
-		constraints.PathExists = &pathExists
-	}
-
-	if attr, exists := content.Attributes["path_absolute"]; exists {
-		pathAbsoluteVal, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse path_absolute attribute: %w", diags.Error())
-		}
-		if pathAbsoluteVal.Type() != cty.Bool {
-			return nil, fmt.Errorf("path_absolute attribute must be a boolean")
-		}
-		pathAbsolute := pathAbsoluteVal.True()
-		constraints.PathAbsolute = &pathAbsolute
-	}
-
-	if attr, exists := content.Attributes["path_relative"]; exists {
-		pathRelativeVal, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse path_relative attribute: %w", diags.Error())
-		}
-		if pathRelativeVal.Type() != cty.Bool {
-			return nil, fmt.Errorf("path_relative attribute must be a boolean")
-		}
-		pathRelative := pathRelativeVal.True()
-		constraints.PathRelative = &pathRelative
 	}
 
 	return constraints, nil
 }
 
-// ctyToInterface converts a cty.Value to interface{}
-func ctyToInterface(val cty.Value) interface{} {
-	if val.IsNull() {
-		return nil
-	}
-
-	switch val.Type() {
-	case cty.String:
-		return val.AsString()
-	case cty.Number:
-		// Convert to float64 for numbers
-		if val.IsKnown() && !val.IsNull() {
-			f, _ := val.AsBigFloat().Float64()
-			return f
-		}
-		return 0.0
-	case cty.Bool:
-		return val.True()
-	case cty.List(cty.String):
-		var result []string
-		for _, item := range val.AsValueSlice() {
-			result = append(result, item.AsString())
-		}
-		return result
-	case cty.Map(cty.String):
-		result := make(map[string]string)
-		for key, value := range val.AsValueMap() {
-			result[key] = value.AsString()
-		}
-		return result
-	default:
-		// For complex types, return as string representation
-		return val.GoString()
-	}
-}
-
-// getVariableNames returns a list of variable names
+// getVariableNames extracts variable names from a map of variables
 func getVariableNames(variables map[string]*spookytypesvariables.Variable) []string {
 	var names []string
 	for name := range variables {

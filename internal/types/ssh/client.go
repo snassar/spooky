@@ -81,7 +81,7 @@ const (
 	ClientStatusClosed       ClientStatus = "closed"
 )
 
-// Session represents an SSH session for command execution
+// Session represents an SSH session for command running
 type Session struct {
 	spookytypescommon.CompleteEntity
 
@@ -101,9 +101,9 @@ type Session struct {
 	Pty         *PtyConfig        `json:"pty,omitempty" hcl:"pty,optional"`
 
 	// Session metrics
-	CommandsExecuted int           `json:"commands_executed" hcl:"commands_executed"`
-	TotalExecTime    time.Duration `json:"total_exec_time" hcl:"total_exec_time"`
-	AverageExecTime  time.Duration `json:"average_exec_time" hcl:"average_exec_time"`
+	ActionsRun     int           `json:"actions_run" hcl:"actions_run"`
+	TotalRunTime   time.Duration `json:"total_run_time" hcl:"total_run_time"`
+	AverageRunTime time.Duration `json:"average_run_time" hcl:"average_run_time"`
 
 	// Session metadata
 	UserAgent    string `json:"user_agent,omitempty" hcl:"user_agent,optional"`
@@ -117,7 +117,7 @@ const (
 	SessionStatusCreated   SessionStatus = "created"
 	SessionStatusStarting  SessionStatus = "starting"
 	SessionStatusActive    SessionStatus = "active"
-	SessionStatusExecuting SessionStatus = "executing"
+	SessionStatusRunning   SessionStatus = "running"
 	SessionStatusCompleted SessionStatus = "completed"
 	SessionStatusFailed    SessionStatus = "failed"
 	SessionStatusClosed    SessionStatus = "closed"
@@ -141,7 +141,7 @@ type PtyConfig struct {
 	EnableSignals   bool `json:"enable_signals" hcl:"enable_signals" default:"true"`
 }
 
-// Command represents a command to be executed via SSH
+// Command represents a command to be run via SSH
 type Command struct {
 	spookytypescommon.CompleteEntity
 
@@ -167,7 +167,7 @@ type Command struct {
 	RequireSudo bool `json:"require_sudo" hcl:"require_sudo" default:"false"`
 }
 
-// CommandResult represents the result of a command execution
+// CommandResult represents the result of a command run
 type CommandResult struct {
 	spookytypescommon.CompleteEntity
 
@@ -175,20 +175,20 @@ type CommandResult struct {
 	Command *Command `json:"command" hcl:"command"`
 	Session *Session `json:"session" hcl:"session"`
 
-	// Execution results
+	// Run results
 	Success  bool   `json:"success" hcl:"success"`
 	ExitCode int    `json:"exit_code" hcl:"exit_code"`
 	Stdout   string `json:"stdout,omitempty" hcl:"stdout,optional"`
 	Stderr   string `json:"stderr,omitempty" hcl:"stderr,optional"`
 	Error    string `json:"error,omitempty" hcl:"error,optional"`
 
-	// Execution metrics
+	// Run metrics
 	StartTime     time.Time     `json:"start_time" hcl:"start_time"`
 	EndTime       time.Time     `json:"end_time" hcl:"end_time"`
 	Duration      time.Duration `json:"duration" hcl:"duration"`
 	RetryAttempts int           `json:"retry_attempts" hcl:"retry_attempts"`
 
-	// Execution metadata
+	// Run metadata
 	Hostname    string            `json:"hostname,omitempty" hcl:"hostname,optional"`
 	Username    string            `json:"username,omitempty" hcl:"username,optional"`
 	WorkingDir  string            `json:"working_dir,omitempty" hcl:"working_dir,optional"`

@@ -27,7 +27,7 @@ This actions system integrates with other core Spooky systems to provide compreh
 
 ### **Project System Integration**
 - **Project Actions**: Actions stored in project-specific `actions.hcl` and `actions/` directory (see [Project System](../project-system.md))
-- **Project Context**: Actions executed within project execution context
+- **Project Context**: Actions run within project execution context
 - **Project Configuration**: Action settings configured in project context
 - **Project Isolation**: Project actions isolated from global actions
 
@@ -46,11 +46,11 @@ This actions system integrates with other core Spooky systems to provide compreh
 ### **Machines System Integration**
 - **Target Selection**: Actions use machine inventory for target selection via tags, names, or filters (see [Machines System](../machines-system.md))
 - **Machine Resolution**: Actions resolve machine targets through the machines system's indexing and lookup capabilities
-- **Execution Context**: Actions execute within machine-specific contexts with authentication and connection details
+- **Execution Context**: Actions run within machine-specific contexts with authentication and connection details
 - **Parallel Execution**: Machine inventory supports parallel action execution across multiple targets
 
 ### **Template System Integration**
-- **Template Actions**: Actions can execute template rendering and deployment (see [Template System](../template-system.md))
+- **Template Actions**: Actions can run template rendering and deployment (see [Template System](../template-system.md))
 - **Template Context**: Actions provide template context with facts, variables, and machine data
 - **Template Deployment**: Actions can deploy rendered templates to target machines
 - **Template Validation**: Actions validate templates before execution
@@ -123,7 +123,7 @@ actions {
 ```hcl
 # Supported action properties
 action "example" {
-  command     = "string"           # Required: command to execute
+  command     = "string"           # Required: command to run
   description = "string"           # Optional: action description
   depends_on  = ["list", "of", "actions"]  # Optional: dependencies
   timeout     = 300                # Optional: timeout in seconds
@@ -793,7 +793,7 @@ schema "actions_config" {
       attribute "command" {
         type = "string"
         required = true
-        description = "Command to execute"
+        description = "Command to run"
       }
       
       attribute "description" {
@@ -1011,7 +1011,7 @@ action "install_packages" {
 # ❌ Automatic fix (user doesn't understand what happened):
 $ spooky act . --auto-fix
 Warning: Fixed circular dependencies automatically
-✓ Actions executed successfully
+✓ Actions run successfully
 
 # User thinks: "Great! It worked!"
 # Reality: User doesn't know what was changed or why

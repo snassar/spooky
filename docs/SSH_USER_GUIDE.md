@@ -975,7 +975,7 @@ spooky machines ping ./my-project
 # 2. Test connectivity and authentication
 spooky machines ping ./my-project --auth
 
-# 3. Execute actions with file transfer (when actions system is implemented)
+# 3. Run actions with file transfer (when actions system is implemented)
 # spooky actions run ./my-project --action deploy-web
 ```
 

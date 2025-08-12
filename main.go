@@ -7,6 +7,6 @@ import (
 )
 
 func main() {
-	// Execute the CLI using the cmd package
+	// Run the CLI using the cmd package
 	cmd.Execute()
 }

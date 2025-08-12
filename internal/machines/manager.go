@@ -355,7 +355,7 @@ func (m *Manager) validateMachineCollection(machines []spookytypes.Machine) erro
 	// Report errors and warnings
 	if len(errors) > 0 {
 		errorMsg := strings.Join(errors, "; ")
-		m.logger.Error("Machine validation errors", fmt.Errorf(errorMsg), map[string]interface{}{
+		m.logger.Error("Machine validation errors", fmt.Errorf("%s", errorMsg), map[string]interface{}{
 			"errors": errors,
 		})
 		return fmt.Errorf("validation errors: %s", errorMsg)

@@ -367,7 +367,7 @@ $ spooky --help
 Usage: spooky <noun> <verb> [options]
 
 Core Execution:
-  actions     Manage and execute actions
+  actions     Manage and run actions
   facts       Manage machine facts and data
   machines    Manage machine inventory and operations
   templates   Manage template files
@@ -1007,7 +1007,7 @@ This section provides comprehensive examples of all CLI compositions, organized 
 
 ### **1. Actions Noun**
 
-Actions manage and execute deployment and configuration tasks.
+Actions manage and run deployment and configuration tasks.
 
 #### **spooky actions list**
 ```bash
@@ -1229,7 +1229,7 @@ spooky machines connect web-001 ./my-project --user admin
 # Connect with port
 spooky machines connect web-001 ./my-project --port 2222
 
-# Connect and execute command (for complex scenarios)
+# Connect and run command (for complex scenarios)
 spooky machines connect web-001 ./my-project --command "register-myself https://cmdb.example.com/"
 ```
 

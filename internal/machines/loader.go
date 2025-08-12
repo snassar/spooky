@@ -1,4 +1,4 @@
-// Package machines provides machine loading functionality for the spooky codebase.
+// Package machines provides machine inventory loading and management functionality.
 package machines
 
 import (
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
@@ -16,25 +17,21 @@ import (
 	spookytypesmachines "spooky/internal/types/machines"
 )
 
-// Loader provides machine loading functionality
+// Loader provides functionality to load machine inventory from HCL files
 type Loader struct {
 	logger spookytypeslogging.Logger
 }
 
-// NewLoader creates a new machine loader
+// NewLoader creates a new machine loader instance
 func NewLoader(logger spookytypeslogging.Logger) *Loader {
 	return &Loader{
 		logger: logger,
 	}
 }
 
-// LoadMachinesFromFile loads machines from a single HCL file
+// LoadMachinesFromFile loads machine inventory from a single HCL file
 func (l *Loader) LoadMachinesFromFile(ctx context.Context, filePath string) ([]spookytypes.Machine, error) {
-	l.logger.Debug("Loading machines from file", map[string]interface{}{
-		"file_path": filePath,
-	})
-
-	// Read the file
+	// Read file content
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
@@ -44,7 +41,7 @@ func (l *Loader) LoadMachinesFromFile(ctx context.Context, filePath string) ([]s
 	parser := hclparse.NewParser()
 	file, diags := parser.ParseHCL(data, filePath)
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to parse HCL file %s: %w", filePath, diags.Error())
+		return nil, fmt.Errorf("failed to parse HCL file %s: %s", filePath, diags.Error())
 	}
 
 	// Extract machines block
@@ -56,7 +53,7 @@ func (l *Loader) LoadMachinesFromFile(ctx context.Context, filePath string) ([]s
 		},
 	})
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to parse machines block in %s: %w", filePath, diags.Error())
+		return nil, fmt.Errorf("failed to parse machines block in %s: %s", filePath, diags.Error())
 	}
 
 	if len(content.Blocks) == 0 {
@@ -92,7 +89,7 @@ func (l *Loader) parseMachinesBlock(block *hcl.Block, sourceFile string) ([]spoo
 		},
 	})
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to parse machine blocks: %w", diags.Error())
+		return nil, fmt.Errorf("failed to parse machine blocks: %s", diags.Error())
 	}
 
 	for _, machineBlock := range content.Blocks {
@@ -140,7 +137,7 @@ func (l *Loader) parseMachineBlock(block *hcl.Block, sourceFile string) (*spooky
 		},
 	})
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to parse machine block: %w", diags.Error())
+		return nil, fmt.Errorf("failed to parse machine block: %s", diags.Error())
 	}
 
 	machine := &spookytypes.Machine{
@@ -162,7 +159,7 @@ func (l *Loader) parseMachineBlock(block *hcl.Block, sourceFile string) (*spooky
 	if attr, exists := attrs["hostname"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid hostname: %w", diags.Error())
+			return nil, fmt.Errorf("invalid hostname: %s", diags.Error())
 		}
 		if val.Type() == cty.String {
 			machine.Hostname = val.AsString()
@@ -172,7 +169,7 @@ func (l *Loader) parseMachineBlock(block *hcl.Block, sourceFile string) (*spooky
 	if attr, exists := attrs["host"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid host: %w", diags.Error())
+			return nil, fmt.Errorf("invalid host: %s", diags.Error())
 		}
 		if val.Type() == cty.String {
 			machine.Host = val.AsString()
@@ -182,7 +179,7 @@ func (l *Loader) parseMachineBlock(block *hcl.Block, sourceFile string) (*spooky
 	if attr, exists := attrs["port"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid port: %w", diags.Error())
+			return nil, fmt.Errorf("invalid port: %s", diags.Error())
 		}
 		if val.Type() == cty.Number {
 			portInt, _ := val.AsBigFloat().Int64()
@@ -193,7 +190,7 @@ func (l *Loader) parseMachineBlock(block *hcl.Block, sourceFile string) (*spooky
 	if attr, exists := attrs["user"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid user: %w", diags.Error())
+			return nil, fmt.Errorf("invalid user: %s", diags.Error())
 		}
 		if val.Type() == cty.String {
 			machine.User = val.AsString()
@@ -204,7 +201,7 @@ func (l *Loader) parseMachineBlock(block *hcl.Block, sourceFile string) (*spooky
 	if attr, exists := attrs["key_file"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid key_file: %w", diags.Error())
+			return nil, fmt.Errorf("invalid key_file: %s", diags.Error())
 		}
 		if val.Type() == cty.String {
 			machine.KeyFile = val.AsString()
@@ -214,7 +211,7 @@ func (l *Loader) parseMachineBlock(block *hcl.Block, sourceFile string) (*spooky
 	if attr, exists := attrs["passphrase"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid passphrase: %w", diags.Error())
+			return nil, fmt.Errorf("invalid passphrase: %s", diags.Error())
 		}
 		if val.Type() == cty.String {
 			machine.Passphrase = val.AsString()
@@ -257,11 +254,11 @@ func (l *Loader) parseMachineBlock(block *hcl.Block, sourceFile string) (*spooky
 		machine.Classes = classes
 	}
 
-	// Parse SSH connection configuration
+	// Parse timeouts
 	if attr, exists := attrs["connection_timeout"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid connection_timeout: %w", diags.Error())
+			return nil, fmt.Errorf("invalid connection_timeout: %s", diags.Error())
 		}
 		if val.Type() == cty.Number {
 			timeoutInt, _ := val.AsBigFloat().Int64()
@@ -272,7 +269,7 @@ func (l *Loader) parseMachineBlock(block *hcl.Block, sourceFile string) (*spooky
 	if attr, exists := attrs["command_timeout"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid command_timeout: %w", diags.Error())
+			return nil, fmt.Errorf("invalid command_timeout: %s", diags.Error())
 		}
 		if val.Type() == cty.Number {
 			timeoutInt, _ := val.AsBigFloat().Int64()
@@ -280,21 +277,22 @@ func (l *Loader) parseMachineBlock(block *hcl.Block, sourceFile string) (*spooky
 		}
 	}
 
+	// Parse connection settings
 	if attr, exists := attrs["max_connections"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid max_connections: %w", diags.Error())
+			return nil, fmt.Errorf("invalid max_connections: %s", diags.Error())
 		}
 		if val.Type() == cty.Number {
-			maxInt, _ := val.AsBigFloat().Int64()
-			machine.MaxConnections = int(maxInt)
+			maxConnInt, _ := val.AsBigFloat().Int64()
+			machine.MaxConnections = int(maxConnInt)
 		}
 	}
 
 	if attr, exists := attrs["retry_attempts"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid retry_attempts: %w", diags.Error())
+			return nil, fmt.Errorf("invalid retry_attempts: %s", diags.Error())
 		}
 		if val.Type() == cty.Number {
 			retryInt, _ := val.AsBigFloat().Int64()
@@ -305,7 +303,7 @@ func (l *Loader) parseMachineBlock(block *hcl.Block, sourceFile string) (*spooky
 	if attr, exists := attrs["retry_delay"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid retry_delay: %w", diags.Error())
+			return nil, fmt.Errorf("invalid retry_delay: %s", diags.Error())
 		}
 		if val.Type() == cty.Number {
 			delayInt, _ := val.AsBigFloat().Int64()
@@ -313,60 +311,21 @@ func (l *Loader) parseMachineBlock(block *hcl.Block, sourceFile string) (*spooky
 		}
 	}
 
-	// Parse resources block
-	for _, resourcesBlock := range content.Blocks {
-		if resourcesBlock.Type == "resources" {
-			resources, err := l.parseResourcesBlock(resourcesBlock)
+	// Parse blocks
+	for _, block := range content.Blocks {
+		switch block.Type {
+		case "resources":
+			resources, err := l.parseResourcesBlock(block)
 			if err != nil {
-				return nil, fmt.Errorf("invalid resources block: %w", err)
+				return nil, fmt.Errorf("failed to parse resources block: %w", err)
 			}
 			machine.Resources = resources
-		}
-	}
-
-	// Parse metadata block
-	for _, metadataBlock := range content.Blocks {
-		if metadataBlock.Type == "metadata" {
-			metadata, err := l.parseMetadataBlock(metadataBlock)
+		case "metadata":
+			metadata, err := l.parseMetadataBlock(block)
 			if err != nil {
-				return nil, fmt.Errorf("invalid metadata block: %w", err)
+				return nil, fmt.Errorf("failed to parse metadata block: %w", err)
 			}
-			// Merge with existing metadata
-			if machine.MachineMetadata == nil {
-				machine.MachineMetadata = metadata
-			} else {
-				// Merge custom fields
-				if metadata.CustomFields != nil {
-					if machine.MachineMetadata.CustomFields == nil {
-						machine.MachineMetadata.CustomFields = make(map[string]string)
-					}
-					for k, v := range metadata.CustomFields {
-						machine.MachineMetadata.CustomFields[k] = v
-					}
-				}
-				// Merge other fields (only if not already set)
-				if machine.MachineMetadata.Environment == "" && metadata.Environment != "" {
-					machine.MachineMetadata.Environment = metadata.Environment
-				}
-				if machine.MachineMetadata.Datacenter == "" && metadata.Datacenter != "" {
-					machine.MachineMetadata.Datacenter = metadata.Datacenter
-				}
-				if machine.MachineMetadata.Rack == "" && metadata.Rack != "" {
-					machine.MachineMetadata.Rack = metadata.Rack
-				}
-				if machine.MachineMetadata.Location == "" && metadata.Location != "" {
-					machine.MachineMetadata.Location = metadata.Location
-				}
-				if machine.MachineMetadata.Owner == "" && metadata.Owner != "" {
-					machine.MachineMetadata.Owner = metadata.Owner
-				}
-				if machine.MachineMetadata.Department == "" && metadata.Department != "" {
-					machine.MachineMetadata.Department = metadata.Department
-				}
-				if machine.MachineMetadata.CostCenter == "" && metadata.CostCenter != "" {
-					machine.MachineMetadata.CostCenter = metadata.CostCenter
-				}
-			}
+			machine.MachineMetadata = metadata
 		}
 	}
 
@@ -380,16 +339,15 @@ func (l *Loader) parseObjectAttribute(attr *hcl.Attribute) (map[string]string, e
 		return nil, fmt.Errorf("failed to parse object attribute: %s", diags.Error())
 	}
 
-	if !val.Type().IsObjectType() {
-		return nil, fmt.Errorf("expected object, got %s", val.Type().FriendlyName())
+	if val.Type() != cty.Map(cty.String) {
+		return nil, fmt.Errorf("expected map of strings, got %s", val.Type().FriendlyName())
 	}
 
 	result := make(map[string]string)
-	for key, value := range val.AsValueMap() {
-		if value.Type() == cty.String {
-			result[key] = value.AsString()
-		}
-	}
+	val.ForEachElement(func(key, value cty.Value) bool {
+		result[key.AsString()] = value.AsString()
+		return false
+	})
 
 	return result, nil
 }
@@ -401,16 +359,13 @@ func (l *Loader) parseArrayAttribute(attr *hcl.Attribute) ([]string, error) {
 		return nil, fmt.Errorf("failed to parse array attribute: %s", diags.Error())
 	}
 
-	// Handle both list and tuple types (HCL can represent arrays as either)
-	if !val.Type().IsListType() && !val.Type().IsTupleType() {
-		return nil, fmt.Errorf("expected list or tuple, got %s", val.Type().FriendlyName())
+	if val.Type() != cty.List(cty.String) {
+		return nil, fmt.Errorf("expected list of strings, got %s", val.Type().FriendlyName())
 	}
 
 	var result []string
 	for _, item := range val.AsValueSlice() {
-		if item.Type() == cty.String {
-			result = append(result, item.AsString())
-		}
+		result = append(result, item.AsString())
 	}
 
 	return result, nil
@@ -418,17 +373,26 @@ func (l *Loader) parseArrayAttribute(attr *hcl.Attribute) ([]string, error) {
 
 // parseResourcesBlock parses a resources block
 func (l *Loader) parseResourcesBlock(block *hcl.Block) (*spookytypesmachines.MachineResources, error) {
-	attrs, diags := block.Body.JustAttributes()
+	content, diags := block.Body.Content(&hcl.BodySchema{
+		Attributes: []hcl.AttributeSchema{
+			{Name: "cpu_cores", Required: false},
+			{Name: "memory_mb", Required: false},
+			{Name: "disk_gb", Required: false},
+			{Name: "network_interfaces", Required: false},
+		},
+	})
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to parse resources attributes: %w", diags.Error())
+		return nil, fmt.Errorf("failed to parse resources block: %s", diags.Error())
 	}
 
 	resources := &spookytypesmachines.MachineResources{}
 
+	attrs := content.Attributes
+
 	if attr, exists := attrs["cpu_cores"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid cpu_cores: %w", diags.Error())
+			return nil, fmt.Errorf("invalid cpu_cores: %s", diags.Error())
 		}
 		if val.Type() == cty.Number {
 			cpuInt, _ := val.AsBigFloat().Int64()
@@ -439,7 +403,7 @@ func (l *Loader) parseResourcesBlock(block *hcl.Block) (*spookytypesmachines.Mac
 	if attr, exists := attrs["memory_gb"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid memory_gb: %w", diags.Error())
+			return nil, fmt.Errorf("invalid memory_gb: %s", diags.Error())
 		}
 		if val.Type() == cty.Number {
 			memInt, _ := val.AsBigFloat().Int64()
@@ -450,7 +414,7 @@ func (l *Loader) parseResourcesBlock(block *hcl.Block) (*spookytypesmachines.Mac
 	if attr, exists := attrs["disk_gb"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid disk_gb: %w", diags.Error())
+			return nil, fmt.Errorf("invalid disk_gb: %s", diags.Error())
 		}
 		if val.Type() == cty.Number {
 			diskInt, _ := val.AsBigFloat().Int64()
@@ -461,7 +425,7 @@ func (l *Loader) parseResourcesBlock(block *hcl.Block) (*spookytypesmachines.Mac
 	if attr, exists := attrs["network_speed"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid network_speed: %w", diags.Error())
+			return nil, fmt.Errorf("invalid network_speed: %s", diags.Error())
 		}
 		if val.Type() == cty.String {
 			resources.NetworkSpeed = val.AsString()
@@ -473,106 +437,108 @@ func (l *Loader) parseResourcesBlock(block *hcl.Block) (*spookytypesmachines.Mac
 
 // parseMetadataBlock parses a metadata block
 func (l *Loader) parseMetadataBlock(block *hcl.Block) (*spookytypesmachines.MachineMetadata, error) {
-	attrs, diags := block.Body.JustAttributes()
+	content, diags := block.Body.Content(&hcl.BodySchema{
+		Attributes: []hcl.AttributeSchema{
+			{Name: "description", Required: false},
+			{Name: "environment", Required: false},
+			{Name: "location", Required: false},
+			{Name: "owner", Required: false},
+			{Name: "team", Required: false},
+			{Name: "custom_fields", Required: false},
+		},
+	})
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to parse metadata attributes: %w", diags.Error())
+		return nil, fmt.Errorf("failed to parse metadata block: %s", diags.Error())
 	}
 
-	metadata := &spookytypesmachines.MachineMetadata{}
-
-	// Parse string attributes
-	stringFields := []string{"environment", "datacenter", "rack", "location", "owner", "department", "cost_center"}
-	for _, field := range stringFields {
-		if attr, exists := attrs[field]; exists {
-			val, diags := attr.Expr.Value(nil)
-			if diags.HasErrors() {
-				return nil, fmt.Errorf("invalid %s: %w", field, diags.Error())
-			}
-			if val.Type() == cty.String {
-				switch field {
-				case "environment":
-					metadata.Environment = val.AsString()
-				case "datacenter":
-					metadata.Datacenter = val.AsString()
-				case "rack":
-					metadata.Rack = val.AsString()
-				case "location":
-					metadata.Location = val.AsString()
-				case "owner":
-					metadata.Owner = val.AsString()
-				case "department":
-					metadata.Department = val.AsString()
-				case "cost_center":
-					metadata.CostCenter = val.AsString()
-				}
-			}
-		}
+	metadata := &spookytypesmachines.MachineMetadata{
+		CustomFields: make(map[string]string),
 	}
 
-	// Parse custom fields (any remaining attributes)
-	metadata.CustomFields = make(map[string]string)
-	for name, attr := range attrs {
-		// Skip already parsed fields
-		found := false
-		for _, field := range stringFields {
-			if name == field {
-				found = true
-				break
-			}
-		}
-		if found {
-			continue
-		}
+	attrs := content.Attributes
 
+	if attr, exists := attrs["environment"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			continue // Skip invalid attributes
+			return nil, fmt.Errorf("invalid environment: %s", diags.Error())
 		}
 		if val.Type() == cty.String {
-			metadata.CustomFields[name] = val.AsString()
+			metadata.Environment = val.AsString()
 		}
+	}
+
+	if attr, exists := attrs["location"]; exists {
+		val, diags := attr.Expr.Value(nil)
+		if diags.HasErrors() {
+			return nil, fmt.Errorf("invalid location: %s", diags.Error())
+		}
+		if val.Type() == cty.String {
+			metadata.Location = val.AsString()
+		}
+	}
+
+	if attr, exists := attrs["owner"]; exists {
+		val, diags := attr.Expr.Value(nil)
+		if diags.HasErrors() {
+			return nil, fmt.Errorf("invalid owner: %s", diags.Error())
+		}
+		if val.Type() == cty.String {
+			metadata.Owner = val.AsString()
+		}
+	}
+
+	if attr, exists := attrs["custom_fields"]; exists {
+		customFields, err := l.parseObjectAttribute(attr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid custom_fields: %w", err)
+		}
+		metadata.CustomFields = customFields
 	}
 
 	return metadata, nil
 }
 
-// LoadMachinesFromDirectory loads machines from a directory containing HCL files
+// LoadMachinesFromDirectory loads machine inventory from all HCL files in a directory
 func (l *Loader) LoadMachinesFromDirectory(ctx context.Context, dirPath string) ([]spookytypes.Machine, error) {
-	l.logger.Debug("Loading machines from directory", map[string]interface{}{
-		"dir_path": dirPath,
-	})
-
-	// Read directory entries
-	entries, err := os.ReadDir(dirPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read directory %s: %w", dirPath, err)
-	}
-
 	var allMachines []spookytypes.Machine
 
-	// Process each HCL file in the directory
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
+	// Walk through directory looking for HCL files
+	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
 		}
 
-		if filepath.Ext(entry.Name()) == ".hcl" {
-			filePath := filepath.Join(dirPath, entry.Name())
-			machines, err := l.LoadMachinesFromFile(ctx, filePath)
-			if err != nil {
-				l.logger.Warn("Failed to load machines from file", map[string]interface{}{
-					"file_path": filePath,
-					"error":     err.Error(),
-				})
-				continue
-			}
-			allMachines = append(allMachines, machines...)
+		// Skip directories
+		if info.IsDir() {
+			return nil
 		}
+
+		// Only process HCL files
+		if !strings.HasSuffix(info.Name(), ".hcl") {
+			return nil
+		}
+
+		// Load machines from this file
+		machines, err := l.LoadMachinesFromFile(ctx, path)
+		if err != nil {
+			l.logger.Warn("Failed to load machines from file", map[string]interface{}{
+				"file":  path,
+				"error": err.Error(),
+			})
+			return nil // Continue with other files
+		}
+
+		allMachines = append(allMachines, machines...)
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to walk directory %s: %w", dirPath, err)
 	}
 
 	l.logger.Info("Machines loaded from directory", map[string]interface{}{
-		"dir_path": dirPath,
-		"count":    len(allMachines),
+		"directory": dirPath,
+		"count":     len(allMachines),
 	})
 
 	return allMachines, nil

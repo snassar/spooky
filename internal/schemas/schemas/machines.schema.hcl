@@ -125,7 +125,7 @@ machines {
       min = 1
       max = 3600
       default = 300
-      description = "Command execution timeout in seconds (overrides global default)"
+      description = "Command run timeout in seconds (overrides global default)"
     }
     
     max_connections = {

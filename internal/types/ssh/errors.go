@@ -116,7 +116,7 @@ type HostKeyError struct {
 	HostKeyComment   string `json:"host_key_comment,omitempty" hcl:"host_key_comment,optional"`
 }
 
-// CommandError represents an SSH command execution error
+// CommandError represents an SSH command run error
 type CommandError struct {
 	SSHError
 
@@ -126,9 +126,9 @@ type CommandError struct {
 	WorkingDir string   `json:"working_dir,omitempty" hcl:"working_dir,optional"`
 	ExitCode   int      `json:"exit_code" hcl:"exit_code"`
 
-	// Command execution
+	// Command run
 	CommandTimeout time.Duration `json:"command_timeout" hcl:"command_timeout"`
-	ExecutionTime  time.Duration `json:"execution_time" hcl:"execution_time"`
+	RunTime        time.Duration `json:"run_time" hcl:"run_time"`
 	Killed         bool          `json:"killed" hcl:"killed"`
 
 	// Command output
@@ -156,9 +156,9 @@ type SessionError struct {
 	SessionClosed  *time.Time `json:"session_closed,omitempty" hcl:"session_closed,optional"`
 
 	// Session metrics
-	CommandsExecuted int           `json:"commands_executed" hcl:"commands_executed"`
-	TotalExecTime    time.Duration `json:"total_exec_time" hcl:"total_exec_time"`
-	LastCommandTime  *time.Time    `json:"last_command_time,omitempty" hcl:"last_command_time,optional"`
+	ActionsRun     int           `json:"actions_run" hcl:"actions_run"`
+	TotalRunTime   time.Duration `json:"total_run_time" hcl:"total_run_time"`
+	LastActionTime *time.Time    `json:"last_action_time,omitempty" hcl:"last_action_time,optional"`
 
 	// Session context
 	PtyRequested bool   `json:"pty_requested" hcl:"pty_requested"`

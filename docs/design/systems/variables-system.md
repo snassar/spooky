@@ -2120,7 +2120,7 @@ func (ctx *TemplateContext) RenderTemplate(templatePath, outputPath string) erro
 #### **Action Context Example:**
 ```go
 // Variables are automatically available in action execution
-func (ctx *TemplateContext) ExecuteAction(action *config.Action, machine string) error {
+func (ctx *TemplateContext) RunAction(action *config.Action, machine string) error {
     // Variables are already loaded and available
     // Action command can use:
     // - ${var.app_name} - from variables.hcl
