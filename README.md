@@ -30,7 +30,42 @@ The CLI now includes advanced features provided by Cobra:
 
 ## Building
 
-To build spooky:
+### Using just (Recommended)
+
+The project uses [just](https://github.com/casey/just) for build automation and [ScalVer](https://scalver.org/) for version management:
+
+```bash
+# Build with ScalVer (daily cadence: MAJOR.YYYYMMDD.PATCH)
+just build
+
+# Build with yearly ScalVer cadence (MAJOR.YYYY.0)
+just build-yearly
+
+# Build with monthly ScalVer cadence (MAJOR.YYYYMM.0)
+just build-monthly
+
+# Build for development (dev version)
+just build-dev
+
+# Build with specific ScalVer version
+just build-scalver 1 20250812 5
+
+# Run all tests and build
+just dev
+
+# Clean build artifacts
+just clean
+
+# Show ScalVer information
+just version
+
+# Show available commands
+just --list
+```
+
+### Manual Build
+
+To build spooky manually:
 
 ```bash
 go build -o spooky .
@@ -113,7 +148,31 @@ The following components need to be implemented:
 - HCL v2 for configuration parsing
 - Cobra v1.9+ for CLI framework
 
+## Versioning
+
+This project uses [ScalVer](https://scalver.org/) (Scalable Calendar Versioning) for version management. ScalVer combines the benefits of SemVer and CalVer:
+
+- **Calendar-aware**: You know when something was released
+- **SemVer compatible**: All existing tooling works unchanged
+- **Adjustable cadence**: Can adapt from yearly → monthly → daily releases
+- **Date-Only-Grows (DOG)**: Prevents version confusion
+
+### ScalVer Format
+
+The version format is `MAJOR.DATE.PATCH` where:
+- **MAJOR**: Mirrors SemVer's MAJOR component (0 = alpha/experimental, 1+ = stable)
+- **DATE**: Calendar date in UTC (YYYY, YYYYMM, or YYYYMMDD)
+- **PATCH**: Monotonically increasing counter for backward-compatible updates
+
+### Examples
+
+- `0.2025.0` - First 2025 alpha release (yearly cadence)
+- `0.202508.0` - First August 2025 release (monthly cadence)
+- `0.20250812.0` - First August 12, 2025 release (daily cadence)
+- `0.20250812.5` - Fifth August 12, 2025 release (same day)
+
 ## Dependencies
 
 - [Cobra](https://github.com/spf13/cobra) - CLI framework
 - [HCL v2](https://github.com/hashicorp/hcl) - Configuration parsing
+- [just](https://github.com/casey/just) - Build automation
