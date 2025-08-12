@@ -8,6 +8,7 @@ import (
 	spookytypescommon "spooky/internal/types/common"
 	spookytypesconfig "spooky/internal/types/config"
 	spookytypeslogging "spooky/internal/types/logging"
+	spookytypesmachines "spooky/internal/types/machines"
 	spookytypesproject "spooky/internal/types/project"
 	spookytypesschemas "spooky/internal/types/schemas"
 )
@@ -74,13 +75,19 @@ type ProjectMetadata = spookytypesproject.ProjectMetadata
 type ProjectSettings = spookytypesproject.ProjectSettings
 type ProjectValidation = spookytypesproject.ProjectValidation
 
+// Machine types
+type Machine = spookytypesmachines.Machine
+type MachineStatus = spookytypesmachines.MachineStatus
+type MachineCollection = spookytypesmachines.MachineCollection
+type MachineFilter = spookytypesmachines.MachineFilter
+type MachineQuery = spookytypesmachines.MachineQuery
+type MachineResult = spookytypesmachines.MachineResult
+
 // Placeholder types for interfaces (to be implemented)
 type FactCollection = interface{}
 type FactStorage = interface{}
 type Action = interface{}
-type Machine = interface{}
 type ActingResult = interface{}
-type MachineStatus = interface{}
 type Template = interface{}
 
 // Schema types

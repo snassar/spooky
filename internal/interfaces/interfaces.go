@@ -197,6 +197,24 @@ type TemplatesIntegration interface {
 	ValidateTemplate(ctx context.Context, template *spookytypes.Template) (*spookytypes.ValidationResult, error)
 }
 
+// MachineValidator provides machine validation
+type MachineValidator interface {
+	// ValidateMachines validates machines
+	ValidateMachines(ctx context.Context, machines []spookytypes.Machine) (*spookytypes.ValidationResult, error)
+
+	// ValidateMachine validates a single machine
+	ValidateMachine(ctx context.Context, machine spookytypes.Machine) (*spookytypes.ValidationResult, error)
+}
+
+// MachineLoader provides machine loading
+type MachineLoader interface {
+	// LoadMachinesFromFile loads machines from a file
+	LoadMachinesFromFile(ctx context.Context, filePath string) ([]spookytypes.Machine, error)
+
+	// LoadMachinesFromDirectory loads machines from a directory
+	LoadMachinesFromDirectory(ctx context.Context, dirPath string) ([]spookytypes.Machine, error)
+}
+
 // MachinesIntegration provides machine management
 type MachinesIntegration interface {
 	// LoadMachines loads machines from the given source
