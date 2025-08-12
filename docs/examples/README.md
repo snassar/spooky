@@ -19,6 +19,11 @@ docs/examples/
 │   ├── variables-basic-config.hcl
 │   ├── variables-multi-file.hcl
 │   └── variables-with-dependencies.hcl
+├── logging/                     # Logging configuration examples
+│   ├── README.md               # Logging-specific documentation
+│   ├── global-logging-config.hcl
+│   ├── project-logging-config.hcl
+│   └── logging-formats.hcl
 ├── actions/                     # Actions and orchestration examples (future)
 │   └── README.md
 ├── templates/                   # Template rendering examples (future)
@@ -49,6 +54,21 @@ docs/examples/
 - Multi-environment infrastructure
 - Kubernetes cluster administration
 - Resource planning and capacity management
+
+### ✅ Logging System
+**Location:** [`logging/`](logging/)
+**Status:** Complete with comprehensive examples
+
+**Examples Available:**
+- **Global Configuration** - System-wide logging setup
+- **Project Configuration** - Project-specific logging overrides
+- **Format Examples** - Different output format configurations
+
+**Use Cases:**
+- Logging configuration and management
+- Output format selection and customization
+- Component-specific logging configuration
+- Performance and audit logging setup
 
 ### 🚧 Future Systems (Planned)
 
@@ -215,6 +235,8 @@ For help with examples:
 ## Current Status
 
 - ✅ **Machines System** - Complete with comprehensive examples
+- ✅ **Variables System** - Complete with comprehensive examples
+- ✅ **Logging System** - Complete with comprehensive examples
 - 🚧 **Other Systems** - Planned and ready for implementation
 - 📋 **Documentation** - Structure established for future growth
 
