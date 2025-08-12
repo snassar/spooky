@@ -11,6 +11,7 @@ import (
 	spookytypesmachines "spooky/internal/types/machines"
 	spookytypesproject "spooky/internal/types/project"
 	spookytypesschemas "spooky/internal/types/schemas"
+	spookytypesssh "spooky/internal/types/ssh"
 	spookytypesvariables "spooky/internal/types/variables"
 )
 
@@ -155,6 +156,169 @@ const (
 	VariableWarningTypeDefaultValue = spookytypesvariables.VariableWarningTypeDefaultValue
 	VariableWarningTypeEnvironment  = spookytypesvariables.VariableWarningTypeEnvironment
 	VariableWarningTypeDependency   = spookytypesvariables.VariableWarningTypeDependency
+)
+
+// SSH types
+type Connection = spookytypesssh.Connection
+type ConnectionStatus = spookytypesssh.ConnectionStatus
+type AuthMethod = spookytypesssh.AuthMethod
+type ConnectionPool = spookytypesssh.ConnectionPool
+type ConnectionFactory = spookytypesssh.ConnectionFactory
+type ConnectionRequest = spookytypesssh.ConnectionRequest
+type ConnectionResult = spookytypesssh.ConnectionResult
+
+type Client = spookytypesssh.Client
+type ClientConfig = spookytypesssh.ClientConfig
+type ClientStatus = spookytypesssh.ClientStatus
+type Session = spookytypesssh.Session
+type SessionStatus = spookytypesssh.SessionStatus
+type PtyConfig = spookytypesssh.PtyConfig
+type SSHCommand = spookytypesssh.Command
+type SSHCommandResult = spookytypesssh.CommandResult
+type FileTransfer = spookytypesssh.FileTransfer
+type TransferDirection = spookytypesssh.TransferDirection
+type TransferMode = spookytypesssh.TransferMode
+type FileTransferResult = spookytypesssh.FileTransferResult
+
+type Authentication = spookytypesssh.Authentication
+type KeyType = spookytypesssh.KeyType
+type Key = spookytypesssh.Key
+type KeyPair = spookytypesssh.KeyPair
+type HostKey = spookytypesssh.HostKey
+type TrustLevel = spookytypesssh.TrustLevel
+type KnownHosts = spookytypesssh.KnownHosts
+type AuthenticationResult = spookytypesssh.AuthenticationResult
+
+type ActingSession = spookytypesssh.ActingSession
+type ActingSessionStatus = spookytypesssh.ActingSessionStatus
+type ActingMode = spookytypesssh.ActingMode
+type ActingCommand = spookytypesssh.ActingCommand
+type ActingCommandResult = spookytypesssh.ActingCommandResult
+type ActingBatch = spookytypesssh.ActingBatch
+type ActingBatchStatus = spookytypesssh.ActingBatchStatus
+type ActingBatchResult = spookytypesssh.ActingBatchResult
+type ActingScript = spookytypesssh.ActingScript
+type ActingScriptResult = spookytypesssh.ActingScriptResult
+
+type SSHError = spookytypesssh.SSHError
+type SSHErrorType = spookytypesssh.SSHErrorType
+type ConnectionError = spookytypesssh.ConnectionError
+type AuthenticationError = spookytypesssh.AuthenticationError
+type HostKeyError = spookytypesssh.HostKeyError
+type SSHCommandError = spookytypesssh.CommandError
+type SessionError = spookytypesssh.SessionError
+type FileTransferError = spookytypesssh.FileTransferError
+type ValidationError = spookytypesssh.ValidationError
+type ValidationType = spookytypesssh.ValidationType
+type ValidationLevel = spookytypesssh.ValidationLevel
+type ConfigurationError = spookytypesssh.ConfigurationError
+
+// SSH constants
+const (
+	// Connection status constants
+	ConnectionStatusDisconnected = spookytypesssh.ConnectionStatusDisconnected
+	ConnectionStatusConnecting   = spookytypesssh.ConnectionStatusConnecting
+	ConnectionStatusConnected    = spookytypesssh.ConnectionStatusConnected
+	ConnectionStatusFailed       = spookytypesssh.ConnectionStatusFailed
+	ConnectionStatusTimeout      = spookytypesssh.ConnectionStatusTimeout
+	ConnectionStatusClosed       = spookytypesssh.ConnectionStatusClosed
+
+	// Auth method constants
+	AuthMethodPassword  = spookytypesssh.AuthMethodPassword
+	AuthMethodPublicKey = spookytypesssh.AuthMethodPublicKey
+	AuthMethodKeyboard  = spookytypesssh.AuthMethodKeyboard
+	AuthMethodAgent     = spookytypesssh.AuthMethodAgent
+	AuthMethodNone      = spookytypesssh.AuthMethodNone
+
+	// Client status constants
+	ClientStatusInitialized  = spookytypesssh.ClientStatusInitialized
+	ClientStatusConnecting   = spookytypesssh.ClientStatusConnecting
+	ClientStatusConnected    = spookytypesssh.ClientStatusConnected
+	ClientStatusDisconnected = spookytypesssh.ClientStatusDisconnected
+	ClientStatusError        = spookytypesssh.ClientStatusError
+	ClientStatusClosed       = spookytypesssh.ClientStatusClosed
+
+	// Session status constants
+	SessionStatusCreated   = spookytypesssh.SessionStatusCreated
+	SessionStatusStarting  = spookytypesssh.SessionStatusStarting
+	SessionStatusActive    = spookytypesssh.SessionStatusActive
+	SessionStatusExecuting = spookytypesssh.SessionStatusExecuting
+	SessionStatusCompleted = spookytypesssh.SessionStatusCompleted
+	SessionStatusFailed    = spookytypesssh.SessionStatusFailed
+	SessionStatusClosed    = spookytypesssh.SessionStatusClosed
+
+	// Acting session status constants
+	ActingSessionStatusCreated   = spookytypesssh.ActingSessionStatusCreated
+	ActingSessionStatusStarting  = spookytypesssh.ActingSessionStatusStarting
+	ActingSessionStatusActive    = spookytypesssh.ActingSessionStatusActive
+	ActingSessionStatusExecuting = spookytypesssh.ActingSessionStatusExecuting
+	ActingSessionStatusCompleted = spookytypesssh.ActingSessionStatusCompleted
+	ActingSessionStatusFailed    = spookytypesssh.ActingSessionStatusFailed
+	ActingSessionStatusClosed    = spookytypesssh.ActingSessionStatusClosed
+
+	// Acting mode constants
+	ActingModeInteractive = spookytypesssh.ActingModeInteractive
+	ActingModeBatch       = spookytypesssh.ActingModeBatch
+	ActingModeScript      = spookytypesssh.ActingModeScript
+	ActingModeCommand     = spookytypesssh.ActingModeCommand
+
+	// Acting batch status constants
+	ActingBatchStatusPending   = spookytypesssh.ActingBatchStatusPending
+	ActingBatchStatusStarting  = spookytypesssh.ActingBatchStatusStarting
+	ActingBatchStatusRunning   = spookytypesssh.ActingBatchStatusRunning
+	ActingBatchStatusCompleted = spookytypesssh.ActingBatchStatusCompleted
+	ActingBatchStatusFailed    = spookytypesssh.ActingBatchStatusFailed
+	ActingBatchStatusCancelled = spookytypesssh.ActingBatchStatusCancelled
+
+	// Transfer direction constants
+	TransferDirectionUpload   = spookytypesssh.TransferDirectionUpload
+	TransferDirectionDownload = spookytypesssh.TransferDirectionDownload
+
+	// Transfer mode constants
+	TransferModeSCP  = spookytypesssh.TransferModeSCP
+	TransferModeSFTP = spookytypesssh.TransferModeSFTP
+
+	// Key type constants
+	KeyTypeRSA     = spookytypesssh.KeyTypeRSA
+	KeyTypeDSA     = spookytypesssh.KeyTypeDSA
+	KeyTypeECDSA   = spookytypesssh.KeyTypeECDSA
+	KeyTypeED25519 = spookytypesssh.KeyTypeED25519
+
+	// Trust level constants
+	TrustLevelUnknown   = spookytypesssh.TrustLevelUnknown
+	TrustLevelUntrusted = spookytypesssh.TrustLevelUntrusted
+	TrustLevelTrusted   = spookytypesssh.TrustLevelTrusted
+	TrustLevelVerified  = spookytypesssh.TrustLevelVerified
+
+	// SSH error type constants
+	SSHErrorTypeConnection     = spookytypesssh.SSHErrorTypeConnection
+	SSHErrorTypeAuthentication = spookytypesssh.SSHErrorTypeAuthentication
+	SSHErrorTypeAuthorization  = spookytypesssh.SSHErrorTypeAuthorization
+	SSHErrorTypeTimeout        = spookytypesssh.SSHErrorTypeTimeout
+	SSHErrorTypeProtocol       = spookytypesssh.SSHErrorTypeProtocol
+	SSHErrorTypeHostKey        = spookytypesssh.SSHErrorTypeHostKey
+	SSHErrorTypeCommand        = spookytypesssh.SSHErrorTypeCommand
+	SSHErrorTypeSession        = spookytypesssh.SSHErrorTypeSession
+	SSHErrorTypeFileTransfer   = spookytypesssh.SSHErrorTypeFileTransfer
+	SSHErrorTypeValidation     = spookytypesssh.SSHErrorTypeValidation
+	SSHErrorTypeConfiguration  = spookytypesssh.SSHErrorTypeConfiguration
+	SSHErrorTypeUnknown        = spookytypesssh.SSHErrorTypeUnknown
+
+	// Validation type constants
+	ValidationTypeRequired    = spookytypesssh.ValidationTypeRequired
+	ValidationTypeFormat      = spookytypesssh.ValidationTypeFormat
+	ValidationTypeRange       = spookytypesssh.ValidationTypeRange
+	ValidationTypeLength      = spookytypesssh.ValidationTypeLength
+	ValidationTypePattern     = spookytypesssh.ValidationTypePattern
+	ValidationTypeEnum        = spookytypesssh.ValidationTypeEnum
+	ValidationTypeCustom      = spookytypesssh.ValidationTypeCustom
+	ValidationTypeDependency  = spookytypesssh.ValidationTypeDependency
+	ValidationTypeConsistency = spookytypesssh.ValidationTypeConsistency
+
+	// Validation level constants
+	ValidationLevelError   = spookytypesssh.ValidationLevelError
+	ValidationLevelWarning = spookytypesssh.ValidationLevelWarning
+	ValidationLevelInfo    = spookytypesssh.ValidationLevelInfo
 )
 
 // Placeholder types for interfaces (to be implemented)

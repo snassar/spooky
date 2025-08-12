@@ -28,8 +28,9 @@ docs/examples/
 │   └── README.md
 ├── templates/                   # Template rendering examples (future)
 │   └── README.md
-├── ssh/                         # SSH connection examples (future)
-│   └── README.md
+├── ssh-basic-connection.hcl     # Basic SSH connection examples
+├── ssh-key-types.hcl           # Different key type configurations
+└── ssh-certificates.hcl        # SSH certificate authentication examples
 └── projects/                    # Complete project examples (future)
     └── README.md
 ```
@@ -54,6 +55,21 @@ docs/examples/
 - Multi-environment infrastructure
 - Kubernetes cluster administration
 - Resource planning and capacity management
+
+### ✅ SSH System
+**Location:** SSH examples in root directory
+**Status:** Complete with comprehensive examples
+
+**Examples Available:**
+- **Basic Connection** - Simple SSH connection setup with different authentication methods
+- **Key Types** - Examples for ED25519, ED25519-SK, and RSA key configurations
+- **Certificates** - SSH certificate authentication with CA setup
+
+**Use Cases:**
+- SSH connection configuration and management
+- Key type selection and validation
+- Certificate-based authentication
+- Security best practices implementation
 
 ### ✅ Logging System
 **Location:** [`logging/`](logging/)

@@ -272,6 +272,51 @@ type ConfigIntegration interface {
 	SaveConfig(ctx context.Context, config *spookytypes.Config, destination string) error
 }
 
+// SSHManager manages SSH connections, authentication, and acting
+type SSHManager interface {
+	// CreateClient creates a new SSH client with the given configuration
+	CreateClient(ctx context.Context, config *spookytypes.ClientConfig) (*spookytypes.Client, error)
+
+	// Connect establishes an SSH connection to the given host
+	Connect(ctx context.Context, request *spookytypes.ConnectionRequest) (*spookytypes.ConnectionResult, error)
+
+	// Authenticate authenticates with the given credentials
+	Authenticate(ctx context.Context, connection *spookytypes.Connection, auth *spookytypes.Authentication) (*spookytypes.AuthenticationResult, error)
+
+	// CreateSession creates a new SSH session
+	CreateSession(ctx context.Context, connection *spookytypes.Connection) (*spookytypes.Session, error)
+
+	// ExecuteCommand executes a command via SSH
+	ExecuteCommand(ctx context.Context, session *spookytypes.Session, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error)
+
+	// CreateActingSession creates a new SSH acting session
+	CreateActingSession(ctx context.Context, connection *spookytypes.Connection) (*spookytypes.ActingSession, error)
+
+	// ExecuteActingCommand executes a command via SSH acting
+	ExecuteActingCommand(ctx context.Context, session *spookytypes.ActingSession, command *spookytypes.ActingCommand) (*spookytypes.ActingCommandResult, error)
+
+	// ExecuteActingBatch executes a batch of commands via SSH acting
+	ExecuteActingBatch(ctx context.Context, session *spookytypes.ActingSession, batch *spookytypes.ActingBatch) (*spookytypes.ActingBatchResult, error)
+
+	// ExecuteActingScript executes a script via SSH acting
+	ExecuteActingScript(ctx context.Context, session *spookytypes.ActingSession, script *spookytypes.ActingScript) (*spookytypes.ActingScriptResult, error)
+
+	// TransferFile transfers a file via SSH
+	TransferFile(ctx context.Context, session *spookytypes.Session, transfer *spookytypes.FileTransfer) (*spookytypes.FileTransferResult, error)
+
+	// ValidateConnection validates SSH connection parameters
+	ValidateConnection(ctx context.Context, request *spookytypes.ConnectionRequest) (*spookytypes.ValidationResult, error)
+
+	// ValidateAuthentication validates SSH authentication parameters
+	ValidateAuthentication(ctx context.Context, auth *spookytypes.Authentication) (*spookytypes.ValidationResult, error)
+
+	// GetConnectionPool returns the connection pool
+	GetConnectionPool() *spookytypes.ConnectionPool
+
+	// Close closes all SSH connections
+	Close(ctx context.Context) error
+}
+
 // FactStorage provides fact storage operations
 type FactStorage interface {
 	// Set stores a fact with the given key
