@@ -8,11 +8,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Version information
+// Version information - these will be injected at build time
 var (
-	Version   = "0.1.0"
-	BuildTime = "unknown"
-	GitCommit = "unknown"
+	Version = "spooky"
 )
 
 // RootCmd represents the base command when called without any subcommands
@@ -42,9 +40,7 @@ func Execute() {
 }
 
 func init() {
-	// Set version template
-	RootCmd.SetVersionTemplate(fmt.Sprintf(`spooky version %s
-Build time: %s
-Git commit: %s
-`, Version, BuildTime, GitCommit))
+	// Set version template - only show version string
+	RootCmd.SetVersionTemplate(fmt.Sprintf(`%s
+`, Version))
 }
