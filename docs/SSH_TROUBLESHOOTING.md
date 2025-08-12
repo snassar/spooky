@@ -288,7 +288,7 @@ chmod 700 ~/.ssh
 **Permission Requirements:**
 - Private key: 600 (owner read/write only)
 - Public key: 644 (owner read/write, others read)
-- .ssh directory: 700 (owner read/write/execute only)
+- .ssh directory: 700 (owner read/write/run only)
 
 ## Certificate Problems
 
@@ -550,7 +550,7 @@ machine "optimized-server" {
 
 #### Problem: Commands timing out
 ```bash
-Error: command execution timeout after 30s
+Error: command run timeout after 30s
 ```
 
 **Solution:**

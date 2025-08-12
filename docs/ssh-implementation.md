@@ -170,7 +170,7 @@ type KeyValidationError struct {
 
 ### Integration Tests
 - Connection establishment
-- Command execution
+- Command running
 - Error handling scenarios
 - Certificate authentication
 

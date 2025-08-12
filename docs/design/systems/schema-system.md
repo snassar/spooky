@@ -33,7 +33,7 @@ This schema system provides the foundation for all other Spooky systems through 
 ### **Actions System Integration**
 - **Action Schema**: Action definition and dependency validation (see [Actions System](../actions-system.md))
 - **Dependency Schema**: Action dependency graph validation and circular reference detection
-- **Execution Schema**: Action execution parameters and validation
+- **Run Schema**: Action run parameters and validation
 - **File Merging**: Schema validation for action file merging and conflict resolution
 
 ### **CLI System Integration**
@@ -169,7 +169,7 @@ Validates facts system data structures and storage formats (see [Facts System](.
 
 **Actions Configuration Schema:**
 - `ActionsConfig` - Action definitions wrapper
-- `Action` - Individual action configuration with execution options
+- `Action` - Individual action configuration with run options
 - `TemplateConfig` - Template-specific configuration for file operations
 
 #### 4. **Validation System** (`internal/config/validator.go`)
@@ -214,7 +214,7 @@ Validates project configuration and directory structure (see [Project System](..
 
 **Project Configuration:**
 - Storage, logging, SSH, and template configurations
-- Default timeouts and parallel execution
+- Default timeouts and parallel running
 - Inventory file and actions file paths
 
 **Project Dependencies:**

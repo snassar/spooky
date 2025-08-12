@@ -150,7 +150,7 @@ Enhanced functions schema with:
 
 **Function-Specific Features**:
 - Function categories (data, project, string, math, array, system)
-- Execution features (lazy evaluation, caching, parallel execution, error handling)
+- Run features (lazy evaluation, caching, parallel running, error handling)
 - Security features (sandboxing, access control, audit logging, pattern filtering)
 
 **Function-Specific Validation**:
@@ -158,7 +158,7 @@ Enhanced functions schema with:
 - Function argument validation (count, types, required arguments)
 - Function return validation (types, size, value validation)
 - Function pattern validation (syntax, dangerous patterns)
-- Function performance validation (execution time, memory, CPU, I/O)
+- Function performance validation (run time, memory, CPU, I/O)
 - Function security validation (file, network, process, environment access)
 
 **Function-Specific Constraints**:
@@ -250,7 +250,7 @@ Enhanced metadata schema with:
 - System functions: System-related operations (restricted by security level)
 
 **Security Features**:
-- Sandboxing: Function execution sandboxing
+- Sandboxing: Function run sandboxing
 - Access control: Function permission levels
 - Audit logging: Function call logging
 - Pattern filtering: Dangerous pattern blocking
@@ -346,7 +346,7 @@ template_functions {
   function_constraints = {
     performance_constraints = {
       max_concurrent_functions = 20
-      max_total_execution_time = 30000
+      max_total_run_time = 30000
     }
   }
 }

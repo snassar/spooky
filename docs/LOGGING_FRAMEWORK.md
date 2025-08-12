@@ -297,7 +297,7 @@ Use descriptive, hierarchical component names:
 ```go
 logManager.GetLogger("ssh.connection")
 logManager.GetLogger("facts.collector")
-logManager.GetLogger("actions.executor")
+logManager.GetLogger("actions.runner")
 ```
 
 ### 2. **Field Consistency**

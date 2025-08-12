@@ -20,7 +20,7 @@ This template system integrates with other core Spooky systems to provide compre
 - **Template Actions**: Actions can run template rendering and deployment (see [Actions System](../actions-system.md))
 - **Template Context**: Actions provide template context with facts, variables, and machine data
 - **Template Deployment**: Actions can deploy rendered templates to target machines
-- **Template Validation**: Actions validate templates before execution
+- **Template Validation**: Actions validate templates before running
 
 ### **Facts System Integration**
 - **Facts in Templates**: Templates can access machine facts for dynamic content (see [Facts System](../facts-system.md))
@@ -50,7 +50,7 @@ This template system integrates with other core Spooky systems to provide compre
 ### **Configuration System Integration**
 - **Global Configuration**: Template settings inherit from global configuration (see [Configuration System](../configuration-system.md))
 - **Template Settings**: Template rendering settings, timeouts, and limits
-- **Security Settings**: Template execution security policies and restrictions
+- **Security Settings**: Template run security policies and restrictions
 - **Performance Settings**: Template caching and optimization settings
 
 ### **Machines System Integration**
@@ -68,7 +68,7 @@ This template system integrates with other core Spooky systems to provide compre
 - ✅ **Template functions** for accessing data (`custom()`, `system()`, `env()`, `data()`)
 - ✅ **Template validation** and syntax checking
 - ✅ **Template preview** capabilities with mock data
-- ✅ **Remote template execution** via SSH
+- ✅ **Remote template running** via SSH
 
 ### **What We Need**
 - 🔄 **Enhanced template schema** with comprehensive validation
@@ -553,7 +553,7 @@ spooky templates debug ./my-project templates/config.tmpl
 # Debug with specific data
 spooky templates debug ./my-project templates/config.tmpl --data data/variables.hcl
 
-# Debug with step-by-step execution
+# Debug with step-by-step running
 spooky templates debug ./my-project templates/config.tmpl --step-by-step
 ```
 
@@ -1027,7 +1027,7 @@ func SanitizeTemplateContent(content string) string {
     // Remove potentially dangerous patterns
     dangerousPatterns := []string{
         `{{.*os\.Exec.*}}`,
-        `{{.*exec.*}}`,
+        `{{.*run.*}}`,
         `{{.*system.*}}`,
         `{{.*eval.*}}`,
     }

@@ -10,7 +10,7 @@ The spooky SSH system provides secure, efficient, and validated SSH connectivity
 2. [Key Types and Authentication](#key-types-and-authentication)
 3. [SSH Certificates](#ssh-certificates)
 4. [Connection Management](#connection-management)
-5. [Command Execution](#command-execution)
+5. [Command Running](#command-running)
 6. [Advanced Features](#advanced-features)
 7. [Advanced SSH Capabilities](#advanced-ssh-capabilities)
 8. [Best Practices](#best-practices)
@@ -311,7 +311,7 @@ Command output is automatically captured and processed:
 
 ### Environment Variables
 
-Set environment variables for command execution:
+Set environment variables for command running:
 
 ```hcl
 actions {
@@ -330,7 +330,7 @@ actions {
 
 ### Working Directory
 
-Set working directory for command execution:
+Set working directory for command running:
 
 ```hcl
 actions {
@@ -722,8 +722,8 @@ actions {
    - Configure appropriate pool sizes
    - Monitor pool utilization
 
-2. **Parallel execution**:
-   - Use parallel execution for multiple machines
+2. **Parallel running**:
+   - Use parallel running for multiple machines
    - Configure appropriate concurrency limits
    - Monitor resource usage
 

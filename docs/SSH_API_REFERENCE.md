@@ -194,18 +194,18 @@ Runs a command via SSH session.
 
 **Parameters:**
 - `ctx`: Context for cancellation and timeouts
-- `session`: SSH session for command execution
+- `session`: SSH session for command running
 - `command`: Command to run with configuration
 
 **Returns:**
-- `*spookytypes.SSHCommandResult`: Command execution result
-- `error`: Error if command execution fails
+- `*spookytypes.SSHCommandResult`: Command run result
+- `error`: Error if command run fails
 
 **Behavior:**
 - Sets up command environment and working directory
 - Runs command with specified timeout
 - Captures standard output and error streams
-- Returns execution result with metrics
+- Returns run result with metrics
 
 ### SimpleClient
 
@@ -444,7 +444,7 @@ type Session struct {
 
     // Session metrics
     ActionsRun int           `json:"actions_run" hcl:"actions_run"`
-    TotalExecutionTime time.Duration `json:"total_execution_time" hcl:"total_execution_time"`
+    TotalRunTime time.Duration `json:"total_run_time" hcl:"total_run_time"`
     AverageCommandTime time.Duration `json:"average_command_time" hcl:"average_command_time"`
 }
 ```

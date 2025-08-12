@@ -304,7 +304,7 @@ tests/
 
 #### Benchmarks
 - **Build time**: Fast incremental builds
-- **Test time**: Quick test execution
+- **Test time**: Quick test running
 - **Memory usage**: Efficient memory allocation
 - **Startup time**: Fast CLI startup
 

@@ -2,58 +2,58 @@
 
 ## Overview
 
-This document is the authoritative source for all actions system implementation details in spooky. It covers action definition, dependency management, file merging, execution planning, and integration with all other spooky systems.
+This document is the authoritative source for all actions system implementation details in spooky. It covers action definition, dependency management, file merging, run planning, and integration with all other spooky systems.
 
-**Schema Integration**: This actions system follows the schema validation patterns and infrastructure defined in [Schema System](../schema-system.md) for action definition validation, dependency schema enforcement, and schema-based execution planning.
+**Schema Integration**: This actions system follows the schema validation patterns and infrastructure defined in [Schema System](../schema-system.md) for action definition validation, dependency schema enforcement, and schema-based run planning.
 
-**Architecture Integration**: Actions integrate with the overall spooky architecture as described in [Spooky Design](../spooky-design.md), providing dynamic execution capabilities and workflow automation for all system components.
+**Architecture Integration**: Actions integrate with the overall spooky architecture as described in [Spooky Design](../spooky-design.md), providing dynamic running capabilities and workflow automation for all system components.
 
 ## System Integration
 
-This actions system integrates with other core Spooky systems to provide comprehensive action management and execution:
+This actions system integrates with other core Spooky systems to provide comprehensive action management and running:
 
 ### **CLI System Integration**
 - **Action Commands**: Actions managed through `spooky actions` commands (see [CLI System](../cli-system.md))
 - **Command Patterns**: Actions follow the established `spooky noun verb` CLI pattern
 - **Validation Commands**: `spooky actions validate` for action file validation
-- **Execution Commands**: `spooky actions run` and `spooky actions dry-run` for action execution
+- **Run Commands**: `spooky actions run` and `spooky actions dry-run` for action running
 - **List Commands**: `spooky actions list` for action discovery and filtering
 
 ### **Facts System Integration**
-- **Facts in Actions**: Actions can access machine facts for dynamic execution (see [Facts System](../facts-system.md))
-- **Facts-Based Commands**: Actions can use facts data in command execution
+- **Facts in Actions**: Actions can access machine facts for dynamic running (see [Facts System](../facts-system.md))
+- **Facts-Based Commands**: Actions can use facts data in command running
 - **Template Context**: Actions have access to facts through template context
-- **Facts Resolution**: Actions resolve facts at execution time for each machine
+- **Facts Resolution**: Actions resolve facts at run time for each machine
 
 ### **Project System Integration**
 - **Project Actions**: Actions stored in project-specific `actions.hcl` and `actions/` directory (see [Project System](../project-system.md))
-- **Project Context**: Actions run within project execution context
+- **Project Context**: Actions run within project run context
 - **Project Configuration**: Action settings configured in project context
 - **Project Isolation**: Project actions isolated from global actions
 
 ### **Variables System Integration**
 - **Variables in Actions**: Actions can use project variables for dynamic configuration (see [Variables System](../variables-system.md))
-- **Variable Resolution**: Actions resolve variables at execution time
+- **Variable Resolution**: Actions resolve variables at run time
 - **Template Integration**: Actions can use variables in command templates
 - **Variable Precedence**: Actions follow variable resolution precedence (Environment → Project → Facts → Defaults)
 
 ### **Configuration System Integration**
-- **Global Configuration**: Action execution settings from `$XDG_CONFIG_HOME/spooky/spooky.hcl` (see [Configuration System](../configuration-system.md))
-- **Execution Settings**: Timeouts, retries, parallel execution limits
-- **SSH Configuration**: SSH settings for remote action execution
-- **Logging Configuration**: Action execution logging and output settings
+- **Global Configuration**: Action run settings from `$XDG_CONFIG_HOME/spooky/spooky.hcl` (see [Configuration System](../configuration-system.md))
+- **Run Settings**: Timeouts, retries, parallel run limits
+- **SSH Configuration**: SSH settings for remote action running
+- **Logging Configuration**: Action run logging and output settings
 
 ### **Machines System Integration**
 - **Target Selection**: Actions use machine inventory for target selection via tags, names, or filters (see [Machines System](../machines-system.md))
 - **Machine Resolution**: Actions resolve machine targets through the machines system's indexing and lookup capabilities
 - **Execution Context**: Actions run within machine-specific contexts with authentication and connection details
-- **Parallel Execution**: Machine inventory supports parallel action execution across multiple targets
+- **Parallel Running**: Machine inventory supports parallel action running across multiple targets
 
 ### **Template System Integration**
 - **Template Actions**: Actions can run template rendering and deployment (see [Template System](../template-system.md))
 - **Template Context**: Actions provide template context with facts, variables, and machine data
 - **Template Deployment**: Actions can deploy rendered templates to target machines
-- **Template Validation**: Actions validate templates before execution
+- **Template Validation**: Actions validate templates before running
 
 ## Current State Analysis
 
@@ -861,7 +861,7 @@ schema "actions_config" {
 
 ### **Immediate Benefits**
 - **Centralized action management** with organized files
-- **Dependency tracking** prevents execution order issues
+- **Dependency tracking** prevents run order issues
 - **Cross-file validation** for merged configurations
 - **Clear error messages** for action and dependency issues
 
@@ -910,10 +910,10 @@ schema "actions_config" {
 Spooky **does** provide automatic dependency resolution through topological sorting:
 
 ```go
-// This works automatically - determines execution order
+// This works automatically - determines run order
 func (dg *DependencyGraph) ResolveOrder() ([]string, error) {
     // Topological sort automatically resolves dependencies
-    // Returns actions in correct execution order
+    // Returns actions in correct run order
     // Handles complex dependency chains automatically
 }
 ```
@@ -921,7 +921,7 @@ func (dg *DependencyGraph) ResolveOrder() ([]string, error) {
 **What's Automatic:**
 - **Execution order determination** via topological sorting
 - **Dependency graph building** from merged files
-- **Parallel execution** of independent actions
+- **Parallel running** of independent actions
 - **Dependency validation** and reference checking
 
 ### **2. We Don't Fix Circular Dependencies**
@@ -1159,7 +1159,7 @@ actions {
 ```
 
 **Key Lessons:**
-- **Tag-based organization** for selective execution
+- **Tag-based organization** for selective running
 - **Role-based file structure** for team collaboration
 - **Clear separation** of install/configure/start phases
 

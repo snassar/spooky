@@ -6,7 +6,7 @@ This document is the authoritative source for all variable system implementation
 
 **Schema Integration**: This variables system leverages the schema validation infrastructure and patterns defined in [Schema System](../schema-system.md) for comprehensive variable validation, type checking, and schema-based export functionality.
 
-**Architecture Integration**: Variables integrate with the overall spooky architecture as described in [Spooky Design](../spooky-design.md), providing configuration values to the actions system for template rendering and execution.
+**Architecture Integration**: Variables integrate with the overall spooky architecture as described in [Spooky Design](../spooky-design.md), providing configuration values to the actions system for template rendering and running.
 
 ## System Integration
 
@@ -20,7 +20,7 @@ This variables system integrates with other core Spooky systems to provide compr
 
 ### **Project System Integration**
 - **Project Variables**: Variables stored in project-specific `variables.hcl` and `variables/` directory (see [Project System](../project-system.md))
-- **Project Context**: Variables resolved within project execution context
+- **Project Context**: Variables resolved within project run context
 - **Project Isolation**: Project variables isolated from global variables
 - **Project Configuration**: Variable settings configured in project context
 
@@ -39,7 +39,7 @@ This variables system integrates with other core Spooky systems to provide compr
 
 ### **Actions System Integration**
 - **Variables in Actions**: Actions can use project variables for dynamic configuration (see [Actions System](../actions-system.md))
-- **Variable Resolution**: Actions resolve variables at execution time
+- **Variable Resolution**: Actions resolve variables at run time
 - **Template Integration**: Actions can use variables in command templates
 - **Variable Precedence**: Actions follow variable resolution precedence (Environment → Project → Facts → Defaults)
 
@@ -509,7 +509,7 @@ func (vr *VariableResolver) Resolve(name string) (interface{}, error) {
 
 **Benefits of Parse-Time Merging:**
 
-1. **Early Error Detection**: Conflicts and syntax errors caught before execution
+1. **Early Error Detection**: Conflicts and syntax errors caught before running
 2. **Performance**: No file I/O during variable resolution
 3. **Consistency**: All variable files loaded once, ensuring consistent state
 4. **Validation**: Can validate dependencies and circular references upfront
@@ -535,7 +535,7 @@ func (p *Project) Load() error {
     return nil
 }
 
-// Runtime (during template rendering or action execution)
+// Runtime (during template rendering or action running)
 func (p *Project) ResolveVariable(name string) (interface{}, error) {
     resolver := &VariableResolver{context: p.TemplateContext}
     return resolver.Resolve(name)
@@ -2119,7 +2119,7 @@ func (ctx *TemplateContext) RenderTemplate(templatePath, outputPath string) erro
 
 #### **Action Context Example:**
 ```go
-// Variables are automatically available in action execution
+// Variables are automatically available in action running
 func (ctx *TemplateContext) RunAction(action *config.Action, machine string) error {
     // Variables are already loaded and available
     // Action command can use:

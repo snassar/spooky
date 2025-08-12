@@ -10,8 +10,8 @@ project "example-project" {
   email = "user@example.com"
   url = "https://github.com/example/spooky-project"
 
-  # Project execution settings
-  execution {
+  # Project run settings
+  run {
     default_timeout = 300
     max_parallel = 10
     dry_run_default = false

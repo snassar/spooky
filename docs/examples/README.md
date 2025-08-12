@@ -115,7 +115,7 @@ docs/examples/
 
 #### Actions System
 **Location:** `actions/` (to be created)
-**Purpose:** Examples for action orchestration and execution
+**Purpose:** Examples for action orchestration and running
 
 **Planned Examples:**
 - Basic action definitions
@@ -141,7 +141,7 @@ docs/examples/
 - SSH connection configuration
 - Authentication methods
 - Connection pooling
-- SSH command execution
+- SSH command running
 
 #### Complete Projects
 **Location:** `projects/` (to be created)

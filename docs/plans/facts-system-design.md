@@ -6,7 +6,7 @@ This document is the authoritative source for all facts system implementation de
 
 **Schema Integration**: This facts system implements the schema validation patterns and data structures defined in [Schema System](../schema-system.md) for comprehensive facts validation, storage format consistency, and schema-based data integrity.
 
-**Architecture Integration**: Facts integrate with the overall spooky architecture as described in [Spooky Design](../spooky-design.md), providing machine data to the actions system for dynamic execution and template rendering.
+**Architecture Integration**: Facts integrate with the overall spooky architecture as described in [Spooky Design](../spooky-design.md), providing machine data to the actions system for dynamic running and template rendering.
 
 ## System Integration
 
@@ -16,7 +16,7 @@ This facts system integrates with other core Spooky systems to provide comprehen
 - **Project Initialization**: Facts database creation during `spooky project init` (see [Project System](../project-system.md))
 - **Project Isolation**: Project-specific facts storage with global facts sharing
 - **Project Configuration**: Facts storage settings in `project.hcl` configuration
-- **Project Context**: Facts available in project execution context
+- **Project Context**: Facts available in project run context
 
 ### **Configuration System Integration**
 - **Global Configuration**: Facts collection settings from `$XDG_CONFIG_HOME/spooky/spooky.hcl` (see [Configuration System](../configuration-system.md))
@@ -45,10 +45,10 @@ This facts system integrates with other core Spooky systems to provide comprehen
 - **Facts Discovery**: `spooky facts list` for facts discovery and filtering
 
 ### **Actions System Integration**
-- **Facts in Actions**: Actions can access machine facts for dynamic execution (see [Actions System](../actions-system.md))
-- **Facts-Based Commands**: Actions can use facts data in command execution
+- **Facts in Actions**: Actions can access machine facts for dynamic running (see [Actions System](../actions-system.md))
+- **Facts-Based Commands**: Actions can use facts data in command running
 - **Template Context**: Actions have access to facts through template context
-- **Facts Resolution**: Actions resolve facts at execution time for each machine
+- **Facts Resolution**: Actions resolve facts at run time for each machine
 
 ### **Machines System Integration**
 - **Machine Facts**: Facts collection uses machine inventory for target identification (see [Machines System](../machines-system.md))
@@ -371,11 +371,11 @@ action "configure-monitoring" {
 
 ### **2. Dynamic Facts**
 
-You can also use executable scripts in `/etc/spooky/facts/` to provide facts at runtime:
+You can also use runnable scripts in `/etc/spooky/facts/` to provide facts at runtime:
 
 ```bash
 #!/bin/bash
-# /etc/spooky/facts/deployment.fact (executable)
+# /etc/spooky/facts/deployment.fact (runnable)
 
 # Get current deployment status
 DEPLOYMENT_STATE=$(systemctl is-active nginx)
@@ -435,7 +435,7 @@ func (c *LocalCollector) CollectCustomFacts() (map[string]interface{}, error) {
         filePath := filepath.Join(factsDir, entry.Name())
         factName := strings.TrimSuffix(entry.Name(), ".fact")
         
-        // Check if file is executable
+        // Check if file is runnable
         if info, err := os.Stat(filePath); err == nil && info.Mode()&0111 != 0 {
             // Run dynamic fact script
             customFacts[factName] = c.runDynamicFact(filePath)

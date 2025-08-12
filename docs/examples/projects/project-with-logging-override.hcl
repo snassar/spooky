@@ -7,7 +7,7 @@ project {
   version = "1.0.0"
   author = "developer"
 
-  execution {
+  run {
     default_timeout = 300
     max_parallel = 10
     dry_run_default = false
@@ -43,7 +43,7 @@ project {
       components = {
         "ssh"     = "debug"   # Very verbose SSH logging
         "facts"   = "debug"   # Debug facts collection
-        "actions" = "debug"   # Debug action execution
+        "actions" = "debug"   # Debug action running
         "project" = "debug"   # Debug project operations
       }
     }

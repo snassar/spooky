@@ -329,7 +329,7 @@ logging {
 - **facts** - Fact collection and processing
 - **machines** - Machine inventory and connectivity
 - **variables** - Variable management and resolution
-- **actions** - Action orchestration and execution
+- **actions** - Action orchestration and running
 - **templates** - Template rendering and processing
 - **ssh** - SSH connections and operations
 - **config** - Configuration loading and validation

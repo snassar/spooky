@@ -17,7 +17,7 @@ This document provides a comprehensive overview of the spooky SSH system documen
 - Key type support and configuration
 - SSH certificate authentication
 - Connection management and pooling
-- Command execution and file transfer
+- Command running and file transfer
 - Advanced SSH capabilities (file transfer library, multi-factor auth) - ✅ COMPLETED
 - Advanced features and best practices
 - Real-world examples and use cases
@@ -191,12 +191,12 @@ The spooky SSH system now includes advanced capabilities that extend beyond basi
    - Connection types and request/response structures
    - Authentication types and key definitions
    - Error types and validation structures
-   - Acting types for command execution
+   - Acting types for command running
 
 2. **SSH Client** (`internal/ssh/client_simple.go`):
    - SimpleClient implementation with connection pooling
    - Key validation and certificate support
-   - Command execution and session management
+   - Command running and session management
    - Error handling and logging
 
 3. **Key Validation**:
@@ -208,7 +208,7 @@ The spooky SSH system now includes advanced capabilities that extend beyond basi
 ### Integration Points
 
 - **Machines System**: SSH connections for machine management
-- **Actions System**: Command execution on remote machines
+- **Actions System**: Command running on remote machines
 - **Facts System**: Data collection from remote systems
 - **Templates System**: Remote template rendering
 

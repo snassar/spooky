@@ -6,7 +6,7 @@ This document is the authoritative source for all machines system implementation
 
 **Schema Integration**: This machines system implements the schema validation patterns and machine configuration definitions defined in [Schema System](../schema-system.md) for comprehensive machine validation, inventory schema enforcement, and schema-based machine lifecycle management.
 
-**Architecture Integration**: Machines integrate with the overall spooky architecture as described in [Spooky Design](../spooky-design.md), providing the foundational inventory management that all other systems depend on for target selection and execution.
+**Architecture Integration**: Machines integrate with the overall spooky architecture as described in [Spooky Design](../spooky-design.md), providing the foundational inventory management that all other systems depend on for target selection and running.
 
 ## System Integration
 
@@ -16,7 +16,7 @@ This machines system integrates with other core Spooky systems to provide compre
 - **Target Selection**: Actions use machine inventory for target selection via tags, names, or filters (see [Actions System](../actions-system.md))
 - **Machine Resolution**: Actions resolve machine targets through the machines system's indexing and lookup capabilities
 - **Execution Context**: Actions run within machine-specific contexts with authentication and connection details
-- **Parallel Execution**: Machine inventory supports parallel action execution across multiple targets
+- **Parallel Running**: Machine inventory supports parallel action running across multiple targets
 
 ### **Facts System Integration**
 - **Machine Identification**: Facts collection uses machine inventory for target identification and authentication (see [Facts System](../facts-system.md))

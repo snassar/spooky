@@ -194,7 +194,7 @@ variable "app_name" {
 
 ### With Actions
 
-Variables can be passed to actions for dynamic execution:
+Variables can be passed to actions for dynamic running:
 
 ```hcl
 # In variables.hcl

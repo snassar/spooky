@@ -22,7 +22,7 @@ When running any spooky command (except `--version` and `--help`), the system:
 2. **Checks if the config directory exists**
 3. **If it doesn't exist**: Creates the directory and default configuration files
 4. **If it exists**: Ensures required files exist and validates their HCL syntax
-5. **If validation fails**: Emits an error and stops execution
+5. **If validation fails**: Emits an error and stops running
 
 ### 3. **Configuration Files Created**
 
@@ -92,13 +92,13 @@ actions {
   # Default action timeout (in seconds)
   default_timeout = 300
   
-  # Maximum parallel action executions
+  # Maximum parallel action runs
   max_parallel = 10
   
   # Enable dry-run mode by default
   dry_run_default = false
   
-  # Validate actions before execution
+  # Validate actions before running
   validate_before_run = true
   
   # Create backups before making changes

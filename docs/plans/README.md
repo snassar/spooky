@@ -28,7 +28,7 @@ The following plans should be implemented in dependency order to ensure proper s
 
 ### Phase 5: Acting Infrastructure 📋 **PLANNED**
 13. 📋 **07-collection-action.md** - Collection acting functionality (core acting)
-14. 📋 **08-ssh-acting-engine.md** - SSH acting engine (acting execution)
+14. 📋 **08-ssh-acting-engine.md** - SSH acting engine (acting running)
 15. 📋 **09-command-action-cli.md** - Command acting CLI (acting interface)
 16. 📋 **10-machine-connectivity-testing.md** - Machine connectivity testing (acting validation)
 
@@ -138,7 +138,7 @@ The following plans should be implemented in dependency order to ensure proper s
 
 ### Then: Phase 5 📋
 6. **Implement collection acting (07)** - Core acting functionality
-7. **Build SSH acting engine (08)** - Acting execution
+7. **Build SSH acting engine (08)** - Acting running
 8. **Create command acting CLI (09)** - Acting interface
 9. **Add connectivity testing (10)** - Acting validation
 

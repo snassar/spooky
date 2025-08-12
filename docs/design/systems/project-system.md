@@ -52,7 +52,7 @@ This project system integrates with other core Spooky systems to provide isolate
 
 ### **Actions System Integration**
 - **Project Actions**: Actions stored in project-specific `actions.hcl` and `actions/` directory (see [Actions System](../actions-system.md))
-- **Project Context**: Actions run within project execution context
+- **Project Context**: Actions run within project run context
 - **Project Configuration**: Action settings configured in project context
 - **Project Isolation**: Project actions isolated from global actions
 - **Dependency Management**: Project-level action dependency tracking
@@ -70,7 +70,7 @@ This project system integrates with other core Spooky systems to provide isolate
 - ✅ **Project initialization** with `spooky project init`
 - ✅ **Basic project structure** (project.hcl, machines.hcl, actions.hcl)
 - ✅ **Template system** with facts integration
-- ✅ **SSH client** for remote execution
+- ✅ **SSH client** for remote running
 - ✅ **HCL parsing** for configuration files
 
 ### **What We Need**
@@ -95,7 +95,7 @@ project-name/
 ├── facts.db/                       # Dynamic facts database (see [Facts System](../facts-system.md))
 ├── templates/                     # Template files
 ├── files/                         # Static files for distribution
-├── logs/                          # Project execution logs
+├── logs/                          # Project run logs
 ```
 
 **Project Identity and Metadata**:
@@ -112,7 +112,7 @@ project "nextcloud-production" {
   # Actions configuration
   actions_file = "actions.hcl"
   
-  # Default execution settings
+  # Default run settings
   default_timeout = 300
   parallel = 10
   
@@ -264,7 +264,7 @@ func applyEnvironmentOverrides(project *Project) {
         }
     }
     
-    // Parallel execution override
+    // Parallel run override
     if parallel := os.Getenv("SPOOKY_PARALLEL"); parallel != "" {
         if p, err := strconv.Atoi(parallel); err == nil {
             project.Parallel = p
@@ -486,7 +486,7 @@ func (p *ProjectValidator) validateFactsDatabase() error {
    - Apply CLI flag overrides
 
 2. **Project context** (`internal/project/context.go`)
-   - Create project execution context
+   - Create project run context
    - Integrate with facts system
    - Manage project isolation
 

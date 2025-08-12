@@ -384,7 +384,7 @@ machine "prod-db-server" {
 
 #### Parallel Execution
 ```bash
-# Use parallel execution for large inventories
+# Use parallel running for large inventories
 spooky machines ping ./my-project --parallel 10
 
 # Monitor system resources during testing
@@ -493,10 +493,10 @@ spooky machines validate ./my-project --verbose
 #### Missing Source Files
 ```bash
 # Check if all referenced files exist
-find ./my-project -name "*.hcl" -exec echo "Found: {}" \;
+find ./my-project -name "*.hcl" -run echo "Found: {}" \;
 
 # Check for broken symlinks
-find ./my-project -type l -exec test ! -e {} \; -print
+find ./my-project -type l -run test ! -e {} \; -print
 
 # Verify file permissions
 ls -la ./my-project/machines/
