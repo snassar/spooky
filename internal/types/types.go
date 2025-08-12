@@ -45,15 +45,13 @@ type LoggingConfig = spookytypesconfig.LoggingConfig
 type SSHConfig = spookytypesconfig.SSHConfig
 type StorageConfig = spookytypesconfig.StorageConfig
 type SecurityConfig = spookytypesconfig.SecurityConfig
-type PerformanceConfig = spookytypesconfig.PerformanceConfig
-type IsolationConfig = spookytypesconfig.IsolationConfig
 
 // Logging types
 type LogLevel = spookytypeslogging.LogLevel
 type LogConfig = spookytypeslogging.LogConfig
-type LogRotation = spookytypeslogging.LogRotation
-type LogFiltering = spookytypeslogging.LogFiltering
-type LogPerformance = spookytypeslogging.LogPerformance
+type LogRotationConfig = spookytypeslogging.LogRotationConfig
+type LogFilteringConfig = spookytypeslogging.LogFilteringConfig
+type LogPerformanceConfig = spookytypeslogging.LogPerformanceConfig
 type LogEntry = spookytypeslogging.LogEntry
 type LogError = spookytypeslogging.LogError
 type LogCaller = spookytypeslogging.LogCaller
@@ -75,12 +73,15 @@ type ProjectConfig = spookytypesproject.ProjectConfig
 type ProjectMetadata = spookytypesproject.ProjectMetadata
 type ProjectSettings = spookytypesproject.ProjectSettings
 type ProjectValidation = spookytypesproject.ProjectValidation
-type ProjectStatus = spookytypesproject.ProjectStatus
-type ProjectIsolation = spookytypesproject.ProjectIsolation
-type ProjectExecution = spookytypesproject.ProjectExecution
-type ProjectManager = spookytypesproject.ProjectManager
-type ProjectValidator = spookytypesproject.ProjectValidator
-type ProjectLoader = spookytypesproject.ProjectLoader
+
+// Placeholder types for interfaces (to be implemented)
+type FactCollection = interface{}
+type FactStorage = interface{}
+type Action = interface{}
+type Machine = interface{}
+type ActingResult = interface{}
+type MachineStatus = interface{}
+type Template = interface{}
 
 // Schema types
 type Schema = spookytypesschemas.Schema

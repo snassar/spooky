@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	spookyconfig "spooky/internal/config"
+
 	"github.com/spf13/cobra"
 )
 
@@ -28,6 +30,19 @@ Examples:
   spooky --version
   spooky --help`,
 	Version: Version,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Skip auto-setup for version and help commands
+		if cmd.Name() == "version" || cmd.Name() == "help" {
+			return nil
+		}
+
+		// Auto-setup configuration for all other commands
+		if err := spookyconfig.AutoSetupConfig(); err != nil {
+			return fmt.Errorf("configuration setup failed: %w", err)
+		}
+
+		return nil
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
