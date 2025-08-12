@@ -43,3 +43,26 @@ The variables system is production-ready and fully functional. The following are
 - Integration with other systems (actions, facts, SSH)
 - Variable dependency visualization
 - Environment-specific variable management
+
+## logging
+
+### Future Enhancements (Planned)
+The logging system is fully functional and production-ready. The following enhancements would improve configuration flexibility:
+
+**HCL Configuration Parsing:**
+- Implement `parseLoggingConfig()` in `internal/config/logging.go` - Parse HCL logging configuration files
+- Implement `parseProjectLoggingConfig()` - Extract logging settings from project.hcl files
+- Support for global logging configuration at `$XDG_CONFIG_HOME/spooky/logging.hcl`
+- Support for project-specific logging configuration in `project.hcl`
+
+**Enhanced Configuration Loading:**
+- Load custom logging levels from configuration files
+- Support for custom output formats and destinations
+- Project-specific logging overrides
+- Environment variable integration for logging configuration
+
+**Advanced Logging Features:**
+- Log rotation configuration from HCL files
+- Performance optimization settings (buffering, async logging)
+- Component-specific filtering from configuration
+- Structured logging field customization
