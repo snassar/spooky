@@ -100,7 +100,7 @@ if err != nil {
 
 ### Command Execution
 ```go
-// Execute command
+// Run command
 command := &spookytypes.SSHCommand{
     Command:      "uname",
     Args:         []string{"-a"},
@@ -108,7 +108,7 @@ command := &spookytypes.SSHCommand{
     Timeout:      10 * time.Second,
 }
 
-cmdResult, err := client.ExecuteCommand(ctx, connection, command)
+cmdResult, err := client.RunCommand(ctx, connection, command)
 if err != nil {
     log.Fatal(err)
 }

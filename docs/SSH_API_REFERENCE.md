@@ -7,12 +7,98 @@ This document provides a comprehensive API reference for the spooky SSH system. 
 ## Table of Contents
 
 1. [Core Interfaces](#core-interfaces)
-2. [Type Definitions](#type-definitions)
-3. [Implementation Details](#implementation-details)
-4. [Error Handling](#error-handling)
-5. [Key Validation Rules](#key-validation-rules)
-6. [Certificate Handling](#certificate-handling)
-7. [Examples](#examples)
+2. [Advanced SSH Capabilities](#advanced-ssh-capabilities)
+3. [Type Definitions](#type-definitions)
+4. [Implementation Details](#implementation-details)
+5. [Error Handling](#error-handling)
+6. [Key Validation Rules](#key-validation-rules)
+7. [Certificate Handling](#certificate-handling)
+8. [File Transfer](#file-transfer)
+9. [Advanced Authentication](#advanced-authentication)
+11. [Examples](#examples)
+
+## Advanced SSH Capabilities
+
+The spooky SSH system now includes advanced capabilities for file transfer (as a library component for actions) and multi-factor authentication.
+
+### FileTransferManager
+
+Manages SFTP and SCP file transfers with progress tracking and verification.
+
+```go
+type FileTransferManager struct {
+    client *SimpleClient
+    logger spookytypeslogging.Logger
+}
+
+func NewFileTransferManager(client *SimpleClient, logger spookytypeslogging.Logger) *FileTransferManager
+```
+
+**Methods:**
+
+#### TransferFile
+```go
+TransferFile(ctx context.Context, connection *spookytypes.Connection, transfer *spookytypesssh.FileTransfer) (*spookytypesssh.FileTransferResult, error)
+```
+Transfers a file using SFTP or SCP protocol.
+
+**Parameters:**
+- `ctx`: Context for cancellation and timeouts
+- `connection`: SSH connection details
+- `transfer`: File transfer configuration
+
+**Returns:**
+- `*spookytypesssh.FileTransferResult`: Transfer result with metrics
+- `error`: Error if transfer fails
+
+**Features:**
+- Supports SFTP and SCP protocols
+- Progress tracking and logging
+- Post-transfer verification
+- Automatic retry on failure
+
+#### BatchTransfer
+```go
+BatchTransfer(ctx context.Context, connection *spookytypes.Connection, transfers []*spookytypesssh.FileTransfer) ([]*spookytypesssh.FileTransferResult, error)
+```
+Performs multiple file transfers concurrently.
+
+
+
+### AdvancedAuthManager
+
+Manages multi-factor authentication and certificate-based authentication.
+
+```go
+type AdvancedAuthManager struct {
+    logger spookytypeslogging.Logger
+    agent  *Agent
+}
+
+func NewAdvancedAuthManager(logger spookytypeslogging.Logger) *AdvancedAuthManager
+```
+
+**Methods:**
+
+#### GetAuthMethods
+```go
+GetAuthMethods(config *MultiFactorAuthConfig) ([]ssh.AuthMethod, error)
+```
+Creates authentication methods for multi-factor authentication.
+
+#### GenerateCertificate
+```go
+GenerateCertificate(config *CertificateConfig) (*ssh.Certificate, error)
+```
+Generates SSH certificates for certificate-based authentication.
+
+#### SaveCertificate
+```go
+SaveCertificate(cert *ssh.Certificate, path string) error
+```
+Saves an SSH certificate to file.
+
+
 
 ## Core Interfaces
 
@@ -34,20 +120,11 @@ type SSHManager interface {
     // CreateSession creates a new SSH session
     CreateSession(ctx context.Context, connection *spookytypes.Connection) (*spookytypes.Session, error)
     
-    // ExecuteCommand executes a command via SSH
-    ExecuteCommand(ctx context.Context, session *spookytypes.Session, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error)
+    // RunCommand runs a command via SSH
+    RunCommand(ctx context.Context, session *spookytypes.Session, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error)
     
     // CreateActingSession creates a new SSH acting session
     CreateActingSession(ctx context.Context, connection *spookytypes.Connection) (*spookytypes.ActingSession, error)
-    
-    // ExecuteActingCommand executes a command via SSH acting
-    ExecuteActingCommand(ctx context.Context, session *spookytypes.ActingSession, command *spookytypes.ActingCommand) (*spookytypes.ActingCommandResult, error)
-    
-    // ExecuteActingBatch executes a batch of commands via SSH acting
-    ExecuteActingBatch(ctx context.Context, session *spookytypes.ActingSession, batch *spookytypes.ActingBatch) (*spookytypes.ActingBatchResult, error)
-    
-    // ExecuteActingScript executes a script via SSH acting
-    ExecuteActingScript(ctx context.Context, session *spookytypes.ActingSession, script *spookytypes.ActingScript) (*spookytypes.ActingScriptResult, error)
     
     // TransferFile transfers a file via SSH
     TransferFile(ctx context.Context, session *spookytypes.Session, transfer *spookytypes.FileTransfer) (*spookytypes.FileTransferResult, error)
@@ -109,16 +186,16 @@ Establishes an SSH connection to the specified host.
 - Performs SSH handshake and authentication
 - Returns connection result with metrics
 
-#### ExecuteCommand
+#### RunCommand
 ```go
-ExecuteCommand(ctx context.Context, session *spookytypes.Session, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error)
+RunCommand(ctx context.Context, session *spookytypes.Session, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error)
 ```
-Executes a command via SSH session.
+Runs a command via SSH session.
 
 **Parameters:**
 - `ctx`: Context for cancellation and timeouts
 - `session`: SSH session for command execution
-- `command`: Command to execute with configuration
+- `command`: Command to run with configuration
 
 **Returns:**
 - `*spookytypes.SSHCommandResult`: Command execution result
@@ -126,7 +203,7 @@ Executes a command via SSH session.
 
 **Behavior:**
 - Sets up command environment and working directory
-- Executes command with specified timeout
+- Runs command with specified timeout
 - Captures standard output and error streams
 - Returns execution result with metrics
 
@@ -801,6 +878,176 @@ if time.Now().After(cert.ValidBefore) {
 }
 ```
 
+## File Transfer
+
+### SFTP Transfer
+
+SFTP (SSH File Transfer Protocol) provides secure file transfer capabilities with progress tracking and verification.
+
+```go
+// Create file transfer manager
+ftm := ssh.NewFileTransferManager(client, logger)
+
+// Configure file transfer
+transfer := &spookytypesssh.FileTransfer{
+    LocalPath:   "/local/file.txt",
+    RemotePath:  "/remote/file.txt",
+    Direction:   spookytypesssh.TransferDirectionUpload,
+    Mode:        spookytypesssh.TransferModeSFTP,
+    Verify:      true,
+    Permissions: 0o644,
+}
+
+// Execute transfer
+result, err := ftm.TransferFile(ctx, connection, transfer)
+if err != nil {
+    log.Printf("Transfer failed: %v", err)
+    return
+}
+
+log.Printf("Transfer successful: %d bytes in %v", 
+    result.BytesTransferred, result.Duration)
+```
+
+### SCP Transfer
+
+SCP (Secure Copy Protocol) provides efficient file transfer using SSH.
+
+```go
+// Configure SCP transfer
+transfer := &spookytypesssh.FileTransfer{
+    LocalPath:   "/local/file.txt",
+    RemotePath:  "/remote/file.txt",
+    Direction:   spookytypesssh.TransferDirectionUpload,
+    Mode:        spookytypesssh.TransferModeSCP,
+    Verify:      true,
+}
+
+// Execute transfer
+result, err := ftm.TransferFile(ctx, connection, transfer)
+```
+
+### Batch Transfer
+
+Perform multiple file transfers concurrently.
+
+```go
+transfers := []*spookytypesssh.FileTransfer{
+    {
+        LocalPath:  "/local/file1.txt",
+        RemotePath: "/remote/file1.txt",
+        Direction:  spookytypesssh.TransferDirectionUpload,
+        Mode:       spookytypesssh.TransferModeSFTP,
+    },
+    {
+        LocalPath:  "/local/file2.txt",
+        RemotePath: "/remote/file2.txt",
+        Direction:  spookytypesssh.TransferDirectionUpload,
+        Mode:       spookytypesssh.TransferModeSFTP,
+    },
+}
+
+results, err := ftm.BatchTransfer(ctx, connection, transfers)
+```
+
+
+
+## Advanced Authentication
+
+### Multi-Factor Authentication
+
+Configure multiple authentication methods with fallback support.
+
+```go
+// Create advanced auth manager
+aam := ssh.NewAdvancedAuthManager(logger)
+
+// Configure multi-factor authentication
+authConfig := &ssh.MultiFactorAuthConfig{
+    PrimaryMethod:   spookytypesssh.AuthMethodPublicKey,
+    PrimaryKey:      "~/.ssh/id_rsa",
+    SecondaryMethod: spookytypesssh.AuthMethodPassword,
+    SecondaryPass:   "password",
+    TOTPSecret:      "your_totp_secret",
+    TOTPAlgorithm:   "sha1",
+    TOTPDigits:      6,
+    TOTPPeriod:      30,
+    AuthOrder:       []string{"primary", "secondary", "totp"},
+    MaxRetries:      3,
+    RetryDelay:      5 * time.Second,
+}
+
+// Get authentication methods
+authMethods, err := aam.GetAuthMethods(authConfig)
+if err != nil {
+    log.Printf("Failed to create auth methods: %v", err)
+    return
+}
+```
+
+### Certificate-Based Authentication
+
+Generate and use SSH certificates for authentication.
+
+```go
+// Generate certificate configuration
+certConfig := &ssh.CertificateConfig{
+    KeyType:         "rsa",
+    KeySize:         4096,
+    Serial:          1,
+    CertType:        1, // User certificate
+    KeyID:           "user-cert",
+    Principals:      []string{"user"},
+    ValidAfter:      time.Now(),
+    ValidBefore:     time.Now().Add(24 * time.Hour),
+    CriticalOptions: map[string]string{},
+    Extensions:      map[string]string{},
+}
+
+// Generate certificate
+cert, err := aam.GenerateCertificate(certConfig)
+if err != nil {
+    log.Printf("Failed to generate certificate: %v", err)
+    return
+}
+
+// Save certificate
+err = aam.SaveCertificate(cert, "/path/to/cert.pub")
+if err != nil {
+    log.Printf("Failed to save certificate: %v", err)
+    return
+}
+```
+
+### SSH Agent Integration
+
+Connect to and use the local SSH agent.
+
+```go
+// Connect to SSH agent
+err := aam.agent.Connect()
+if err != nil {
+    log.Printf("Failed to connect to SSH agent: %v", err)
+    return
+}
+
+// List available keys
+keys, err := aam.agent.ListKeys()
+if err != nil {
+    log.Printf("Failed to list keys: %v", err)
+    return
+}
+
+log.Printf("SSH agent has %d keys", len(keys))
+
+// Add key to agent
+err = aam.agent.AddKey(signer)
+if err != nil {
+    log.Printf("Failed to add key: %v", err)
+    return
+}
+```
+
 ## Examples
 
 ### Basic SSH Client Usage
@@ -862,7 +1109,7 @@ func main() {
         result.Connection.Port, 
         result.Connection.User)
 
-    // Execute command
+    // Run command
     command := &spookytypes.SSHCommand{
         Command:      "uname",
         Args:         []string{"-a"},
@@ -870,7 +1117,7 @@ func main() {
         Timeout:      10 * time.Second,
     }
 
-    cmdResult, err := client.ExecuteCommand(ctx, result.Connection, command)
+    cmdResult, err := client.RunCommand(ctx, result.Connection, command)
     if err != nil {
         log.Fatal(err)
     }
@@ -974,14 +1221,14 @@ func main() {
     fmt.Printf("Certificate: %s\n", request.CertificatePath)
     fmt.Printf("Private key: %s\n", request.KeyPath)
 
-    // Execute command
+    // Run command
     command := &spookytypes.SSHCommand{
         Command:      "whoami",
         CaptureOutput: true,
         Timeout:      10 * time.Second,
     }
 
-    cmdResult, err := client.ExecuteCommand(ctx, result.Connection, command)
+    cmdResult, err := client.RunCommand(ctx, result.Connection, command)
     if err != nil {
         log.Fatal(err)
     }

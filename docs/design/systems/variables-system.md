@@ -2130,7 +2130,7 @@ func (ctx *TemplateContext) ExecuteAction(action *config.Action, machine string)
     // Interpolate variables in action command
     interpolatedCommand := ctx.interpolateVariables(action.Command)
     
-    return ctx.sshClient.ExecuteCommand(machine, interpolatedCommand)
+    return ctx.sshClient.RunCommand(machine, interpolatedCommand)
 }
 ```
 

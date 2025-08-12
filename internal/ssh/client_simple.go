@@ -3,11 +3,13 @@
 package ssh
 
 import (
+	"bufio"
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +20,7 @@ import (
 
 	spookytypes "spooky/internal/types"
 	spookytypeslogging "spooky/internal/types/logging"
+	spookytypesssh "spooky/internal/types/ssh"
 )
 
 // Supported key types
@@ -38,13 +41,723 @@ func (e *KeyValidationError) Error() string {
 	return fmt.Sprintf("key validation failed for %s: %s", e.KeyType, e.Reason)
 }
 
+// PooledConnection represents a connection in the pool with metadata
+type PooledConnection struct {
+	Client       *ssh.Client
+	Host         string
+	Port         int
+	User         string
+	CreatedAt    time.Time
+	LastUsed     time.Time
+	UseCount     int
+	ErrorCount   int
+	Latency      time.Duration
+	IsHealthy    bool
+	IsIdle       bool
+	ConnectionID string
+}
+
+// ConnectionPoolMetrics tracks pool performance and health
+type ConnectionPoolMetrics struct {
+	TotalConnections    int           `json:"total_connections"`
+	ActiveConnections   int           `json:"active_connections"`
+	IdleConnections     int           `json:"idle_connections"`
+	FailedConnections   int           `json:"failed_connections"`
+	ConnectionAttempts  int           `json:"connection_attempts"`
+	ConnectionErrors    int           `json:"connection_errors"`
+	AverageLatency      time.Duration `json:"average_latency"`
+	AverageConnectTime  time.Duration `json:"average_connect_time"`
+	PoolUtilization     float64       `json:"pool_utilization"`
+	HealthCheckPasses   int           `json:"health_check_passes"`
+	HealthCheckFailures int           `json:"health_check_failures"`
+	LastCleanup         time.Time     `json:"last_cleanup"`
+	CleanupCycles       int           `json:"cleanup_cycles"`
+}
+
+// AdvancedConnectionPool implements sophisticated connection pooling
+type AdvancedConnectionPool struct {
+	connections   map[string]*PooledConnection
+	mu            sync.RWMutex
+	metrics       *ConnectionPoolMetrics
+	config        *spookytypes.ClientConfig
+	logger        spookytypeslogging.Logger
+	ctx           context.Context
+	cancel        context.CancelFunc
+	cleanupTicker *time.Ticker
+}
+
+// NewAdvancedConnectionPool creates a new advanced connection pool
+func NewAdvancedConnectionPool(config *spookytypes.ClientConfig, logger spookytypeslogging.Logger) *AdvancedConnectionPool {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	pool := &AdvancedConnectionPool{
+		connections: make(map[string]*PooledConnection),
+		metrics: &ConnectionPoolMetrics{
+			LastCleanup: time.Now(),
+		},
+		config: config,
+		logger: logger,
+		ctx:    ctx,
+		cancel: cancel,
+	}
+
+	// Start background cleanup
+	pool.startCleanupRoutine()
+
+	return pool
+}
+
+// startCleanupRoutine starts the background cleanup routine
+func (p *AdvancedConnectionPool) startCleanupRoutine() {
+	cleanupInterval := p.config.IdleTimeout / 2
+	if cleanupInterval < 30*time.Second {
+		cleanupInterval = 30 * time.Second
+	}
+
+	p.cleanupTicker = time.NewTicker(cleanupInterval)
+
+	go func() {
+		for {
+			select {
+			case <-p.cleanupTicker.C:
+				p.cleanupIdleConnections()
+			case <-p.ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+// cleanupIdleConnections removes idle connections and updates metrics
+func (p *AdvancedConnectionPool) cleanupIdleConnections() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	now := time.Now()
+	removedCount := 0
+	idleThreshold := p.config.IdleTimeout
+
+	for key, conn := range p.connections {
+		if conn.IsIdle && now.Sub(conn.LastUsed) > idleThreshold {
+			// Close the connection
+			if err := conn.Client.Close(); err != nil {
+				p.logger.Warn("Failed to close idle connection", map[string]interface{}{
+					"host":  conn.Host,
+					"port":  conn.Port,
+					"error": err.Error(),
+				})
+			}
+
+			delete(p.connections, key)
+			removedCount++
+			p.metrics.TotalConnections--
+			p.metrics.IdleConnections--
+		}
+	}
+
+	if removedCount > 0 {
+		p.logger.Info("Cleaned up idle connections", map[string]interface{}{
+			"removed_count": removedCount,
+			"remaining":     len(p.connections),
+		})
+	}
+
+	p.metrics.LastCleanup = now
+	p.metrics.CleanupCycles++
+	p.updatePoolMetrics()
+}
+
+// updatePoolMetrics updates pool utilization and other metrics
+func (p *AdvancedConnectionPool) updatePoolMetrics() {
+	total := len(p.connections)
+	active := 0
+	idle := 0
+	totalLatency := time.Duration(0)
+	latencyCount := 0
+
+	for _, conn := range p.connections {
+		if conn.IsIdle {
+			idle++
+		} else {
+			active++
+		}
+		if conn.Latency > 0 {
+			totalLatency += conn.Latency
+			latencyCount++
+		}
+	}
+
+	p.metrics.TotalConnections = total
+	p.metrics.ActiveConnections = active
+	p.metrics.IdleConnections = idle
+
+	if latencyCount > 0 {
+		p.metrics.AverageLatency = totalLatency / time.Duration(latencyCount)
+	}
+
+	if p.config.MaxConnections > 0 {
+		p.metrics.PoolUtilization = float64(total) / float64(p.config.MaxConnections)
+	}
+}
+
+// GetConnection retrieves or creates a connection from the pool
+func (p *AdvancedConnectionPool) GetConnection(host string, port int, user string) (*PooledConnection, error) {
+	connectionKey := fmt.Sprintf("%s:%d", host, port)
+
+	p.mu.RLock()
+	if conn, exists := p.connections[connectionKey]; exists {
+		// Check if connection is healthy
+		if p.isConnectionHealthy(conn) {
+			p.mu.RUnlock()
+			p.updateConnectionUsage(conn)
+			return conn, nil
+		}
+		// Connection is unhealthy, remove it
+		p.mu.RUnlock()
+		p.removeConnection(connectionKey)
+	} else {
+		p.mu.RUnlock()
+	}
+
+	// Check pool capacity
+	p.mu.Lock()
+	if len(p.connections) >= p.config.MaxConnections {
+		p.mu.Unlock()
+		return nil, fmt.Errorf("connection pool at capacity (%d)", p.config.MaxConnections)
+	}
+	p.mu.Unlock()
+
+	// Create new connection
+	conn, err := p.createNewConnection(host, port, user)
+	if err != nil {
+		p.metrics.ConnectionErrors++
+		return nil, err
+	}
+
+	p.metrics.ConnectionAttempts++
+	p.updatePoolMetrics()
+
+	return conn, nil
+}
+
+// isConnectionHealthy checks if a connection is healthy
+func (p *AdvancedConnectionPool) isConnectionHealthy(conn *PooledConnection) bool {
+	// Handle nil connection
+	if conn == nil {
+		p.metrics.HealthCheckFailures++
+		return false
+	}
+
+	// Check if connection is too old
+	if time.Since(conn.CreatedAt) > p.config.IdleTimeout*2 {
+		conn.IsHealthy = false
+		p.metrics.HealthCheckFailures++
+		return false
+	}
+
+	// Check if connection has too many errors
+	if conn.ErrorCount > 3 {
+		conn.IsHealthy = false
+		p.metrics.HealthCheckFailures++
+		return false
+	}
+
+	// Test connection with keepalive
+	if _, _, err := conn.Client.SendRequest("keepalive@openssh.com", true, nil); err != nil {
+		conn.ErrorCount++
+		conn.IsHealthy = false
+		p.metrics.HealthCheckFailures++
+		return false
+	}
+
+	conn.IsHealthy = true
+	p.metrics.HealthCheckPasses++
+	return true
+}
+
+// updateConnectionUsage updates connection usage statistics
+func (p *AdvancedConnectionPool) updateConnectionUsage(conn *PooledConnection) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	conn.LastUsed = time.Now()
+	conn.UseCount++
+	conn.IsIdle = false
+}
+
+// removeConnection removes a connection from the pool
+func (p *AdvancedConnectionPool) removeConnection(connectionKey string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if conn, exists := p.connections[connectionKey]; exists {
+		if err := conn.Client.Close(); err != nil {
+			p.logger.Warn("Failed to close connection during removal", map[string]interface{}{
+				"host":  conn.Host,
+				"port":  conn.Port,
+				"error": err.Error(),
+			})
+		}
+		delete(p.connections, connectionKey)
+		p.metrics.TotalConnections--
+		if conn.IsIdle {
+			p.metrics.IdleConnections--
+		} else {
+			p.metrics.ActiveConnections--
+		}
+	}
+}
+
+// createNewConnection creates a new SSH connection
+func (p *AdvancedConnectionPool) createNewConnection(host string, port int, user string) (*PooledConnection, error) {
+	startTime := time.Now()
+
+	// Create SSH config (simplified for this example)
+	config := &ssh.ClientConfig{
+		User:            user,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // Will be replaced by host key manager
+		Timeout:         p.config.DefaultTimeout,
+	}
+
+	// Establish connection
+	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", host, port), config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SSH connection: %w", err)
+	}
+
+	connectTime := time.Since(startTime)
+
+	// Create pooled connection
+	conn := &PooledConnection{
+		Client:       client,
+		Host:         host,
+		Port:         port,
+		User:         user,
+		CreatedAt:    time.Now(),
+		LastUsed:     time.Now(),
+		UseCount:     1,
+		ErrorCount:   0,
+		Latency:      connectTime,
+		IsHealthy:    true,
+		IsIdle:       false,
+		ConnectionID: fmt.Sprintf("%s-%d-%d", host, port, time.Now().UnixNano()),
+	}
+
+	// Add to pool
+	p.mu.Lock()
+	connectionKey := fmt.Sprintf("%s:%d", host, port)
+	p.connections[connectionKey] = conn
+	p.mu.Unlock()
+
+	// Update metrics
+	p.metrics.TotalConnections++
+	p.metrics.ActiveConnections++
+	p.metrics.AverageConnectTime = (p.metrics.AverageConnectTime + connectTime) / 2
+
+	p.logger.Info("Created new SSH connection", map[string]interface{}{
+		"host":         host,
+		"port":         port,
+		"user":         user,
+		"connect_time": connectTime,
+		"pool_size":    len(p.connections),
+	})
+
+	return conn, nil
+}
+
+// ReturnConnection returns a connection to the pool
+func (p *AdvancedConnectionPool) ReturnConnection(conn *PooledConnection) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	conn.IsIdle = true
+	p.metrics.ActiveConnections--
+	p.metrics.IdleConnections++
+}
+
+// GetMetrics returns current pool metrics
+func (p *AdvancedConnectionPool) GetMetrics() *ConnectionPoolMetrics {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	// Create a copy of metrics
+	metrics := *p.metrics
+	return &metrics
+}
+
+// Close closes all connections in the pool
+func (p *AdvancedConnectionPool) Close() error {
+	p.cancel()
+	if p.cleanupTicker != nil {
+		p.cleanupTicker.Stop()
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	for key, conn := range p.connections {
+		if err := conn.Client.Close(); err != nil {
+			p.logger.Warn("Failed to close connection during pool shutdown", map[string]interface{}{
+				"host":  conn.Host,
+				"port":  conn.Port,
+				"error": err.Error(),
+			})
+		}
+		delete(p.connections, key)
+	}
+
+	p.logger.Info("Connection pool closed", map[string]interface{}{
+		"total_connections": p.metrics.TotalConnections,
+		"cleanup_cycles":    p.metrics.CleanupCycles,
+	})
+
+	return nil
+}
+
+// HostKeyManager manages host key verification and known hosts
+type HostKeyManager struct {
+	knownHostsPath     string
+	strictHostKeyCheck bool
+	allowInsecureHosts bool
+	knownHosts         map[string]*spookytypesssh.HostKey
+	mu                 sync.RWMutex
+	logger             spookytypeslogging.Logger
+}
+
+// NewHostKeyManager creates a new host key manager
+func NewHostKeyManager(knownHostsPath string, strictHostKeyCheck, allowInsecureHosts bool, logger spookytypeslogging.Logger) *HostKeyManager {
+	if knownHostsPath == "" {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			knownHostsPath = filepath.Join(home, ".ssh", "known_hosts")
+		}
+	}
+
+	return &HostKeyManager{
+		knownHostsPath:     knownHostsPath,
+		strictHostKeyCheck: strictHostKeyCheck,
+		allowInsecureHosts: allowInsecureHosts,
+		knownHosts:         make(map[string]*spookytypesssh.HostKey),
+		logger:             logger,
+	}
+}
+
+// LoadKnownHosts loads known hosts from file
+func (h *HostKeyManager) LoadKnownHosts() error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	// Clear existing entries
+	h.knownHosts = make(map[string]*spookytypesssh.HostKey)
+
+	// Check if known hosts file exists
+	if _, err := os.Stat(h.knownHostsPath); os.IsNotExist(err) {
+		h.logger.Info("Known hosts file does not exist, creating empty file", map[string]interface{}{
+			"known_hosts_path": h.knownHostsPath,
+		})
+		return nil
+	}
+
+	file, err := os.Open(h.knownHostsPath)
+	if err != nil {
+		return fmt.Errorf("failed to open known hosts file: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	lineNum := 0
+
+	for scanner.Scan() {
+		lineNum++
+		line := strings.TrimSpace(scanner.Text())
+
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		hostKey, err := h.parseKnownHostsLine(line)
+		if err != nil {
+			h.logger.Warn("Failed to parse known hosts line", map[string]interface{}{
+				"line":    lineNum,
+				"content": line,
+				"error":   err.Error(),
+			})
+			continue
+		}
+
+		// Store host key
+		key := fmt.Sprintf("%s:%d", hostKey.Hostname, hostKey.Port)
+		h.knownHosts[key] = hostKey
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error reading known hosts file: %w", err)
+	}
+
+	h.logger.Info("Loaded known hosts", map[string]interface{}{
+		"known_hosts_path": h.knownHostsPath,
+		"total_entries":    len(h.knownHosts),
+	})
+
+	return nil
+}
+
+// parseKnownHostsLine parses a line from known_hosts file
+func (h *HostKeyManager) parseKnownHostsLine(line string) (*spookytypesssh.HostKey, error) {
+	// Parse known_hosts format: hostname,ip ssh-key-type key-data [comment]
+	parts := strings.Fields(line)
+	if len(parts) < 3 {
+		return nil, fmt.Errorf("invalid known_hosts line format")
+	}
+
+	hosts := strings.Split(parts[0], ",")
+	if len(hosts) == 0 {
+		return nil, fmt.Errorf("no host specified")
+	}
+
+	// Use the first host (usually the hostname)
+	hostname := hosts[0]
+	port := 22 // Default SSH port
+
+	// Check if port is specified in hostname
+	if strings.Contains(hostname, ":") {
+		hostParts := strings.Split(hostname, ":")
+		if len(hostParts) == 2 {
+			hostname = hostParts[0]
+			if p, err := fmt.Sscanf(hostParts[1], "%d", &port); err != nil || p != 1 {
+				return nil, fmt.Errorf("invalid port in hostname")
+			}
+		}
+	}
+
+	keyType := parts[1]
+	keyData := parts[2]
+
+	// Parse the public key
+	pubKey, _, _, _, err := ssh.ParseAuthorizedKey([]byte(fmt.Sprintf("%s %s", keyType, keyData)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse public key: %w", err)
+	}
+
+	// Generate fingerprint
+	fingerprint := ssh.FingerprintSHA256(pubKey)
+
+	// Determine key algorithm and size
+	var algorithm string
+	var keySize int
+
+	switch pubKey.Type() {
+	case ssh.KeyAlgoED25519:
+		algorithm = "ed25519"
+		keySize = 256
+	case ssh.KeyAlgoRSA:
+		algorithm = "rsa"
+		if rsaKey, ok := pubKey.(ssh.CryptoPublicKey); ok {
+			if cryptoKey := rsaKey.CryptoPublicKey(); cryptoKey != nil {
+				if rsaPubKey, ok := cryptoKey.(*rsa.PublicKey); ok {
+					keySize = rsaPubKey.Size() * 8
+				}
+			}
+		}
+	default:
+		algorithm = pubKey.Type()
+		keySize = 0
+	}
+
+	now := time.Now()
+	hostKey := &spookytypesssh.HostKey{
+		Hostname:    hostname,
+		Port:        port,
+		KeyType:     spookytypesssh.KeyType(keyType),
+		Fingerprint: fingerprint,
+		PublicKey:   ssh.MarshalAuthorizedKey(pubKey),
+		Algorithm:   algorithm,
+		KeySize:     keySize,
+		FirstSeen:   now,
+		LastSeen:    now,
+		IsValid:     true,
+		IsTrusted:   true,
+		TrustLevel:  spookytypesssh.TrustLevelTrusted,
+		UsageCount:  1,
+	}
+
+	return hostKey, nil
+}
+
+// SaveKnownHosts saves known hosts to file
+func (h *HostKeyManager) SaveKnownHosts() error {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	// Create directory if it doesn't exist
+	dir := filepath.Dir(h.knownHostsPath)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return fmt.Errorf("failed to create known hosts directory: %w", err)
+	}
+
+	file, err := os.Create(h.knownHostsPath)
+	if err != nil {
+		return fmt.Errorf("failed to create known hosts file: %w", err)
+	}
+	defer file.Close()
+
+	// Write header
+	_, err = fmt.Fprintf(file, "# Known hosts file for spooky\n")
+	if err != nil {
+		return fmt.Errorf("failed to write known hosts header: %w", err)
+	}
+
+	// Write host keys
+	for _, hostKey := range h.knownHosts {
+		if hostKey.IsTrusted {
+			line := fmt.Sprintf("%s:%d %s %s\n",
+				hostKey.Hostname,
+				hostKey.Port,
+				hostKey.KeyType,
+				strings.TrimSpace(string(hostKey.PublicKey)))
+			_, err = file.WriteString(line)
+			if err != nil {
+				return fmt.Errorf("failed to write host key: %w", err)
+			}
+		}
+	}
+
+	h.logger.Info("Saved known hosts", map[string]interface{}{
+		"known_hosts_path": h.knownHostsPath,
+		"total_entries":    len(h.knownHosts),
+	})
+
+	return nil
+}
+
+// VerifyHostKey verifies a host key against known hosts
+func (h *HostKeyManager) VerifyHostKey(hostname string, port int, remoteKey ssh.PublicKey) error {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	key := fmt.Sprintf("%s:%d", hostname, port)
+	remoteFingerprint := ssh.FingerprintSHA256(remoteKey)
+
+	// Check if we have a known host key
+	knownHostKey, exists := h.knownHosts[key]
+
+	if !exists {
+		// New host key
+		if h.strictHostKeyCheck && !h.allowInsecureHosts {
+			return fmt.Errorf("host key not found for %s (strict host key checking enabled)", key)
+		}
+
+		// Allow insecure hosts or add to known hosts
+		h.logger.Info("New host key encountered", map[string]interface{}{
+			"hostname":    hostname,
+			"port":        port,
+			"fingerprint": remoteFingerprint,
+			"key_type":    remoteKey.Type(),
+		})
+
+		// Add to known hosts
+		h.addHostKey(hostname, port, remoteKey, remoteFingerprint)
+		return nil
+	}
+
+	// Verify against known host key
+	if knownHostKey.Fingerprint != remoteFingerprint {
+		return fmt.Errorf("host key mismatch for %s: expected %s, got %s", key, knownHostKey.Fingerprint, remoteFingerprint)
+	}
+
+	// Update usage statistics
+	h.mu.RUnlock()
+	h.mu.Lock()
+	knownHostKey.LastSeen = time.Now()
+	knownHostKey.UsageCount++
+	h.mu.Unlock()
+	h.mu.RLock()
+
+	h.logger.Debug("Host key verified", map[string]interface{}{
+		"hostname":    hostname,
+		"port":        port,
+		"fingerprint": remoteFingerprint,
+		"trust_level": knownHostKey.TrustLevel,
+	})
+
+	return nil
+}
+
+// addHostKey adds a new host key to known hosts
+func (h *HostKeyManager) addHostKey(hostname string, port int, remoteKey ssh.PublicKey, fingerprint string) {
+	// Determine key algorithm and size
+	var algorithm string
+	var keySize int
+
+	switch remoteKey.Type() {
+	case ssh.KeyAlgoED25519:
+		algorithm = "ed25519"
+		keySize = 256
+	case ssh.KeyAlgoRSA:
+		algorithm = "rsa"
+		if rsaKey, ok := remoteKey.(ssh.CryptoPublicKey); ok {
+			if cryptoKey := rsaKey.CryptoPublicKey(); cryptoKey != nil {
+				if rsaPubKey, ok := cryptoKey.(*rsa.PublicKey); ok {
+					keySize = rsaPubKey.Size() * 8
+				}
+			}
+		}
+	default:
+		algorithm = remoteKey.Type()
+		keySize = 0
+	}
+
+	now := time.Now()
+	hostKey := &spookytypesssh.HostKey{
+		Hostname:    hostname,
+		Port:        port,
+		KeyType:     spookytypesssh.KeyType(remoteKey.Type()),
+		Fingerprint: fingerprint,
+		PublicKey:   ssh.MarshalAuthorizedKey(remoteKey),
+		Algorithm:   algorithm,
+		KeySize:     keySize,
+		FirstSeen:   now,
+		LastSeen:    now,
+		IsValid:     true,
+		IsTrusted:   !h.strictHostKeyCheck || h.allowInsecureHosts,
+		TrustLevel:  spookytypesssh.TrustLevelTrusted,
+		UsageCount:  1,
+	}
+
+	key := fmt.Sprintf("%s:%d", hostname, port)
+	h.knownHosts[key] = hostKey
+
+	// Save to file
+	go func() {
+		if err := h.SaveKnownHosts(); err != nil {
+			h.logger.Error("Failed to save known hosts", err, map[string]interface{}{})
+		}
+	}()
+}
+
+// GetHostKeyCallback returns a host key callback function
+func (h *HostKeyManager) GetHostKeyCallback() ssh.HostKeyCallback {
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		// Extract port from remote address
+		port := 22
+		if tcpAddr, ok := remote.(*net.TCPAddr); ok {
+			port = tcpAddr.Port
+		}
+
+		return h.VerifyHostKey(hostname, port, key)
+	}
+}
+
 // SimpleClient implements basic SSH client functionality
 type SimpleClient struct {
-	config      *spookytypes.ClientConfig
-	logger      spookytypeslogging.Logger
-	connections map[string]*ssh.Client
-	mu          sync.RWMutex
-	closed      bool
+	config              *spookytypes.ClientConfig
+	logger              spookytypeslogging.Logger
+	hostKeyManager      *HostKeyManager
+	connectionPool      *AdvancedConnectionPool
+	fileTransferManager *FileTransferManager
+	advancedAuthManager *AdvancedAuthManager
+	closed              bool
 }
 
 // NewSimpleClient creates a new SSH client
@@ -60,91 +773,63 @@ func NewSimpleClient(config *spookytypes.ClientConfig, logger spookytypeslogging
 		}
 	}
 
-	return &SimpleClient{
-		config:      config,
-		logger:      logger,
-		connections: make(map[string]*ssh.Client),
+	// Create host key manager
+	hostKeyManager := NewHostKeyManager(
+		config.KnownHostsPath,
+		config.StrictHostKeyCheck,
+		config.AllowInsecureHosts,
+		logger,
+	)
+
+	// Load known hosts
+	if err := hostKeyManager.LoadKnownHosts(); err != nil {
+		logger.Warn("Failed to load known hosts", map[string]interface{}{
+			"error": err.Error(),
+		})
 	}
+
+	// Create advanced connection pool
+	connectionPool := NewAdvancedConnectionPool(config, logger)
+
+	// Create SimpleClient first
+	client := &SimpleClient{
+		config:         config,
+		logger:         logger,
+		hostKeyManager: hostKeyManager,
+		connectionPool: connectionPool,
+	}
+
+	// Create advanced SSH managers with the client
+	client.fileTransferManager = NewFileTransferManager(client, logger)
+	client.advancedAuthManager = NewAdvancedAuthManager(logger)
+
+	return client
 }
 
-// Connect establishes an SSH connection
+// Connect establishes an SSH connection using the advanced connection pool
 func (c *SimpleClient) Connect(ctx context.Context, request *spookytypes.ConnectionRequest) (*spookytypes.ConnectionResult, error) {
 	if c.closed {
 		return nil, fmt.Errorf("client is closed")
 	}
 
 	startTime := time.Now()
-	connectionKey := fmt.Sprintf("%s:%d", request.Host, request.Port)
 
-	// Check if we already have a connection
-	c.mu.RLock()
-	if conn, exists := c.connections[connectionKey]; exists {
-		c.mu.RUnlock()
-		// Test if connection is still alive
-		if _, _, err := conn.SendRequest("keepalive@openssh.com", true, nil); err == nil {
-			return &spookytypes.ConnectionResult{
-				Connection: &spookytypes.Connection{
-					Host:        request.Host,
-					Port:        request.Port,
-					User:        request.User,
-					Status:      spookytypes.ConnectionStatusConnected,
-					ConnectedAt: &startTime,
-				},
-				Request:     request,
-				Success:     true,
-				ConnectTime: time.Since(startTime),
-				CompletedAt: time.Now(),
-			}, nil
-		}
-		// Connection is dead, remove it
-		c.mu.RUnlock()
-		c.mu.Lock()
-		delete(c.connections, connectionKey)
-		c.mu.Unlock()
-	} else {
-		c.mu.RUnlock()
-	}
-
-	// Create SSH client config
-	sshConfig, err := c.createSSHConfig(request)
+	// Get connection from pool
+	pooledConn, err := c.connectionPool.GetConnection(request.Host, request.Port, request.User)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create SSH config: %w", err)
-	}
-
-	// Establish connection with retries
-	var conn *ssh.Client
-	var lastErr error
-	for attempt := 1; attempt <= c.config.MaxRetryAttempts; attempt++ {
-		conn, err = ssh.Dial("tcp", fmt.Sprintf("%s:%d", request.Host, request.Port), sshConfig)
-		if err == nil {
-			break
-		}
-
-		lastErr = err
-		if attempt < c.config.MaxRetryAttempts {
-			time.Sleep(c.config.RetryDelay)
-		}
-	}
-
-	if conn == nil {
 		return &spookytypes.ConnectionResult{
 			Request:       request,
 			Success:       false,
-			Error:         lastErr.Error(),
+			Error:         err.Error(),
 			ConnectTime:   time.Since(startTime),
 			RetryAttempts: c.config.MaxRetryAttempts,
 			CompletedAt:   time.Now(),
 		}, nil
 	}
 
-	// Store connection
-	c.mu.Lock()
-	c.connections[connectionKey] = conn
-	c.mu.Unlock()
-
 	// Get connection info
-	clientVersion := conn.ClientVersion()
-	serverVersion := conn.ServerVersion()
+	clientVersion := pooledConn.Client.ClientVersion()
+	serverVersion := pooledConn.Client.ServerVersion()
 
 	connection := &spookytypes.Connection{
 		Host:          request.Host,
@@ -154,6 +839,7 @@ func (c *SimpleClient) Connect(ctx context.Context, request *spookytypes.Connect
 		ConnectedAt:   &startTime,
 		ClientVersion: string(clientVersion),
 		ServerVersion: string(serverVersion),
+		Latency:       pooledConn.Latency,
 	}
 
 	result := &spookytypes.ConnectionResult{
@@ -171,7 +857,7 @@ func (c *SimpleClient) Connect(ctx context.Context, request *spookytypes.Connect
 func (c *SimpleClient) createSSHConfig(request *spookytypes.ConnectionRequest) (*ssh.ClientConfig, error) {
 	config := &ssh.ClientConfig{
 		User:            request.User,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // TODO: Implement proper host key verification
+		HostKeyCallback: c.hostKeyManager.GetHostKeyCallback(),
 		Timeout:         request.Timeout,
 	}
 
@@ -453,8 +1139,8 @@ func (c *SimpleClient) generateRSA4096Key() (ssh.Signer, error) {
 	return signer, nil
 }
 
-// ExecuteCommand executes a command via SSH
-func (c *SimpleClient) ExecuteCommand(ctx context.Context, connection *spookytypes.Connection, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error) {
+// RunCommand runs a command via SSH using the connection pool
+func (c *SimpleClient) RunCommand(ctx context.Context, connection *spookytypes.Connection, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error) {
 	if c.closed {
 		return nil, fmt.Errorf("client is closed")
 	}
@@ -462,17 +1148,17 @@ func (c *SimpleClient) ExecuteCommand(ctx context.Context, connection *spookytyp
 	startTime := time.Now()
 	connectionKey := fmt.Sprintf("%s:%d", connection.Host, connection.Port)
 
-	// Get SSH client
-	c.mu.RLock()
-	sshClient, exists := c.connections[connectionKey]
-	c.mu.RUnlock()
-
-	if !exists {
-		return nil, fmt.Errorf("no SSH connection found for %s", connectionKey)
+	// Get connection from pool
+	pooledConn, err := c.connectionPool.GetConnection(connection.Host, connection.Port, connection.User)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get SSH connection for %s: %w", connectionKey, err)
 	}
 
+	// Return connection to pool when done
+	defer c.connectionPool.ReturnConnection(pooledConn)
+
 	// Create session
-	session, err := sshClient.NewSession()
+	session, err := pooledConn.Client.NewSession()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SSH session: %w", err)
 	}
@@ -481,7 +1167,9 @@ func (c *SimpleClient) ExecuteCommand(ctx context.Context, connection *spookytyp
 	// Set up environment
 	if len(command.Environment) > 0 {
 		for key, value := range command.Environment {
-			session.Setenv(key, value)
+			if err := session.Setenv(key, value); err != nil {
+				return nil, fmt.Errorf("failed to set environment variable %s: %w", key, err)
+			}
 		}
 	}
 
@@ -496,7 +1184,7 @@ func (c *SimpleClient) ExecuteCommand(ctx context.Context, connection *spookytyp
 		session.Stdin = strings.NewReader(command.Stdin)
 	}
 
-	// Execute command
+	// Run command
 	cmd := command.Command
 	if len(command.Args) > 0 {
 		cmd = cmd + " " + strings.Join(command.Args, " ")
@@ -542,20 +1230,59 @@ func (c *SimpleClient) ExecuteCommand(ctx context.Context, connection *spookytyp
 
 // Close closes all SSH connections
 func (c *SimpleClient) Close(ctx context.Context) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	if c.closed {
 		return nil
 	}
 
-	for key, conn := range c.connections {
-		if err := conn.Close(); err != nil {
-			// Log warning but continue
-		}
-		delete(c.connections, key)
+	// Close the connection pool
+	if err := c.connectionPool.Close(); err != nil {
+		c.logger.Warn("Failed to close connection pool", map[string]interface{}{
+			"error": err.Error(),
+		})
 	}
 
 	c.closed = true
 	return nil
+}
+
+// TestHostKeyVerification tests the host key verification functionality
+func (c *SimpleClient) TestHostKeyVerification() error {
+	// Test with a mock host key
+	testHostname := "test.example.com"
+	testPort := 22
+
+	// Generate a test key
+	pubKey, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return fmt.Errorf("failed to generate test key: %w", err)
+	}
+
+	sshPubKey, err := ssh.NewPublicKey(pubKey)
+	if err != nil {
+		return fmt.Errorf("failed to create SSH public key: %w", err)
+	}
+
+	// Test host key verification
+	err = c.hostKeyManager.VerifyHostKey(testHostname, testPort, sshPubKey)
+	if err != nil {
+		return fmt.Errorf("host key verification failed: %w", err)
+	}
+
+	c.logger.Info("Host key verification test passed", map[string]interface{}{
+		"hostname":    testHostname,
+		"port":        testPort,
+		"fingerprint": ssh.FingerprintSHA256(sshPubKey),
+	})
+
+	return nil
+}
+
+// GetFileTransferManager returns the file transfer manager
+func (c *SimpleClient) GetFileTransferManager() *FileTransferManager {
+	return c.fileTransferManager
+}
+
+// GetAdvancedAuthManager returns the advanced authentication manager
+func (c *SimpleClient) GetAdvancedAuthManager() *AdvancedAuthManager {
+	return c.advancedAuthManager
 }

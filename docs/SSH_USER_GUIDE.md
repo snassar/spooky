@@ -12,8 +12,9 @@ The spooky SSH system provides secure, efficient, and validated SSH connectivity
 4. [Connection Management](#connection-management)
 5. [Command Execution](#command-execution)
 6. [Advanced Features](#advanced-features)
-7. [Best Practices](#best-practices)
-8. [Examples](#examples)
+7. [Advanced SSH Capabilities](#advanced-ssh-capabilities)
+8. [Best Practices](#best-practices)
+9. [Examples](#examples)
 
 ## Getting Started
 
@@ -52,11 +53,17 @@ Use the machines ping command to test SSH connectivity:
 # Test connectivity to all machines
 spooky machines ping ./my-project
 
+# Test connectivity and authentication
+spooky machines ping ./my-project --auth
+
 # Test specific machine
 spooky machines ping ./my-project --machine web-server-01
 
 # Test with verbose output
 spooky machines ping ./my-project --verbose
+
+# Test with JSON output
+spooky machines ping ./my-project --format json
 ```
 
 ## Key Types and Authentication
@@ -254,7 +261,7 @@ The SSH system implements robust retry logic:
 
 ### Basic Command Execution
 
-Commands are executed through the actions system:
+Commands are run through the actions system:
 
 ```hcl
 actions {
@@ -369,6 +376,268 @@ machines {
     
     # Enable compression
     compression = true
+  }
+}
+```
+
+## Advanced SSH Capabilities
+
+The spooky SSH system now includes advanced capabilities for file transfer, session management, and multi-factor authentication.
+
+### File Transfer
+
+#### SFTP File Transfer
+
+Transfer files securely using SFTP with progress tracking and verification.
+
+```hcl
+actions {
+  action "deploy-config" {
+    description = "Deploy configuration files via SFTP"
+    
+    machines = ["web-server-01"]
+    
+    # File transfer configuration
+    file_transfer {
+      local_path = "./config/app.conf"
+      remote_path = "/etc/app/app.conf"
+      mode = "sftp"
+      verify = true
+      permissions = "0644"
+    }
+    
+    command = "systemctl reload app"
+  }
+}
+```
+
+#### SCP File Transfer
+
+Use SCP for efficient file transfer:
+
+```hcl
+actions {
+  action "backup-data" {
+    description = "Backup data using SCP"
+    
+    machines = ["db-server-01"]
+    
+    file_transfer {
+      local_path = "/tmp/backup.sql"
+      remote_path = "/backups/db-backup.sql"
+      mode = "scp"
+      direction = "download"
+      verify = true
+    }
+  }
+}
+```
+
+#### Batch File Transfer
+
+Transfer multiple files concurrently:
+
+```hcl
+actions {
+  action "deploy-application" {
+    description = "Deploy application files"
+    
+    machines = ["app-server-01"]
+    
+    file_transfer {
+      local_path = "./app/"
+      remote_path = "/opt/app/"
+      mode = "sftp"
+      batch = true
+      verify = true
+    }
+    
+    command = "systemctl restart app"
+  }
+}
+```
+
+### Session Management
+
+#### Persistent Sessions
+
+Create and manage long-lived SSH sessions:
+
+```hcl
+actions {
+  action "monitor-system" {
+    description = "Monitor system with persistent session"
+    
+    machines = ["monitor-server-01"]
+    
+    session {
+      persistent = true
+      keepalive = true
+      timeout = "300s"
+    }
+    
+    command = "tail -f /var/log/system.log"
+  }
+}
+```
+
+#### Session Recovery
+
+Sessions can be paused and resumed:
+
+```hcl
+actions {
+  action "long-running-task" {
+    description = "Long-running task with session recovery"
+    
+    machines = ["task-server-01"]
+    
+    session {
+      persistent = true
+      recoverable = true
+      max_retries = 3
+    }
+    
+    command = "long-running-script.sh"
+  }
+}
+```
+
+### Multi-Factor Authentication
+
+#### TOTP Authentication
+
+Configure Time-based One-Time Password authentication:
+
+```hcl
+machines {
+  machine "secure-server" {
+    host = "secure.example.com"
+    user = "admin"
+    key_file = "~/.ssh/id_ed25519"
+    
+    authentication {
+      primary_method = "public_key"
+      secondary_method = "totp"
+      totp_secret = "your_totp_secret"
+      totp_algorithm = "sha1"
+      totp_digits = 6
+      totp_period = 30
+    }
+  }
+}
+```
+
+#### Certificate-Based Authentication
+
+Use SSH certificates for enhanced security:
+
+```hcl
+machines {
+  machine "cert-server" {
+    host = "cert.example.com"
+    user = "admin"
+    
+    authentication {
+      primary_method = "certificate"
+      certificate_path = "~/.ssh/user-cert.pub"
+      key_path = "~/.ssh/user-key"
+      ca_path = "~/.ssh/ca.pub"
+    }
+  }
+}
+```
+
+#### SSH Agent Integration
+
+Integrate with the local SSH agent:
+
+```hcl
+machines {
+  machine "agent-server" {
+    host = "agent.example.com"
+    user = "admin"
+    
+    authentication {
+      primary_method = "agent"
+      agent_socket = "~/.ssh/agent.sock"
+    }
+  }
+}
+```
+
+### Advanced Configuration Examples
+
+#### Complete Advanced Setup
+
+```hcl
+machines {
+  machine "advanced-server" {
+    host = "advanced.example.com"
+    user = "admin"
+    port = 2222
+    
+    key_file = "~/.ssh/advanced_key"
+    passphrase = "secure-passphrase"
+    
+    authentication {
+      primary_method = "public_key"
+      secondary_method = "totp"
+      totp_secret = "your_totp_secret"
+      auth_order = ["primary", "secondary"]
+      max_retries = 3
+      retry_delay = "5s"
+    }
+    
+    session {
+      persistent = true
+      keepalive = true
+      timeout = "600s"
+      recoverable = true
+    }
+    
+    file_transfer {
+      default_mode = "sftp"
+      verify_transfers = true
+      progress_tracking = true
+    }
+    
+    tags = ["advanced", "production"]
+  }
+}
+
+actions {
+  action "advanced-deployment" {
+    description = "Advanced deployment with file transfer and session management"
+    
+    machines = ["advanced-server"]
+    
+    file_transfer {
+      local_path = "./app/"
+      remote_path = "/opt/app/"
+      mode = "sftp"
+      verify = true
+      permissions = "0755"
+    }
+    
+    session {
+      persistent = true
+      working_dir = "/opt/app"
+      environment = {
+        "APP_ENV" = "production"
+        "DEBUG" = "false"
+      }
+    }
+    
+    command = """
+    echo "Starting deployment..."
+    npm install --production
+    npm run build
+    systemctl restart app
+    echo "Deployment completed"
+    """
+    
+    timeout = "300s"
   }
 }
 ```
@@ -671,6 +940,43 @@ actions {
     tags = ["deployment", "web", "production"]
   }
 }
+```
+
+## Advanced SSH Capabilities CLI Commands
+
+The spooky CLI provides comprehensive commands for advanced SSH capabilities including authentication testing.
+
+**Note**: File transfer capabilities are available through the actions system. Actions can include file transfer operations that use the underlying SSH file transfer functionality.
+
+### Authentication Testing
+
+**Test connectivity and authentication:**
+```bash
+# Test basic connectivity
+spooky machines ping ./my-project
+
+# Test connectivity and authentication
+spooky machines ping ./my-project --auth
+
+# Test with verbose output
+spooky machines ping ./my-project --auth --verbose
+
+# Test with JSON output
+spooky machines ping ./my-project --auth --format json
+```
+
+### Command Examples
+
+**Complete workflow example:**
+```bash
+# 1. Test connectivity
+spooky machines ping ./my-project
+
+# 2. Test connectivity and authentication
+spooky machines ping ./my-project --auth
+
+# 3. Execute actions with file transfer (when actions system is implemented)
+# spooky actions run ./my-project --action deploy-web
 ```
 
 This comprehensive user guide provides everything needed to effectively use the SSH system in spooky, from basic setup to advanced configurations and best practices.

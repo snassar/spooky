@@ -67,9 +67,9 @@ func Example() {
 		Timeout:       10 * time.Second,
 	}
 
-	cmdResult, err := client.ExecuteCommand(ctx, result.Connection, command)
+	cmdResult, err := client.RunCommand(ctx, result.Connection, command)
 	if err != nil {
-		fmt.Printf("Failed to execute command: %v\n", err)
+		fmt.Printf("Failed to run command: %v\n", err)
 		return
 	}
 

@@ -263,12 +263,37 @@ func handleMachinesPing(cmd *cobra.Command, projectPath string) error {
 		return nil
 	}
 
-	fmt.Printf("📊 Pinging %d machines...\n", len(machines))
+	// Get auth flag
+	auth, _ := cmd.Flags().GetBool("auth")
+
+	if auth {
+		fmt.Printf("🔐 Testing connectivity and authentication for %d machines...\n", len(machines))
+	} else {
+		fmt.Printf("📊 Pinging %d machines...\n", len(machines))
+	}
 
 	// Ping machines using the manager
 	statuses, err := machinesManager.PingMachines(ctx, machines)
 	if err != nil {
 		return fmt.Errorf("failed to ping machines: %w", err)
+	}
+
+	// If auth flag is set, test authentication for each machine
+	if auth {
+		fmt.Printf("🔑 Testing authentication...\n")
+		for i := range statuses {
+			if statuses[i].Status == "online" {
+				// Test authentication for this machine
+				err := testMachineAuthentication(ctx, machines[i])
+				if err != nil {
+					statuses[i].Status = "auth_failed"
+					statuses[i].Error = fmt.Sprintf("Authentication failed: %v", err)
+				} else {
+					statuses[i].Status = "authenticated"
+					statuses[i].Error = "" // Clear any previous errors
+				}
+			}
+		}
 	}
 
 	// Get output format and verbose flags
@@ -361,6 +386,18 @@ func outputPingResultsJSON(statuses []spookytypes.MachineStatus, verbose bool) e
 	return nil
 }
 
+// testMachineAuthentication tests authentication for a single machine
+func testMachineAuthentication(ctx context.Context, machine spookytypes.Machine) error {
+	// For now, this is a placeholder that will be implemented when SSH integration is complete
+	// In the future, this will:
+	// 1. Create an SSH client
+	// 2. Attempt to authenticate using the machine's credentials
+	// 3. Return success/failure based on authentication result
+
+	fmt.Printf("Testing authentication for %s (placeholder - will be implemented)\n", machine.Hostname)
+	return fmt.Errorf("authentication testing not yet implemented")
+}
+
 // getErrorMessage extracts error message from machine status
 func getErrorMessage(status spookytypes.MachineStatus) string {
 	if status.Error != "" {
@@ -373,6 +410,7 @@ func init() {
 	// Add format and verbose flags to ping command
 	machinesPingCmd.Flags().String("format", "text", "Output format: text or json")
 	machinesPingCmd.Flags().Bool("verbose", false, "Show detailed output for all machines")
+	machinesPingCmd.Flags().Bool("auth", false, "Test authentication in addition to connectivity")
 
 	// Add machines commands to root
 	machinesCmd.AddCommand(machinesListCmd)

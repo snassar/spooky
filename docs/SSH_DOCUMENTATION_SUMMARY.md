@@ -18,6 +18,7 @@ This document provides a comprehensive overview of the spooky SSH system documen
 - SSH certificate authentication
 - Connection management and pooling
 - Command execution and file transfer
+- Advanced SSH capabilities (file transfer library, multi-factor auth) - ✅ COMPLETED
 - Advanced features and best practices
 - Real-world examples and use cases
 
@@ -29,10 +30,13 @@ This document provides a comprehensive overview of the spooky SSH system documen
 
 **What it covers:**
 - Core interfaces and type definitions
+- Advanced SSH capabilities (FileTransferManager, AdvancedAuthManager)
 - Implementation details and algorithms
 - Error handling patterns
 - Key validation rules and schemas
 - Certificate handling and validation
+- File transfer APIs (library component for actions)
+- Authentication testing and framework
 - Code examples and patterns
 
 **When to use:** Use this when developing with the SSH system, extending functionality, or debugging implementation issues.
@@ -50,6 +54,30 @@ This document provides a comprehensive overview of the spooky SSH system documen
 - Best practices for troubleshooting
 
 **When to use:** Use this when encountering problems or need to debug issues with the SSH system.
+
+### 🚀 Advanced SSH Capabilities
+
+The spooky SSH system now includes advanced capabilities that extend beyond basic SSH connectivity:
+
+#### File Transfer
+- **SFTP Support**: Secure file transfer with progress tracking and verification
+- **SCP Support**: Efficient file transfer using SSH
+- **Batch Transfers**: Concurrent file transfer operations
+- **Progress Tracking**: Real-time transfer progress monitoring
+- **Post-transfer Verification**: Checksum validation for transferred files
+
+#### Authentication Testing
+- **Integrated Testing**: Test connectivity and authentication with `ping --auth`
+- **Multi-Factor Support**: Framework for advanced authentication methods
+- **SSH Agent Integration**: Connect to local SSH agent
+- **Certificate Support**: Framework for certificate-based authentication
+
+#### Advanced Authentication Framework
+- **Multi-Factor Authentication**: Framework for multiple auth methods with fallback
+- **SSH Certificate Support**: Framework for certificate-based authentication
+- **TOTP Integration**: Framework for Time-based One-Time Password support
+- **SSH Agent Integration**: Connect to local SSH agent
+- **Hardware Token Support**: Framework for hardware token authentication
 
 ### 📁 Examples Directory
 

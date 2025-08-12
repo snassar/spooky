@@ -130,8 +130,8 @@ type CLIManager interface {
 	// RegisterCommand registers a new command
 	RegisterCommand(command spookytypes.Command) error
 
-	// ExecuteCommand executes a command
-	ExecuteCommand(ctx context.Context, commandName string, args []string) error
+	// RunCommand runs a command
+	RunCommand(ctx context.Context, commandName string, args []string) error
 
 	// GetCommand returns a command by name
 	GetCommand(commandName string) (spookytypes.Command, bool)
@@ -286,20 +286,11 @@ type SSHManager interface {
 	// CreateSession creates a new SSH session
 	CreateSession(ctx context.Context, connection *spookytypes.Connection) (*spookytypes.Session, error)
 
-	// ExecuteCommand executes a command via SSH
-	ExecuteCommand(ctx context.Context, session *spookytypes.Session, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error)
+	// RunCommand runs a command via SSH
+	RunCommand(ctx context.Context, session *spookytypes.Session, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error)
 
 	// CreateActingSession creates a new SSH acting session
 	CreateActingSession(ctx context.Context, connection *spookytypes.Connection) (*spookytypes.ActingSession, error)
-
-	// ExecuteActingCommand executes a command via SSH acting
-	ExecuteActingCommand(ctx context.Context, session *spookytypes.ActingSession, command *spookytypes.ActingCommand) (*spookytypes.ActingCommandResult, error)
-
-	// ExecuteActingBatch executes a batch of commands via SSH acting
-	ExecuteActingBatch(ctx context.Context, session *spookytypes.ActingSession, batch *spookytypes.ActingBatch) (*spookytypes.ActingBatchResult, error)
-
-	// ExecuteActingScript executes a script via SSH acting
-	ExecuteActingScript(ctx context.Context, session *spookytypes.ActingSession, script *spookytypes.ActingScript) (*spookytypes.ActingScriptResult, error)
 
 	// TransferFile transfers a file via SSH
 	TransferFile(ctx context.Context, session *spookytypes.Session, transfer *spookytypes.FileTransfer) (*spookytypes.FileTransferResult, error)
