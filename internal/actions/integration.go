@@ -59,3 +59,8 @@ func (i *Integration) RunActions(ctx context.Context, actions []spookytypes.Acti
 func (i *Integration) CreateActionPlan(ctx context.Context, actions []spookytypes.Action, machines []spookytypes.Machine) (*spookytypesactions.ActionPlan, error) {
 	return i.manager.createActionPlan(ctx, actions, machines)
 }
+
+// GetSSHManager returns the SSH manager for authentication testing
+func (i *Integration) GetSSHManager() spookyinterfaces.SSHManager {
+	return i.manager.GetSSHManager()
+}

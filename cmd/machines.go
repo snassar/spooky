@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
@@ -394,14 +395,64 @@ func testMachineAuthentication(ctx context.Context, machine spookytypes.Machine)
 		return fmt.Errorf("actions integration not available")
 	}
 
-	// For now, this is a placeholder that will be implemented when SSH integration is complete
-	// In the future, this will:
-	// 1. Get SSH manager from actions integration
-	// 2. Create SSH client with machine credentials
-	// 3. Attempt to authenticate and return success/failure
+	// Get SSH manager from actions integration
+	sshManager := actionsIntegration.GetSSHManager()
+	if sshManager == nil {
+		return fmt.Errorf("SSH manager not available")
+	}
 
-	fmt.Printf("Testing authentication for %s (placeholder - SSH integration in progress)\n", machine.Hostname)
-	return fmt.Errorf("authentication testing not yet implemented - SSH integration needs completion")
+	// Create SSH client configuration from machine
+	clientConfig := &spookytypes.ClientConfig{
+		DefaultHost:      machine.Hostname,
+		DefaultPort:      machine.Port,
+		DefaultUser:      machine.User,
+		DefaultTimeout:   time.Duration(machine.ConnectionTimeout) * time.Second,
+		MaxRetryAttempts: machine.RetryAttempts,
+		RetryDelay:       time.Duration(machine.RetryDelay) * time.Second,
+	}
+
+	// Set authentication method based on available credentials
+	if machine.KeyFile != "" {
+		clientConfig.DefaultKeyPath = machine.KeyFile
+		clientConfig.DefaultAuthMethod = "public_key"
+	} else if machine.Password != "" {
+		clientConfig.DefaultAuthMethod = "password"
+	} else {
+		return fmt.Errorf("no authentication credentials provided for %s", machine.Hostname)
+	}
+
+	// Create connection request with authentication
+	connectionRequest := &spookytypes.ConnectionRequest{
+		Host:    machine.Hostname,
+		Port:    machine.Port,
+		User:    machine.User,
+		Timeout: time.Duration(machine.ConnectionTimeout) * time.Second,
+	}
+
+	// Set authentication method and credentials
+	if machine.KeyFile != "" {
+		connectionRequest.AuthMethod = "public_key"
+		connectionRequest.KeyPath = machine.KeyFile
+		if machine.Passphrase != "" {
+			connectionRequest.Passphrase = machine.Passphrase
+		}
+	} else if machine.Password != "" {
+		connectionRequest.AuthMethod = "password"
+		connectionRequest.Password = machine.Password
+	}
+
+	// Attempt to connect and authenticate
+	connectionResult, err := sshManager.Connect(ctx, connectionRequest)
+	if err != nil {
+		return fmt.Errorf("authentication failed for %s: %w", machine.Hostname, err)
+	}
+
+	if !connectionResult.Success {
+		return fmt.Errorf("authentication failed for %s: %s", machine.Hostname, connectionResult.Error)
+	}
+
+	fmt.Printf("✅ Authentication successful for %s\n", machine.Hostname)
+	return nil
 }
 
 // getErrorMessage extracts error message from machine status

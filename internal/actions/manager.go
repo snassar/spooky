@@ -1098,6 +1098,11 @@ func (m *Manager) machineHasTags(machine *spookytypes.Machine, tags []string) bo
 	return true
 }
 
+// GetSSHManager returns the SSH manager for authentication testing
+func (m *Manager) GetSSHManager() spookyinterfaces.SSHManager {
+	return m.sshManager
+}
+
 // resolveDependencies resolves action dependencies and creates running order
 func (m *Manager) resolveDependencies(actions []*spookytypesactions.Action) (runningOrder [][]string, dependencies map[string][]string, err error) {
 	// Build dependency graph

@@ -174,6 +174,9 @@ type ActionsIntegration interface {
 
 	// RunActions runs actions on the given machines
 	RunActions(ctx context.Context, actions []spookytypes.Action, machines []spookytypes.Machine) ([]spookytypes.ActingResult, error)
+
+	// GetSSHManager returns the SSH manager for authentication testing
+	GetSSHManager() SSHManager
 }
 
 // VariableValidator provides variable validation
