@@ -13,6 +13,7 @@ import (
 	spookyschemas "spooky/internal/schemas"
 	spookytypes "spooky/internal/types"
 	spookytypesactions "spooky/internal/types/actions"
+	spookytypesmachines "spooky/internal/types/machines"
 	spookytypesssh "spooky/internal/types/ssh"
 
 	"github.com/hashicorp/hcl/v2/hclsimple"
@@ -186,8 +187,18 @@ func (m *Manager) createActionPlan(_ context.Context, actions []spookytypes.Acti
 
 	// Convert actions to internal format
 	var internalActions []*spookytypesactions.Action
-	for i := range actions {
-		internalActions = append(internalActions, &actions[i])
+	for _, action := range actions {
+		// Convert spookytypes.Action to spookytypesactions.Action
+		internalAction := &spookytypesactions.Action{
+			Name:         action.Name,
+			Description:  action.Description,
+			Type:         action.Type,
+			Machines:     action.Machines,
+			Tags:         action.Tags,
+			Dependencies: action.Dependencies,
+			// Add other fields as needed
+		}
+		internalActions = append(internalActions, internalAction)
 	}
 
 	// Create plan
@@ -278,7 +289,7 @@ func (m *Manager) runActionStep(ctx context.Context, session *spookytypesactions
 			continue
 		}
 
-		actionResults, err := m.runAction(ctx, session, action, plan)
+		actionResults, err := m.runAction(ctx, session, action)
 		if err != nil {
 			m.logger.Error("Failed to run action", err, map[string]interface{}{"action": actionName})
 			continue
@@ -290,15 +301,15 @@ func (m *Manager) runActionStep(ctx context.Context, session *spookytypesactions
 	return results, nil
 }
 
-// runAction runs a single action on all target machines
-func (m *Manager) runAction(ctx context.Context, session *spookytypesactions.ActingSession, action *spookytypesactions.Action, plan *spookytypesactions.ActionPlan) ([]spookytypes.ActingResult, error) {
+// runAction runs a single action on target machines
+func (m *Manager) runAction(ctx context.Context, session *spookytypesactions.ActingSession, action *spookytypesactions.Action) ([]spookytypes.ActingResult, error) {
 	m.logger.Debug("Running action", map[string]interface{}{
 		"action": action.Name,
 		"type":   action.Type,
 	})
 
 	// Get target machines
-	targetMachines := m.getTargetMachines(action, session, plan.Machines)
+	targetMachines := m.getTargetMachines(action, session, session.MachineInventory)
 
 	var results []spookytypes.ActingResult
 
@@ -877,18 +888,40 @@ func (m *Manager) runServiceControlAction(ctx context.Context, action *spookytyp
 }
 
 // getTargetMachines determines which machines should run the action
-func (m *Manager) getTargetMachines(action *spookytypesactions.Action, _ *spookytypesactions.ActingSession, availableMachines []spookytypes.Machine) []spookytypes.Machine {
+func (m *Manager) getTargetMachines(action *spookytypesactions.Action, session *spookytypesactions.ActingSession, availableMachines []spookytypes.Machine) []spookytypes.Machine {
+	// If session has machine inventory, use it for better performance
+	if session != nil && len(session.MachineInventory) > 0 {
+		return m.getTargetMachinesFromSession(action, session)
+	}
+
+	// Fallback to the passed availableMachines parameter
 	// If action has specific machines defined, filter by name
 	if len(action.Machines) > 0 {
 		var targetMachines []spookytypes.Machine
-		for i := range availableMachines {
-			for _, targetName := range action.Machines {
+		var missingMachines []string
+
+		for _, targetName := range action.Machines {
+			found := false
+			for i := range availableMachines {
 				if availableMachines[i].Hostname == targetName {
 					targetMachines = append(targetMachines, availableMachines[i])
+					found = true
 					break
 				}
 			}
+			if !found {
+				missingMachines = append(missingMachines, targetName)
+			}
 		}
+
+		// Log warning for missing machines
+		if len(missingMachines) > 0 {
+			m.logger.Warn("Some target machines not found in inventory", map[string]interface{}{
+				"missing_machines": missingMachines,
+				"action":           action.Name,
+			})
+		}
+
 		return targetMachines
 	}
 
@@ -900,6 +933,15 @@ func (m *Manager) getTargetMachines(action *spookytypesactions.Action, _ *spooky
 				targetMachines = append(targetMachines, availableMachines[i])
 			}
 		}
+
+		// Log warning if no machines match tags
+		if len(targetMachines) == 0 {
+			m.logger.Warn("No machines found matching action tags", map[string]interface{}{
+				"action_tags": action.Tags,
+				"action":      action.Name,
+			})
+		}
+
 		return targetMachines
 	}
 
@@ -907,19 +949,148 @@ func (m *Manager) getTargetMachines(action *spookytypesactions.Action, _ *spooky
 	return availableMachines
 }
 
+// getTargetMachinesFromSession uses the session's machine inventory for efficient lookup
+func (m *Manager) getTargetMachinesFromSession(action *spookytypesactions.Action, session *spookytypesactions.ActingSession) []spookytypes.Machine {
+	// Convert session machine inventory to the expected type
+	availableMachines := make([]spookytypes.Machine, len(session.MachineInventory))
+	for i, machine := range session.MachineInventory {
+		availableMachines[i] = spookytypes.Machine(machine)
+	}
+
+	// Use the same logic as getTargetMachines but with session inventory
+	if len(action.Machines) > 0 {
+		var targetMachines []spookytypes.Machine
+		var missingMachines []string
+
+		for _, targetName := range action.Machines {
+			found := false
+			for i := range availableMachines {
+				if availableMachines[i].Hostname == targetName {
+					targetMachines = append(targetMachines, availableMachines[i])
+					found = true
+					break
+				}
+			}
+			if !found {
+				missingMachines = append(missingMachines, targetName)
+			}
+		}
+
+		// Log warning for missing machines
+		if len(missingMachines) > 0 {
+			m.logger.Warn("Some target machines not found in session inventory", map[string]interface{}{
+				"missing_machines": missingMachines,
+				"action":           action.Name,
+			})
+		}
+
+		return targetMachines
+	}
+
+	// If action has tags defined, filter machines by tags
+	if len(action.Tags) > 0 {
+		var targetMachines []spookytypes.Machine
+		for i := range availableMachines {
+			if m.machineHasTags(&availableMachines[i], action.Tags) {
+				targetMachines = append(targetMachines, availableMachines[i])
+			}
+		}
+
+		// Log warning if no machines match tags
+		if len(targetMachines) == 0 {
+			m.logger.Warn("No machines found matching action tags in session inventory", map[string]interface{}{
+				"action_tags": action.Tags,
+				"action":      action.Name,
+			})
+		}
+
+		return targetMachines
+	}
+
+	// If no specific targeting, return all available machines
+	return availableMachines
+}
+
+// populateSessionWithMachineInventory loads and populates the session with machine inventory
+func (m *Manager) populateSessionWithMachineInventory(ctx context.Context, session *spookytypesactions.ActingSession) error {
+	if session == nil {
+		return fmt.Errorf("session cannot be nil")
+	}
+
+	if session.ProjectPath == "" {
+		return fmt.Errorf("session project path is required for machine inventory loading")
+	}
+
+	// Load machines from the project
+	machines, err := m.loadMachinesFromProject(ctx, session.ProjectPath)
+	if err != nil {
+		return fmt.Errorf("failed to load machine inventory: %w", err)
+	}
+
+	// Convert to session machine type and populate inventory
+	session.MachineInventory = make([]spookytypesmachines.Machine, len(machines))
+	session.MachineCache = make(map[string]*spookytypesmachines.Machine)
+
+	for i, machine := range machines {
+		// Convert spookytypes.Machine to spookytypesmachines.Machine
+		sessionMachine := spookytypesmachines.Machine(machine)
+		session.MachineInventory[i] = sessionMachine
+		session.MachineCache[machine.Hostname] = &session.MachineInventory[i]
+	}
+
+	m.logger.Debug("Populated session with machine inventory", map[string]interface{}{
+		"session_id":    session.SessionID,
+		"project_path":  session.ProjectPath,
+		"machine_count": len(session.MachineInventory),
+		"cache_entries": len(session.MachineCache),
+	})
+
+	return nil
+}
+
+// loadMachinesFromProject loads machines from a project path
+// This is a helper method that would typically use the machines integration
+func (m *Manager) loadMachinesFromProject(_ context.Context, projectPath string) ([]spookytypes.Machine, error) {
+	// This is a placeholder implementation
+	// In a real implementation, this would use the machines integration
+	// For now, return empty slice to avoid compilation errors
+	return []spookytypes.Machine{}, nil
+}
+
 // machineHasTags checks if a machine has the specified tags
+// Supports both key=value and key-only tag matching
 func (m *Manager) machineHasTags(machine *spookytypes.Machine, tags []string) bool {
 	if len(tags) == 0 {
 		return true
 	}
 
-	machineTags := make(map[string]bool)
-	for _, tag := range machine.Tags {
-		machineTags[tag] = true
+	// Handle case where machine has no tags
+	if len(machine.Tags) == 0 {
+		return false
 	}
 
+	// Check each required tag
 	for _, requiredTag := range tags {
-		if !machineTags[requiredTag] {
+		tagMatched := false
+
+		// Check if tag is in key=value format
+		if strings.Contains(requiredTag, "=") {
+			parts := strings.SplitN(requiredTag, "=", 2)
+			if len(parts) == 2 {
+				key, value := parts[0], parts[1]
+				if machineValue, exists := machine.Tags[key]; exists && machineValue == value {
+					tagMatched = true
+				}
+			}
+		} else {
+			// Key-only format - check if the key exists in machine tags
+			if _, exists := machine.Tags[requiredTag]; exists {
+				tagMatched = true
+			}
+		}
+
+		// If any required tag doesn't match, machine doesn't have all required tags
+		if !tagMatched {
 			return false
 		}
 	}

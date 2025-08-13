@@ -5,6 +5,7 @@ import (
 	"time"
 
 	spookytypescommon "spooky/internal/types/common"
+	spookytypesmachines "spooky/internal/types/machines"
 )
 
 // ActionRunContext represents the context for action running
@@ -88,6 +89,10 @@ type ActingSession struct {
 	CompletedActions int     `json:"completed_actions" hcl:"completed_actions"`
 	FailedActions    int     `json:"failed_actions" hcl:"failed_actions"`
 	SuccessRate      float64 `json:"success_rate" hcl:"success_rate"`
+
+	// Machine inventory access
+	MachineInventory []spookytypesmachines.Machine           `json:"machine_inventory" hcl:"machine_inventory,optional"`
+	MachineCache     map[string]*spookytypesmachines.Machine `json:"machine_cache" hcl:"machine_cache,optional"`
 
 	// Session metadata
 	Tags     []string          `json:"tags" hcl:"tags,optional"`

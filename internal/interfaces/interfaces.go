@@ -246,6 +246,18 @@ type MachinesIntegration interface {
 
 	// PingMachines pings machines to check connectivity
 	PingMachines(ctx context.Context, machines []spookytypes.Machine) ([]spookytypes.MachineStatus, error)
+
+	// GetMachineByName looks up a machine by hostname
+	GetMachineByName(ctx context.Context, name string) (*spookytypes.Machine, error)
+
+	// GetMachinesByTags filters machines by tags (supports key=value and key-only matching)
+	GetMachinesByTags(ctx context.Context, tags []string) ([]spookytypes.Machine, error)
+
+	// GetFullInventory returns the complete machine inventory
+	GetFullInventory(ctx context.Context) ([]spookytypes.Machine, error)
+
+	// GetMachinesByFilter applies complex filtering criteria to machines
+	GetMachinesByFilter(ctx context.Context, filter interface{}) ([]spookytypes.Machine, error)
 }
 
 // SecretsIntegration provides secrets management

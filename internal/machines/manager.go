@@ -14,6 +14,7 @@ import (
 	spookyinterfaces "spooky/internal/interfaces"
 	spookytypes "spooky/internal/types"
 	spookytypeslogging "spooky/internal/types/logging"
+	spookytypesmachines "spooky/internal/types/machines"
 )
 
 // Manager provides machine management functionality
@@ -104,6 +105,103 @@ func (m *Manager) LoadMachines(ctx context.Context, projectPath string) ([]spook
 	})
 
 	return allMachines, nil
+}
+
+// GetMachineByName looks up a machine by hostname
+func (m *Manager) GetMachineByName(ctx context.Context, name string) (*spookytypes.Machine, error) {
+	if name == "" {
+		return nil, fmt.Errorf("machine name cannot be empty")
+	}
+
+	// Load machines from the current project context
+	// Note: This assumes we have access to the project path from context
+	// In a real implementation, this would be passed as a parameter or stored in the manager
+	projectPath := m.getProjectPathFromContext(ctx)
+	if projectPath == "" {
+		return nil, fmt.Errorf("project path not available in context")
+	}
+
+	machines, err := m.LoadMachines(ctx, projectPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load machines: %w", err)
+	}
+
+	// Find machine by hostname
+	for i := range machines {
+		if machines[i].Hostname == name {
+			return &machines[i], nil
+		}
+	}
+
+	return nil, fmt.Errorf("machine '%s' not found in inventory", name)
+}
+
+// GetMachinesByTags filters machines by tags (supports key=value and key-only matching)
+func (m *Manager) GetMachinesByTags(ctx context.Context, tags []string) ([]spookytypes.Machine, error) {
+	if len(tags) == 0 {
+		return nil, fmt.Errorf("at least one tag must be specified")
+	}
+
+	// Load machines from the current project context
+	projectPath := m.getProjectPathFromContext(ctx)
+	if projectPath == "" {
+		return nil, fmt.Errorf("project path not available in context")
+	}
+
+	machines, err := m.LoadMachines(ctx, projectPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load machines: %w", err)
+	}
+
+	var filteredMachines []spookytypes.Machine
+
+	// Filter machines by tags
+	for i := range machines {
+		if m.machineHasTags(&machines[i], tags) {
+			filteredMachines = append(filteredMachines, machines[i])
+		}
+	}
+
+	m.logger.Debug("Filtered machines by tags", map[string]interface{}{
+		"tags":              tags,
+		"total_machines":    len(machines),
+		"filtered_machines": len(filteredMachines),
+	})
+
+	return filteredMachines, nil
+}
+
+// GetFullInventory returns the complete machine inventory
+func (m *Manager) GetFullInventory(ctx context.Context) ([]spookytypes.Machine, error) {
+	projectPath := m.getProjectPathFromContext(ctx)
+	if projectPath == "" {
+		return nil, fmt.Errorf("project path not available in context")
+	}
+
+	return m.LoadMachines(ctx, projectPath)
+}
+
+// GetMachinesByFilter applies complex filtering criteria to machines
+func (m *Manager) GetMachinesByFilter(ctx context.Context, filter interface{}) ([]spookytypes.Machine, error) {
+	projectPath := m.getProjectPathFromContext(ctx)
+	if projectPath == "" {
+		return nil, fmt.Errorf("project path not available in context")
+	}
+
+	machines, err := m.LoadMachines(ctx, projectPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load machines: %w", err)
+	}
+
+	// Apply filter based on type
+	switch f := filter.(type) {
+	case *spookytypesmachines.MachineFilter:
+		return m.applyMachineFilter(machines, f)
+	case map[string]interface{}:
+		return m.applyMapFilter(machines, f)
+	default:
+		return nil, fmt.Errorf("unsupported filter type: %T", filter)
+	}
 }
 
 // ValidateMachines validates machines
@@ -478,4 +576,187 @@ func (m *Manager) validateCrossFileConsistency(machines []spookytypes.Machine) e
 	}
 
 	return nil
+}
+
+// machineHasTags checks if a machine has the specified tags
+// Supports both key=value and key-only tag matching
+func (m *Manager) machineHasTags(machine *spookytypes.Machine, tags []string) bool {
+	if len(tags) == 0 {
+		return true
+	}
+
+	// Handle case where machine has no tags
+	if machine.Tags == nil || len(machine.Tags) == 0 {
+		return false
+	}
+
+	// Check each required tag
+	for _, requiredTag := range tags {
+		tagMatched := false
+
+		// Check if tag is in key=value format
+		if strings.Contains(requiredTag, "=") {
+			parts := strings.SplitN(requiredTag, "=", 2)
+			if len(parts) == 2 {
+				key, value := parts[0], parts[1]
+				if machineValue, exists := machine.Tags[key]; exists && machineValue == value {
+					tagMatched = true
+				}
+			}
+		} else {
+			// Key-only format - check if the key exists in machine tags
+			if _, exists := machine.Tags[requiredTag]; exists {
+				tagMatched = true
+			}
+		}
+
+		// If any required tag doesn't match, machine doesn't have all required tags
+		if !tagMatched {
+			return false
+		}
+	}
+
+	return true
+}
+
+// applyMachineFilter applies a MachineFilter to the machine list
+func (m *Manager) applyMachineFilter(machines []spookytypes.Machine, filter *spookytypesmachines.MachineFilter) ([]spookytypes.Machine, error) {
+	var filteredMachines []spookytypes.Machine
+
+	for i := range machines {
+		machine := &machines[i]
+
+		// Check hostname filter
+		if len(filter.Hostnames) > 0 {
+			hostnameMatch := false
+			for _, hostname := range filter.Hostnames {
+				if machine.Hostname == hostname {
+					hostnameMatch = true
+					break
+				}
+			}
+			if !hostnameMatch {
+				continue
+			}
+		}
+
+		// Check groups filter
+		if len(filter.Groups) > 0 {
+			groupMatch := false
+			for _, group := range filter.Groups {
+				for _, machineGroup := range machine.Groups {
+					if machineGroup == group {
+						groupMatch = true
+						break
+					}
+				}
+				if groupMatch {
+					break
+				}
+			}
+			if !groupMatch {
+				continue
+			}
+		}
+
+		// Check roles filter
+		if len(filter.Roles) > 0 {
+			roleMatch := false
+			for _, role := range filter.Roles {
+				for _, machineRole := range machine.Roles {
+					if machineRole == role {
+						roleMatch = true
+						break
+					}
+				}
+				if roleMatch {
+					break
+				}
+			}
+			if !roleMatch {
+				continue
+			}
+		}
+
+		// Check tags filter
+		if len(filter.Tags) > 0 {
+			tagMatch := false
+			for key, value := range filter.Tags {
+				if machineValue, exists := machine.Tags[key]; exists && machineValue == value {
+					tagMatch = true
+					break
+				}
+			}
+			if !tagMatch {
+				continue
+			}
+		}
+
+		// Check patterns filter
+		if len(filter.Patterns) > 0 {
+			patternMatch := false
+			for _, pattern := range filter.Patterns {
+				if strings.Contains(machine.Hostname, pattern) {
+					patternMatch = true
+					break
+				}
+			}
+			if !patternMatch {
+				continue
+			}
+		}
+
+		filteredMachines = append(filteredMachines, *machine)
+	}
+
+	return filteredMachines, nil
+}
+
+// applyMapFilter applies a map-based filter to the machine list
+func (m *Manager) applyMapFilter(machines []spookytypes.Machine, filter map[string]interface{}) ([]spookytypes.Machine, error) {
+	var filteredMachines []spookytypes.Machine
+
+	for i := range machines {
+		machine := &machines[i]
+		match := true
+
+		for key, value := range filter {
+			switch key {
+			case "hostname":
+				if expected, ok := value.(string); ok && machine.Hostname != expected {
+					match = false
+				}
+			case "host":
+				if expected, ok := value.(string); ok && machine.Host != expected {
+					match = false
+				}
+			case "user":
+				if expected, ok := value.(string); ok && machine.User != expected {
+					match = false
+				}
+			case "environment":
+				if machine.MachineMetadata != nil {
+					if expected, ok := value.(string); ok && machine.MachineMetadata.Environment != expected {
+						match = false
+					}
+				} else {
+					match = false
+				}
+			}
+		}
+
+		if match {
+			filteredMachines = append(filteredMachines, *machine)
+		}
+	}
+
+	return filteredMachines, nil
+}
+
+// getProjectPathFromContext extracts project path from context
+// This is a placeholder - in a real implementation, this would be properly integrated
+func (m *Manager) getProjectPathFromContext(ctx context.Context) string {
+	// For now, return empty string - this would need to be properly implemented
+	// based on how the context is structured in the application
+	return ""
 }
