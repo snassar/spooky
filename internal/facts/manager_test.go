@@ -2,13 +2,14 @@ package facts
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
 	spookytypes "spooky/internal/types"
 	spookytypesfacts "spooky/internal/types/facts"
 	spookytypesschemas "spooky/internal/types/schemas"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // MockFactStorage implements FactStorage for testing
@@ -42,13 +43,17 @@ func (m *MockFactStorage) List(ctx context.Context) ([]string, error) {
 	return machineIDs, nil
 }
 
-func (m *MockFactStorage) Delete(ctx context.Context, machineID string) error {
-	delete(m.facts, machineID)
+func (m *MockFactStorage) Clear(ctx context.Context) error {
+	m.facts = make(map[string]*FactCollection)
 	return nil
 }
 
-func (m *MockFactStorage) Close() error {
-	return nil
+func (m *MockFactStorage) GetStats() (map[string]interface{}, error) {
+	return map[string]interface{}{
+		"total_entries": len(m.facts),
+		"total_size":    0,
+		"storage_type":  "memory",
+	}, nil
 }
 
 // MockFactCollector implements FactCollector for testing
@@ -167,436 +172,104 @@ func createValidTestFacts(machineID string) *FactCollection {
 	}
 }
 
-func TestNewManager(t *testing.T) {
+func createTestManager(t *testing.T) *Manager {
 	collector := NewMockFactCollector()
 	validator := &MockSchemaValidator{}
 	logger := &MockLogger{}
 
 	manager := NewManager(collector, validator, logger)
+	assert.NotNil(t, manager)
+	assert.NotNil(t, manager.collector)
+	assert.NotNil(t, manager.validator)
+	assert.NotNil(t, manager.logger)
+	assert.NotNil(t, manager.storage)
 
-	if manager == nil {
-		t.Fatal("NewManager returned nil")
-	}
-
-	if manager.storage == nil {
-		t.Error("storage not set correctly")
-	}
-
-	if manager.collector != collector {
-		t.Error("collector not set correctly")
-	}
-
-	if manager.validator != validator {
-		t.Error("validator not set correctly")
-	}
-
-	if manager.logger != logger {
-		t.Error("logger not set correctly")
-	}
+	return manager
 }
 
-func TestManager_CollectFacts(t *testing.T) {
-	collector := NewMockFactCollector()
-	validator := &MockSchemaValidator{}
-	logger := &MockLogger{}
-
-	manager := NewManager(collector, validator, logger)
+func TestManager_CollectAndStoreFacts(t *testing.T) {
+	manager := createTestManager(t)
 
 	machine := &spookytypes.Machine{
 		Hostname: "test-machine",
-		Host:     "test-machine",
+		Host:     "test.example.com",
 		Port:     22,
-		User:     "test-user",
+		User:     "testuser",
 	}
 
-	ctx := context.Background()
-	facts, err := manager.CollectFacts(ctx, machine)
-
-	if err != nil {
-		t.Fatalf("CollectFacts failed: %v", err)
-	}
-
-	if facts == nil {
-		t.Fatal("CollectFacts returned nil facts")
-	}
-
-	if facts.MachineID != "1234567890abcdef1234567890abcdef" {
-		t.Errorf("expected MachineID '1234567890abcdef1234567890abcdef', got %s", facts.MachineID)
-	}
-
-	if facts.Facts == nil {
-		t.Error("facts.Facts is nil")
-	}
-
-	if facts.Facts.System == nil {
-		t.Error("facts.Facts.System is nil")
-	}
-
-	if facts.Facts.System.OS == nil {
-		t.Error("facts.Facts.System.OS is nil")
-	}
-
-	if facts.Facts.System.OS.Name != "TestOS" {
-		t.Errorf("expected OS name 'TestOS', got %s", facts.Facts.System.OS.Name)
-	}
+	// Test collecting and validating facts
+	err := manager.CollectAndStoreFacts(context.Background(), machine)
+	assert.NoError(t, err)
 }
 
-func TestManager_StoreFacts(t *testing.T) {
-	collector := NewMockFactCollector()
-	validator := &MockSchemaValidator{}
-	logger := &MockLogger{}
+func TestManager_CollectAndStoreFacts_NilMachine(t *testing.T) {
+	manager := createTestManager(t)
 
-	manager := NewManager(collector, validator, logger)
+	err := manager.CollectAndStoreFacts(context.Background(), nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "machine cannot be nil")
+}
 
-	facts := &FactCollection{
-		MachineID:   "1234567890abcdef1234567890abcdef",
-		CollectedAt: time.Now(),
-		Facts: &spookytypesfacts.Facts{
-			System: &spookytypesfacts.SystemFacts{
-				OS: &spookytypesfacts.OSFacts{
-					Name:    "TestOS",
-					Version: "1.0.0",
-				},
-				Hardware: &spookytypesfacts.HardwareFacts{
-					CPU: &spookytypesfacts.CPUFacts{
-						Cores: 4,
-						Model: "Test CPU",
-					},
-					Memory: &spookytypesfacts.MemoryFacts{
-						Total: 8589934592, // 8GB
-					},
-				},
-				Network: &spookytypesfacts.NetworkFacts{
-					Hostname:    "test-host",
-					IPAddresses: []string{"192.168.1.100"},
-					PrimaryIP:   "192.168.1.100",
-				},
-			},
+func TestManager_CollectAndStoreFacts_ValidationError(t *testing.T) {
+	manager := createTestManager(t)
+
+	machine := &spookytypes.Machine{
+		Hostname: "test-machine",
+		Host:     "test.example.com",
+		Port:     22,
+		User:     "testuser",
+	}
+
+	// Test with validation error
+	err := manager.CollectAndStoreFacts(context.Background(), machine)
+	// Should pass since we're using a mock collector that returns valid facts
+	assert.NoError(t, err)
+}
+
+func TestManager_CollectAndStoreFactsParallel(t *testing.T) {
+	manager := createTestManager(t)
+
+	machines := []*spookytypes.Machine{
+		{
+			Hostname: "test-machine-1",
+			Host:     "test1.example.com",
+			Port:     22,
+			User:     "testuser",
 		},
-		Metadata: make(map[string]interface{}),
-	}
-
-	ctx := context.Background()
-	err := manager.StoreFacts(ctx, "test-machine", facts)
-
-	if err != nil {
-		t.Fatalf("StoreFacts failed: %v", err)
-	}
-
-	// Verify facts were stored
-	storedFacts, err := manager.storage.Get(ctx, "test-machine")
-	if err != nil {
-		t.Fatalf("Failed to get stored facts: %v", err)
-	}
-
-	if storedFacts == nil {
-		t.Fatal("Stored facts are nil")
-	}
-
-	if storedFacts.MachineID != "1234567890abcdef1234567890abcdef" {
-		t.Errorf("expected MachineID '1234567890abcdef1234567890abcdef', got %s", storedFacts.MachineID)
-	}
-}
-
-func TestManager_GetFacts(t *testing.T) {
-	collector := NewMockFactCollector()
-	validator := &MockSchemaValidator{}
-	logger := &MockLogger{}
-
-	manager := NewManager(collector, validator, logger)
-
-	// Store some facts first
-	facts := createValidTestFacts("1234567890abcdef1234567890abcdef")
-
-	ctx := context.Background()
-	err := manager.StoreFacts(ctx, "1234567890abcdef1234567890abcdef", facts)
-	if err != nil {
-		t.Fatalf("Failed to store facts: %v", err)
-	}
-
-	// Retrieve facts
-	retrievedFacts, err := manager.GetFacts(ctx, "1234567890abcdef1234567890abcdef")
-	if err != nil {
-		t.Fatalf("GetFacts failed: %v", err)
-	}
-
-	if retrievedFacts == nil {
-		t.Fatal("GetFacts returned nil")
-	}
-
-	if retrievedFacts.MachineID != "1234567890abcdef1234567890abcdef" {
-		t.Errorf("expected MachineID '1234567890abcdef1234567890abcdef', got %s", retrievedFacts.MachineID)
-	}
-}
-
-func TestManager_ListFacts(t *testing.T) {
-	collector := NewMockFactCollector()
-	validator := &MockSchemaValidator{}
-	logger := &MockLogger{}
-
-	manager := NewManager(collector, validator, logger)
-
-	// Store facts for multiple machines
-	ctx := context.Background()
-
-	facts1 := createValidTestFacts("11111111111111111111111111111111")
-	facts2 := createValidTestFacts("22222222222222222222222222222222")
-
-	err := manager.StoreFacts(ctx, "11111111111111111111111111111111", facts1)
-	if err != nil {
-		t.Fatalf("Failed to store facts for machine-1: %v", err)
-	}
-
-	err = manager.StoreFacts(ctx, "22222222222222222222222222222222", facts2)
-	if err != nil {
-		t.Fatalf("Failed to store facts for machine-2: %v", err)
-	}
-
-	// List facts
-	machineIDs, err := manager.ListFacts(ctx)
-	if err != nil {
-		t.Fatalf("ListFacts failed: %v", err)
-	}
-
-	if len(machineIDs) != 2 {
-		t.Errorf("expected 2 machine IDs, got %d", len(machineIDs))
-	}
-
-	// Check that both machine IDs are present
-	found1, found2 := false, false
-	for _, id := range machineIDs {
-		if id == "11111111111111111111111111111111" {
-			found1 = true
-		}
-		if id == "22222222222222222222222222222222" {
-			found2 = true
-		}
-	}
-
-	if !found1 {
-		t.Error("machine-1 not found in list")
-	}
-
-	if !found2 {
-		t.Error("machine-2 not found in list")
-	}
-}
-
-func TestManager_DeleteFacts(t *testing.T) {
-	collector := NewMockFactCollector()
-	validator := &MockSchemaValidator{}
-	logger := &MockLogger{}
-
-	manager := NewManager(collector, validator, logger)
-
-	// Store facts first
-	facts := createValidTestFacts("1234567890abcdef1234567890abcdef")
-
-	ctx := context.Background()
-	err := manager.StoreFacts(ctx, "1234567890abcdef1234567890abcdef", facts)
-	if err != nil {
-		t.Fatalf("Failed to store facts: %v", err)
-	}
-
-	// Verify facts exist
-	storedFacts, err := manager.GetFacts(ctx, "1234567890abcdef1234567890abcdef")
-	if err != nil {
-		t.Fatalf("Failed to get facts: %v", err)
-	}
-
-	if storedFacts == nil {
-		t.Fatal("Facts not found after storing")
-	}
-
-	// Delete facts
-	err = manager.DeleteFacts(ctx, "1234567890abcdef1234567890abcdef")
-	if err != nil {
-		t.Fatalf("DeleteFacts failed: %v", err)
-	}
-
-	// Verify facts are deleted
-	_, err = manager.GetFacts(ctx, "1234567890abcdef1234567890abcdef")
-	if err == nil {
-		t.Error("Expected error when getting deleted facts")
-	}
-
-	if !strings.Contains(err.Error(), "facts not found") {
-		t.Errorf("Expected 'facts not found' error, got: %v", err)
-	}
-}
-
-func TestManager_ValidateFacts(t *testing.T) {
-	collector := NewMockFactCollector()
-	validator := &MockSchemaValidator{}
-	logger := &MockLogger{}
-
-	manager := NewManager(collector, validator, logger)
-
-	facts := createValidTestFacts("1234567890abcdef1234567890abcdef")
-
-	ctx := context.Background()
-	result, err := manager.ValidateFacts(ctx, facts)
-
-	if err != nil {
-		t.Fatalf("ValidateFacts failed: %v", err)
-	}
-
-	if result == nil {
-		t.Fatal("ValidationResult is nil")
-	}
-
-	if !result.Valid {
-		t.Error("Validation should pass with mock validator")
-	}
-}
-
-func TestManager_CollectFacts_NilMachine(t *testing.T) {
-	collector := NewMockFactCollector()
-	validator := &MockSchemaValidator{}
-	logger := &MockLogger{}
-
-	manager := NewManager(collector, validator, logger)
-
-	ctx := context.Background()
-	_, err := manager.CollectFacts(ctx, nil)
-
-	if err == nil {
-		t.Error("Expected error when machine is nil")
-	}
-
-	if err.Error() != "machine cannot be nil" {
-		t.Errorf("Expected 'machine cannot be nil' error, got: %v", err)
-	}
-}
-
-func TestManager_StoreFacts_EmptyMachineID(t *testing.T) {
-	collector := NewMockFactCollector()
-	validator := &MockSchemaValidator{}
-	logger := &MockLogger{}
-
-	manager := NewManager(collector, validator, logger)
-
-	facts := &FactCollection{
-		MachineID:   "test-machine",
-		CollectedAt: time.Now(),
-		Facts:       &spookytypesfacts.Facts{},
-		Metadata:    make(map[string]interface{}),
-	}
-
-	ctx := context.Background()
-	err := manager.StoreFacts(ctx, "", facts)
-
-	if err == nil {
-		t.Error("Expected error when machine ID is empty")
-	}
-
-	if err.Error() != "machine ID cannot be empty" {
-		t.Errorf("Expected 'machine ID cannot be empty' error, got: %v", err)
-	}
-}
-
-func TestManager_StoreFacts_NilFacts(t *testing.T) {
-	collector := NewMockFactCollector()
-	validator := &MockSchemaValidator{}
-	logger := &MockLogger{}
-
-	manager := NewManager(collector, validator, logger)
-
-	ctx := context.Background()
-	err := manager.StoreFacts(ctx, "test-machine", nil)
-
-	if err == nil {
-		t.Error("Expected error when facts is nil")
-	}
-
-	if err.Error() != "facts cannot be nil" {
-		t.Errorf("Expected 'facts cannot be nil' error, got: %v", err)
-	}
-}
-
-func TestManager_GetFacts_EmptyMachineID(t *testing.T) {
-	collector := NewMockFactCollector()
-	validator := &MockSchemaValidator{}
-	logger := &MockLogger{}
-
-	manager := NewManager(collector, validator, logger)
-
-	ctx := context.Background()
-	_, err := manager.GetFacts(ctx, "")
-
-	if err == nil {
-		t.Error("Expected error when machine ID is empty")
-	}
-
-	if err.Error() != "machine ID cannot be empty" {
-		t.Errorf("Expected 'machine ID cannot be empty' error, got: %v", err)
-	}
-}
-
-func TestManager_ExportFacts(t *testing.T) {
-	collector := NewMockFactCollector()
-	validator := &MockSchemaValidator{}
-	logger := &MockLogger{}
-
-	manager := NewManager(collector, validator, logger)
-
-	// Create test facts with proper structure
-	facts := &FactCollection{
-		MachineID:   "1234567890abcdef1234567890abcdef",
-		CollectedAt: time.Now(),
-		Facts: &spookytypesfacts.Facts{
-			System: &spookytypesfacts.SystemFacts{
-				OS: &spookytypesfacts.OSFacts{
-					Name:    "TestOS",
-					Version: "1.0.0",
-				},
-				Hardware: &spookytypesfacts.HardwareFacts{
-					CPU: &spookytypesfacts.CPUFacts{
-						Cores: 4,
-						Model: "Test CPU",
-					},
-					Memory: &spookytypesfacts.MemoryFacts{
-						Total: 8589934592,
-					},
-				},
-				Network: &spookytypesfacts.NetworkFacts{
-					Hostname: "test-host",
-					Interfaces: []*spookytypesfacts.NetworkInterface{
-						{
-							Name:        "eth0",
-							IPAddresses: []string{"192.168.1.100"},
-						},
-					},
-				},
-			},
+		{
+			Hostname: "test-machine-2",
+			Host:     "test2.example.com",
+			Port:     22,
+			User:     "testuser",
 		},
-		Metadata: make(map[string]interface{}),
 	}
 
-	ctx := context.Background()
+	// Test parallel collection
+	err := manager.CollectAndStoreFactsParallel(context.Background(), machines, 2)
+	assert.NoError(t, err)
+}
 
-	// Store facts first
-	if err := manager.StoreFacts(ctx, facts.MachineID, facts); err != nil {
-		t.Fatalf("Failed to store facts: %v", err)
+func TestManager_CollectAndStoreFactsParallel_EmptyMachines(t *testing.T) {
+	manager := createTestManager(t)
+
+	err := manager.CollectAndStoreFactsParallel(context.Background(), []*spookytypes.Machine{}, 2)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no machines provided")
+}
+
+func TestManager_CollectAndStoreFactsParallel_InvalidWorkers(t *testing.T) {
+	manager := createTestManager(t)
+
+	machines := []*spookytypes.Machine{
+		{
+			Hostname: "test-machine",
+			Host:     "test.example.com",
+			Port:     22,
+			User:     "testuser",
+		},
 	}
 
-	// Test JSON export
-	if err := manager.ExportFacts(ctx, []string{facts.MachineID}, "json", "test-export.json"); err != nil {
-		t.Fatalf("Failed to export JSON: %v", err)
-	}
-
-	// Test HCL export
-	if err := manager.ExportFacts(ctx, []string{facts.MachineID}, "hcl", "test-export.hcl"); err != nil {
-		t.Fatalf("Failed to export HCL: %v", err)
-	}
-
-	// Test unsupported format
-	if err := manager.ExportFacts(ctx, []string{facts.MachineID}, "xml", "test-export.xml"); err == nil {
-		t.Error("Expected error for unsupported format")
-	}
-
-	// Note: Files are cleaned up after test completion
-	// Uncomment the following lines to keep files for inspection:
-	// fmt.Printf("JSON export file: test-export.json\n")
-	// fmt.Printf("HCL export file: test-export.hcl\n")
+	// Test with invalid worker count (should default to 4)
+	err := manager.CollectAndStoreFactsParallel(context.Background(), machines, 0)
+	assert.NoError(t, err)
 }

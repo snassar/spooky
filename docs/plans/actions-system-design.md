@@ -748,10 +748,10 @@ schema "project_directory" {
   }
   
   # Required directories
-  directory "facts.db" {
-    required = true
-    description = "Facts database directory"
-    validate = "badgerdb_initialized"
+  directory "logs" {
+    required = false
+    description = "Log files directory"
+    validate = "directory_exists"
   }
   
   # Optional directories

@@ -127,7 +127,7 @@ func (v *Validator) ValidateProjectDirectory(ctx context.Context, projectPath st
 
 	// Check required directories according to project-directory.schema.hcl
 	requiredDirs := []string{
-		"facts.db", // Required by schema
+		// No required directories
 	}
 	for _, dir := range requiredDirs {
 		dirPath := filepath.Join(absPath, dir)

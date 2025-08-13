@@ -59,7 +59,7 @@ func (m *Manager) Initialize(ctx context.Context, projectPath string) (*spookyty
 
 	// Create required directories according to project-directory.schema.hcl
 	requiredDirs := []string{
-		"facts.db", // Required by schema
+		// No required directories
 	}
 	for _, dir := range requiredDirs {
 		dirPath := filepath.Join(absPath, dir)
@@ -291,7 +291,6 @@ func (m *Manager) createREADME(project *spookytypes.Project) error {
 This project follows the spooky project-directory.schema.hcl structure:
 
 - ` + "`" + `project.hcl` + "`" + ` - Main project configuration
-- ` + "`" + `facts.db/` + "`" + ` - Facts database (in-memory storage, no directory needed)
 - ` + "`" + `files/` + "`" + ` - Static files for deployment
 - ` + "`" + `logs/` + "`" + ` - Log files directory
 

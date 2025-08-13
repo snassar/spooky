@@ -91,7 +91,7 @@ type TemplateContext struct {
     // Project configuration
     Project *config.ProjectConfig
     
-    // Machine facts (from facts.db or JSON)
+    // Machine facts
     Facts map[string]interface{}
     
     // Inventory information

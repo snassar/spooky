@@ -71,8 +71,8 @@ func (m *MockFactManager) ListFacts(ctx context.Context) ([]string, error) {
 	return machineIDs, nil
 }
 
-func (m *MockFactManager) DeleteFacts(ctx context.Context, machineID string) error {
-	delete(m.facts, machineID)
+func (m *MockFactManager) ClearFacts(ctx context.Context) error {
+	m.facts = make(map[string]*FactCollection)
 	return nil
 }
 
@@ -154,7 +154,7 @@ func TestIntegration_StoreFacts(t *testing.T) {
 	facts := createValidTestFacts("1234567890abcdef1234567890abcdef")
 
 	ctx := context.Background()
-	err := integration.StoreFacts(ctx, facts, nil)
+	err := integration.StoreFacts(ctx, facts)
 
 	if err != nil {
 		t.Fatalf("StoreFacts failed: %v", err)
@@ -180,7 +180,7 @@ func TestIntegration_StoreFacts_NilFacts(t *testing.T) {
 	integration := NewIntegration(mockManager)
 
 	ctx := context.Background()
-	err := integration.StoreFacts(ctx, nil, nil)
+	err := integration.StoreFacts(ctx, nil)
 
 	if err == nil {
 		t.Error("Expected error when facts is nil")
@@ -196,7 +196,7 @@ func TestIntegration_StoreFacts_InvalidType(t *testing.T) {
 	integration := NewIntegration(mockManager)
 
 	ctx := context.Background()
-	err := integration.StoreFacts(ctx, "invalid-type", nil)
+	err := integration.StoreFacts(ctx, "invalid-type")
 
 	if err == nil {
 		t.Error("Expected error when facts is invalid type")
@@ -220,7 +220,7 @@ func TestIntegration_LoadFacts(t *testing.T) {
 	}
 
 	// Load facts
-	loadedFacts, err := integration.LoadFacts(ctx, nil)
+	loadedFacts, err := integration.LoadFacts(ctx)
 	if err != nil {
 		t.Fatalf("LoadFacts failed: %v", err)
 	}
@@ -245,7 +245,7 @@ func TestIntegration_LoadFacts_Empty(t *testing.T) {
 	integration := NewIntegration(mockManager)
 
 	ctx := context.Background()
-	loadedFacts, err := integration.LoadFacts(ctx, nil)
+	loadedFacts, err := integration.LoadFacts(ctx)
 	if err != nil {
 		t.Fatalf("LoadFacts failed: %v", err)
 	}

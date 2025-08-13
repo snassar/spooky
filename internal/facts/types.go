@@ -24,22 +24,13 @@ type FactCollection struct {
 	Metadata map[string]interface{} `json:"metadata,omitempty" hcl:"metadata,optional"`
 }
 
-// FactStorage provides storage operations for facts
+// FactStorage provides minimal storage for debugging and statistics during export operations
 type FactStorage interface {
-	// Store stores facts for a machine
-	Store(ctx context.Context, machineID string, facts *FactCollection) error
+	// GetStats returns memory usage statistics for debugging
+	GetStats() (map[string]interface{}, error)
 
-	// Get retrieves facts for a machine
-	Get(ctx context.Context, machineID string) (*FactCollection, error)
-
-	// List lists all machine IDs with stored facts
-	List(ctx context.Context) ([]string, error)
-
-	// Delete deletes facts for a machine
-	Delete(ctx context.Context, machineID string) error
-
-	// Close closes the storage
-	Close() error
+	// Clear removes all facts from memory
+	Clear(ctx context.Context) error
 }
 
 // FactCollector collects facts from a machine
@@ -51,22 +42,22 @@ type FactCollector interface {
 	GetName() string
 }
 
-// FactManager manages fact collection and storage
+// FactManager manages fact collection and memory storage
 type FactManager interface {
 	// CollectFacts collects facts from the given machine
 	CollectFacts(ctx context.Context, machine *spookytypes.Machine) (*FactCollection, error)
 
-	// StoreFacts stores facts for a machine
+	// StoreFacts stores facts temporarily in memory for a machine
 	StoreFacts(ctx context.Context, machineID string, facts *FactCollection) error
 
-	// GetFacts retrieves facts for a machine
+	// GetFacts retrieves facts from memory for a machine
 	GetFacts(ctx context.Context, machineID string) (*FactCollection, error)
 
-	// ListFacts lists all machines with stored facts
+	// ListFacts lists all machines with facts currently in memory
 	ListFacts(ctx context.Context) ([]string, error)
 
-	// DeleteFacts deletes facts for a machine
-	DeleteFacts(ctx context.Context, machineID string) error
+	// ClearFacts removes all facts from memory
+	ClearFacts(ctx context.Context) error
 
 	// ValidateFacts validates facts against schema
 	ValidateFacts(ctx context.Context, facts *FactCollection) (*spookytypes.ValidationResult, error)

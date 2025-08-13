@@ -15,26 +15,14 @@ type FactManager interface {
     // CollectFacts collects facts from the given machine
     CollectFacts(ctx context.Context, machine *spookytypes.Machine) (*FactCollection, error)
     
-    // StoreFacts stores facts for a machine
-    StoreFacts(ctx context.Context, machineID string, facts *FactCollection) error
-    
-    // GetFacts retrieves facts for a machine
-    GetFacts(ctx context.Context, machineID string) (*FactCollection, error)
-    
-    // ListFacts lists all machines with stored facts
-    ListFacts(ctx context.Context) ([]string, error)
-    
-    // DeleteFacts deletes facts for a machine
-    DeleteFacts(ctx context.Context, machineID string) error
-    
     // ValidateFacts validates facts against schema
     ValidateFacts(ctx context.Context, facts *FactCollection) (*spookytypes.ValidationResult, error)
     
-    // ExportFacts exports facts to the given format
-    ExportFacts(ctx context.Context, machineIDs []string, format string, outputPath string) error
+    // ExportFacts gathers facts from machines and exports them directly to the specified format and file
+    ExportFacts(ctx context.Context, machines []*spookytypes.Machine, format string, outputPath string) error
     
-    // ImportFacts imports facts from the given format
-    ImportFacts(ctx context.Context, format string, inputPath string) error
+    // GetStorageStats returns storage statistics for debugging
+    GetStorageStats() (map[string]interface{}, error)
 }
 ```
 
@@ -78,8 +66,8 @@ type FactsIntegration interface {
     // ValidateFacts validates facts against schema
     ValidateFacts(ctx context.Context, facts interface{}) (*spookytypes.ValidationResult, error)
     
-    // ExportFacts exports facts to the given format
-    ExportFacts(ctx context.Context, machineIDs []string, format string, outputPath string) error
+    // ExportFacts gathers facts from machines and exports them directly to the specified format and file
+    ExportFacts(ctx context.Context, machines []*spookytypes.Machine, format string, outputPath string) error
 }
 ```
 
@@ -222,7 +210,7 @@ The fact collection process follows these steps:
 2. **SSH Connection**: Establish SSH connection to the target machine
 3. **Fact Collection**: Use gopsutil to collect system information
 4. **Data Processing**: Convert and validate collected data
-5. **In-Memory Storage**: Store facts in memory for the duration of the action run
+5. **In-Memory Storage**: Provides minimal storage for debugging and statistics during export operations
 
 ### In-Memory Implementation
 
@@ -231,7 +219,7 @@ The in-memory facts implementation provides:
 - **Fast Access**: Facts available immediately after collection
 - **No I/O Overhead**: No disk operations during fact access
 - **Session-Based**: Facts persist for the duration of the action run
-- **Efficient Memory Usage**: Optimized memory allocation for fact storage
+- **Efficient Allocation**: Optimized memory allocation for fact gathering and export
 - **Parallel Collection**: Efficient parallel fact collection across machines
 
 ### Validation Rules
@@ -308,7 +296,7 @@ CLI commands provide detailed error reporting:
 
 ### Data Protection
 
-- **Memory Protection**: Facts stored in memory are not persisted to disk
+- **Memory Protection**: Facts are gathered and exported directly without persistent storage
 - **Access Control**: Facts are only accessible during the action run
 - **Audit Logging**: Logging of fact collection and usage
 - **Data Sanitization**: Removal of sensitive information before collection
@@ -356,7 +344,7 @@ Performance tests validate:
 - **Regular Collection**: Collect facts regularly for up-to-date information
 - **Parallel Processing**: Use parallel collection for multiple machines
 - **Error Handling**: Implement proper error handling and retry logic
-- **Validation**: Always validate collected facts before storage
+- **Validation**: Always validate collected facts before export
 
 ### Memory Management
 
@@ -386,11 +374,11 @@ Performance tests validate:
 - **Logging**: Enable debug logging for detailed information
 - **Validation**: Use validation commands to check fact integrity
 - **Export/Import**: Use export/import for data analysis
-- **Storage Inspection**: Direct inspection of BadgerDB contents
+- **Memory Inspection**: Direct inspection of memory contents
 
 ### Performance Optimization
 
 - **Parallel Collection**: Increase parallel workers for faster collection
 - **Timeout Tuning**: Adjust timeouts based on network conditions
-- **Storage Tuning**: Optimize BadgerDB configuration
+- **Memory Tuning**: Optimize memory allocation and usage
 - **Memory Management**: Monitor and optimize memory usage

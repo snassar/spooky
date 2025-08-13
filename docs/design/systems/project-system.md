@@ -87,15 +87,18 @@ This project system integrates with other core Spooky systems to provide isolate
 
 **Standard Project Structure**:
 ```
-project-name/
-├── project.hcl                    # Project configuration and metadata
-├── machines.hcl                  # Machine inventory (optional) / (machines/ is also optional)
-├── actions.hcl                    # Action definitions (optional) / (actions/ is also optional)
-├── variables.hcl                  # Variable definitions (see [Variables System](../variables-system.md))
-├── facts.db/                       # Dynamic facts database (see [Facts System](../facts-system.md))
-├── templates/                     # Template files
-├── files/                         # Static files for distribution
-├── logs/                          # Project run logs
+project-root/
+├── project.hcl                   # Main project configuration
+├── machines.hcl                  # Machine inventory (optional)
+├── actions.hcl                   # Action definitions (optional)
+├── variables.hcl                 # Project variables (optional)
+├── machines/                     # Machine inventory files (optional)
+├── actions/                      # Action definition files (optional)
+├── variables/                    # Variable definition files (optional)
+├── templates/                    # Template files (optional)
+├── files/                        # Static files for deployment (optional)
+├── logs/                         # Log files directory (optional)
+└── README.md                     # Project documentation (optional)
 ```
 
 **Project Identity and Metadata**:
@@ -118,8 +121,8 @@ project "nextcloud-production" {
   
   # Facts storage configuration
   facts_storage {
-    type = "badgerdb"
-    path = "facts.db"
+    type = "memory"
+    path = "memory"
   }
   
   # Logging configuration
@@ -164,57 +167,9 @@ project "nextcloud-production" {
 
 ```go
 type Project struct {
-    Name             string                `hcl:"name,label"`
-    Description      string                `hcl:"description,optional"`
-    Version          string                `hcl:"version,optional"`
-    Environment      string                `hcl:"environment,optional"`
-    MachineInventory string                `hcl:"machine_inventory,optional"`
-    ActionsFile      string                `hcl:"actions_file,optional"`
-    DefaultTimeout   int                   `hcl:"default_timeout,optional"`
-    Parallel         int                   `hcl:"parallel,optional"`
-    FactsStorage     *ProjectFactsStorage  `hcl:"facts_storage,block"`
-    Logging          *ProjectLogging       `hcl:"logging,block"`
-    SSH              *ProjectSSH           `hcl:"ssh,block"`
-    Templates        *ProjectTemplates     `hcl:"templates,block"`
-    Security         *ProjectSecurity      `hcl:"security,block"`
-}
-
-type ProjectFactsStorage struct {
-    Type string `hcl:"type"`
-    Path string `hcl:"path"`
-}
-
-type ProjectLogging struct {
-    Level  string `hcl:"level,optional"`
-    Format string `hcl:"format,optional"`
-    Output string `hcl:"output,optional"`
-}
-
-type ProjectSSH struct {
-    DefaultUser            string `hcl:"default_user,optional"`
-    DefaultPort            int    `hcl:"default_port,optional"`
-    ConnectionTimeout       int    `hcl:"connection_timeout,optional"`
-    CommandTimeout         int    `hcl:"command_timeout,optional"`
-    RetryAttempts          int    `hcl:"retry_attempts,optional"`
-    RetryDelay             int    `hcl:"retry_delay,optional"`
-    KeyPath                string `hcl:"key_path,optional"`
-    KnownHosts             string `hcl:"known_hosts,optional"`
-    StrictHostKeyChecking  bool   `hcl:"strict_host_key_checking,optional"`
-    AllowPasswordAuth      bool   `hcl:"allow_password_auth,optional"`
-}
-
-type ProjectTemplates struct {
-    DataDirectory      string `hcl:"data_directory,optional"`
-    TemplatesDirectory string `hcl:"templates_directory,optional"`
-    AutoLoadData       bool   `hcl:"auto_load_data,optional"`
-    StrictValidation   bool   `hcl:"strict_validation,optional"`
-}
-
-type ProjectSecurity struct {
-    AllowInsecureConnections bool   `hcl:"allow_insecure_connections,optional"`
-    AllowPasswordAuth        bool   `hcl:"allow_password_auth,optional"`
-    RequireHTTPSImports      bool   `hcl:"require_https_imports,optional"`
-    MaxFileSize              string `hcl:"max_file_size,optional"`
+	Path   string
+	Config *ProjectConfig
+	// Facts are stored in memory during export operations
 }
 ```
 
@@ -311,24 +266,21 @@ type ProjectContext struct {
     Logger       *Logger
 }
 
-// Project facts manager with project-specific storage
+// Project facts manager with project-specific export capabilities
 type ProjectFactsManager struct {
     projectPath string
-    factsDB     *BadgerDB
-    config      *ProjectFactsStorage
+    config      *ProjectFactsConfig
 }
 
-// Integrates with the facts system (see [Facts System](../facts-system.md)) for project-specific fact storage
-func (p *ProjectFactsManager) GetFacts(machine string) (*FactCollection, error) {
-    // Get facts from project-specific facts.db
-    key := fmt.Sprintf("facts:%s", machine)
-    return p.factsDB.Get(key)
+// Integrates with the facts system (see [Facts System](../facts-system.md)) for project-specific fact gathering and export
+func (p *ProjectFactsManager) ExportFacts(machines []*Machine, format string, outputPath string) error {
+    // Gather and export facts directly from machines
+    return p.factsManager.ExportFacts(context.Background(), machines, format, outputPath)
 }
 
-func (p *ProjectFactsManager) StoreFacts(machine string, facts *FactCollection) error {
-    // Store facts in project-specific facts.db
-    key := fmt.Sprintf("facts:%s", machine)
-    return p.factsDB.Set(key, facts)
+func (p *ProjectFactsManager) GetStorageStats() (map[string]interface{}, error) {
+    // Get storage statistics for debugging
+    return p.factsManager.GetStorageStats()
 }
 ```
 
@@ -386,11 +338,6 @@ func (p *ProjectValidator) Validate() error {
         errors = append(errors, fmt.Sprintf("directory structure: %v", err))
     }
     
-    // 3. Validate facts database
-    if err := p.validateFactsDatabase(); err != nil {
-        errors = append(errors, fmt.Sprintf("facts database: %v", err))
-    }
-    
     if len(errors) > 0 {
         return fmt.Errorf("project validation failed:\n  %s", strings.Join(errors, "\n  "))
     }
@@ -417,12 +364,6 @@ func (p *ProjectValidator) validateProjectConfig() error {
 }
 
 func (p *ProjectValidator) validateDirectoryStructure() error {
-    // Check for required facts.db directory
-    factsDBPath := filepath.Join(p.path, "facts.db")
-    if _, err := os.Stat(factsDBPath); os.IsNotExist(err) {
-        return fmt.Errorf("facts.db directory is required")
-    }
-    
     // Check for optional directories
     optionalDirs := []string{"templates", "files", "logs"}
     for _, dir := range optionalDirs {
@@ -437,92 +378,4 @@ func (p *ProjectValidator) validateDirectoryStructure() error {
     
     return nil
 }
-
-func (p *ProjectValidator) validateFactsDatabase() error {
-    if p.project.FactsStorage == nil {
-        return nil // Facts storage is optional
-    }
-    
-    // Validate facts storage type
-    validTypes := []string{"badgerdb", "json", "hcl"}
-    valid := false
-    for _, t := range validTypes {
-        if p.project.FactsStorage.Type == t {
-            valid = true
-            break
-        }
-    }
-    if !valid {
-        return fmt.Errorf("invalid facts storage type: %s", p.project.FactsStorage.Type)
-    }
-    
-    return nil
-}
 ```
-
-## Implementation Phases
-
-### **Phase 1: Project Schema Implementation (Week 1)**
-**Goal**: Implement project configuration schema based on actual schema files
-
-#### Tasks:
-1. **Project schema definition** (`internal/project/schema.go`)
-   - Define project configuration structs matching `project.hcl` schema
-   - Add HCL tags and validation rules
-   - Create default value functions
-
-2. **Project validation** (`internal/project/validator.go`)
-   - Validate project structure based on `project-directory.hcl` schema
-   - Check project configuration against `project.hcl` schema
-   - Ensure facts database initialization
-
-### **Phase 2: Configuration Integration (Week 1)**
-**Goal**: Integrate project configuration with global configuration
-
-#### Tasks:
-1. **Configuration loading** (`internal/project/config.go`)
-   - Implement project configuration loading
-   - Handle environment variable overrides
-   - Apply CLI flag overrides
-
-2. **Project context** (`internal/project/context.go`)
-   - Create project run context
-   - Integrate with facts system
-   - Manage project isolation
-
-### **Phase 3: CLI Integration (Week 2)**
-**Goal**: Add project management to CLI
-
-#### Tasks:
-1. **Project commands** (`internal/cli/project.go`)
-   - `spooky project validate` - Validate project configuration
-   - `spooky project info` - Show project information
-
-2. **Enhanced init command** (`internal/cli/init.go`)
-   - Create projects with proper schema
-   - Generate default configuration
-   - Set up project structure with facts.db
-
-## Benefits
-
-### **Immediate Benefits**
-- **Project configuration** with comprehensive settings
-- **Project isolation** with global integration
-- **Portable project names** for cross-environment use
-- **Schema validation** for project configuration
-- **Facts database** integration
-
-### **Long-term Benefits**
-- **Team collaboration** with shared project definitions
-- **Environment consistency** across dev/staging/production
-- **Operational efficiency** with standardized project structure
-- **Scalability** for large infrastructure projects
-
-## Success Metrics
-
-### **Functionality Metrics**
-- [ ] Project configuration loads correctly
-- [ ] Project isolation works as expected
-- [ ] Schema validation functions properly
-- [ ] Facts database integration works
-- [ ] Project portability works across environments 

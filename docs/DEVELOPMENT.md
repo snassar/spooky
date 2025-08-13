@@ -15,7 +15,6 @@ This guide covers everything needed to develop and contribute to the spooky auto
 
 ### Optional Tools
 
-- **BadgerDB**: For local development and testing
 - **SSH tools**: For testing SSH functionality
 - **Podman/Docker**: For integration testing
 
@@ -262,8 +261,7 @@ var projectInitCmd = &cobra.Command{
 - **`XDG_CONFIG_HOME`**: Configuration directory
 - **`SPOOKY_CONFIG_PATH`**: Custom config file path
 - **`SPOOKY_LOG_LEVEL`**: Logging level
-- **`SPOOKY_FACTS_PATH`**: Facts database path
-- **`SPOOKY_FACTS_FORMAT`**: Storage format (badgerdb/json)
+- **`SPOOKY_FACTS_FORMAT`**: Export format (json/hcl)
 
 ## Testing Guidelines
 
@@ -474,7 +472,7 @@ golangci-lint run internal/types/types.go
 ### Development Tools
 - **Go**: [golang.org](https://golang.org/)
 - **Git**: [git-scm.com](https://git-scm.com/)
-- **BadgerDB**: [github.com/dgraph-io/badger](https://github.com/dgraph-io/badger)
+- **Memory Storage**: In-memory fact storage for export operations
 
 ---
 

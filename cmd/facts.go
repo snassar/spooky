@@ -135,7 +135,7 @@ func handleFactsExport(cmd *cobra.Command, projectPath string) error {
 		}
 
 		// Store facts
-		if err := factsManager.StoreFacts(ctx, facts, nil); err != nil {
+		if err := factsManager.StoreFacts(ctx, facts); err != nil {
 			errorCount++
 			factsLogger.Error("Failed to store facts for export", err, map[string]interface{}{
 				"machine": machine.Hostname,

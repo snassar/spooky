@@ -48,24 +48,7 @@ examples/test-environment/ssh-keys/
 spooky.exe
 spooky
 build/*
-examples/actions/large-scale-example-*.hcl
-examples/actions/medium-scale-example-*.hcl
-examples/actions/small-scale-example-*.hcl
 
-# Facts database
-.facts.db
-examples/projects/development/facts.db
-
-# Memory storage files (no longer used - facts are stored in memory)
-# *.sst
-# *.vlog
-# *.mem
-# DISCARD
-# KEYREGISTRY
-# MANIFEST
-# LOCK
-
-# Test database directories (no longer used - facts are stored in memory)
-# tests/*/facts.db/
-# tests/*/*/facts.db/
-# internal/storage/badger/:memory:/
+# Facts exports (facts are stored in memory during export operations)
+*.facts.json
+*.facts.hcl

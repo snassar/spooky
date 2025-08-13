@@ -48,8 +48,8 @@ func (i *Integration) CollectFacts(ctx context.Context, source string) (interfac
 	return facts, nil
 }
 
-// StoreFacts stores facts in the given storage
-func (i *Integration) StoreFacts(ctx context.Context, facts interface{}, storage spookytypes.FactStorage) error {
+// StoreFacts stores facts in memory
+func (i *Integration) StoreFacts(ctx context.Context, facts interface{}) error {
 	if facts == nil {
 		return fmt.Errorf("facts cannot be nil")
 	}
@@ -68,8 +68,8 @@ func (i *Integration) StoreFacts(ctx context.Context, facts interface{}, storage
 	return nil
 }
 
-// LoadFacts loads facts from the given storage
-func (i *Integration) LoadFacts(ctx context.Context, storage spookytypes.FactStorage) (interface{}, error) {
+// LoadFacts loads facts from memory
+func (i *Integration) LoadFacts(ctx context.Context) (interface{}, error) {
 	// List all machine IDs with stored facts
 	machineIDs, err := i.manager.ListFacts(ctx)
 	if err != nil {

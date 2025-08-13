@@ -14,7 +14,7 @@ This schema system provides the foundation for all other Spooky systems through 
 
 ### **Facts System Integration**
 - **Facts Schema**: Comprehensive schema validation for facts storage and structure (see [Facts System](../facts-system.md))
-- **Storage Validation**: BadgerDB, JSON, and HCL storage format validation
+- **Storage Validation**: JSON and HCL storage format validation
 - **Fact Collection**: Schema validation for fact collection and processing
 - **Schema Composition**: Runtime schema composition for facts validation
 
@@ -78,7 +78,6 @@ This schema system provides the foundation for all other Spooky systems through 
 **Composed Schema Types:**
 - `facts-hcl-composed.hcl` - HCL format facts schema
 - `facts-json-composed.hcl` - JSON format facts schema
-- `facts-badger-composed.hcl` - BadgerDB format facts schema
 
 **API Functions:**
 - `ComposeSchemas()` - Compose all schema combinations
@@ -102,11 +101,9 @@ internal/schemas/schemas/
 ├── facts-structure.hcl          # Base fact structure (all gopsutil data)
 ├── storage/
 │   ├── hcl.hcl                  # HCL-specific validation rules
-│   ├── json.hcl                 # JSON-specific validation rules
-│   └── badger.hcl               # BadgerDB-specific validation rules
+│   └── json.hcl                 # JSON-specific validation rules
 ├── facts-hcl.hcl         # Composed schema (includes base + format)
-├── facts-json.hcl        # Composed schema (includes base + format)
-└── facts-badger.hcl      # Composed schema (includes base + format)
+└── facts-json.hcl        # Composed schema (includes base + format)
 ```
 
 #### **Build Integration**
@@ -153,7 +150,6 @@ Validates facts system data structures and storage formats (see [Facts System](.
 **Storage Format Schemas:**
 - `storage/hcl.hcl` - HCL-specific validation rules
 - `storage/json.hcl` - JSON-specific validation rules
-- `storage/badger.hcl` - BadgerDB-specific validation rules
 
 #### 3. **Comprehensive Go Structs with HCL Tags** (`internal/config/types.go`)
 

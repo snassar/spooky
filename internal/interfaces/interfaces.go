@@ -146,16 +146,16 @@ type CLIManager interface {
 	ShowVersion() error
 }
 
-// FactsIntegration provides fact collection and storage
+// FactsIntegration provides fact collection and memory storage
 type FactsIntegration interface {
 	// CollectFacts collects facts from the given source
 	CollectFacts(ctx context.Context, source string) (interface{}, error)
 
-	// StoreFacts stores facts in the given storage
-	StoreFacts(ctx context.Context, facts interface{}, storage spookytypes.FactStorage) error
+	// StoreFacts stores facts in memory
+	StoreFacts(ctx context.Context, facts interface{}) error
 
-	// LoadFacts loads facts from the given storage
-	LoadFacts(ctx context.Context, storage spookytypes.FactStorage) (interface{}, error)
+	// LoadFacts loads facts from memory
+	LoadFacts(ctx context.Context) (interface{}, error)
 
 	// ValidateFacts validates facts
 	ValidateFacts(ctx context.Context, facts interface{}) (*spookytypes.ValidationResult, error)
@@ -311,20 +311,8 @@ type SSHManager interface {
 	Close(ctx context.Context) error
 }
 
-// FactStorage provides fact storage operations
+// FactStorage provides minimal storage for debugging and statistics during export operations
 type FactStorage interface {
-	// Set stores a fact with the given key
-	Set(ctx context.Context, key string, fact interface{}) error
-
-	// Get retrieves a fact with the given key
-	Get(ctx context.Context, key string) (interface{}, error)
-
-	// Delete deletes a fact with the given key
-	Delete(ctx context.Context, key string) error
-
-	// List lists all facts with the given prefix
-	List(ctx context.Context, prefix string) ([]string, error)
-
-	// Close closes the storage
-	Close() error
+	// GetStats returns memory usage statistics for debugging
+	GetStats() (map[string]interface{}, error)
 }

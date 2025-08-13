@@ -65,52 +65,9 @@ authentication {
 }
 ```
 
-#### "Failed to collect facts: timeout"
+#### "Failed to gather facts: memory limit exceeded"
 
-**Problem:** Fact collection is timing out.
-
-**Solution:**
-```bash
-# Increase timeout for slow machines
-spooky facts gather ./my-project --timeout 120s
-
-# Check network connectivity
-ping machine.example.com
-
-# Test SSH connection speed
-time ssh user@machine.example.com "echo test"
-```
-
-**Check your configuration:**
-```hcl
-project {
-  facts {
-    timeout_seconds = 120  # Increase timeout for slow networks
-  }
-}
-```
-
-#### "Failed to collect facts: machine not found"
-
-**Problem:** The specified machine is not in the project inventory.
-
-**Solution:**
-```bash
-# List available machines
-spooky machines list ./my-project
-
-# Check machine inventory file
-cat ./my-project/machines.hcl
-
-# Verify machine name spelling
-spooky facts gather ./my-project --machine correct-machine-name
-```
-
-### Memory Errors
-
-#### "Failed to allocate memory for facts: out of memory"
-
-**Problem:** Cannot allocate memory for fact storage.
+**Problem:** Memory limit exceeded during fact gathering and export.
 
 **Solution:**
 ```bash
@@ -118,51 +75,32 @@ spooky facts gather ./my-project --machine correct-machine-name
 free -h
 
 # Reduce parallel workers
-spooky facts gather ./my-project --parallel 2
+spooky facts export ./my-project --parallel 2
 
-# Monitor memory usage
-spooky facts gather ./my-project --monitor-memory
+# Monitor memory usage during export
+spooky facts export ./my-project --verbose
 
-# Use smaller batch size
-spooky facts gather ./my-project --batch-size 5
-```
-
-#### "Failed to store facts: memory limit exceeded"
-
-**Problem:** Memory limit exceeded for fact storage.
-
-**Solution:**
-```bash
-# Check memory usage
-free -h
-
-# Reduce parallel workers
-spooky facts gather ./my-project --parallel 1
-
-# Process machines in smaller batches
-spooky facts gather ./my-project --batch-size 3
-
-# Use memory-efficient collection
-spooky facts gather ./my-project --memory-efficient
+# Export fewer machines at once
+spooky facts export ./my-project --machine specific-machine --output single-machine-facts.json
 ```
 
 #### "Failed to read facts: memory corruption detected"
 
-**Problem:** Memory corruption detected in fact storage.
+**Problem:** Memory corruption detected during fact gathering and export.
 
 **Solution:**
 ```bash
 # Restart spooky process
 pkill spooky
 
-# Re-collect facts with fresh memory
-spooky facts gather ./my-project
+# Re-export facts with fresh memory
+spooky facts export ./my-project --output fresh-facts.json
 
 # Use memory validation
-spooky facts gather ./my-project --validate-memory
+spooky facts export ./my-project --verbose
 
 # Check for memory leaks
-spooky facts gather ./my-project --memory-profile
+spooky facts export ./my-project --parallel 1
 ```
 
 ### Validation Errors
@@ -277,7 +215,6 @@ project {
     parallel_workers = 4
     timeout_seconds = 60
     retry_attempts = 3
-    storage_path = "facts.db"
     compression_enabled = true
   }
 }
@@ -508,7 +445,7 @@ spooky facts gather ./my-project --memory-profile
 
 #### "Failed to allocate facts memory"
 
-**Problem:** Cannot allocate memory for fact storage.
+**Problem:** Cannot allocate memory for fact gathering and export.
 
 **Solution:**
 ```bash
@@ -519,10 +456,10 @@ free -h
 ulimit -a
 
 # Reduce memory usage
-spooky facts gather ./my-project --parallel 1
+spooky facts export ./my-project --parallel 1
 
-# Use memory-efficient mode
-spooky facts gather ./my-project --memory-efficient
+# Export fewer machines at once
+spooky facts export ./my-project --machine specific-machine --output single-machine-facts.json
 ```
 
 ## Performance Optimization
@@ -579,20 +516,23 @@ spooky facts gather ./my-project --memory-optimized
 spooky facts gather ./my-project --memory-pool
 ```
 
-#### "High memory usage during fact storage"
+#### "High memory usage during fact export"
 
-**Problem:** Storing facts is causing high memory usage.
+**Problem:** Exporting facts is causing high memory usage.
 
 **Solution:**
 ```bash
-# Use memory-efficient storage
-spooky facts gather ./my-project --memory-efficient
+# Reduce parallel workers
+spooky facts export ./my-project --parallel 2
 
-# Reduce memory allocation
-spooky facts gather ./my-project --memory-limit 1GB
+# Export fewer machines at once
+spooky facts export ./my-project --machine specific-machine --output single-machine-facts.json
 
-# Use memory pooling
-spooky facts gather ./my-project --memory-pool
+# Monitor memory usage
+spooky facts export ./my-project --verbose
+
+# Use smaller batch sizes
+spooky facts export ./my-project --machine machine1,machine2 --output batch-facts.json
 ```
 
 ## Debugging Techniques
@@ -608,9 +548,9 @@ spooky facts gather ./my-project --verbose
 export SPOOKY_SSH_DEBUG=true
 spooky facts gather ./my-project
 
-# Enable storage debug logging
-export SPOOKY_STORAGE_DEBUG=true
-spooky facts gather ./my-project
+# Enable export debug logging
+export SPOOKY_EXPORT_DEBUG=true
+spooky facts export ./my-project
 ```
 
 ### Collect Debug Information
@@ -647,26 +587,26 @@ spooky facts gather ./my-project --machine test-machine --verbose
 # Restart spooky process
 pkill spooky
 
-# Re-collect facts with fresh memory
-spooky facts gather ./my-project
+# Re-export facts with fresh memory
+spooky facts export ./my-project --output fresh-facts.json
 
-# Validate memory integrity
+# Validate exported facts
 spooky facts validate ./my-project
 
 # Check for memory leaks
-spooky facts gather ./my-project --memory-profile
+spooky facts export ./my-project --parallel 1
 ```
 
 ### Fact Recollection
 
 ```bash
-# Remove problematic facts
-spooky facts delete ./my-project --machine problematic-machine
+# Export facts for specific machine
+spooky facts export ./my-project --machine problematic-machine --output problematic-machine-facts.json
 
-# Re-collect facts
-spooky facts gather ./my-project --machine problematic-machine
+# Re-export facts for specific machine
+spooky facts export ./my-project --machine problematic-machine --output recollected-facts.json
 
-# Validate recollected facts
+# Validate exported facts
 spooky facts validate ./my-project --machine problematic-machine
 ```
 

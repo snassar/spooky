@@ -80,27 +80,25 @@ type SystemFactCollector struct {
 
 ### **2. Memory Storage**
 
-Facts are stored in memory using `MemoryFactStorage` during export operations:
+Facts are gathered directly and exported without intermediate storage:
 
 ```go
 type MemoryFactStorage struct {
-    facts map[string]*FactCollection
     mutex sync.RWMutex
 }
 ```
 
 **Features:**
 - Thread-safe operations with RWMutex
-- Machine ID-based storage
-- JSON export/import capabilities
-- Storage statistics
-- Memory cleanup on close
+- Direct export to JSON and HCL formats
+- No intermediate storage (facts gathered and exported immediately)
+- Storage statistics for debugging
+- Minimal memory footprint
 
 **Storage Operations:**
-- `Store()` - Store facts for a machine
-- `Get()` - Retrieve facts for a machine
-- `List()` - List all machine IDs with facts
-- `ExportFacts()` - Export facts to files
+- `GetStats()` - Get memory usage statistics for debugging
+- `ExportToJSON()` - Export facts directly to JSON format following facts-structure.schema.hcl
+- `ExportToHCL()` - Export facts directly to HCL format following facts-structure.schema.hcl
 
 ### **3. CLI Integration**
 
@@ -282,19 +280,19 @@ The facts system supports parallel fact collection:
 
 ### **Memory Management**
 
-Facts are stored in memory during export operations:
+Facts are gathered directly and exported without intermediate storage:
 
 **Memory Usage:**
-- Facts stored per machine
-- Temporary storage during export
-- Memory cleanup after export
-- No persistent storage
-
-**Memory Optimization:**
-- Efficient data structures
+- Facts gathered from machines during export process
+- No intermediate storage (direct gather → export)
 - Minimal memory footprint
-- Garbage collection friendly
-- Thread-safe operations
+- No cleanup needed (no persistent storage)
+
+**Memory Benefits:**
+- Fast gather and export process
+- No disk I/O overhead
+- No memory leaks (no persistent storage)
+- Simple and efficient for ephemeral data
 
 ## Integration Patterns
 
@@ -332,12 +330,12 @@ Facts commands integrate with the CLI system:
 
 ## Current Limitations
 
-### **Storage Limitations**
+### **Storage Characteristics**
 
-1. **No Persistent Storage**: Facts are only stored in memory during export
-2. **No Fact History**: No historical fact tracking or comparison
-3. **No Fact Import**: No import functionality from external sources
-4. **No Fact Validation**: Limited validation beyond basic structure
+1. **Ephemeral Storage**: Facts are only stored in memory during export (this is intentional)
+2. **No Fact History**: No historical fact tracking or comparison (facts are gathered fresh each time)
+3. **No Persistent Storage**: Facts are not saved to disk (memory-only during export)
+4. **No Import Functionality**: Facts cannot be imported (only export is supported)
 
 ### **Collection Limitations**
 

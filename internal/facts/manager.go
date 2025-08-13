@@ -57,93 +57,6 @@ func (m *Manager) CollectFacts(ctx context.Context, machine *spookytypes.Machine
 	return facts, nil
 }
 
-// StoreFacts stores facts for a machine
-func (m *Manager) StoreFacts(ctx context.Context, machineID string, facts *FactCollection) error {
-	if machineID == "" {
-		return fmt.Errorf("machine ID cannot be empty")
-	}
-
-	if facts == nil {
-		return fmt.Errorf("facts cannot be nil")
-	}
-
-	m.logger.Info("Storing facts", map[string]interface{}{"machine_id": machineID})
-
-	// Validate facts before storing
-	validationResult, err := m.ValidateFacts(ctx, facts)
-	if err != nil {
-		m.logger.Error("Facts validation failed", err, map[string]interface{}{"machine_id": machineID})
-		return fmt.Errorf("facts validation failed for %s: %w", machineID, err)
-	}
-
-	if !validationResult.Valid {
-		m.logger.Error("Facts validation failed", fmt.Errorf("validation errors: %v", validationResult.Errors), map[string]interface{}{"machine_id": machineID})
-		return fmt.Errorf("facts validation failed for %s: %w", machineID, fmt.Errorf("validation errors: %v", validationResult.Errors))
-	}
-
-	// Store facts
-	if err := m.storage.Store(ctx, machineID, facts); err != nil {
-		m.logger.Error("Failed to store facts", err, map[string]interface{}{"machine_id": machineID})
-		return fmt.Errorf("failed to store facts for %s: %w", machineID, err)
-	}
-
-	m.logger.Info("Successfully stored facts", map[string]interface{}{"machine_id": machineID})
-
-	return nil
-}
-
-// GetFacts retrieves facts for a machine
-func (m *Manager) GetFacts(ctx context.Context, machineID string) (*FactCollection, error) {
-	if machineID == "" {
-		return nil, fmt.Errorf("machine ID cannot be empty")
-	}
-
-	m.logger.Debug("Retrieving facts", map[string]interface{}{"machine_id": machineID})
-
-	facts, err := m.storage.Get(ctx, machineID)
-	if err != nil {
-		m.logger.Error("Failed to retrieve facts", err, map[string]interface{}{"machine_id": machineID})
-		return nil, fmt.Errorf("failed to retrieve facts for %s: %w", machineID, err)
-	}
-
-	m.logger.Debug("Successfully retrieved facts", map[string]interface{}{"machine_id": machineID})
-
-	return facts, nil
-}
-
-// ListFacts lists all machines with stored facts
-func (m *Manager) ListFacts(ctx context.Context) ([]string, error) {
-	m.logger.Debug("Listing facts")
-
-	machineIDs, err := m.storage.List(ctx)
-	if err != nil {
-		m.logger.Error("Failed to list facts", err)
-		return nil, fmt.Errorf("failed to list facts: %w", err)
-	}
-
-	m.logger.Debug("Successfully listed facts", map[string]interface{}{"count": len(machineIDs)})
-
-	return machineIDs, nil
-}
-
-// DeleteFacts deletes facts for a machine
-func (m *Manager) DeleteFacts(ctx context.Context, machineID string) error {
-	if machineID == "" {
-		return fmt.Errorf("machine ID cannot be empty")
-	}
-
-	m.logger.Info("Deleting facts", map[string]interface{}{"machine_id": machineID})
-
-	if err := m.storage.Delete(ctx, machineID); err != nil {
-		m.logger.Error("Failed to delete facts", err, map[string]interface{}{"machine_id": machineID})
-		return fmt.Errorf("failed to delete facts for %s: %w", machineID, err)
-	}
-
-	m.logger.Info("Successfully deleted facts", map[string]interface{}{"machine_id": machineID})
-
-	return nil
-}
-
 // ValidateFacts validates facts against schema
 func (m *Manager) ValidateFacts(ctx context.Context, facts *FactCollection) (*spookytypes.ValidationResult, error) {
 	if facts == nil {
@@ -204,166 +117,220 @@ func (m *Manager) ValidateFacts(ctx context.Context, facts *FactCollection) (*sp
 
 // ExportFacts exports facts to the given format
 func (m *Manager) ExportFacts(ctx context.Context, machineIDs []string, format string, outputPath string) error {
-	if len(machineIDs) == 0 {
-		return fmt.Errorf("no machine IDs provided for export")
-	}
+	m.logger.Info("Exporting facts", map[string]interface{}{
+		"machines": len(machineIDs),
+		"format":   format,
+		"output":   outputPath,
+	})
 
-	if format == "" {
-		format = "json"
-	}
-
-	if outputPath == "" {
-		outputPath = fmt.Sprintf("facts-export-%s.%s", time.Now().Format("20060102-150405"), format)
-	}
-
-	m.logger.Info("Exporting facts", map[string]interface{}{"machines": len(machineIDs), "format": format, "output": outputPath})
-
-	// Collect facts for all machines with validation
-	exportData := make(map[string]*FactCollection)
-
+	// Collect facts for the specified machines
+	var allFacts []*FactCollection
 	for _, machineID := range machineIDs {
-		facts, err := m.GetFacts(ctx, machineID)
+		facts, err := m.CollectFacts(ctx, &spookytypes.Machine{Hostname: machineID})
 		if err != nil {
-			m.logger.Warn("Failed to get facts for export", map[string]interface{}{"machine_id": machineID, "error": err.Error()})
-			continue
-		}
-
-		// Validate facts before export
-		validationResult, err := m.ValidateFacts(ctx, facts)
-		if err != nil {
-			m.logger.Warn("Failed to validate facts for export", map[string]interface{}{"machine_id": machineID, "error": err.Error()})
-			continue
-		}
-
-		if !validationResult.Valid {
-			m.logger.Warn("Facts validation failed for export", map[string]interface{}{
-				"machine_id": machineID,
-				"errors":     len(validationResult.Errors),
-				"warnings":   len(validationResult.Warnings),
+			m.logger.Error("Failed to collect facts for machine", err, map[string]interface{}{
+				"machine": machineID,
 			})
-
-			// Log validation errors for debugging
-			for _, validationErr := range validationResult.Errors {
-				m.logger.Debug("Validation error", map[string]interface{}{
-					"machine_id": machineID,
-					"error":      validationErr.Message,
-				})
-			}
-
-			// Continue with export but log the validation issues
-			m.logger.Info("Proceeding with export despite validation issues", map[string]interface{}{"machine_id": machineID})
+			return fmt.Errorf("failed to collect facts for machine %s: %w", machineID, err)
 		}
-
-		exportData[machineID] = facts
-	}
-
-	// Create export structure
-	export := &FactExport{
-		ExportedAt:   time.Now(),
-		Format:       format,
-		MachineCount: len(exportData),
-		Facts:        exportData,
+		allFacts = append(allFacts, facts)
 	}
 
 	// Export based on format
-	var data []byte
-	var err error
-
 	switch format {
 	case "json":
-		data, err = json.MarshalIndent(export, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal facts to JSON: %w", err)
-		}
-
+		return m.exportToJSON(allFacts, outputPath)
 	case "hcl":
-		data, err = m.exportToHCL(export)
-		if err != nil {
-			return fmt.Errorf("failed to marshal facts to HCL: %w", err)
-		}
-
+		return m.exportToHCL(allFacts, outputPath)
 	default:
 		return fmt.Errorf("unsupported export format: %s", format)
 	}
+}
 
-	// Write to file
-	if err := os.WriteFile(outputPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write export file: %w", err)
+// exportToJSON exports facts to JSON format following facts-structure.schema.hcl
+func (m *Manager) exportToJSON(facts []*FactCollection, outputPath string) error {
+	// Export each fact collection individually following the schema structure
+	var exportData []map[string]interface{}
+
+	for _, fact := range facts {
+		if fact == nil {
+			continue
+		}
+
+		// Create the facts_structure format
+		factStructure := map[string]interface{}{
+			"machine_id":   fact.MachineID,
+			"collected_at": fact.CollectedAt.Format(time.RFC3339),
+			"facts":        fact.Facts,
+		}
+
+		exportData = append(exportData, factStructure)
 	}
 
-	m.logger.Info("Successfully exported facts", map[string]interface{}{"output": outputPath, "machines": len(exportData)})
+	data, err := json.MarshalIndent(exportData, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal facts to JSON: %w", err)
+	}
 
+	if err := os.WriteFile(outputPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write JSON export file: %w", err)
+	}
+
+	m.logger.Info("Successfully exported facts to JSON", map[string]interface{}{"output": outputPath, "machines": len(facts)})
 	return nil
 }
 
-// ImportFacts imports facts from the given format
-func (m *Manager) ImportFacts(ctx context.Context, format string, inputPath string) error {
-	if format == "" {
-		format = "json"
-	}
+// exportToHCL exports facts to HCL format following facts-structure.schema.hcl
+func (m *Manager) exportToHCL(facts []*FactCollection, outputPath string) error {
+	file := hclwrite.NewEmptyFile()
+	rootBody := file.Body()
 
-	if inputPath == "" {
-		return fmt.Errorf("input path is required")
-	}
-
-	m.logger.Info("Importing facts", map[string]interface{}{"format": format, "input": inputPath})
-
-	// Read file
-	data, err := os.ReadFile(inputPath)
-	if err != nil {
-		return fmt.Errorf("failed to read import file: %w", err)
-	}
-
-	// Parse based on format
-	var export *FactExport
-
-	switch format {
-	case "json":
-		if err := json.Unmarshal(data, &export); err != nil {
-			return fmt.Errorf("failed to unmarshal facts from JSON: %w", err)
-		}
-
-	case "hcl":
-		// HCL import would be implemented here
-		return fmt.Errorf("HCL import not implemented yet")
-
-	default:
-		return fmt.Errorf("unsupported import format: %s", format)
-	}
-
-	// Validate export structure
-	if export == nil {
-		return fmt.Errorf("invalid export structure")
-	}
-
-	// Import facts
-	imported := 0
-	failed := 0
-
-	for machineID, facts := range export.Facts {
-		// Validate facts before importing
-		if validationResult, err := m.ValidateFacts(ctx, facts); err != nil {
-			m.logger.Error("Failed to validate facts during import", err, map[string]interface{}{"machine_id": machineID})
-			failed++
-			continue
-		} else if !validationResult.Valid {
-			m.logger.Error("Facts validation failed during import", fmt.Errorf("validation errors: %v", validationResult.Errors), map[string]interface{}{"machine_id": machineID})
-			failed++
+	// Export each fact collection following the facts_structure schema
+	for _, fact := range facts {
+		if fact == nil {
 			continue
 		}
 
-		// Store facts
-		if err := m.StoreFacts(ctx, machineID, facts); err != nil {
-			m.logger.Error("Failed to store facts during import", err, map[string]interface{}{"machine_id": machineID})
-			failed++
-			continue
-		}
+		// Create facts_structure block
+		factsStructureBlock := rootBody.AppendNewBlock("facts_structure", nil)
+		factsStructureBody := factsStructureBlock.Body()
 
-		imported++
+		// Add machine_id
+		factsStructureBody.SetAttributeValue("machine_id", cty.StringVal(fact.MachineID))
+
+		// Add collected_at
+		factsStructureBody.SetAttributeValue("collected_at", cty.StringVal(fact.CollectedAt.Format(time.RFC3339)))
+
+		// Add facts object
+		if fact.Facts != nil {
+			factsBlock := factsStructureBody.AppendNewBlock("facts", nil)
+			factsBody := factsBlock.Body()
+
+			// Add system facts if available
+			if fact.Facts.System != nil {
+				systemBlock := factsBody.AppendNewBlock("system", nil)
+				systemBody := systemBlock.Body()
+
+				// OS facts
+				if fact.Facts.System.OS != nil {
+					osBlock := systemBody.AppendNewBlock("os", nil)
+					osBody := osBlock.Body()
+					osBody.SetAttributeValue("name", cty.StringVal(fact.Facts.System.OS.Name))
+					osBody.SetAttributeValue("version", cty.StringVal(fact.Facts.System.OS.Version))
+					osBody.SetAttributeValue("arch", cty.StringVal(fact.Facts.System.OS.Arch))
+					if fact.Facts.System.OS.Kernel != "" {
+						osBody.SetAttributeValue("kernel", cty.StringVal(fact.Facts.System.OS.Kernel))
+					}
+					if fact.Facts.System.OS.Platform != "" {
+						osBody.SetAttributeValue("platform", cty.StringVal(fact.Facts.System.OS.Platform))
+					}
+					if fact.Facts.System.OS.Family != "" {
+						osBody.SetAttributeValue("family", cty.StringVal(fact.Facts.System.OS.Family))
+					}
+				}
+
+				// Hardware facts
+				if fact.Facts.System.Hardware != nil {
+					hardwareBlock := systemBody.AppendNewBlock("hardware", nil)
+					hardwareBody := hardwareBlock.Body()
+
+					// CPU facts
+					if fact.Facts.System.Hardware.CPU != nil {
+						cpuBlock := hardwareBody.AppendNewBlock("cpu", nil)
+						cpuBody := cpuBlock.Body()
+						cpuBody.SetAttributeValue("cores", cty.NumberIntVal(int64(fact.Facts.System.Hardware.CPU.Cores)))
+						cpuBody.SetAttributeValue("model", cty.StringVal(fact.Facts.System.Hardware.CPU.Model))
+						if fact.Facts.System.Hardware.CPU.Frequency > 0 {
+							cpuBody.SetAttributeValue("frequency", cty.NumberFloatVal(fact.Facts.System.Hardware.CPU.Frequency))
+						}
+						if fact.Facts.System.Hardware.CPU.Architecture != "" {
+							cpuBody.SetAttributeValue("architecture", cty.StringVal(fact.Facts.System.Hardware.CPU.Architecture))
+						}
+						if fact.Facts.System.Hardware.CPU.Vendor != "" {
+							cpuBody.SetAttributeValue("vendor", cty.StringVal(fact.Facts.System.Hardware.CPU.Vendor))
+						}
+					}
+
+					// Memory facts
+					if fact.Facts.System.Hardware.Memory != nil {
+						memoryBlock := hardwareBody.AppendNewBlock("memory", nil)
+						memoryBody := memoryBlock.Body()
+						memoryBody.SetAttributeValue("total", cty.NumberIntVal(fact.Facts.System.Hardware.Memory.Total))
+						if fact.Facts.System.Hardware.Memory.Available > 0 {
+							memoryBody.SetAttributeValue("available", cty.NumberIntVal(fact.Facts.System.Hardware.Memory.Available))
+						}
+						if fact.Facts.System.Hardware.Memory.Used > 0 {
+							memoryBody.SetAttributeValue("used", cty.NumberIntVal(fact.Facts.System.Hardware.Memory.Used))
+						}
+						if fact.Facts.System.Hardware.Memory.Free > 0 {
+							memoryBody.SetAttributeValue("free", cty.NumberIntVal(fact.Facts.System.Hardware.Memory.Free))
+						}
+						if fact.Facts.System.Hardware.Memory.Buffers > 0 {
+							memoryBody.SetAttributeValue("buffers", cty.NumberIntVal(fact.Facts.System.Hardware.Memory.Buffers))
+						}
+						if fact.Facts.System.Hardware.Memory.Cached > 0 {
+							memoryBody.SetAttributeValue("cached", cty.NumberIntVal(fact.Facts.System.Hardware.Memory.Cached))
+						}
+					}
+				}
+
+				// Network facts
+				if fact.Facts.System.Network != nil {
+					networkBlock := systemBody.AppendNewBlock("network", nil)
+					networkBody := networkBlock.Body()
+
+					if fact.Facts.System.Network.Hostname != "" {
+						networkBody.SetAttributeValue("hostname", cty.StringVal(fact.Facts.System.Network.Hostname))
+					}
+
+					if len(fact.Facts.System.Network.Interfaces) > 0 {
+						interfacesBlock := networkBody.AppendNewBlock("interfaces", nil)
+						interfacesBody := interfacesBlock.Body()
+
+						for _, iface := range fact.Facts.System.Network.Interfaces {
+							ifaceBlock := interfacesBody.AppendNewBlock("interface", []string{iface.Name})
+							ifaceBody := ifaceBlock.Body()
+							ifaceBody.SetAttributeValue("name", cty.StringVal(iface.Name))
+							if iface.MACAddress != "" {
+								ifaceBody.SetAttributeValue("mac_address", cty.StringVal(iface.MACAddress))
+							}
+							if len(iface.IPAddresses) > 0 {
+								// Convert IP addresses to HCL list
+								ipList := make([]cty.Value, len(iface.IPAddresses))
+								for i, ip := range iface.IPAddresses {
+									ipList[i] = cty.StringVal(ip)
+								}
+								ifaceBody.SetAttributeValue("ip_addresses", cty.ListVal(ipList))
+							}
+							if iface.MTU > 0 {
+								ifaceBody.SetAttributeValue("mtu", cty.NumberIntVal(int64(iface.MTU)))
+							}
+						}
+					}
+
+					if len(fact.Facts.System.Network.IPAddresses) > 0 {
+						// Convert IP addresses to HCL list
+						ipList := make([]cty.Value, len(fact.Facts.System.Network.IPAddresses))
+						for i, ip := range fact.Facts.System.Network.IPAddresses {
+							ipList[i] = cty.StringVal(ip)
+						}
+						networkBody.SetAttributeValue("ip_addresses", cty.ListVal(ipList))
+					}
+
+					if fact.Facts.System.Network.PrimaryIP != "" {
+						networkBody.SetAttributeValue("primary_ip", cty.StringVal(fact.Facts.System.Network.PrimaryIP))
+					}
+				}
+			}
+		}
 	}
 
-	m.logger.Info("Successfully imported facts", map[string]interface{}{"imported": imported, "failed": failed})
+	// Write to file
+	if err := os.WriteFile(outputPath, file.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write HCL export file: %w", err)
+	}
 
+	m.logger.Info("Successfully exported facts to HCL", map[string]interface{}{"output": outputPath, "machines": len(facts)})
 	return nil
 }
 
@@ -375,8 +342,17 @@ func (m *Manager) CollectAndStoreFacts(ctx context.Context, machine *spookytypes
 		return err
 	}
 
-	// Store facts
-	return m.StoreFacts(ctx, facts.MachineID, facts)
+	// Validate facts
+	validationResult, err := m.ValidateFacts(ctx, facts)
+	if err != nil {
+		return fmt.Errorf("facts validation failed: %w", err)
+	}
+
+	if !validationResult.Valid {
+		return fmt.Errorf("facts validation failed: %v", validationResult.Errors)
+	}
+
+	return nil
 }
 
 // CollectAndStoreFactsParallel collects and stores facts for multiple machines in parallel
@@ -434,18 +410,48 @@ func (m *Manager) GetStorageStats() (map[string]interface{}, error) {
 	}
 
 	return map[string]interface{}{
-		"total_entries": 0,
-		"total_size":    0,
-		"storage_type":  "unknown",
+		"storage_type": "unknown",
+		"description":  "Unknown storage type",
 	}, nil
 }
 
-// Close closes the manager and underlying storage
-func (m *Manager) Close() error {
-	if m.storage != nil {
-		return m.storage.Close()
-	}
-	return nil
+// StoreFacts stores facts for a machine
+func (m *Manager) StoreFacts(ctx context.Context, machineID string, facts *FactCollection) error {
+	m.logger.Info("Storing facts for machine", map[string]interface{}{
+		"machine": machineID,
+	})
+
+	// Memory storage doesn't support storing - facts are collected on demand
+	return fmt.Errorf("store not supported for memory storage - facts are collected on demand")
+}
+
+// ListFacts lists all available facts
+func (m *Manager) ListFacts(ctx context.Context) ([]string, error) {
+	m.logger.Info("Listing facts")
+
+	// Memory storage doesn't maintain a list - facts are collected on demand
+	return []string{}, nil
+}
+
+// ImportFacts imports facts from the given format
+func (m *Manager) ImportFacts(ctx context.Context, format string, inputPath string) error {
+	m.logger.Info("Importing facts", map[string]interface{}{
+		"format": format,
+		"input":  inputPath,
+	})
+
+	// Memory storage doesn't support importing - facts are collected on demand
+	return fmt.Errorf("import not supported for memory storage - facts are collected on demand")
+}
+
+// GetFacts retrieves facts for a specific machine
+func (m *Manager) GetFacts(ctx context.Context, machineID string) (*FactCollection, error) {
+	m.logger.Info("Getting facts for machine", map[string]interface{}{
+		"machine": machineID,
+	})
+
+	// For memory storage, we need to collect facts on demand
+	return m.CollectFacts(ctx, &spookytypes.Machine{Hostname: machineID})
 }
 
 // FactExport represents exported facts data
@@ -454,6 +460,20 @@ type FactExport struct {
 	Format       string                     `json:"format"`
 	MachineCount int                        `json:"machine_count"`
 	Facts        map[string]*FactCollection `json:"facts"`
+}
+
+// ClearFacts removes all facts from memory
+func (m *Manager) ClearFacts(ctx context.Context) error {
+	m.logger.Info("Clearing all facts from memory")
+
+	if err := m.storage.Clear(ctx); err != nil {
+		m.logger.Error("Failed to clear facts", err)
+		return fmt.Errorf("failed to clear facts from memory: %w", err)
+	}
+
+	m.logger.Info("Successfully cleared all facts from memory")
+
+	return nil
 }
 
 // isValidMachineID validates machine ID format
@@ -469,54 +489,4 @@ func isValidMachineID(machineID string) bool {
 	}
 
 	return true
-}
-
-// exportToHCL exports facts to HCL format
-func (m *Manager) exportToHCL(export *FactExport) ([]byte, error) {
-	// Create HCL file
-	f := hclwrite.NewFile()
-
-	// Create root body
-	rootBody := f.Body()
-
-	// Add exported_at
-	rootBody.SetAttributeValue("exported_at", cty.StringVal(export.ExportedAt.Format(time.RFC3339)))
-
-	// Add format
-	rootBody.SetAttributeValue("format", cty.StringVal(export.Format))
-
-	// Add machine_count
-	rootBody.SetAttributeValue("machine_count", cty.NumberIntVal(int64(export.MachineCount)))
-
-	// Add facts block
-	factsBlock := rootBody.AppendNewBlock("facts", nil)
-	factsBody := factsBlock.Body()
-
-	// Add each machine's facts
-	for machineID, factCollection := range export.Facts {
-		machineBlock := factsBody.AppendNewBlock("machine", []string{machineID})
-		machineBody := machineBlock.Body()
-
-		// Add machine_id
-		machineBody.SetAttributeValue("machine_id", cty.StringVal(factCollection.MachineID))
-
-		// Add collected_at
-		machineBody.SetAttributeValue("collected_at", cty.StringVal(factCollection.CollectedAt.Format(time.RFC3339)))
-
-		// Add facts data (simplified for now)
-		if factCollection.Facts != nil {
-			factsData := machineBody.AppendNewBlock("facts_data", nil)
-			factsDataBody := factsData.Body()
-
-			// Add system facts if available
-			if factCollection.Facts.System != nil && factCollection.Facts.System.OS != nil {
-				factsDataBody.SetAttributeValue("os_name", cty.StringVal(factCollection.Facts.System.OS.Name))
-				if factCollection.Facts.System.OS.Version != "" {
-					factsDataBody.SetAttributeValue("os_version", cty.StringVal(factCollection.Facts.System.OS.Version))
-				}
-			}
-		}
-	}
-
-	return f.Bytes(), nil
 }

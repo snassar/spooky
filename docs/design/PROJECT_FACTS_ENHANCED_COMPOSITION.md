@@ -36,17 +36,14 @@ This document describes the enhanced composition pattern implemented for project
   - JSON format limitations (no comments, no expressions, etc.)
   - JSON performance constraints
 
-#### 3. `project-facts-badger.hcl` (Enhanced)
-- **Purpose**: BadgerDB-specific features and validation
+#### 3. `project-facts-memory.hcl` (Enhanced)
+- **Purpose**: Memory-based storage features and validation
 - **Features**:
-  - BadgerDB compression (zstd)
-  - BadgerDB encryption (age)
-  - BadgerDB transactions (ACID)
-  - BadgerDB indexing (prefix, value)
-  - BadgerDB garbage collection
-  - BadgerDB key/value structure
-  - BadgerDB query patterns
-  - BadgerDB backup structure
+  - Memory-efficient storage during export operations
+  - Direct export to JSON and HCL formats
+  - No intermediate storage (gather → export)
+  - Minimal memory footprint
+  - Thread-safe operations
 
 ## Enhanced Composition Pattern
 
@@ -111,11 +108,11 @@ project_facts {
 - **Constraints**: Format limitations, performance constraints, export features
 - **Extensions**: Export structure, import structure, schema integration
 
-### BadgerDB Schema Enhancements
-- **Features**: Compression, encryption, transactions, indexing, garbage collection
-- **Validation**: Key format, value format, transaction, encryption, compression
-- **Constraints**: Storage constraints, performance constraints, encryption constraints
-- **Extensions**: Key structure, value structure, query structure, backup structure
+### Memory Schema Enhancements
+- **Features**: Memory-efficient storage, direct export, thread-safe operations
+- **Validation**: Memory usage, export format validation, thread safety
+- **Constraints**: Memory constraints, export constraints, performance constraints
+- **Extensions**: Export structure, memory management, cleanup operations
 
 ## Usage Examples
 
@@ -154,23 +151,24 @@ fact "application" {
 }
 ```
 
-### BadgerDB Facts Example
-```go
-// Key: "facts:a1b2c3d4e5f67890123456789012345678"
-// Value: JSON-encoded fact collection with compression and encryption
-{
-  "machine_id": "a1b2c3d4e5f67890123456789012345678",
-  "project_id": "my-project",
-  "collected_at": "2024-01-01T00:00:00Z",
-  "ttl": "1h",
-  "facts": {
-    "application": {
-      "version": "1.0.0",
-      "config_path": "/etc/app/config.conf"
-    }
-  },
-  "encrypted": true,
-  "compression": "zstd"
+### Memory Facts Example
+```hcl
+# project-facts-memory.hcl
+fact "system_info" {
+  machine_id = "1234567890abcdef1234567890abcdef"
+  collected_at = "2024-01-15T10:30:45Z"
+  
+  os {
+    name = "Linux"
+    version = "Ubuntu 22.04.3 LTS"
+    architecture = "x86_64"
+  }
+  
+  hardware {
+    cpu_count = 4
+    memory_total = 8589934592
+    disk_total = 107374182400
+  }
 }
 ```
 

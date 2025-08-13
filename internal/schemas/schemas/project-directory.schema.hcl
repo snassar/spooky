@@ -109,8 +109,6 @@ project_directory "project_root" {
     validate = "directory_exists"
   }
   
-  # Facts are now stored in memory - no database directory required
-  
   # Cross-file validation rules
   validation_rules = [
     "machines_file_or_directory_exists",

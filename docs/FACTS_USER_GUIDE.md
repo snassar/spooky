@@ -44,17 +44,20 @@ The fact collection process works as follows:
 1. **Machine Discovery**: Read machine inventory from project configuration
 2. **SSH Connection**: Establish secure connection to each machine
 3. **Data Collection**: Use gopsutil to gather system information
-4. **Data Processing**: Convert and validate collected data
-5. **Storage**: Store facts in memory during the export operation
+4. **Custom Facts**: Read custom facts from `/etc/spooky/facts.{hcl,json}` if present
+5. **Data Processing**: Convert and validate collected data
+6. **Direct Export**: Write facts directly to output file in requested format
+7. **Cleanup**: Memory is automatically managed during export
 
 ### Fact Storage
 
-Facts are stored in memory during the export operation with the following structure:
+Facts are gathered directly and exported without intermediate storage:
 
-- **Key**: Machine ID (32-character hex string)
-- **Value**: Fact collection with timestamp
-- **Metadata**: Collection metadata and validation status
-- **Lifetime**: Facts persist for the duration of the export operation
+- **Direct Export**: Facts are collected from machines and exported immediately
+- **No Intermediate Storage**: No temporary storage step - direct gather → export
+- **Minimal Memory Usage**: Only the facts being exported are kept in memory
+- **Automatic Management**: Memory is automatically managed during export
+- **Debugging Support**: Storage statistics available for performance monitoring
 
 ## Basic Usage
 
@@ -139,8 +142,39 @@ spooky facts export ./my-project --tags "role=web" --groups "production" --outpu
 
 #### Export Formats
 
-- **HCL**: HashiCorp Configuration Language format (default)
-- **JSON**: Standard JSON format for data exchange
+Both JSON and HCL export formats follow the exact structure defined in `facts-structure.schema.hcl`:
+
+**JSON Format:**
+```json
+[
+  {
+    "machine_id": "32-character-hex-string",
+    "collected_at": "2024-01-01T12:00:00Z",
+    "facts": {
+      "system": {
+        "os": { ... },
+        "hardware": { ... },
+        "network": { ... }
+      }
+    }
+  }
+]
+```
+
+**HCL Format:**
+```hcl
+facts_structure {
+  machine_id = "32-character-hex-string"
+  collected_at = "2024-01-01T12:00:00Z"
+  facts {
+    system {
+      os { ... }
+      hardware { ... }
+      network { ... }
+    }
+  }
+}
+```
 
 #### Filtering Options
 
@@ -338,8 +372,8 @@ Facts commands integrate with the CLI system:
 ### ✅ Implemented Features
 
 - **Basic Fact Collection**: System fact collection using gopsutil
-- **Memory Storage**: In-memory fact storage during export operations
-- **Export Functionality**: Facts export to JSON and HCL formats
+- **Memory Storage**: Minimal memory usage during fact gathering and export
+- **Export Functionality**: Facts export to JSON and HCL formats following facts-structure.schema.hcl
 - **CLI Integration**: `spooky facts export` command with filtering options
 - **Machine Integration**: Facts collection from project machine inventory
 - **Basic Validation**: Fact collection validation and error handling
@@ -352,7 +386,6 @@ Facts commands integrate with the CLI system:
 - **Fact History**: Historical fact tracking and comparison
 - **Advanced Collectors**: Custom fact collectors for specific data
 - **Fact Validation**: Enhanced validation and schema checking
-- **Fact Import**: Import facts from external sources
 - **Fact Comparison**: Compare facts across machines and time periods
 
 ## Best Practices
