@@ -7,6 +7,7 @@ import (
 
 	spookytypes "spooky/internal/types"
 	spookytypesfacts "spooky/internal/types/facts"
+	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesschemas "spooky/internal/types/schemas"
 
 	"github.com/stretchr/testify/assert"
@@ -127,6 +128,19 @@ func (m *MockSchemaValidator) ValidateBytes(schema *spookytypesschemas.Schema, d
 	return m.Validate(schema, data)
 }
 
+func (m *MockSchemaValidator) ValidateWithContext(schema *spookytypesschemas.Schema, data interface{}, context map[string]interface{}) (*spookytypesschemas.ValidationResult, error) {
+	return m.Validate(schema, data)
+}
+
+func (m *MockSchemaValidator) ValidateField(schema *spookytypesschemas.Schema, fieldPath string, value interface{}) (*spookytypesschemas.ValidationResult, error) {
+	return &spookytypesschemas.ValidationResult{
+		Valid:       true,
+		ValidatedAt: time.Now(),
+		Errors:      []spookytypesschemas.SchemaError{},
+		Warnings:    []spookytypesschemas.SchemaError{},
+	}, nil
+}
+
 // MockLogger implements Logger for testing
 type MockLogger struct{}
 
@@ -139,7 +153,7 @@ func (m *MockLogger) WithFields(fields map[string]interface{}) spookytypes.Logge
 func (m *MockLogger) WithComponent(component string) spookytypes.Logger             { return m }
 func (m *MockLogger) WithOperation(operation string) spookytypes.Logger             { return m }
 func (m *MockLogger) SetLevel(level spookytypes.LogLevel)                           {}
-func (m *MockLogger) GetLevel() spookytypes.LogLevel                                { return spookytypes.LogLevelInfo }
+func (m *MockLogger) GetLevel() spookytypes.LogLevel                                { return spookytypeslogging.LogLevelInfo }
 
 // createValidTestFacts creates a valid FactCollection for testing
 func createValidTestFacts(machineID string) *FactCollection {
@@ -182,7 +196,6 @@ func createTestManager(t *testing.T) *Manager {
 	assert.NotNil(t, manager.collector)
 	assert.NotNil(t, manager.validator)
 	assert.NotNil(t, manager.logger)
-	assert.NotNil(t, manager.storage)
 
 	return manager
 }

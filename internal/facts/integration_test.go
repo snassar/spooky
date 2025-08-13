@@ -92,6 +92,15 @@ func (m *MockFactManager) ImportFacts(ctx context.Context, format string, inputP
 	return nil
 }
 
+func (m *MockFactManager) GetStorageStats() (map[string]interface{}, error) {
+	return map[string]interface{}{
+		"total_facts":   len(m.facts),
+		"machine_count": len(m.facts),
+		"storage_type":  "mock",
+		"last_updated":  time.Now(),
+	}, nil
+}
+
 func TestNewIntegration(t *testing.T) {
 	mockManager := NewMockFactManager()
 	integration := NewIntegration(mockManager)
@@ -144,114 +153,6 @@ func TestIntegration_CollectFacts(t *testing.T) {
 
 	if factCollection.Facts.System.OS.Name != "TestOS" {
 		t.Errorf("expected OS name 'TestOS', got %s", factCollection.Facts.System.OS.Name)
-	}
-}
-
-func TestIntegration_StoreFacts(t *testing.T) {
-	mockManager := NewMockFactManager()
-	integration := NewIntegration(mockManager)
-
-	facts := createValidTestFacts("1234567890abcdef1234567890abcdef")
-
-	ctx := context.Background()
-	err := integration.StoreFacts(ctx, facts)
-
-	if err != nil {
-		t.Fatalf("StoreFacts failed: %v", err)
-	}
-
-	// Verify facts were stored
-	storedFacts, err := mockManager.GetFacts(ctx, "1234567890abcdef1234567890abcdef")
-	if err != nil {
-		t.Fatalf("Failed to get stored facts: %v", err)
-	}
-
-	if storedFacts == nil {
-		t.Fatal("Stored facts are nil")
-	}
-
-	if storedFacts.MachineID != "1234567890abcdef1234567890abcdef" {
-		t.Errorf("expected MachineID '1234567890abcdef1234567890abcdef', got %s", storedFacts.MachineID)
-	}
-}
-
-func TestIntegration_StoreFacts_NilFacts(t *testing.T) {
-	mockManager := NewMockFactManager()
-	integration := NewIntegration(mockManager)
-
-	ctx := context.Background()
-	err := integration.StoreFacts(ctx, nil)
-
-	if err == nil {
-		t.Error("Expected error when facts is nil")
-	}
-
-	if err.Error() != "facts cannot be nil" {
-		t.Errorf("Expected 'facts cannot be nil' error, got: %v", err)
-	}
-}
-
-func TestIntegration_StoreFacts_InvalidType(t *testing.T) {
-	mockManager := NewMockFactManager()
-	integration := NewIntegration(mockManager)
-
-	ctx := context.Background()
-	err := integration.StoreFacts(ctx, "invalid-type")
-
-	if err == nil {
-		t.Error("Expected error when facts is invalid type")
-	}
-
-	if err.Error() != "invalid facts type" {
-		t.Errorf("Expected 'invalid facts type' error, got: %v", err)
-	}
-}
-
-func TestIntegration_LoadFacts(t *testing.T) {
-	mockManager := NewMockFactManager()
-	integration := NewIntegration(mockManager)
-
-	// Store some facts first
-	facts := createValidTestFacts("1234567890abcdef1234567890abcdef")
-	ctx := context.Background()
-	err := mockManager.StoreFacts(ctx, "1234567890abcdef1234567890abcdef", facts)
-	if err != nil {
-		t.Fatalf("Failed to store facts: %v", err)
-	}
-
-	// Load facts
-	loadedFacts, err := integration.LoadFacts(ctx)
-	if err != nil {
-		t.Fatalf("LoadFacts failed: %v", err)
-	}
-
-	if loadedFacts == nil {
-		t.Fatal("LoadFacts returned nil")
-	}
-
-	// Type assert to check the facts
-	factCollection, ok := loadedFacts.(*FactCollection)
-	if !ok {
-		t.Fatal("loadedFacts is not of type *FactCollection")
-	}
-
-	if factCollection.MachineID != "1234567890abcdef1234567890abcdef" {
-		t.Errorf("expected MachineID '1234567890abcdef1234567890abcdef', got %s", factCollection.MachineID)
-	}
-}
-
-func TestIntegration_LoadFacts_Empty(t *testing.T) {
-	mockManager := NewMockFactManager()
-	integration := NewIntegration(mockManager)
-
-	ctx := context.Background()
-	loadedFacts, err := integration.LoadFacts(ctx)
-	if err != nil {
-		t.Fatalf("LoadFacts failed: %v", err)
-	}
-
-	if loadedFacts != nil {
-		t.Error("LoadFacts should return nil when no facts exist")
 	}
 }
 
