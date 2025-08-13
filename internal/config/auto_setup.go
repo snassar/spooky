@@ -116,7 +116,7 @@ func configDirectoryExists(configDir string) (bool, error) {
 // createConfigDirectory creates the spooky config directory and default configuration files
 func createConfigDirectory(configDir string) error {
 	// Create the config directory
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create config directory %s: %w", configDir, err)
 	}
 
@@ -224,7 +224,7 @@ storage {
 `
 
 	configPath := filepath.Join(configDir, "spooky.hcl")
-	return os.WriteFile(configPath, []byte(content), 0644)
+	return os.WriteFile(configPath, []byte(content), 0o600)
 }
 
 // createDefaultLoggingConfig creates a minimal logging.hcl file with sane defaults
@@ -287,7 +287,7 @@ logging {
 `
 
 	configPath := filepath.Join(configDir, "logging.hcl")
-	return os.WriteFile(configPath, []byte(content), 0644)
+	return os.WriteFile(configPath, []byte(content), 0o600)
 }
 
 // validateConfigFiles validates that the existing config files are valid HCL
@@ -329,7 +329,7 @@ func validateHCLFile(filePath, fileName string) error {
 }
 
 // validateHCLSyntax performs basic HCL syntax validation
-func validateHCLSyntax(content []byte, fileName string) error {
+func validateHCLSyntax(content []byte, _ string) error {
 	contentStr := string(content)
 
 	// Check for balanced braces first (most critical)
