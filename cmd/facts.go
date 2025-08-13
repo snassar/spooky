@@ -48,49 +48,32 @@ hardware information, network configuration, and custom data. Facts are
 stored in memory and can be used for decision making in actions.`,
 }
 
-// factsGatherCmd represents the facts gather command
-var factsGatherCmd = &cobra.Command{
-	Use:   "gather [project-path]",
-	Short: "Gather facts from machines",
-	Long: `Gather facts from all machines in the project inventory.
-
-This command connects to each machine in the project's machine inventory
-and collects system facts including OS information, hardware details,
-network configuration, and other system data. Facts are stored in memory
-for the duration of the session.
-
-Examples:
-  spooky facts gather ./my-project
-  spooky facts gather ./my-project --parallel 4
-  spooky facts gather ./my-project --machine web-server`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return handleFactsGather(cmd, args[0])
-	},
-}
-
 
 
 // factsExportCmd represents the facts export command
 var factsExportCmd = &cobra.Command{
 	Use:   "export [project-path]",
 	Short: "Export facts to file",
-	Long: `Export facts from memory to a file.
+	Long: `Export facts to a file in JSON or HCL format.
 
-This command exports facts to JSON or HCL format for backup, analysis,
+This command automatically gathers facts from all machines in the project
+inventory and exports them to the specified format for backup, analysis,
 or transfer to other systems.
 
 Examples:
   spooky facts export ./my-project --format json --output facts.json
-  spooky facts export ./my-project --format hcl --output facts.hcl`,
+  spooky facts export ./my-project --format hcl --output facts.hcl
+  spooky facts export ./my-project --machine web-server --format json --output web-server-facts.json`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return handleFactsExport(cmd, args[0])
 	},
 }
 
-// handleFactsGather handles gathering facts using the FactsIntegration interface
-func handleFactsGather(cmd *cobra.Command, projectPath string) error {
+
+
+// handleFactsExport handles exporting facts using the FactsManager interface
+func handleFactsExport(cmd *cobra.Command, projectPath string) error {
 	ctx := context.Background()
 
 	// Initialize dependencies if not already done
@@ -101,6 +84,8 @@ func handleFactsGather(cmd *cobra.Command, projectPath string) error {
 	}
 
 	// Get flags
+	format, _ := cmd.Flags().GetString("format")
+	outputPath, _ := cmd.Flags().GetString("output")
 	machineFilter, _ := cmd.Flags().GetString("machine")
 	parallel, _ := cmd.Flags().GetInt("parallel")
 	verbose, _ := cmd.Flags().GetBool("verbose")
@@ -120,7 +105,7 @@ func handleFactsGather(cmd *cobra.Command, projectPath string) error {
 	}
 
 	if verbose {
-		factsLogger.Info("Starting fact collection", map[string]interface{}{
+		factsLogger.Info("Starting fact collection for export", map[string]interface{}{
 			"project_path":  projectPath,
 			"machine_count": len(machines),
 			"parallel":      parallel,
@@ -133,7 +118,7 @@ func handleFactsGather(cmd *cobra.Command, projectPath string) error {
 
 	for _, machine := range machines {
 		if verbose {
-			factsLogger.Info("Collecting facts", map[string]interface{}{
+			factsLogger.Info("Collecting facts for export", map[string]interface{}{
 				"machine": machine.Hostname,
 			})
 		}
@@ -142,7 +127,7 @@ func handleFactsGather(cmd *cobra.Command, projectPath string) error {
 		facts, err := factsManager.CollectFacts(ctx, machine.Hostname)
 		if err != nil {
 			errorCount++
-			factsLogger.Error("Failed to collect facts", err, map[string]interface{}{
+			factsLogger.Error("Failed to collect facts for export", err, map[string]interface{}{
 				"machine": machine.Hostname,
 			})
 			continue
@@ -151,7 +136,7 @@ func handleFactsGather(cmd *cobra.Command, projectPath string) error {
 		// Store facts
 		if err := factsManager.StoreFacts(ctx, facts, nil); err != nil {
 			errorCount++
-			factsLogger.Error("Failed to store facts", err, map[string]interface{}{
+			factsLogger.Error("Failed to store facts for export", err, map[string]interface{}{
 				"machine": machine.Hostname,
 			})
 			continue
@@ -159,41 +144,18 @@ func handleFactsGather(cmd *cobra.Command, projectPath string) error {
 
 		successCount++
 		if verbose {
-			factsLogger.Info("Successfully collected facts", map[string]interface{}{
+			factsLogger.Info("Successfully collected facts for export", map[string]interface{}{
 				"machine": machine.Hostname,
 			})
 		}
 	}
 
-	// Print summary
-	fmt.Printf("Fact collection completed:\n")
-	fmt.Printf("  Success: %d machines\n", successCount)
-	fmt.Printf("  Errors: %d machines\n", errorCount)
-	fmt.Printf("  Total: %d machines\n", len(machines))
-
-	if errorCount > 0 {
-		return fmt.Errorf("fact collection completed with %d errors", errorCount)
+	if verbose {
+		fmt.Printf("Fact collection completed:\n")
+		fmt.Printf("  Success: %d machines\n", successCount)
+		fmt.Printf("  Errors: %d machines\n", errorCount)
+		fmt.Printf("  Total: %d machines\n", len(machines))
 	}
-
-	return nil
-}
-
-
-
-// handleFactsExport handles exporting facts using the FactsManager interface
-func handleFactsExport(cmd *cobra.Command, projectPath string) error {
-	ctx := context.Background()
-
-	// Initialize dependencies if not already done
-	if factsManager == nil {
-		if err := InitializeFactsDependencies(); err != nil {
-			return fmt.Errorf("failed to initialize facts dependencies: %w", err)
-		}
-	}
-
-	// Get flags
-	format, _ := cmd.Flags().GetString("format")
-	outputPath, _ := cmd.Flags().GetString("output")
 
 	// Get the underlying fact manager
 	managerInterface := factsManager.GetManager()
@@ -240,20 +202,17 @@ func filterMachines(machines []spookytypes.Machine, filter string) []spookytypes
 }
 
 func init() {
-	// Add flags to facts gather command
-	factsGatherCmd.Flags().String("machine", "", "Filter to specific machine")
-	factsGatherCmd.Flags().Int("parallel", 1, "Number of parallel workers")
-	factsGatherCmd.Flags().Bool("verbose", false, "Verbose output")
-
 
 
 	// Add flags to facts export command
 	factsExportCmd.Flags().String("format", "json", "Export format (json, hcl)")
 	factsExportCmd.Flags().String("output", "", "Output file path (required)")
+	factsExportCmd.Flags().String("machine", "", "Filter to specific machine")
+	factsExportCmd.Flags().Int("parallel", 1, "Number of parallel workers")
+	factsExportCmd.Flags().Bool("verbose", false, "Verbose output")
 	factsExportCmd.MarkFlagRequired("output")
 
 	// Add commands to facts command
-	factsCmd.AddCommand(factsGatherCmd)
 	factsCmd.AddCommand(factsExportCmd)
 
 	// Add facts command to root

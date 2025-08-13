@@ -20,9 +20,9 @@ The spooky facts system provides comprehensive fact collection and storage capab
    spooky facts --help
    ```
 
-2. **Gather Facts from a Project**
+2. **Export Facts from a Project**
    ```bash
-   spooky facts gather ./my-project
+   spooky facts export ./my-project --format json --output facts.json
    ```
 
 
@@ -62,77 +62,47 @@ Facts are stored in memory during the action run with the following structure:
 
 ## Basic Usage
 
-### Gathering Facts
+### Exporting Facts
 
-The `gather` command collects facts from all machines in a project:
+The `export` command automatically gathers facts from all machines in a project and exports them to a file:
 
 ```bash
-# Gather facts from all machines in the project
-spooky facts gather ./my-project
+# Export facts from all machines to JSON
+spooky facts export ./my-project --format json --output facts.json
 
-# Gather facts with parallel processing
-spooky facts gather ./my-project --parallel 4
+# Export facts with parallel processing
+spooky facts export ./my-project --parallel 4 --format json --output facts.json
 
-# Gather facts from a specific machine
-spooky facts gather ./my-project --machine web-server
+# Export facts from a specific machine
+spooky facts export ./my-project --machine web-server --format json --output web-server-facts.json
 
-# Gather facts with custom timeout
-spooky facts gather ./my-project --timeout 30s
+# Export facts to HCL format
+spooky facts export ./my-project --format hcl --output facts.hcl
 ```
 
 #### Command Options
 
+- `--format`: Export format (json, hcl) (default: json)
+- `--output`: Output file path (required)
 - `--machine`: Target specific machine (default: all machines)
 - `--parallel`: Number of parallel workers (default: 1)
-- `--timeout`: Collection timeout per machine (default: 60s)
-- `--retry`: Number of retry attempts (default: 3)
+- `--verbose`: Verbose output
 
 #### Example Output
 
 ```bash
-$ spooky facts gather ./my-project
-INFO: Starting fact collection for project: ./my-project
+$ spooky facts export ./my-project --format json --output facts.json
+INFO: Starting fact collection for export
 INFO: Found 3 machines in inventory
 INFO: Collecting facts from web-server (192.168.1.10)
 INFO: Collecting facts from db-server (192.168.1.11)
 INFO: Collecting facts from app-server (192.168.1.12)
 INFO: Successfully collected facts from 3 machines
-INFO: Facts stored in memory for action run
+INFO: Exporting facts to facts.json
+Successfully exported facts to: facts.json
 ```
 
-### Listing Facts
 
-The `list` command shows information about stored facts:
-
-```bash
-# List all machines with stored facts
-spooky facts list ./my-project
-
-# List facts for a specific machine
-spooky facts list ./my-project --machine web-server
-
-# List facts with detailed information
-spooky facts list ./my-project --verbose
-```
-
-#### Example Output
-
-```bash
-$ spooky facts list ./my-project
-Machine ID: 1234567890abcdef1234567890abcdef
-  Hostname: web-server
-  Collected: 2024-01-15 10:30:45 UTC
-  OS: Ubuntu 22.04.3 LTS
-  CPU: 4 cores, Intel(R) Core(TM) i7-7700K
-  Memory: 16GB total, 8GB available
-
-Machine ID: 2345678901bcdef12345678901bcdef1
-  Hostname: db-server
-  Collected: 2024-01-15 10:31:12 UTC
-  OS: CentOS 8.5.2111
-  CPU: 8 cores, Intel(R) Xeon(R) E5-2680
-  Memory: 32GB total, 24GB available
-```
 
 ### Fact Validation
 

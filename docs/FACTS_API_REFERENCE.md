@@ -260,8 +260,7 @@ The facts system provides comprehensive error handling:
 The facts CLI provides these commands:
 
 ```bash
-spooky facts gather [project-path]     # Collect facts from machines
-spooky facts export [project-path]     # Export facts to file (includes internal validation)
+spooky facts export [project-path]     # Export facts to file (automatically gathers and exports)
 ```
 
 ### Command Options
