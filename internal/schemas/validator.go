@@ -22,6 +22,7 @@ type Validator struct {
 	logger   spookytypeslogging.Logger
 	schemas  map[string]*spookytypesschemas.Schema
 	registry spookytypesschemas.SchemaRegistry
+	manager  *Manager
 }
 
 // NewValidator creates a new schema validator instance
@@ -37,9 +38,55 @@ func (v *Validator) SetRegistry(registry spookytypesschemas.SchemaRegistry) {
 	v.registry = registry
 }
 
+// SetManager sets the schema manager for the validator
+func (v *Validator) SetManager(manager *Manager) {
+	v.manager = manager
+}
+
 // LoadSchemas loads all schema files from the schemas directory
 func (v *Validator) LoadSchemas(schemasDir string) error {
 	v.logger.Info("Loading schemas from directory", map[string]interface{}{
+		"schemas_dir": schemasDir,
+	})
+
+	// Use manager if available for metadata validation
+	if v.manager != nil {
+		schemas, err := v.manager.LoadSchemasFromDirectory(schemasDir)
+		if err != nil {
+			return fmt.Errorf("failed to load schemas with metadata validation: %w", err)
+		}
+
+		// Store schemas in validator
+		for name, schema := range schemas {
+			v.schemas[name] = schema
+
+			// Register with registry if available
+			if v.registry != nil {
+				if err := v.registry.Register(schema); err != nil {
+					v.logger.Warn("Failed to register schema", map[string]interface{}{
+						"schema_name": name,
+						"error":       err.Error(),
+					})
+				}
+			}
+		}
+
+		v.logger.Info("Schemas loaded successfully with metadata validation", map[string]interface{}{
+			"schemas_dir": schemasDir,
+			"count":       len(schemas),
+			"schemas":     v.getSchemaNames(),
+		})
+
+		return nil
+	}
+
+	// Fallback to original implementation if no manager available
+	return v.loadSchemasWithoutManager(schemasDir)
+}
+
+// loadSchemasWithoutManager loads schemas without metadata validation (fallback)
+func (v *Validator) loadSchemasWithoutManager(schemasDir string) error {
+	v.logger.Info("Loading schemas without metadata validation (fallback)", map[string]interface{}{
 		"schemas_dir": schemasDir,
 	})
 
@@ -95,7 +142,7 @@ func (v *Validator) LoadSchemas(schemasDir string) error {
 		return fmt.Errorf("failed to walk schemas directory: %w", err)
 	}
 
-	v.logger.Info("Schemas loaded successfully", map[string]interface{}{
+	v.logger.Info("Schemas loaded successfully (without metadata validation)", map[string]interface{}{
 		"schemas_dir": schemasDir,
 		"count":       len(v.schemas),
 		"schemas":     v.getSchemaNames(),

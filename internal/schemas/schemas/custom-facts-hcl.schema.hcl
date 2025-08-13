@@ -338,4 +338,5 @@ facts {
       "system_facts"   # System facts from gopsutil (lower priority)
     ]
   }
+  
 } 

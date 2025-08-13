@@ -118,4 +118,5 @@ project_directory "project_root" {
     "logging_file_output_requires_logs_directory",
     "logging_file_path_validation"
   ]
+  
 }

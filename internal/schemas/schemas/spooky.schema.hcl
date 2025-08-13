@@ -1,6 +1,22 @@
 # Spooky Global Configuration Schema
 # Schema for $XDG_CONFIG_HOME/spooky/spooky.hcl
 
+# Schema metadata
+metadata {
+  schema_version = "0.20250809.0"
+  schema_type = "spooky"
+  schema_name = "Spooky Global Configuration Schema"
+  last_updated = "2024-01-01"
+  compatibility = ["0.20250809.0"]
+  description = "Global configuration schema for spooky CLI - defines configuration structure for $XDG_CONFIG_HOME/spooky/spooky.hcl"
+  
+  # ScalVer format: 0.YYYYMMDD.N
+  # - 0: Development phase
+  # - 20250809: Date (9 August 2025)
+  # - 0: Patch version
+  scalver_format = "0.20250809.0"
+}
+
 # Global configuration block structure
 spooky {
   # Storage configuration
@@ -353,4 +369,5 @@ spooky {
       description = "Garbage collection interval in seconds"
     }
   }
+  
 } 

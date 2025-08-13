@@ -434,4 +434,5 @@ variables_structure {
       message = "Duration types must have valid format (e.g., '30s', '5m', '2h', '1d')"
     }
   }
+  
 } 

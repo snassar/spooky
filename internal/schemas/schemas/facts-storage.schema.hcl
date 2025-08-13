@@ -2,6 +2,22 @@
 # Memory storage specifics for facts
 # This schema defines storage constraints and features for facts in memory format
 
+# Schema metadata
+metadata {
+  schema_version = "0.20250809.0"
+  schema_type = "facts-storage"
+  schema_name = "Facts Storage Schema"
+  last_updated = "2024-01-01"
+  compatibility = ["0.20250809.0"]
+  description = "Memory storage specifics for facts - defines storage constraints and features for facts in memory format"
+  
+  # ScalVer format: 0.YYYYMMDD.N
+  # - 0: Development phase
+  # - 20250809: Date (9 August 2025)
+  # - 0: Patch version
+  scalver_format = "0.20250809.0"
+}
+
 # Facts storage in memory format
 facts_storage {
   # Include the base facts structure
@@ -335,4 +351,5 @@ facts_storage {
       }
     }
   }
+  
 } 

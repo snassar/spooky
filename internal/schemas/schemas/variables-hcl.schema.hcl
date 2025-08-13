@@ -149,4 +149,5 @@ variables {
       description = "Variables support HCL heredoc syntax for multi-line strings"
     }
   }
+  
 } 

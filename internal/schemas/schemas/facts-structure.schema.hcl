@@ -3,6 +3,22 @@
 # This file defines the structure of facts that can be stored and exported
 # Used for validation of facts data regardless of format (memory, JSON, HCL)
 
+# Schema metadata
+metadata {
+  schema_version = "0.20250809.0"
+  schema_type = "facts-structure"
+  schema_name = "Facts Structure Schema"
+  last_updated = "2024-01-01"
+  compatibility = ["0.20250809.0"]
+  description = "Common fact structure definitions for all storage and export formats - defines the structure of facts that can be stored and exported"
+  
+  # ScalVer format: 0.YYYYMMDD.N
+  # - 0: Development phase
+  # - 20250809: Date (9 August 2025)
+  # - 0: Patch version
+  scalver_format = "0.20250809.0"
+}
+
 # Common facts structure
 facts_structure {
   # Machine ID (32-character hex string from /etc/machine-id)
@@ -2199,34 +2215,4 @@ facts_structure {
     }
   }
 
-  # Common metadata (format-agnostic)
-  metadata = {
-    # Schema version
-    schema_version = {
-      type = "string"
-      value = "1.0.0"
-      description = "Facts structure schema version"
-    }
-    
-    # Schema type
-    schema_type = {
-      type = "string"
-      value = "facts-structure"
-      description = "Schema type identifier"
-    }
-    
-    # Last updated
-    last_updated = {
-      type = "string"
-      value = "2024-01-01"
-      description = "Last schema update date"
-    }
-    
-    # Description
-    description = {
-      type = "string"
-      value = "Common fact structure definitions for all storage and export formats"
-      description = "Schema description"
-    }
-  }
 } 

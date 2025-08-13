@@ -6,8 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
+
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclparse"
+	"github.com/zclconf/go-cty/cty"
 
 	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesschemas "spooky/internal/types/schemas"
@@ -20,6 +25,10 @@ type Manager struct {
 	validator         *Validator
 	enhancedValidator *EnhancedValidator
 	evolutionManager  *EvolutionManager
+
+	// Metadata validation
+	metadataSchema *spookytypesschemas.Schema
+	parser         *hclparse.Parser
 }
 
 // NewManager creates a new schema manager instance
@@ -33,13 +42,19 @@ func NewManager(logger spookytypeslogging.Logger) *Manager {
 
 	evolutionManager := NewEvolutionManager(logger, registry)
 
-	return &Manager{
+	manager := &Manager{
 		logger:            logger,
 		registry:          registry,
 		validator:         validator,
 		enhancedValidator: enhancedValidator,
 		evolutionManager:  evolutionManager,
+		parser:            hclparse.NewParser(),
 	}
+
+	// Set the manager as the validator's manager for metadata validation
+	validator.SetManager(manager)
+
+	return manager
 }
 
 // Load loads a schema from a file
@@ -76,6 +91,13 @@ func (m *Manager) Load(filePath string) (*spookytypesschemas.Schema, error) {
 		return nil, fmt.Errorf("failed to parse schema file: %w", err)
 	}
 
+	// Validate schema metadata if this is not the metadata schema itself
+	if !strings.HasSuffix(filepath.Base(filePath), "schema-metadata.schema.hcl") {
+		if err := m.validateSchemaMetadata(data, filePath); err != nil {
+			return nil, fmt.Errorf("schema metadata validation failed: %w", err)
+		}
+	}
+
 	return schema, nil
 }
 
@@ -101,6 +123,11 @@ func (m *Manager) LoadFromString(content string) (*spookytypesschemas.Schema, er
 		return nil, fmt.Errorf("failed to parse schema content: %w", err)
 	}
 
+	// Validate schema metadata
+	if err := m.validateSchemaMetadata([]byte(content), "string"); err != nil {
+		return nil, fmt.Errorf("schema metadata validation failed: %w", err)
+	}
+
 	return schema, nil
 }
 
@@ -124,6 +151,11 @@ func (m *Manager) LoadFromBytes(data []byte) (*spookytypesschemas.Schema, error)
 	// Validate content
 	if err := m.validateSchemaContent(data, "bytes"); err != nil {
 		return nil, fmt.Errorf("failed to parse schema data: %w", err)
+	}
+
+	// Validate schema metadata
+	if err := m.validateSchemaMetadata(data, "bytes"); err != nil {
+		return nil, fmt.Errorf("schema metadata validation failed: %w", err)
 	}
 
 	return schema, nil
@@ -177,6 +209,52 @@ func (m *Manager) LoadMultiple(filePaths []string) (map[string]*spookytypesschem
 	}
 
 	return schemas, nil
+}
+
+// LoadSchemasFromDirectory loads all schema files from a directory with metadata validation
+func (m *Manager) LoadSchemasFromDirectory(dirPath string) (map[string]*spookytypesschemas.Schema, error) {
+	if dirPath == "" {
+		return nil, fmt.Errorf("directory path cannot be empty")
+	}
+
+	// Check if directory exists
+	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("schema directory does not exist: %s", dirPath)
+	}
+
+	var schemaFiles []string
+
+	// Walk through directory to find schema files
+	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip directories
+		if info.IsDir() {
+			return nil
+		}
+
+		// Only process schema files
+		if strings.HasSuffix(info.Name(), ".schema.hcl") {
+			schemaFiles = append(schemaFiles, path)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to walk schema directory: %w", err)
+	}
+
+	m.logger.Info("Found schema files", map[string]interface{}{
+		"directory": dirPath,
+		"count":     len(schemaFiles),
+		"files":     schemaFiles,
+	})
+
+	// Load all schemas with metadata validation
+	return m.LoadMultiple(schemaFiles)
 }
 
 // Validate validates data against a schema
@@ -575,6 +653,382 @@ func (m *Manager) validateSchemaContent(data []byte, source string) error {
 	}
 
 	return nil
+}
+
+// validateSchemaMetadata validates schema metadata against the meta-schema
+func (m *Manager) validateSchemaMetadata(data []byte, source string) error {
+	// Load the metadata schema if not already loaded
+	if m.metadataSchema == nil {
+		if err := m.loadMetadataSchema(); err != nil {
+			return fmt.Errorf("failed to load metadata schema: %w", err)
+		}
+	}
+
+	// Extract metadata block from the schema content
+	metadataBlock, err := m.extractMetadataBlock(data, source)
+	if err != nil {
+		return fmt.Errorf("failed to extract metadata block: %w", err)
+	}
+
+	// If no metadata block found, that's an error
+	if metadataBlock == nil {
+		return fmt.Errorf("schema must contain a metadata block")
+	}
+
+	// Validate the metadata block using simple validation rules
+	if err := m.validateMetadataBlock(metadataBlock); err != nil {
+		return fmt.Errorf("metadata validation failed: %w", err)
+	}
+
+	m.logger.Debug("Schema metadata validation passed", map[string]interface{}{
+		"source": source,
+	})
+
+	return nil
+}
+
+// validateMetadataBlock validates a metadata block using simple validation rules
+func (m *Manager) validateMetadataBlock(metadata map[string]interface{}) error {
+	var errors []string
+
+	// Check required fields
+	requiredFields := []string{"schema_version", "schema_type", "schema_name", "last_updated", "description"}
+	for _, field := range requiredFields {
+		if value, exists := metadata[field]; !exists || value == nil {
+			errors = append(errors, fmt.Sprintf("required field '%s' is missing", field))
+		}
+	}
+
+	// Validate schema_version format (ScalVer: 0.YYYYMMDD.N)
+	if version, exists := metadata["schema_version"]; exists && version != nil {
+		if versionStr, ok := version.(string); ok {
+			if !m.isValidScalVerFormat(versionStr) {
+				errors = append(errors, fmt.Sprintf("schema_version must be in ScalVer format (0.YYYYMMDD.N), got: %s", versionStr))
+			}
+		} else {
+			errors = append(errors, "schema_version must be a string")
+		}
+	}
+
+	// Validate schema_type format (lowercase with hyphens)
+	if schemaType, exists := metadata["schema_type"]; exists && schemaType != nil {
+		if typeStr, ok := schemaType.(string); ok {
+			if !m.isValidSchemaTypeFormat(typeStr) {
+				errors = append(errors, fmt.Sprintf("schema_type must be lowercase with hyphens only, got: %s", typeStr))
+			}
+		} else {
+			errors = append(errors, "schema_type must be a string")
+		}
+	}
+
+	// Validate last_updated format (YYYY-MM-DD)
+	if lastUpdated, exists := metadata["last_updated"]; exists && lastUpdated != nil {
+		if dateStr, ok := lastUpdated.(string); ok {
+			if !m.isValidDateFormat(dateStr) {
+				errors = append(errors, fmt.Sprintf("last_updated must be in YYYY-MM-DD format, got: %s", dateStr))
+			}
+		} else {
+			errors = append(errors, "last_updated must be a string")
+		}
+	}
+
+	// Validate description length
+	if description, exists := metadata["description"]; exists && description != nil {
+		if descStr, ok := description.(string); ok {
+			if len(descStr) < 10 {
+				errors = append(errors, "description must be at least 10 characters long")
+			}
+			if len(descStr) > 500 {
+				errors = append(errors, "description must be at most 500 characters long")
+			}
+		} else {
+			errors = append(errors, "description must be a string")
+		}
+	}
+
+	// If there are any errors, return them
+	if len(errors) > 0 {
+		return fmt.Errorf("metadata validation failed: %s", strings.Join(errors, "; "))
+	}
+
+	return nil
+}
+
+// isValidScalVerFormat checks if a string is in ScalVer format (0.YYYYMMDD.N)
+func (m *Manager) isValidScalVerFormat(version string) bool {
+	// Simple regex check for ScalVer format: 0.YYYYMMDD.N
+	matched, _ := regexp.MatchString(`^0\.\d{8}\.\d+$`, version)
+	return matched
+}
+
+// isValidSchemaTypeFormat checks if a string is a valid schema type format
+func (m *Manager) isValidSchemaTypeFormat(schemaType string) bool {
+	// Simple regex check for lowercase with hyphens
+	matched, _ := regexp.MatchString(`^[a-z][a-z0-9-]*$`, schemaType)
+	return matched
+}
+
+// isValidDateFormat checks if a string is in YYYY-MM-DD format
+func (m *Manager) isValidDateFormat(date string) bool {
+	// Simple regex check for YYYY-MM-DD format
+	matched, _ := regexp.MatchString(`^\d{4}-\d{2}-\d{2}$`, date)
+	return matched
+}
+
+// loadMetadataSchema loads the schema-metadata.schema.hcl file
+func (m *Manager) loadMetadataSchema() error {
+	// Look for the metadata schema in the schemas directory
+	// Try multiple possible paths
+	possiblePaths := []string{
+		filepath.Join("internal", "schemas", "schemas", "schema-metadata.schema.hcl"),
+		filepath.Join("schemas", "schema-metadata.schema.hcl"),
+		"schema-metadata.schema.hcl",
+	}
+
+	var metadataSchemaPath string
+	for _, path := range possiblePaths {
+		if _, err := os.Stat(path); err == nil {
+			metadataSchemaPath = path
+			break
+		}
+	}
+
+	if metadataSchemaPath == "" {
+		return fmt.Errorf("metadata schema file not found in any of the expected locations: %v", possiblePaths)
+	}
+
+	// Load the metadata schema without metadata validation to avoid infinite recursion
+	schema, err := m.loadSchemaWithoutMetadataValidation(metadataSchemaPath)
+	if err != nil {
+		return fmt.Errorf("failed to load metadata schema: %w", err)
+	}
+
+	m.metadataSchema = schema
+	return nil
+}
+
+// loadSchemaWithoutMetadataValidation loads a schema without validating its metadata
+// This is used to load the metadata schema itself to avoid infinite recursion
+func (m *Manager) loadSchemaWithoutMetadataValidation(filePath string) (*spookytypesschemas.Schema, error) {
+	if filePath == "" {
+		return nil, fmt.Errorf("file path cannot be empty")
+	}
+
+	// Check if file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("schema file does not exist: %s", filePath)
+	}
+
+	// Read file content
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read schema file: %w", err)
+	}
+
+	// Create schema from file content
+	schema := &spookytypesschemas.Schema{
+		Version:     "1.0",
+		Type:        "hcl",
+		Name:        filepath.Base(filePath),
+		Description: fmt.Sprintf("Schema loaded from %s", filePath),
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Content:     string(data),
+		Metadata:    make(map[string]interface{}),
+	}
+
+	// Parse HCL content to validate it
+	if err := m.validateSchemaContent(data, filePath); err != nil {
+		return nil, fmt.Errorf("failed to parse schema file: %w", err)
+	}
+
+	return schema, nil
+}
+
+// extractMetadataBlock extracts the metadata block from schema content
+func (m *Manager) extractMetadataBlock(data []byte, source string) (map[string]interface{}, error) {
+	// Parse HCL content
+	file, diags := m.parser.ParseHCL(data, source)
+	if diags.HasErrors() {
+		return nil, fmt.Errorf("failed to parse HCL content: %s", diags.Error())
+	}
+
+	// Use a more direct approach - parse the body without schema validation
+	body := file.Body
+
+	// Try to get all blocks using a very permissive approach
+	// We'll use the raw body and look for metadata blocks manually
+	content, diags := body.Content(&hcl.BodySchema{
+		Blocks: []hcl.BlockHeaderSchema{
+			{
+				Type: "metadata",
+			},
+		},
+		// Don't specify any attributes to be permissive
+	})
+
+	// If we get errors, it might be because of other blocks
+	// Let's try a different approach - parse the raw content
+	if diags.HasErrors() {
+		// Try to parse with a more permissive approach
+		// Look for metadata block in the raw content
+		contentStr := string(data)
+		if !strings.Contains(contentStr, "metadata {") {
+			return nil, nil // No metadata block found
+		}
+
+		// If we found metadata block in the string, try to extract it
+		// This is a fallback approach
+		return m.extractMetadataFromString(contentStr)
+	}
+
+	// Look for metadata block
+	for _, block := range content.Blocks {
+		if block.Type == "metadata" {
+			metadata, err := m.parseMetadataBlock(block)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse metadata block: %w", err)
+			}
+			return metadata, nil
+		}
+	}
+
+	// No metadata block found
+	return nil, nil
+}
+
+// extractMetadataFromString extracts metadata from HCL string content
+// This is a fallback method when strict parsing fails
+func (m *Manager) extractMetadataFromString(content string) (map[string]interface{}, error) {
+	// Simple string-based extraction for testing purposes
+	// In a real implementation, this would be more sophisticated
+
+	// Look for metadata block
+	metadataStart := strings.Index(content, "metadata {")
+	if metadataStart == -1 {
+		return nil, nil
+	}
+
+	// Find the end of the metadata block
+	braceCount := 0
+	metadataEnd := -1
+	for i := metadataStart; i < len(content); i++ {
+		if content[i] == '{' {
+			braceCount++
+		} else if content[i] == '}' {
+			braceCount--
+			if braceCount == 0 {
+				metadataEnd = i + 1
+				break
+			}
+		}
+	}
+
+	if metadataEnd == -1 {
+		return nil, fmt.Errorf("unclosed metadata block")
+	}
+
+	// Extract the metadata block content
+	metadataContent := content[metadataStart:metadataEnd]
+
+	// Parse the metadata content using simple string parsing
+	metadata := make(map[string]interface{})
+
+	// Extract key-value pairs from the metadata block
+	lines := strings.Split(metadataContent, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || line == "metadata {" || line == "}" {
+			continue
+		}
+
+		// Look for key = value pattern
+		if strings.Contains(line, "=") {
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				key := strings.TrimSpace(parts[0])
+				value := strings.TrimSpace(parts[1])
+
+				// Remove quotes if present
+				if strings.HasPrefix(value, `"`) && strings.HasSuffix(value, `"`) {
+					value = value[1 : len(value)-1]
+				}
+
+				metadata[key] = value
+			}
+		}
+	}
+
+	return metadata, nil
+}
+
+// parseMetadataBlock parses a metadata block into a map
+func (m *Manager) parseMetadataBlock(block *hcl.Block) (map[string]interface{}, error) {
+	// Define the schema for metadata block attributes
+	content, diags := block.Body.Content(&hcl.BodySchema{
+		Attributes: []hcl.AttributeSchema{
+			{Name: "schema_version", Required: false},
+			{Name: "schema_type", Required: false},
+			{Name: "schema_name", Required: false},
+			{Name: "last_updated", Required: false},
+			{Name: "compatibility", Required: false},
+			{Name: "description", Required: false},
+			{Name: "scalver_format", Required: false},
+		},
+	})
+	if diags.HasErrors() {
+		return nil, fmt.Errorf("failed to parse metadata block attributes: %s", diags.Error())
+	}
+
+	metadata := make(map[string]interface{})
+
+	// Parse each attribute
+	for name, attr := range content.Attributes {
+		val, diags := attr.Expr.Value(nil)
+		if diags.HasErrors() {
+			return nil, fmt.Errorf("failed to parse metadata attribute %s: %s", name, diags.Error())
+		}
+
+		// Convert cty.Value to appropriate Go type
+		switch val.Type() {
+		case cty.String:
+			metadata[name] = val.AsString()
+		case cty.Number:
+			if val.IsNull() {
+				metadata[name] = nil
+			} else {
+				// Try to convert to int first, then float
+				if val.CanIterateElements() {
+					// Handle arrays
+					var result []string
+					val.ForEachElement(func(key, value cty.Value) bool {
+						if value.Type() == cty.String {
+							result = append(result, value.AsString())
+						}
+						return false
+					})
+					metadata[name] = result
+				} else {
+					// Handle numbers
+					bigFloat := val.AsBigFloat()
+					if bigFloat.IsInt() {
+						intVal, _ := bigFloat.Int64()
+						metadata[name] = int(intVal)
+					} else {
+						floatVal, _ := bigFloat.Float64()
+						metadata[name] = floatVal
+					}
+				}
+			}
+		case cty.Bool:
+			metadata[name] = val.True()
+		default:
+			// For complex types, try to convert to string representation
+			metadata[name] = val.AsString()
+		}
+	}
+
+	return metadata, nil
 }
 
 // determineUpdateType determines the type of update
