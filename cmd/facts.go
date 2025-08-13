@@ -88,25 +88,6 @@ Examples:
 	},
 }
 
-// factsValidateCmd represents the facts validate command
-var factsValidateCmd = &cobra.Command{
-	Use:   "validate [project-path]",
-	Short: "Validate stored facts",
-	Long: `Validate facts stored in memory.
-
-This command validates that all stored facts are properly formatted and
-contain required data. It checks fact structure, timestamps, and data
-integrity.
-
-Examples:
-  spooky facts validate ./my-project
-  spooky facts validate ./my-project --compare`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return handleFactsValidate(cmd, args[0])
-	},
-}
-
 // factsExportCmd represents the facts export command
 var factsExportCmd = &cobra.Command{
 	Use:   "export [project-path]",
@@ -255,71 +236,7 @@ func handleFactsList(cmd *cobra.Command, projectPath string) error {
 	return nil
 }
 
-// handleFactsValidate handles validating facts using the FactsIntegration interface
-func handleFactsValidate(cmd *cobra.Command, projectPath string) error {
-	ctx := context.Background()
 
-	// Initialize dependencies if not already done
-	if factsManager == nil {
-		if err := InitializeFactsDependencies(); err != nil {
-			return fmt.Errorf("failed to initialize facts dependencies: %w", err)
-		}
-	}
-
-	// Get flags
-	compare, _ := cmd.Flags().GetBool("compare")
-
-	// Load facts from storage
-	facts, err := factsManager.LoadFacts(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to load facts: %w", err)
-	}
-
-	if facts == nil {
-		fmt.Println("No facts found to validate")
-		return nil
-	}
-
-	// Validate facts
-	validationResult, err := factsManager.ValidateFacts(ctx, facts)
-	if err != nil {
-		return fmt.Errorf("failed to validate facts: %w", err)
-	}
-
-	// Display validation results
-	fmt.Printf("Facts validation results:\n")
-	fmt.Printf("  Valid: %t\n", validationResult.Valid)
-	fmt.Printf("  Errors: %d\n", len(validationResult.Errors))
-	fmt.Printf("  Warnings: %d\n", len(validationResult.Warnings))
-
-	if len(validationResult.Errors) > 0 {
-		fmt.Printf("\nErrors:\n")
-		for _, err := range validationResult.Errors {
-			fmt.Printf("  - %s\n", err.Message)
-		}
-	}
-
-	if len(validationResult.Warnings) > 0 {
-		fmt.Printf("\nWarnings:\n")
-		for _, warning := range validationResult.Warnings {
-			fmt.Printf("  - %s\n", warning.Message)
-		}
-	}
-
-	if !validationResult.Valid {
-		return fmt.Errorf("facts validation failed with %d errors", len(validationResult.Errors))
-	}
-
-	// Compare with fresh facts if requested
-	if compare {
-		fmt.Printf("\nComparing with fresh facts...\n")
-		if err := compareWithFreshFacts(ctx, projectPath, facts); err != nil {
-			return fmt.Errorf("failed to compare facts: %w", err)
-		}
-	}
-
-	return nil
-}
 
 // handleFactsExport handles exporting facts using the FactsManager interface
 func handleFactsExport(cmd *cobra.Command, projectPath string) error {
@@ -380,12 +297,7 @@ func filterMachines(machines []spookytypes.Machine, filter string) []spookytypes
 	return filtered
 }
 
-func compareWithFreshFacts(ctx context.Context, projectPath string, storedFacts interface{}) error {
-	// This would compare stored facts with fresh facts from machines
-	// For now, just indicate that comparison is not implemented
-	fmt.Println("Fact comparison not yet implemented")
-	return nil
-}
+
 
 func init() {
 	// Add flags to facts gather command
@@ -396,8 +308,7 @@ func init() {
 	// Add flags to facts list command
 	factsListCmd.Flags().String("format", "summary", "Output format (summary, table, json)")
 
-	// Add flags to facts validate command
-	factsValidateCmd.Flags().Bool("compare", false, "Compare with fresh facts")
+
 
 	// Add flags to facts export command
 	factsExportCmd.Flags().String("format", "json", "Export format (json, hcl)")
@@ -407,7 +318,6 @@ func init() {
 	// Add commands to facts command
 	factsCmd.AddCommand(factsGatherCmd)
 	factsCmd.AddCommand(factsListCmd)
-	factsCmd.AddCommand(factsValidateCmd)
 	factsCmd.AddCommand(factsExportCmd)
 
 	// Add facts command to root

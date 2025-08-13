@@ -218,7 +218,7 @@ func (m *Manager) ExportFacts(ctx context.Context, machineIDs []string, format s
 
 	m.logger.Info("Exporting facts", map[string]interface{}{"machines": len(machineIDs), "format": format, "output": outputPath})
 
-	// Collect facts for all machines
+	// Collect facts for all machines with validation
 	exportData := make(map[string]*FactCollection)
 
 	for _, machineID := range machineIDs {
@@ -226,6 +226,32 @@ func (m *Manager) ExportFacts(ctx context.Context, machineIDs []string, format s
 		if err != nil {
 			m.logger.Warn("Failed to get facts for export", map[string]interface{}{"machine_id": machineID, "error": err.Error()})
 			continue
+		}
+
+		// Validate facts before export
+		validationResult, err := m.ValidateFacts(ctx, facts)
+		if err != nil {
+			m.logger.Warn("Failed to validate facts for export", map[string]interface{}{"machine_id": machineID, "error": err.Error()})
+			continue
+		}
+
+		if !validationResult.Valid {
+			m.logger.Warn("Facts validation failed for export", map[string]interface{}{
+				"machine_id": machineID,
+				"errors":     len(validationResult.Errors),
+				"warnings":   len(validationResult.Warnings),
+			})
+			
+			// Log validation errors for debugging
+			for _, validationErr := range validationResult.Errors {
+				m.logger.Debug("Validation error", map[string]interface{}{
+					"machine_id": machineID,
+					"error":      validationErr.Message,
+				})
+			}
+			
+			// Continue with export but log the validation issues
+			m.logger.Info("Proceeding with export despite validation issues", map[string]interface{}{"machine_id": machineID})
 		}
 
 		exportData[machineID] = facts

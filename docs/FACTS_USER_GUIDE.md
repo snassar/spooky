@@ -30,10 +30,7 @@ The spooky facts system provides comprehensive fact collection and storage capab
    spooky facts list ./my-project
    ```
 
-4. **Validate Facts**
-   ```bash
-   spooky facts validate ./my-project
-   ```
+
 
 ## Facts System Concepts
 
@@ -140,24 +137,9 @@ Machine ID: 2345678901bcdef12345678901bcdef1
   Memory: 32GB total, 24GB available
 ```
 
-### Validating Facts
+### Fact Validation
 
-The `validate` command checks stored facts for integrity and schema compliance:
-
-```bash
-# Validate all stored facts
-spooky facts validate ./my-project
-
-# Validate facts for a specific machine
-spooky facts validate ./my-project --machine web-server
-
-# Validate with detailed error reporting
-spooky facts validate ./my-project --verbose
-```
-
-#### Validation Checks
-
-The validation process checks:
+Fact validation is performed internally during export operations to ensure data integrity and schema compliance. The validation process checks:
 
 - **Machine ID Format**: 32-character hexadecimal string
 - **Required Fields**: System, hardware, and network facts
@@ -165,17 +147,7 @@ The validation process checks:
 - **String Lengths**: String fields within limits
 - **Schema Compliance**: Facts match expected structure
 
-#### Example Output
-
-```bash
-$ spooky facts validate ./my-project
-INFO: Validating facts for project: ./my-project
-INFO: Found 3 machines with stored facts
-INFO: Validating facts for web-server
-INFO: Validating facts for db-server
-INFO: Validating facts for app-server
-INFO: All facts validation passed
-```
+Validation errors and warnings are logged during export operations, but export continues to ensure data availability.
 
 ### Exporting Facts
 

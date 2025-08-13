@@ -262,8 +262,7 @@ The facts CLI provides these commands:
 ```bash
 spooky facts gather [project-path]     # Collect facts from machines
 spooky facts list [project-path]       # List stored facts
-spooky facts validate [project-path]   # Validate stored facts
-spooky facts export [project-path]     # Export facts to file
+spooky facts export [project-path]     # Export facts to file (includes internal validation)
 ```
 
 ### Command Options
@@ -275,7 +274,6 @@ Common options across facts commands:
 - `--timeout`: Collection timeout
 - `--format`: Export format (json, hcl)
 - `--output`: Output file path
-- `--validate`: Validate facts after collection
 
 ### Error Reporting
 
