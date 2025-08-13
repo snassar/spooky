@@ -48,8 +48,6 @@ hardware information, network configuration, and custom data. Facts are
 stored in memory and can be used for decision making in actions.`,
 }
 
-
-
 // factsExportCmd represents the facts export command
 var factsExportCmd = &cobra.Command{
 	Use:   "export [project-path]",
@@ -61,16 +59,14 @@ inventory and exports them to the specified format for backup, analysis,
 or transfer to other systems.
 
 Examples:
+  spooky facts export ./my-project --output facts.hcl
   spooky facts export ./my-project --format json --output facts.json
-  spooky facts export ./my-project --format hcl --output facts.hcl
-  spooky facts export ./my-project --machine web-server --format json --output web-server-facts.json`,
+  spooky facts export ./my-project --machine web-server --output web-server-facts.hcl`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return handleFactsExport(cmd, args[0])
 	},
 }
-
-
 
 // handleFactsExport handles exporting facts using the FactsManager interface
 func handleFactsExport(cmd *cobra.Command, projectPath string) error {
@@ -203,9 +199,8 @@ func filterMachines(machines []spookytypes.Machine, filter string) []spookytypes
 
 func init() {
 
-
 	// Add flags to facts export command
-	factsExportCmd.Flags().String("format", "json", "Export format (json, hcl)")
+	factsExportCmd.Flags().String("format", "hcl", "Export format (hcl, json)")
 	factsExportCmd.Flags().String("output", "", "Output file path (required)")
 	factsExportCmd.Flags().String("machine", "", "Filter to specific machine")
 	factsExportCmd.Flags().Int("parallel", 1, "Number of parallel workers")

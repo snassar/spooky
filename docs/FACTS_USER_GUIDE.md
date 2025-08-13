@@ -67,22 +67,22 @@ Facts are stored in memory during the action run with the following structure:
 The `export` command automatically gathers facts from all machines in a project and exports them to a file:
 
 ```bash
-# Export facts from all machines to JSON
-spooky facts export ./my-project --format json --output facts.json
+# Export facts from all machines to HCL (default)
+spooky facts export ./my-project --output facts.hcl
 
 # Export facts with parallel processing
-spooky facts export ./my-project --parallel 4 --format json --output facts.json
+spooky facts export ./my-project --parallel 4 --output facts.hcl
 
 # Export facts from a specific machine
-spooky facts export ./my-project --machine web-server --format json --output web-server-facts.json
+spooky facts export ./my-project --machine web-server --output web-server-facts.hcl
 
-# Export facts to HCL format
-spooky facts export ./my-project --format hcl --output facts.hcl
+# Export facts to JSON format
+spooky facts export ./my-project --format json --output facts.json
 ```
 
 #### Command Options
 
-- `--format`: Export format (json, hcl) (default: json)
+- `--format`: Export format (hcl, json) (default: hcl)
 - `--output`: Output file path (required)
 - `--machine`: Target specific machine (default: all machines)
 - `--parallel`: Number of parallel workers (default: 1)
@@ -91,15 +91,15 @@ spooky facts export ./my-project --format hcl --output facts.hcl
 #### Example Output
 
 ```bash
-$ spooky facts export ./my-project --format json --output facts.json
+$ spooky facts export ./my-project --output facts.hcl
 INFO: Starting fact collection for export
 INFO: Found 3 machines in inventory
 INFO: Collecting facts from web-server (192.168.1.10)
 INFO: Collecting facts from db-server (192.168.1.11)
 INFO: Collecting facts from app-server (192.168.1.12)
 INFO: Successfully collected facts from 3 machines
-INFO: Exporting facts to facts.json
-Successfully exported facts to: facts.json
+INFO: Exporting facts to facts.hcl
+Successfully exported facts to: facts.hcl
 ```
 
 
@@ -133,9 +133,8 @@ spooky facts export ./my-project --machine web-server --format json --output web
 
 #### Export Formats
 
+- **HCL**: HashiCorp Configuration Language format (default)
 - **JSON**: Standard JSON format for data exchange
-- **HCL**: HashiCorp Configuration Language format
-- **YAML**: YAML format for human-readable output
 
 #### Example JSON Output
 
