@@ -193,8 +193,8 @@ The spooky SSH system now includes advanced capabilities that extend beyond basi
    - Error types and validation structures
    - Acting types for command running
 
-2. **SSH Client** (`internal/ssh/client_simple.go`):
-   - SimpleClient implementation with connection pooling
+2. **SSH Client** (`internal/ssh/client.go`):
+   - Client implementation with connection pooling
    - Key validation and certificate support
    - Command running and session management
    - Error handling and logging

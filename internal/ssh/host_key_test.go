@@ -45,7 +45,7 @@ func TestHostKeyManager(t *testing.T) {
 	t.Logf("Host key manager test completed successfully")
 }
 
-func TestSimpleClientWithHostKeyVerification(t *testing.T) {
+func TestClientWithHostKeyVerification(t *testing.T) {
 	// Create a temporary directory for test files
 	tempDir, err := os.MkdirTemp("", "spooky-ssh-test")
 	if err != nil {
@@ -70,8 +70,8 @@ func TestSimpleClientWithHostKeyVerification(t *testing.T) {
 	logManager := spookylogging.NewLogManager()
 	logger := logManager.GetLogger("test")
 
-	// Create simple client
-	client := NewSimpleClient(config, logger)
+	// Create client
+	client := NewClient(config, logger)
 
 	// Test host key verification
 	err = client.TestHostKeyVerification()
@@ -107,8 +107,8 @@ func TestHostKeyVerificationStrictMode(t *testing.T) {
 	logManager := spookylogging.NewLogManager()
 	logger := logManager.GetLogger("test")
 
-	// Create simple client
-	client := NewSimpleClient(config, logger)
+	// Create client
+	client := NewClient(config, logger)
 
 	// Test host key verification - should fail in strict mode
 	err = client.TestHostKeyVerification()

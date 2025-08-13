@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/hashicorp/hcl/v2/hclsimple"
+
 	spookyinterfaces "spooky/internal/interfaces"
 	spookytypes "spooky/internal/types"
 	spookytypeslogging "spooky/internal/types/logging"
@@ -36,17 +38,17 @@ func (i *Integration) LoadConfig(ctx context.Context, source string) (*spookytyp
 		return nil, fmt.Errorf("config file not found: %s", source)
 	}
 
-	// Load configuration using the existing config package
-	config, err := LoadConfig(source)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load config from %s: %w", source, err)
+	// Parse HCL configuration
+	var config spookytypes.Config
+	if err := hclsimple.DecodeFile(source, nil, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse config file %s: %w", source, err)
 	}
 
 	i.logger.Info("Configuration loaded successfully", map[string]interface{}{
 		"source": source,
 	})
 
-	return config, nil
+	return &config, nil
 }
 
 // ValidateConfig validates configuration
@@ -63,11 +65,11 @@ func (i *Integration) ValidateConfig(ctx context.Context, config *spookytypes.Co
 	var errors []spookytypesschemas.SchemaError
 	var warnings []spookytypesschemas.SchemaError
 
-	// Validate project configuration
-	if config.Project != nil {
-		if config.Project.Name == "" {
-			errors = append(errors, spookytypesschemas.SchemaError{
-				Message: "project name is required",
+	// Validate global configuration
+	if config.Global != nil {
+		if config.Global.DefaultProjectPath == "" {
+			warnings = append(warnings, spookytypesschemas.SchemaError{
+				Message: "default project path is recommended",
 			})
 		}
 	}
@@ -112,10 +114,10 @@ func (i *Integration) SaveConfig(ctx context.Context, config *spookytypes.Config
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
-	// Save configuration using the existing config package
-	if err := SaveConfig(config, destination); err != nil {
-		return fmt.Errorf("failed to save config to %s: %w", destination, err)
-	}
+	// Save configuration to file
+	// TODO: Implement HCL marshaling
+	// For now, return an error indicating this is not implemented
+	return fmt.Errorf("config saving is not yet implemented")
 
 	i.logger.Info("Configuration saved successfully", map[string]interface{}{
 		"destination": destination,

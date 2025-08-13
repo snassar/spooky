@@ -17,7 +17,7 @@ func TestKeyValidation(t *testing.T) {
 	logger := logManager.GetLogger("ssh-test")
 
 	// Create SSH client
-	client := NewSimpleClient(nil, logger)
+	client := NewClient(nil, logger)
 
 	// Test ed25519 key generation and validation
 	t.Run("ED25519 Key", func(t *testing.T) {
@@ -108,7 +108,7 @@ func TestSupportedKeyGeneration(t *testing.T) {
 	logger := logManager.GetLogger("ssh-test")
 
 	// Create SSH client
-	client := NewSimpleClient(nil, logger)
+	client := NewClient(nil, logger)
 
 	// Test supported key types
 	supportedTypes := []string{KeyTypeED25519, KeyTypeRSA4096}

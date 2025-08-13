@@ -60,7 +60,7 @@ func TestFileTransfer(t *testing.T) {
 	}
 
 	logger := &MockLogger{}
-	client := NewSimpleClient(config, logger)
+	client := NewClient(config, logger)
 	defer client.Close(context.Background())
 
 	// Create file transfer manager
@@ -261,7 +261,7 @@ func BenchmarkFileTransfer(b *testing.B) {
 	}
 
 	logger := &MockLogger{}
-	client := NewSimpleClient(config, logger)
+	client := NewClient(config, logger)
 	defer client.Close(context.Background())
 
 	ftm := NewFileTransferManager(client, logger)
@@ -308,7 +308,7 @@ func ExampleFileTransfer() {
 	}
 
 	logger := &MockLogger{}
-	client := NewSimpleClient(config, logger)
+	client := NewClient(config, logger)
 	defer client.Close(context.Background())
 
 	// Create managers

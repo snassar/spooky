@@ -27,11 +27,11 @@ Manages SFTP and SCP file transfers with progress tracking and verification.
 
 ```go
 type FileTransferManager struct {
-    client *SimpleClient
+	client *Client
     logger spookytypeslogging.Logger
 }
 
-func NewFileTransferManager(client *SimpleClient, logger spookytypeslogging.Logger) *FileTransferManager
+func NewFileTransferManager(client *Client, logger spookytypeslogging.Logger) *FileTransferManager
 ```
 
 **Methods:**
@@ -207,12 +207,12 @@ Runs a command via SSH session.
 - Captures standard output and error streams
 - Returns run result with metrics
 
-### SimpleClient
+### Client
 
 The main SSH client implementation.
 
 ```go
-type SimpleClient struct {
+type Client struct {
     config      *spookytypes.ClientConfig
     logger      spookytypeslogging.Logger
     connections map[string]*ssh.Client
@@ -223,9 +223,9 @@ type SimpleClient struct {
 
 **Key Methods:**
 
-#### NewSimpleClient
+#### NewClient
 ```go
-func NewSimpleClient(config *spookytypes.ClientConfig, logger spookytypeslogging.Logger) *SimpleClient
+func NewClient(config *spookytypes.ClientConfig, logger spookytypeslogging.Logger) *Client
 ```
 Creates a new SSH client with default configuration if none provided.
 
@@ -239,7 +239,7 @@ Creates a new SSH client with default configuration if none provided.
 
 #### loadPrivateKey
 ```go
-func (c *SimpleClient) loadPrivateKey(keyPath, passphrase string) (ssh.Signer, error)
+func (c *Client) loadPrivateKey(keyPath, passphrase string) (ssh.Signer, error)
 ```
 Loads and validates a private key from file.
 
@@ -251,7 +251,7 @@ Loads and validates a private key from file.
 
 #### validateKeyType
 ```go
-func (c *SimpleClient) validateKeyType(signer ssh.Signer) error
+func (c *Client) validateKeyType(signer ssh.Signer) error
 ```
 Validates that the key is of a supported type.
 
@@ -1080,7 +1080,7 @@ func main() {
         IdleTimeout:        300 * time.Second,
     }
 
-    client := ssh.NewSimpleClient(config, logger)
+    client := ssh.NewClient(config, logger)
 
     // Create connection request
     request := &spookytypes.ConnectionRequest{
@@ -1148,7 +1148,7 @@ func main() {
     // Create client for key validation
     logManager := logging.NewLogManager()
     logger := logManager.GetLogger("key-validation")
-    client := ssh.NewSimpleClient(nil, logger)
+    client := ssh.NewClient(nil, logger)
 
     // Test key generation and validation
     keyTypes := []string{ssh.KeyTypeED25519, ssh.KeyTypeRSA4096}
@@ -1191,7 +1191,7 @@ func main() {
     // Create logger and client
     logManager := spookylogging.NewLogManager()
     logger := logManager.GetLogger("cert-example")
-    client := ssh.NewSimpleClient(nil, logger)
+    client := ssh.NewClient(nil, logger)
 
     // Create connection request with certificate
     request := &spookytypes.ConnectionRequest{

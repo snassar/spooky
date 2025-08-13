@@ -7,6 +7,7 @@ import (
 
 	spookylogging "spooky/internal/logging"
 	spookytypes "spooky/internal/types"
+	spookytypesssh "spooky/internal/types/ssh"
 )
 
 // Example demonstrates basic SSH client usage
@@ -24,11 +25,11 @@ func Example() {
 		RetryDelay:        5 * time.Second,
 		IdleTimeout:       300 * time.Second,
 		DefaultKeyPath:    "~/.ssh/id_rsa",
-		DefaultAuthMethod: spookytypes.AuthMethodPublicKey,
+		DefaultAuthMethod: spookytypesssh.AuthMethodPublicKey,
 	}
 
 	// Create SSH client
-	client := NewSimpleClient(config, logger)
+	client := NewClient(config, logger)
 
 	// Create connection request
 	request := &spookytypes.ConnectionRequest{

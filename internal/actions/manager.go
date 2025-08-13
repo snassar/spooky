@@ -13,6 +13,7 @@ import (
 	spookyschemas "spooky/internal/schemas"
 	spookytypes "spooky/internal/types"
 	spookytypesactions "spooky/internal/types/actions"
+	spookytypesssh "spooky/internal/types/ssh"
 )
 
 // Manager implements the ActionsIntegration interface
@@ -367,39 +368,506 @@ func (m *Manager) runActionOnMachine(ctx context.Context, _ *spookytypesactions.
 	return *result, err
 }
 
+// setFilePermissions sets file permissions on a remote machine via SSH
+func (m *Manager) setFilePermissions(ctx context.Context, session *spookytypes.Session, machine spookytypes.Machine, filePath, permissions string, action *spookytypesactions.Action) error {
+	chmodCommand := fmt.Sprintf("chmod %s %s", permissions, filePath)
+
+	sshCommand := &spookytypes.SSHCommand{
+		Command:       chmodCommand,
+		WorkingDir:    action.WorkingDir,
+		Environment:   action.Environment,
+		Timeout:       time.Duration(action.Timeout) * time.Second,
+		CaptureOutput: true,
+	}
+
+	commandResult, err := m.sshManager.RunCommand(ctx, session, sshCommand)
+	if err != nil {
+		return fmt.Errorf("failed to set file permissions on %s: %w", machine.Hostname, err)
+	}
+
+	if !commandResult.Success {
+		return fmt.Errorf("failed to set file permissions on %s: %s", machine.Hostname, commandResult.Error)
+	}
+
+	return nil
+}
+
 // runCommandAction runs a command action
-func (m *Manager) runCommandAction(_ context.Context, action *spookytypesactions.Action, machine spookytypes.Machine, result *spookytypesactions.ActingResult) error {
-	// TODO: Implement proper SSH connection and command running
-	result.Stdout = "Command running placeholder"
+func (m *Manager) runCommandAction(ctx context.Context, action *spookytypesactions.Action, machine spookytypes.Machine, result *spookytypesactions.ActingResult) error {
+	m.logger.Debug("Running command action via SSH", map[string]interface{}{
+		"action":  action.Name,
+		"machine": machine.Hostname,
+		"command": action.Command,
+	})
+
+	// Create SSH connection request
+	connectionRequest := &spookytypes.ConnectionRequest{
+		Host:     machine.Hostname,
+		Port:     machine.Port,
+		User:     machine.User,
+		Timeout:  time.Duration(action.Timeout) * time.Second,
+		KeyPath:  machine.KeyFile,
+		Password: machine.Password,
+	}
+
+	// Establish SSH connection
+	connectionResult, err := m.sshManager.Connect(ctx, connectionRequest)
+	if err != nil {
+		return fmt.Errorf("failed to establish SSH connection to %s: %w", machine.Hostname, err)
+	}
+
+	if !connectionResult.Success {
+		return fmt.Errorf("SSH connection failed to %s: %s", machine.Hostname, connectionResult.Error)
+	}
+
+	// Create SSH session
+	session, err := m.sshManager.CreateSession(ctx, connectionResult.Connection)
+	if err != nil {
+		return fmt.Errorf("failed to create SSH session for %s: %w", machine.Hostname, err)
+	}
+
+	// Create SSH command
+	sshCommand := &spookytypes.SSHCommand{
+		Command:       action.Command.Command,
+		Args:          action.Command.Args,
+		WorkingDir:    action.WorkingDir,
+		Environment:   action.Environment,
+		Timeout:       time.Duration(action.Timeout) * time.Second,
+		CaptureOutput: true,
+	}
+
+	// Run command via SSH
+	commandResult, err := m.sshManager.RunCommand(ctx, session, sshCommand)
+	if err != nil {
+		return fmt.Errorf("failed to run command on %s: %w", machine.Hostname, err)
+	}
+
+	// Update result with SSH command results
+	result.ExitCode = commandResult.ExitCode
+	result.Stdout = commandResult.Stdout
+	result.Stderr = commandResult.Stderr
+	result.StartTime = commandResult.StartTime
+	result.EndTime = commandResult.EndTime
+	result.Duration = commandResult.Duration
+
+	if !commandResult.Success {
+		result.Status = "failure"
+		result.ErrorType = "command_execution"
+		result.Error = commandResult.Error
+	}
+
+	m.logger.Info("Command action completed", map[string]interface{}{
+		"action":    action.Name,
+		"machine":   machine.Hostname,
+		"exit_code": commandResult.ExitCode,
+		"duration":  commandResult.Duration,
+		"success":   commandResult.Success,
+	})
+
 	return nil
 }
 
 // runScriptAction runs a script action
 func (m *Manager) runScriptAction(ctx context.Context, action *spookytypesactions.Action, machine spookytypes.Machine, result *spookytypesactions.ActingResult) error {
-	// TODO: Implement script running
-	return fmt.Errorf("script running not yet implemented")
+	m.logger.Debug("Running script action via SSH", map[string]interface{}{
+		"action":  action.Name,
+		"machine": machine.Hostname,
+		"script":  action.Script,
+	})
+
+	// Create SSH connection request
+	connectionRequest := &spookytypes.ConnectionRequest{
+		Host:     machine.Hostname,
+		Port:     machine.Port,
+		User:     machine.User,
+		Timeout:  time.Duration(action.Timeout) * time.Second,
+		KeyPath:  machine.KeyFile,
+		Password: machine.Password,
+	}
+
+	// Establish SSH connection
+	connectionResult, err := m.sshManager.Connect(ctx, connectionRequest)
+	if err != nil {
+		return fmt.Errorf("failed to establish SSH connection to %s: %w", machine.Hostname, err)
+	}
+
+	if !connectionResult.Success {
+		return fmt.Errorf("SSH connection failed to %s: %s", machine.Hostname, connectionResult.Error)
+	}
+
+	// Create SSH session
+	session, err := m.sshManager.CreateSession(ctx, connectionResult.Connection)
+	if err != nil {
+		return fmt.Errorf("failed to create SSH session for %s: %w", machine.Hostname, err)
+	}
+
+	// Determine shell based on action configuration
+	shell := action.Script.Shell
+	if shell == "" {
+		shell = "/bin/bash"
+	}
+
+	// Create script command
+	scriptCommand := fmt.Sprintf("%s << 'EOF'\n%s\nEOF", shell, action.Script.Script)
+
+	// Create SSH command
+	sshCommand := &spookytypes.SSHCommand{
+		Command:       scriptCommand,
+		WorkingDir:    action.WorkingDir,
+		Environment:   action.Environment,
+		Timeout:       time.Duration(action.Timeout) * time.Second,
+		CaptureOutput: true,
+	}
+
+	// Run script via SSH
+	commandResult, err := m.sshManager.RunCommand(ctx, session, sshCommand)
+	if err != nil {
+		return fmt.Errorf("failed to run script on %s: %w", machine.Hostname, err)
+	}
+
+	// Update result with SSH command results
+	result.ExitCode = commandResult.ExitCode
+	result.Stdout = commandResult.Stdout
+	result.Stderr = commandResult.Stderr
+	result.StartTime = commandResult.StartTime
+	result.EndTime = commandResult.EndTime
+	result.Duration = commandResult.Duration
+
+	if !commandResult.Success {
+		result.Status = "failure"
+		result.ErrorType = "script_execution"
+		result.Error = commandResult.Error
+	}
+
+	m.logger.Info("Script action completed", map[string]interface{}{
+		"action":    action.Name,
+		"machine":   machine.Hostname,
+		"exit_code": commandResult.ExitCode,
+		"duration":  commandResult.Duration,
+		"success":   commandResult.Success,
+	})
+
+	return nil
 }
 
 // runTemplateAction runs a template deployment action
 func (m *Manager) runTemplateAction(ctx context.Context, action *spookytypesactions.Action, machine spookytypes.Machine, result *spookytypesactions.ActingResult) error {
-	// TODO: Implement template deployment
-	return fmt.Errorf("template deployment not yet implemented")
+	m.logger.Debug("Running template deployment action via SSH", map[string]interface{}{
+		"action":   action.Name,
+		"machine":  machine.Hostname,
+		"template": action.Template,
+	})
+
+	if action.Template == nil {
+		return fmt.Errorf("template action requires template configuration")
+	}
+
+	// Create SSH connection request
+	connectionRequest := &spookytypes.ConnectionRequest{
+		Host:     machine.Hostname,
+		Port:     machine.Port,
+		User:     machine.User,
+		Timeout:  time.Duration(action.Timeout) * time.Second,
+		KeyPath:  machine.KeyFile,
+		Password: machine.Password,
+	}
+
+	// Establish SSH connection
+	connectionResult, err := m.sshManager.Connect(ctx, connectionRequest)
+	if err != nil {
+		return fmt.Errorf("failed to establish SSH connection to %s: %w", machine.Hostname, err)
+	}
+
+	if !connectionResult.Success {
+		return fmt.Errorf("SSH connection failed to %s: %s", machine.Hostname, connectionResult.Error)
+	}
+
+	// Create SSH session
+	session, err := m.sshManager.CreateSession(ctx, connectionResult.Connection)
+	if err != nil {
+		return fmt.Errorf("failed to create SSH session for %s: %w", machine.Hostname, err)
+	}
+
+	// For template deployment, we need to:
+	// 1. Transfer the template file to the remote machine
+	// 2. Execute the template on the remote machine
+
+	// Create file transfer for template
+	transfer := &spookytypes.FileTransfer{
+		LocalPath:  action.Template.Source,
+		RemotePath: action.Template.Destination,
+		Direction:  spookytypesssh.TransferDirectionUpload,
+		Mode:       spookytypesssh.TransferModeSFTP,
+	}
+
+	// Transfer template file
+	transferResult, err := m.sshManager.TransferFile(ctx, session, transfer)
+	if err != nil {
+		return fmt.Errorf("failed to transfer template file to %s: %w", machine.Hostname, err)
+	}
+
+	if !transferResult.Success {
+		return fmt.Errorf("template file transfer failed to %s: %s", machine.Hostname, transferResult.Error)
+	}
+
+	// Set file permissions if specified
+	if action.Template.Permissions != "" {
+		err = m.setFilePermissions(ctx, session, machine, action.Template.Destination, action.Template.Permissions, action)
+		if err != nil {
+			return fmt.Errorf("failed to set template file permissions on %s: %w", machine.Hostname, err)
+		}
+	}
+
+	// Execute template if it's executable (we'll assume it's executable for now)
+	// In a real implementation, you might check file permissions or have a separate flag
+	sshCommand := &spookytypes.SSHCommand{
+		Command:       action.Template.Destination,
+		WorkingDir:    action.WorkingDir,
+		Environment:   action.Environment,
+		Timeout:       time.Duration(action.Timeout) * time.Second,
+		CaptureOutput: true,
+	}
+
+	commandResult, err := m.sshManager.RunCommand(ctx, session, sshCommand)
+	if err != nil {
+		return fmt.Errorf("failed to execute template on %s: %w", machine.Hostname, err)
+	}
+
+	// Update result with SSH command results
+	result.ExitCode = commandResult.ExitCode
+	result.Stdout = commandResult.Stdout
+	result.Stderr = commandResult.Stderr
+	result.StartTime = commandResult.StartTime
+	result.EndTime = commandResult.EndTime
+	result.Duration = commandResult.Duration
+
+	if !commandResult.Success {
+		result.Status = "failure"
+		result.ErrorType = "template_execution"
+		result.Error = commandResult.Error
+	}
+
+	m.logger.Info("Template action completed", map[string]interface{}{
+		"action":      action.Name,
+		"machine":     machine.Hostname,
+		"template":    action.Template.Source,
+		"destination": action.Template.Destination,
+		"success":     result.Status == "success",
+	})
+
+	return nil
 }
 
 // runFileCopyAction runs a file copy action
 func (m *Manager) runFileCopyAction(ctx context.Context, action *spookytypesactions.Action, machine spookytypes.Machine, result *spookytypesactions.ActingResult) error {
-	// TODO: Implement file copy
-	return fmt.Errorf("file copy not yet implemented")
+	m.logger.Debug("Running file copy action via SSH", map[string]interface{}{
+		"action":    action.Name,
+		"machine":   machine.Hostname,
+		"file_copy": action.FileCopy,
+	})
+
+	if action.FileCopy == nil {
+		return fmt.Errorf("file copy action requires file copy configuration")
+	}
+
+	// Create SSH connection request
+	connectionRequest := &spookytypes.ConnectionRequest{
+		Host:     machine.Hostname,
+		Port:     machine.Port,
+		User:     machine.User,
+		Timeout:  time.Duration(action.Timeout) * time.Second,
+		KeyPath:  machine.KeyFile,
+		Password: machine.Password,
+	}
+
+	// Establish SSH connection
+	connectionResult, err := m.sshManager.Connect(ctx, connectionRequest)
+	if err != nil {
+		return fmt.Errorf("failed to establish SSH connection to %s: %w", machine.Hostname, err)
+	}
+
+	if !connectionResult.Success {
+		return fmt.Errorf("SSH connection failed to %s: %s", machine.Hostname, connectionResult.Error)
+	}
+
+	// Create SSH session
+	session, err := m.sshManager.CreateSession(ctx, connectionResult.Connection)
+	if err != nil {
+		return fmt.Errorf("failed to create SSH session for %s: %w", machine.Hostname, err)
+	}
+
+	// Create file transfer
+	transfer := &spookytypes.FileTransfer{
+		LocalPath:  action.FileCopy.Source,
+		RemotePath: action.FileCopy.Destination,
+		Direction:  spookytypesssh.TransferDirectionUpload,
+		Mode:       spookytypesssh.TransferModeSFTP,
+	}
+
+	// Transfer file
+	transferResult, err := m.sshManager.TransferFile(ctx, session, transfer)
+	if err != nil {
+		return fmt.Errorf("failed to transfer file to %s: %w", machine.Hostname, err)
+	}
+
+	if !transferResult.Success {
+		return fmt.Errorf("file transfer failed to %s: %s", machine.Hostname, transferResult.Error)
+	}
+
+	// Set file permissions if specified
+	if action.FileCopy.Permissions != "" {
+		err = m.setFilePermissions(ctx, session, machine, action.FileCopy.Destination, action.FileCopy.Permissions, action)
+		if err != nil {
+			return fmt.Errorf("failed to set file permissions on %s: %w", machine.Hostname, err)
+		}
+	}
+
+	// Set file ownership if specified
+	if action.FileCopy.Owner != "" || action.FileCopy.Group != "" {
+		chownCommand := fmt.Sprintf("chown %s:%s %s",
+			action.FileCopy.Owner,
+			action.FileCopy.Group,
+			action.FileCopy.Destination)
+
+		sshCommand := &spookytypes.SSHCommand{
+			Command:       chownCommand,
+			WorkingDir:    action.WorkingDir,
+			Environment:   action.Environment,
+			Timeout:       time.Duration(action.Timeout) * time.Second,
+			CaptureOutput: true,
+		}
+
+		commandResult, err := m.sshManager.RunCommand(ctx, session, sshCommand)
+		if err != nil {
+			return fmt.Errorf("failed to set file ownership on %s: %w", machine.Hostname, err)
+		}
+
+		if !commandResult.Success {
+			return fmt.Errorf("failed to set file ownership on %s: %s", machine.Hostname, commandResult.Error)
+		}
+	}
+
+	// Update result
+	result.Stdout = fmt.Sprintf("File copied successfully from %s to %s",
+		action.FileCopy.Source, action.FileCopy.Destination)
+	result.StartTime = time.Now()
+	result.EndTime = time.Now()
+
+	m.logger.Info("File copy action completed", map[string]interface{}{
+		"action":      action.Name,
+		"machine":     machine.Hostname,
+		"source":      action.FileCopy.Source,
+		"destination": action.FileCopy.Destination,
+		"success":     true,
+	})
+
+	return nil
 }
 
 // runServiceControlAction runs a service control action
 func (m *Manager) runServiceControlAction(ctx context.Context, action *spookytypesactions.Action, machine spookytypes.Machine, result *spookytypesactions.ActingResult) error {
+	m.logger.Debug("Running service control action via SSH", map[string]interface{}{
+		"action":          action.Name,
+		"machine":         machine.Hostname,
+		"service_control": action.ServiceControl,
+	})
+
 	if action.ServiceControl == nil {
 		return fmt.Errorf("service control action requires service control configuration")
 	}
 
-	// TODO: Implement service control
-	return fmt.Errorf("service control not yet implemented")
+	// Create SSH connection request
+	connectionRequest := &spookytypes.ConnectionRequest{
+		Host:     machine.Hostname,
+		Port:     machine.Port,
+		User:     machine.User,
+		Timeout:  time.Duration(action.Timeout) * time.Second,
+		KeyPath:  machine.KeyFile,
+		Password: machine.Password,
+	}
+
+	// Establish SSH connection
+	connectionResult, err := m.sshManager.Connect(ctx, connectionRequest)
+	if err != nil {
+		return fmt.Errorf("failed to establish SSH connection to %s: %w", machine.Hostname, err)
+	}
+
+	if !connectionResult.Success {
+		return fmt.Errorf("SSH connection failed to %s: %s", machine.Hostname, connectionResult.Error)
+	}
+
+	// Create SSH session
+	session, err := m.sshManager.CreateSession(ctx, connectionResult.Connection)
+	if err != nil {
+		return fmt.Errorf("failed to create SSH session for %s: %w", machine.Hostname, err)
+	}
+
+	// Determine service control command based on action
+	var serviceCommand string
+	switch action.ServiceControl.Action {
+	case "start":
+		serviceCommand = fmt.Sprintf("systemctl start %s", action.ServiceControl.Service)
+	case "stop":
+		serviceCommand = fmt.Sprintf("systemctl stop %s", action.ServiceControl.Service)
+	case "restart":
+		serviceCommand = fmt.Sprintf("systemctl restart %s", action.ServiceControl.Service)
+	case "reload":
+		serviceCommand = fmt.Sprintf("systemctl reload %s", action.ServiceControl.Service)
+	case "enable":
+		serviceCommand = fmt.Sprintf("systemctl enable %s", action.ServiceControl.Service)
+	case "disable":
+		serviceCommand = fmt.Sprintf("systemctl disable %s", action.ServiceControl.Service)
+	case "status":
+		serviceCommand = fmt.Sprintf("systemctl status %s", action.ServiceControl.Service)
+	default:
+		return fmt.Errorf("unsupported service control action: %s", action.ServiceControl.Action)
+	}
+
+	// Add sudo if required (using systemd flag as proxy for sudo requirement)
+	if action.ServiceControl.Systemd {
+		serviceCommand = fmt.Sprintf("sudo %s", serviceCommand)
+	}
+
+	// Create SSH command
+	sshCommand := &spookytypes.SSHCommand{
+		Command:       serviceCommand,
+		WorkingDir:    action.WorkingDir,
+		Environment:   action.Environment,
+		Timeout:       time.Duration(action.Timeout) * time.Second,
+		CaptureOutput: true,
+	}
+
+	// Run service control command via SSH
+	commandResult, err := m.sshManager.RunCommand(ctx, session, sshCommand)
+	if err != nil {
+		return fmt.Errorf("failed to run service control command on %s: %w", machine.Hostname, err)
+	}
+
+	// Update result with SSH command results
+	result.ExitCode = commandResult.ExitCode
+	result.Stdout = commandResult.Stdout
+	result.Stderr = commandResult.Stderr
+	result.StartTime = commandResult.StartTime
+	result.EndTime = commandResult.EndTime
+	result.Duration = commandResult.Duration
+
+	if !commandResult.Success {
+		result.Status = "failure"
+		result.ErrorType = "service_control"
+		result.Error = commandResult.Error
+	}
+
+	m.logger.Info("Service control action completed", map[string]interface{}{
+		"action":      action.Name,
+		"machine":     machine.Hostname,
+		"service":     action.ServiceControl.Service,
+		"action_type": action.ServiceControl.Action,
+		"exit_code":   commandResult.ExitCode,
+		"duration":    commandResult.Duration,
+		"success":     commandResult.Success,
+	})
+
+	return nil
 }
 
 // getTargetMachines determines which machines should run the action

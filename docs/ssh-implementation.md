@@ -56,8 +56,8 @@ request := &spookytypes.ConnectionRequest{
 - **Acting Types**: ActingSession, ActingCommand, ActingBatch
 - **Error Types**: SSHError, ConnectionError, AuthenticationError
 
-### 2. SSH Client (`internal/ssh/client_simple.go`)
-- **SimpleClient**: Main SSH client implementation
+### 2. SSH Client (`internal/ssh/client.go`)
+- **Client**: Main SSH client implementation
 - **Key Validation**: Comprehensive key type validation
 - **Certificate Support**: SSH certificate loading and authentication
 - **Connection Pooling**: Efficient connection management
@@ -80,7 +80,7 @@ request := &spookytypes.ConnectionRequest{
 ### Basic SSH Connection
 ```go
 // Create SSH client
-client := NewSimpleClient(config, logger)
+client := NewClient(config, logger)
 
 // Create connection request
 request := &spookytypes.ConnectionRequest{

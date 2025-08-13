@@ -26,13 +26,13 @@ import (
 
 // FileTransferManager manages file transfer operations via SSH
 type FileTransferManager struct {
-	client *SimpleClient
+	client *Client
 	logger spookytypeslogging.Logger
 	mu     sync.RWMutex
 }
 
 // NewFileTransferManager creates a new file transfer manager
-func NewFileTransferManager(client *SimpleClient, logger spookytypeslogging.Logger) *FileTransferManager {
+func NewFileTransferManager(client *Client, logger spookytypeslogging.Logger) *FileTransferManager {
 	return &FileTransferManager{
 		client: client,
 		logger: logger,

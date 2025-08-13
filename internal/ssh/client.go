@@ -749,8 +749,8 @@ func (h *HostKeyManager) GetHostKeyCallback() ssh.HostKeyCallback {
 	}
 }
 
-// SimpleClient implements basic SSH client functionality
-type SimpleClient struct {
+// Client implements basic SSH client functionality
+type Client struct {
 	config              *spookytypes.ClientConfig
 	logger              spookytypeslogging.Logger
 	hostKeyManager      *HostKeyManager
@@ -760,8 +760,8 @@ type SimpleClient struct {
 	closed              bool
 }
 
-// NewSimpleClient creates a new SSH client
-func NewSimpleClient(config *spookytypes.ClientConfig, logger spookytypeslogging.Logger) *SimpleClient {
+// NewClient creates a new SSH client
+func NewClient(config *spookytypes.ClientConfig, logger spookytypeslogging.Logger) *Client {
 	if config == nil {
 		config = &spookytypes.ClientConfig{
 			DefaultPort:      22,
@@ -791,8 +791,8 @@ func NewSimpleClient(config *spookytypes.ClientConfig, logger spookytypeslogging
 	// Create advanced connection pool
 	connectionPool := NewAdvancedConnectionPool(config, logger)
 
-	// Create SimpleClient first
-	client := &SimpleClient{
+	// Create Client first
+	client := &Client{
 		config:         config,
 		logger:         logger,
 		hostKeyManager: hostKeyManager,
@@ -807,7 +807,7 @@ func NewSimpleClient(config *spookytypes.ClientConfig, logger spookytypeslogging
 }
 
 // Connect establishes an SSH connection using the advanced connection pool
-func (c *SimpleClient) Connect(ctx context.Context, request *spookytypes.ConnectionRequest) (*spookytypes.ConnectionResult, error) {
+func (c *Client) Connect(ctx context.Context, request *spookytypes.ConnectionRequest) (*spookytypes.ConnectionResult, error) {
 	if c.closed {
 		return nil, fmt.Errorf("client is closed")
 	}
@@ -835,7 +835,7 @@ func (c *SimpleClient) Connect(ctx context.Context, request *spookytypes.Connect
 		Host:          request.Host,
 		Port:          request.Port,
 		User:          request.User,
-		Status:        spookytypes.ConnectionStatusConnected,
+		Status:        spookytypesssh.ConnectionStatusConnected,
 		ConnectedAt:   &startTime,
 		ClientVersion: string(clientVersion),
 		ServerVersion: string(serverVersion),
@@ -854,7 +854,7 @@ func (c *SimpleClient) Connect(ctx context.Context, request *spookytypes.Connect
 }
 
 // createSSHConfig creates an SSH client configuration
-func (c *SimpleClient) createSSHConfig(request *spookytypes.ConnectionRequest) (*ssh.ClientConfig, error) {
+func (c *Client) createSSHConfig(request *spookytypes.ConnectionRequest) (*ssh.ClientConfig, error) {
 	config := &ssh.ClientConfig{
 		User:            request.User,
 		HostKeyCallback: c.hostKeyManager.GetHostKeyCallback(),
@@ -905,7 +905,7 @@ func (c *SimpleClient) createSSHConfig(request *spookytypes.ConnectionRequest) (
 }
 
 // loadPrivateKey loads and validates a private key from file
-func (c *SimpleClient) loadPrivateKey(keyPath, passphrase string) (ssh.Signer, error) {
+func (c *Client) loadPrivateKey(keyPath, passphrase string) (ssh.Signer, error) {
 	// Expand tilde in path
 	if strings.HasPrefix(keyPath, "~") {
 		home, err := os.UserHomeDir()
@@ -941,7 +941,7 @@ func (c *SimpleClient) loadPrivateKey(keyPath, passphrase string) (ssh.Signer, e
 }
 
 // loadSSHCertificate loads an SSH certificate with its private key
-func (c *SimpleClient) loadSSHCertificate(certPath, keyPath, passphrase string) (ssh.Signer, error) {
+func (c *Client) loadSSHCertificate(certPath, keyPath, passphrase string) (ssh.Signer, error) {
 	// Expand tilde in paths
 	if strings.HasPrefix(certPath, "~") {
 		home, err := os.UserHomeDir()
@@ -1004,7 +1004,7 @@ func (c *SimpleClient) loadSSHCertificate(certPath, keyPath, passphrase string) 
 }
 
 // validateKeyType validates that the key is of a supported type
-func (c *SimpleClient) validateKeyType(signer ssh.Signer) error {
+func (c *Client) validateKeyType(signer ssh.Signer) error {
 	pubKey := signer.PublicKey()
 	keyType := pubKey.Type()
 
@@ -1039,7 +1039,7 @@ func (c *SimpleClient) validateKeyType(signer ssh.Signer) error {
 }
 
 // validateED25519Key validates an ed25519 key
-func (c *SimpleClient) validateED25519Key(pubKey ssh.PublicKey) error {
+func (c *Client) validateED25519Key(pubKey ssh.PublicKey) error {
 	// ed25519 keys are always valid - they have a fixed size
 	// We just need to ensure it's actually an ed25519 key
 	if pubKey.Type() != ssh.KeyAlgoED25519 {
@@ -1049,7 +1049,7 @@ func (c *SimpleClient) validateED25519Key(pubKey ssh.PublicKey) error {
 }
 
 // validateRSAKey validates an RSA key (must be 4096-bit)
-func (c *SimpleClient) validateRSAKey(pubKey ssh.PublicKey) error {
+func (c *Client) validateRSAKey(pubKey ssh.PublicKey) error {
 	if pubKey.Type() != ssh.KeyAlgoRSA {
 		return fmt.Errorf("expected RSA key, got %s", pubKey.Type())
 	}
@@ -1076,7 +1076,7 @@ func (c *SimpleClient) validateRSAKey(pubKey ssh.PublicKey) error {
 }
 
 // generateSupportedKey generates a supported key type for testing
-func (c *SimpleClient) generateSupportedKey(keyType string) (ssh.Signer, error) {
+func (c *Client) generateSupportedKey(keyType string) (ssh.Signer, error) {
 	switch keyType {
 	case KeyTypeED25519:
 		return c.generateED25519Key()
@@ -1088,7 +1088,7 @@ func (c *SimpleClient) generateSupportedKey(keyType string) (ssh.Signer, error) 
 }
 
 // generateED25519Key generates an ed25519 key pair
-func (c *SimpleClient) generateED25519Key() (ssh.Signer, error) {
+func (c *Client) generateED25519Key() (ssh.Signer, error) {
 	pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate ed25519 key: %w", err)
@@ -1115,7 +1115,7 @@ func (c *SimpleClient) generateED25519Key() (ssh.Signer, error) {
 }
 
 // generateRSA4096Key generates a 4096-bit RSA key pair
-func (c *SimpleClient) generateRSA4096Key() (ssh.Signer, error) {
+func (c *Client) generateRSA4096Key() (ssh.Signer, error) {
 	privKey, err := rsa.GenerateKey(rand.Reader, MinRSAKeySize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate RSA key: %w", err)
@@ -1140,7 +1140,7 @@ func (c *SimpleClient) generateRSA4096Key() (ssh.Signer, error) {
 }
 
 // RunCommand runs a command via SSH using the connection pool
-func (c *SimpleClient) RunCommand(ctx context.Context, connection *spookytypes.Connection, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error) {
+func (c *Client) RunCommand(ctx context.Context, connection *spookytypes.Connection, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error) {
 	if c.closed {
 		return nil, fmt.Errorf("client is closed")
 	}
@@ -1198,7 +1198,7 @@ func (c *SimpleClient) RunCommand(ctx context.Context, connection *spookytypes.C
 		Session: &spookytypes.Session{
 			SessionID:  fmt.Sprintf("%s-%d", connectionKey, startTime.UnixNano()),
 			Connection: connection,
-			Status:     spookytypes.SessionStatusCompleted,
+			Status:     spookytypesssh.SessionStatusCompleted,
 			StartedAt:  startTime,
 			EndedAt:    &endTime,
 		},
@@ -1229,7 +1229,7 @@ func (c *SimpleClient) RunCommand(ctx context.Context, connection *spookytypes.C
 }
 
 // Close closes all SSH connections
-func (c *SimpleClient) Close(ctx context.Context) error {
+func (c *Client) Close(ctx context.Context) error {
 	if c.closed {
 		return nil
 	}
@@ -1246,7 +1246,7 @@ func (c *SimpleClient) Close(ctx context.Context) error {
 }
 
 // TestHostKeyVerification tests the host key verification functionality
-func (c *SimpleClient) TestHostKeyVerification() error {
+func (c *Client) TestHostKeyVerification() error {
 	// Test with a mock host key
 	testHostname := "test.example.com"
 	testPort := 22
@@ -1278,11 +1278,11 @@ func (c *SimpleClient) TestHostKeyVerification() error {
 }
 
 // GetFileTransferManager returns the file transfer manager
-func (c *SimpleClient) GetFileTransferManager() *FileTransferManager {
+func (c *Client) GetFileTransferManager() *FileTransferManager {
 	return c.fileTransferManager
 }
 
 // GetAdvancedAuthManager returns the advanced authentication manager
-func (c *SimpleClient) GetAdvancedAuthManager() *AdvancedAuthManager {
+func (c *Client) GetAdvancedAuthManager() *AdvancedAuthManager {
 	return c.advancedAuthManager
 }
