@@ -111,11 +111,14 @@ spooky facts gather /path/to/project --dry-run
 
 ### Actions Integration Issues
 
+**Status: ✅ Fully Functional** - The actions integration is complete with full SSH-based execution, dependency resolution, and comprehensive error handling.
+
 **Common Problems:**
 - Actions configuration file not found
 - Action validation failures
-- Template rendering errors
+- SSH connectivity issues during execution
 - Action dependencies not met
+- Machine targeting problems
 
 **Diagnostic Commands:**
 ```bash
@@ -125,15 +128,19 @@ spooky actions list /path/to/project
 # Validate actions
 spooky actions validate /path/to/project
 
-# Test action loading
+# Test action execution (dry-run)
 spooky actions run /path/to/project --dry-run
+
+# Check action plan
+spooky actions run /path/to/project --plan
 ```
 
 **Solutions:**
 1. **Missing configuration**: Ensure `actions.hcl` exists and is valid
 2. **Validation failures**: Fix action syntax and dependencies
-3. **Template errors**: Check template syntax and variable resolution
-4. **Dependency issues**: Install required dependencies
+3. **SSH issues**: Check SSH connectivity and authentication
+4. **Dependency issues**: Resolve action dependencies and circular references
+5. **Machine targeting**: Verify machine names and tags are correct
 
 ### Variables Integration Issues
 

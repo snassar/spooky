@@ -45,7 +45,7 @@ func (i *Integration) LoadActions(ctx context.Context, source string) ([]spookyt
 }
 
 // ValidateActions validates a collection of actions
-func (i *Integration) ValidateActions(ctx context.Context, actions []spookytypes.Action) (*spookytypesactions.ActionValidation, error) {
+func (i *Integration) ValidateActions(ctx context.Context, actions []spookytypes.Action) (*spookytypes.ValidationResult, error) {
 	return i.manager.ValidateActions(ctx, actions)
 }
 

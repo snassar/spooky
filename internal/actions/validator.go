@@ -38,19 +38,18 @@ func (v *Validator) ValidateActions(ctx context.Context, actions []spookytypes.A
 	}
 
 	// Validate each action
-	for i, action := range actions {
-		actionResult, err := v.ValidateAction(ctx, action)
+	for i := range actions {
+		actionResult, err := v.ValidateAction(ctx, actions[i])
 		if err != nil {
-			return nil, fmt.Errorf("failed to validate action %d: %w", i, err)
+			return nil, fmt.Errorf("failed to validate action %s: %w", actions[i].Name, err)
 		}
 
-		// Aggregate results
 		if !actionResult.Valid {
 			result.Valid = false
+			result.Errors = append(result.Errors, actionResult.Errors...)
 		}
-		result.Errors = append(result.Errors, actionResult.Errors...)
+
 		result.Warnings = append(result.Warnings, actionResult.Warnings...)
-		result.Info = append(result.Info, actionResult.Info...)
 	}
 
 	// Validate dependencies across all actions
@@ -74,17 +73,17 @@ func (v *Validator) ValidateActions(ctx context.Context, actions []spookytypes.A
 }
 
 // ValidateAction validates a single action
-func (v *Validator) ValidateAction(ctx context.Context, action spookytypes.Action) (*spookytypes.ValidationResult, error) {
+func (v *Validator) ValidateAction(_ context.Context, action spookytypes.Action) (*spookytypes.ValidationResult, error) {
 	v.logger.Debug("Validating action", map[string]interface{}{
 		"action": action.Name,
+		"type":   action.Type,
 	})
 
+	// Initialize result
 	result := &spookytypes.ValidationResult{
-		Valid:       true,
-		ValidatedAt: time.Now(),
-		Errors:      []spookytypes.SchemaError{},
-		Warnings:    []spookytypes.SchemaError{},
-		Info:        []spookytypes.SchemaError{},
+		Valid:    true,
+		Errors:   []spookytypes.SchemaError{},
+		Warnings: []spookytypes.SchemaError{},
 	}
 
 	// Validate required fields
@@ -111,7 +110,7 @@ func (v *Validator) ValidateAction(ctx context.Context, action spookytypes.Actio
 	// Validate action type-specific requirements
 	switch action.Type {
 	case string(spookytypesactions.ActionTypeCommand):
-		if action.Command == "" {
+		if action.Command == nil {
 			result.Valid = false
 			result.Errors = append(result.Errors, spookytypes.SchemaError{
 				Code:        "missing_command",
@@ -122,7 +121,7 @@ func (v *Validator) ValidateAction(ctx context.Context, action spookytypes.Actio
 		}
 
 	case string(spookytypesactions.ActionTypeScript):
-		if action.Script == "" {
+		if action.Script == nil {
 			result.Valid = false
 			result.Errors = append(result.Errors, spookytypes.SchemaError{
 				Code:        "missing_script",
@@ -203,21 +202,8 @@ func (v *Validator) ValidateAction(ctx context.Context, action spookytypes.Actio
 func (v *Validator) validateDependencies(actions []spookytypes.Action) error {
 	// Build dependency graph
 	dependencies := make(map[string][]string)
-	actionNames := make(map[string]bool)
-
-	// Collect all action names
-	for _, action := range actions {
-		actionNames[action.Name] = true
-	}
-
-	// Build dependency map
-	for _, action := range actions {
-		for _, dep := range action.Dependencies {
-			if !actionNames[dep] {
-				return fmt.Errorf("action '%s' depends on undefined action '%s'", action.Name, dep)
-			}
-			dependencies[action.Name] = append(dependencies[action.Name], dep)
-		}
+	for i := range actions {
+		dependencies[actions[i].Name] = actions[i].Dependencies
 	}
 
 	// Check for circular dependencies

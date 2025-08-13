@@ -975,8 +975,8 @@ spooky machines ping ./my-project
 # 2. Test connectivity and authentication
 spooky machines ping ./my-project --auth
 
-# 3. Run actions with file transfer (when actions system is implemented)
-# spooky actions run ./my-project --action deploy-web
+# 3. Run actions with file transfer (actions system is fully implemented)
+spooky actions run ./my-project --action deploy-web
 ```
 
 This comprehensive user guide provides everything needed to effectively use the SSH system in spooky, from basic setup to advanced configurations and best practices.
