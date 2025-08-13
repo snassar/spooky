@@ -4,6 +4,7 @@
 package types
 
 import (
+	spookytypesactions "spooky/internal/types/actions"
 	spookytypescli "spooky/internal/types/cli"
 	spookytypescommon "spooky/internal/types/common"
 	spookytypesconfig "spooky/internal/types/config"
@@ -13,6 +14,7 @@ import (
 	spookytypesproject "spooky/internal/types/project"
 	spookytypesschemas "spooky/internal/types/schemas"
 	spookytypesssh "spooky/internal/types/ssh"
+	spookytypestemplates "spooky/internal/types/templates"
 	spookytypesvariables "spooky/internal/types/variables"
 )
 
@@ -384,12 +386,37 @@ type MonitoringFacts = spookytypesfacts.MonitoringFacts
 type MonitoringEndpoints = spookytypesfacts.MonitoringEndpoints
 type HealthCheckFacts = spookytypesfacts.HealthCheckFacts
 
-// Placeholder types for interfaces (to be implemented)
-type FactCollection = interface{}
-type FactStorage = interface{}
-type Action = interface{}
-type ActingResult = interface{}
-type Template = interface{}
+// Actions types
+type Action = spookytypesactions.Action
+type ActionCollection = spookytypesactions.ActionCollection
+type ActionPlan = spookytypesactions.ActionPlan
+type ActionDependency = spookytypesactions.ActionDependency
+type ActionExecution = spookytypesactions.ActionExecution
+type ActionValidation = spookytypesactions.ActionValidation
+type ActionMetrics = spookytypesactions.ActionMetrics
+type ActionExecutionContext = spookytypesactions.ActionExecutionContext
+type ActingResult = spookytypesactions.ActingResult
+type TemplateConfig = spookytypesactions.TemplateConfig
+type FileCopyConfig = spookytypesactions.FileCopyConfig
+type ServiceConfig = spookytypesactions.ServiceConfig
+type ResourceLimits = spookytypesactions.ResourceLimits
+
+// Template types
+type Template = spookytypestemplates.Template
+type TemplateMetadata = spookytypestemplates.TemplateMetadata
+type TemplateContext = spookytypestemplates.TemplateContext
+type TemplateEngine = spookytypestemplates.TemplateEngine
+type TemplateManager = spookytypestemplates.TemplateManager
+type TemplateError = spookytypestemplates.TemplateError
+type TemplateValidationResult = spookytypestemplates.TemplateValidationResult
+
+// Facts types
+type FactCollection = spookytypesfacts.FactCollection
+type FactStorage = spookytypesfacts.FactStorage
+type FactCollector = spookytypesfacts.FactCollector
+type FactManager = spookytypesfacts.FactManager
+type FactCollectionOptions = spookytypesfacts.FactCollectionOptions
+type FactExportOptions = spookytypesfacts.FactExportOptions
 
 // Schema types
 type Schema = spookytypesschemas.Schema

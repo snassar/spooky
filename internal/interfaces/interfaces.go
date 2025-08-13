@@ -263,6 +263,15 @@ type SecretsIntegration interface {
 	ValidateKey(ctx context.Context, key []byte) error
 }
 
+// ActionValidator provides action validation
+type ActionValidator interface {
+	// ValidateActions validates a collection of actions
+	ValidateActions(ctx context.Context, actions []spookytypes.Action) (*spookytypes.ValidationResult, error)
+
+	// ValidateAction validates a single action
+	ValidateAction(ctx context.Context, action spookytypes.Action) (*spookytypes.ValidationResult, error)
+}
+
 // ConfigIntegration provides configuration management
 type ConfigIntegration interface {
 	// LoadConfig loads configuration from the given source
