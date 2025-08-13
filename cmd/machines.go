@@ -388,14 +388,20 @@ func outputPingResultsJSON(statuses []spookytypes.MachineStatus, verbose bool) e
 
 // testMachineAuthentication tests authentication for a single machine
 func testMachineAuthentication(ctx context.Context, machine spookytypes.Machine) error {
+	// Get actions integration to access SSH manager
+	actionsIntegration := getIntegrationManager().GetActionsIntegration()
+	if actionsIntegration == nil {
+		return fmt.Errorf("actions integration not available")
+	}
+
 	// For now, this is a placeholder that will be implemented when SSH integration is complete
 	// In the future, this will:
-	// 1. Create an SSH client
-	// 2. Attempt to authenticate using the machine's credentials
-	// 3. Return success/failure based on authentication result
+	// 1. Get SSH manager from actions integration
+	// 2. Create SSH client with machine credentials
+	// 3. Attempt to authenticate and return success/failure
 
-	fmt.Printf("Testing authentication for %s (placeholder - will be implemented)\n", machine.Hostname)
-	return fmt.Errorf("authentication testing not yet implemented")
+	fmt.Printf("Testing authentication for %s (placeholder - SSH integration in progress)\n", machine.Hostname)
+	return fmt.Errorf("authentication testing not yet implemented - SSH integration needs completion")
 }
 
 // getErrorMessage extracts error message from machine status

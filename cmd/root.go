@@ -41,6 +41,11 @@ Examples:
 			return fmt.Errorf("configuration setup failed: %w", err)
 		}
 
+		// Initialize integration manager for commands that need it
+		if err := InitializeIntegrationsDependencies(); err != nil {
+			return fmt.Errorf("integration initialization failed: %w", err)
+		}
+
 		return nil
 	},
 }

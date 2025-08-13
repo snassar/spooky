@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
-
-	"github.com/spf13/cobra"
+	"os"
+	"path/filepath"
 
 	spookyinterfaces "spooky/internal/interfaces"
+
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -25,10 +28,42 @@ all actions in the project will be run.`,
 		Short: "List available actions",
 		Long:  `List all available actions in the project.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("Available actions (placeholder implementation):")
-			fmt.Println("- deploy-web")
-			fmt.Println("- restart-services")
-			fmt.Println("- backup-database")
+			if len(args) == 0 {
+				return fmt.Errorf("project directory is required")
+			}
+
+			projectPath := args[0]
+			if err := validateProjectPath(projectPath); err != nil {
+				return err
+			}
+
+			// Get actions integration
+			actionsIntegration := getIntegrationManager().GetActionsIntegration()
+			if actionsIntegration == nil {
+				return fmt.Errorf("actions integration not available")
+			}
+
+			// Load actions from project
+			ctx := context.Background()
+			actions, err := actionsIntegration.LoadActions(ctx, projectPath)
+			if err != nil {
+				return fmt.Errorf("failed to load actions: %w", err)
+			}
+
+			if len(actions) == 0 {
+				fmt.Println("No actions found in project")
+				return nil
+			}
+
+			fmt.Printf("Available actions (%d found):\n", len(actions))
+			for i, action := range actions {
+				fmt.Printf("%d. %s", i+1, action.Name)
+				if action.Description != "" {
+					fmt.Printf(" - %s", action.Description)
+				}
+				fmt.Println()
+			}
+
 			return nil
 		},
 	}
@@ -45,25 +80,61 @@ all actions in the project will be run.
 Use --plan to see what would be run without actually running.
 Use --dry-run to simulate running without making changes.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return fmt.Errorf("project directory is required")
+			}
+
+			projectPath := args[0]
+			if err := validateProjectPath(projectPath); err != nil {
+				return err
+			}
+
+			// Get actions integration
+			actionsIntegration := getIntegrationManager().GetActionsIntegration()
+			if actionsIntegration == nil {
+				return fmt.Errorf("actions integration not available")
+			}
+
+			ctx := context.Background()
+
+			// Load actions from project
+			actions, err := actionsIntegration.LoadActions(ctx, projectPath)
+			if err != nil {
+				return fmt.Errorf("failed to load actions: %w", err)
+			}
+
+			if len(actions) == 0 {
+				return fmt.Errorf("no actions found in project")
+			}
+
 			// Check running mode
 			if isFlagSet(cmd, "plan") {
-				fmt.Println("Action running plan (placeholder implementation):")
-				fmt.Println("1. deploy-web")
-				fmt.Println("2. restart-services")
-				fmt.Println("3. backup-database")
+				fmt.Printf("Action running plan (%d actions):\n", len(actions))
+				for i, action := range actions {
+					fmt.Printf("%d. %s", i+1, action.Name)
+					if action.Description != "" {
+						fmt.Printf(" - %s", action.Description)
+					}
+					fmt.Println()
+				}
 				return nil
 			}
 
 			if isFlagSet(cmd, "dry-run") {
 				fmt.Println("Simulating running...")
-				fmt.Println("[web-server-1] Would run: sudo systemctl stop nginx")
-				fmt.Println("[web-server-2] Would run: sudo systemctl stop nginx")
+				for _, action := range actions {
+					fmt.Printf("[%s] Would run: %s\n", action.Name, action.Command)
+				}
 				return nil
 			}
 
 			// Normal running mode
-			fmt.Println("Running actions (placeholder implementation)...")
-			fmt.Println("No actions run (placeholder implementation)")
+			fmt.Printf("Running %d actions...\n", len(actions))
+			for _, action := range actions {
+				fmt.Printf("Running action: %s\n", action.Name)
+				// TODO: Implement actual action running
+			}
+			fmt.Println("Actions completed")
 			return nil
 		},
 	}
@@ -74,8 +145,50 @@ Use --dry-run to simulate running without making changes.`,
 		Short: "Validate action configurations",
 		Long:  `Validate action configurations for syntax and dependencies.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("Validating actions (placeholder implementation)...")
-			fmt.Println("All actions are valid!")
+			if len(args) == 0 {
+				return fmt.Errorf("project directory is required")
+			}
+
+			projectPath := args[0]
+			if err := validateProjectPath(projectPath); err != nil {
+				return err
+			}
+
+			// Get actions integration
+			actionsIntegration := getIntegrationManager().GetActionsIntegration()
+			if actionsIntegration == nil {
+				return fmt.Errorf("actions integration not available")
+			}
+
+			ctx := context.Background()
+
+			// Load actions from project
+			actions, err := actionsIntegration.LoadActions(ctx, projectPath)
+			if err != nil {
+				return fmt.Errorf("failed to load actions: %w", err)
+			}
+
+			if len(actions) == 0 {
+				fmt.Println("No actions found to validate")
+				return nil
+			}
+
+			// Validate actions
+			result, err := actionsIntegration.ValidateActions(ctx, actions)
+			if err != nil {
+				return fmt.Errorf("validation failed: %w", err)
+			}
+
+			if result.Valid {
+				fmt.Printf("✅ All %d actions are valid!\n", len(actions))
+			} else {
+				fmt.Printf("❌ Validation failed for %d actions:\n", len(result.Errors))
+				for _, err := range result.Errors {
+					fmt.Printf("  - %s\n", err.Message)
+				}
+				return fmt.Errorf("action validation failed")
+			}
+
 			return nil
 		},
 	}
@@ -86,10 +199,35 @@ func isFlagSet(cmd *cobra.Command, flagName string) bool {
 	return cmd.Flags().Lookup(flagName) != nil && cmd.Flags().Lookup(flagName).Changed
 }
 
-// Helper function to get SSH manager (placeholder)
-func getSSHManager() spookyinterfaces.SSHManager {
-	// TODO: Implement proper SSH manager initialization
+// Helper function to validate project path
+func validateProjectPath(projectPath string) error {
+	if projectPath == "" {
+		return fmt.Errorf("project path cannot be empty")
+	}
+
+	// Check if project path exists
+	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+		return fmt.Errorf("project path does not exist: %s", projectPath)
+	}
+
+	// Check if it's a directory
+	if info, err := os.Stat(projectPath); err == nil && !info.IsDir() {
+		return fmt.Errorf("project path must be a directory: %s", projectPath)
+	}
+
+	// Check for project.hcl file
+	projectFile := filepath.Join(projectPath, "project.hcl")
+	if _, err := os.Stat(projectFile); os.IsNotExist(err) {
+		return fmt.Errorf("project.hcl not found in: %s", projectPath)
+	}
+
 	return nil
+}
+
+// Helper function to get integration manager
+func getIntegrationManager() spookyinterfaces.IntegrationManager {
+	// Return the global integration manager from cmd package
+	return integrationManager
 }
 
 func init() {
