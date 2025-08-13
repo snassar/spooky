@@ -845,7 +845,7 @@ spooky machines ping ./my-project
 ls -la ~/.ssh/
 chmod 600 ~/.ssh/id_rsa
 
-# Regenerate SSH keys if needed
+# Note: spooky does not generate SSH keys - use openssh to regenerate keys if needed
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
 
 # Copy keys to machines

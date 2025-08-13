@@ -4,7 +4,6 @@ package ssh
 
 import (
 	"crypto/rand"
-	"crypto/rsa"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -449,18 +448,14 @@ func (aam *AdvancedAuthManager) createAgentAuth() (ssh.AuthMethod, error) {
 
 // GenerateCertificate generates a new SSH certificate
 func (aam *AdvancedAuthManager) GenerateCertificate(config *CertificateConfig) (*ssh.Certificate, error) {
-	// Generate or load private key
-	var signer ssh.Signer
-	var err error
-
-	if config.PrivateKeyPath != "" {
-		signer, err = aam.loadPrivateKey(config.PrivateKeyPath, config.PrivateKeyPass)
-	} else {
-		signer, err = aam.generatePrivateKey(config.KeyType, config.KeySize)
+	// Load private key
+	if config.PrivateKeyPath == "" {
+		return nil, fmt.Errorf("private key path is required")
 	}
 
+	signer, err := aam.loadPrivateKey(config.PrivateKeyPath, config.PrivateKeyPass)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get private key: %w", err)
+		return nil, fmt.Errorf("failed to load private key: %w", err)
 	}
 
 	// Create certificate
@@ -503,23 +498,6 @@ func (aam *AdvancedAuthManager) GenerateCertificate(config *CertificateConfig) (
 	})
 
 	return cert, nil
-}
-
-// generatePrivateKey generates a new private key
-func (aam *AdvancedAuthManager) generatePrivateKey(keyType string, keySize int) (ssh.Signer, error) {
-	switch keyType {
-	case "rsa":
-		privateKey, err := rsa.GenerateKey(rand.Reader, keySize)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate RSA key: %w", err)
-		}
-		return ssh.NewSignerFromKey(privateKey)
-	case "ed25519":
-		// For ed25519, we need to use a different approach
-		return nil, fmt.Errorf("ed25519 key generation not implemented")
-	default:
-		return nil, fmt.Errorf("unsupported key type: %s", keyType)
-	}
 }
 
 // CertificateConfig represents certificate generation configuration

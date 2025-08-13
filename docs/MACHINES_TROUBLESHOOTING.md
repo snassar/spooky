@@ -121,7 +121,7 @@ machine "web-server" {
 # Check if key file exists
 ls -la ~/.ssh/id_rsa
 
-# Generate a new SSH key if needed
+# Note: spooky does not generate SSH keys - use openssh to generate a new SSH key if needed
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
 
 # Set correct permissions

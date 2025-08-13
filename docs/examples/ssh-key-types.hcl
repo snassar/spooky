@@ -117,6 +117,9 @@ machines {
 
 # Key Generation Commands Reference
 # 
+# Note: spooky does not generate SSH keys
+# Use openssh to generate keys:
+#
 # Generate ED25519 key:
 #   ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "spooky-ed25519-key"
 #   ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "spooky-ed25519-key" -N "my-passphrase"

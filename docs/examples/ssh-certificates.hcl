@@ -127,6 +127,9 @@ machines {
 
 # Certificate Authority Setup Commands
 #
+# Note: spooky does not generate SSH keys
+# Use openssh to generate keys:
+#
 # 1. Generate CA key:
 #    ssh-keygen -t ed25519 -f ~/.ssh/ca_key -C "spooky-ca"
 #

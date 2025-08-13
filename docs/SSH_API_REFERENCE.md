@@ -1150,25 +1150,9 @@ func main() {
     logger := logManager.GetLogger("key-validation")
     client := ssh.NewClient(nil, logger)
 
-    // Test key generation and validation
-    keyTypes := []string{ssh.KeyTypeED25519, ssh.KeyTypeRSA4096}
-
-    for _, keyType := range keyTypes {
-        fmt.Printf("Testing %s key generation and validation...\n", keyType)
-        
-        signer, err := client.generateSupportedKey(keyType)
-        if err != nil {
-            fmt.Printf("Failed to generate %s key: %v\n", keyType, err)
-            continue
-        }
-
-        // Validate the generated key
-        if err := client.validateKeyType(signer); err != nil {
-            fmt.Printf("Key validation failed for %s: %v\n", keyType, err)
-        } else {
-            fmt.Printf("✓ %s key validation passed\n", keyType)
-        }
-    }
+    // Test key validation
+    fmt.Println("Key generation not supported - use existing SSH keys for validation testing")
+    fmt.Println("To validate keys, use the validateKeyType method with existing key signers")
 }
 ```
 

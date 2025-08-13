@@ -26,7 +26,8 @@ This troubleshooting guide provides solutions for common issues encountered when
 
 **Solution:**
 ```bash
-# Generate a new 4096-bit RSA key
+# Note: spooky does not generate SSH keys
+# Use openssh to generate a new 4096-bit RSA key:
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_4096 -C "spooky-rsa-key"
 
 # Update machine configuration
@@ -48,10 +49,11 @@ machine "server" {
 
 **Solution:**
 ```bash
-# Generate a supported key type (ED25519 recommended)
+# Note: spooky does not generate SSH keys
+# Use openssh to generate a supported key type (ED25519 recommended):
 ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "spooky-ed25519-key"
 
-# Or generate 4096-bit RSA key
+# Or generate 4096-bit RSA key:
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_4096 -C "spooky-rsa-key"
 
 # Update machine configuration
@@ -76,7 +78,8 @@ machine "server" {
 # Check if key file exists
 ls -la ~/.ssh/id_rsa
 
-# Generate key if it doesn't exist
+# Note: spooky does not generate SSH keys
+# Use openssh to generate key if it doesn't exist:
 ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519
 
 # Verify the path in configuration
@@ -231,7 +234,8 @@ ssh-keygen -lf ~/.ssh/id_rsa
 
 **Solution:**
 ```bash
-# Generate new 4096-bit RSA key
+# Note: spooky does not generate SSH keys
+# Use openssh to generate new 4096-bit RSA key:
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_4096 -C "spooky-4096-key"
 
 # Update configuration
@@ -252,14 +256,15 @@ Error: key validation failed for dsa: unsupported key type: ssh-dss
 
 **Solution:**
 ```bash
-# Generate supported key type
+# Note: spooky does not generate SSH keys
+# Use openssh to generate supported key type:
 ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "spooky-ed25519-key"
 
 # Update all machine configurations to use supported keys
 ```
 
 **Migration Strategy:**
-1. Generate new supported keys
+1. Use openssh to generate new supported keys
 2. Install public keys on target machines
 3. Update machine configurations
 4. Test connections

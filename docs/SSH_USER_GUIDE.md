@@ -77,7 +77,8 @@ Modern, secure elliptic curve keys with fixed 256-bit size.
 
 **Generation:**
 ```bash
-# Generate ED25519 key
+# Note: spooky does not generate SSH keys
+# Use openssh to generate keys:
 ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "spooky-ssh-key"
 
 # Generate with passphrase
@@ -106,7 +107,8 @@ Traditional RSA keys with enhanced security requirements.
 
 **Generation:**
 ```bash
-# Generate 4096-bit RSA key
+# Note: spooky does not generate SSH keys
+# Use openssh to generate keys:
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_4096 -C "spooky-rsa-key"
 
 # Generate with passphrase

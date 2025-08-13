@@ -241,7 +241,7 @@ spooky secrets encrypt --test
 ```
 
 **Solutions:**
-1. **Missing keys**: Generate or import encryption keys
+1. **Missing keys**: Import encryption keys (spooky does not generate keys)
 2. **Key validation**: Fix key format and permissions
 3. **Encryption errors**: Check encryption libraries and algorithms
 4. **Permission issues**: Fix key file permissions (600)

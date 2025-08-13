@@ -108,21 +108,6 @@ func (i *Integration) Decrypt(ctx context.Context, data []byte, key []byte) ([]b
 	return plaintext, nil
 }
 
-// GenerateKey generates a new encryption key
-func (i *Integration) GenerateKey(ctx context.Context) ([]byte, error) {
-	// Generate a 256-bit (32-byte) key
-	key := make([]byte, 32)
-	if _, err := io.ReadFull(rand.Reader, key); err != nil {
-		return nil, fmt.Errorf("failed to generate key: %w", err)
-	}
-
-	i.logger.Info("Encryption key generated successfully", map[string]interface{}{
-		"key_size": len(key),
-	})
-
-	return key, nil
-}
-
 // ValidateKey validates an encryption key
 func (i *Integration) ValidateKey(ctx context.Context, key []byte) error {
 	if len(key) == 0 {

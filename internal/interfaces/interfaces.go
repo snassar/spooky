@@ -268,9 +268,6 @@ type SecretsIntegration interface {
 	// Decrypt decrypts data with the given key
 	Decrypt(ctx context.Context, data []byte, key []byte) ([]byte, error)
 
-	// GenerateKey generates a new encryption key
-	GenerateKey(ctx context.Context) ([]byte, error)
-
 	// ValidateKey validates an encryption key
 	ValidateKey(ctx context.Context, key []byte) error
 }

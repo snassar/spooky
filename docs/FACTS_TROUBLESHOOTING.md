@@ -252,7 +252,7 @@ machines {
 # Check if key file exists
 ls -la ~/.ssh/id_rsa
 
-# Generate new SSH key if needed
+# Note: spooky does not generate SSH keys - use openssh to generate new SSH key if needed
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
 
 # Copy key to target machine

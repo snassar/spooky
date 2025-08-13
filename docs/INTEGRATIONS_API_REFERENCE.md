@@ -78,7 +78,6 @@ type MachinesIntegration interface {
 type SecretsIntegration interface {
     Encrypt(ctx context.Context, data []byte, key []byte) ([]byte, error)
     Decrypt(ctx context.Context, data []byte, key []byte) ([]byte, error)
-    GenerateKey(ctx context.Context) ([]byte, error)
     ValidateKey(ctx context.Context, key []byte) error
 }
 ```

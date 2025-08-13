@@ -69,11 +69,11 @@ request := &spookytypes.ConnectionRequest{
 - **Error Handling**: Detailed validation error messages
 - **Logging**: Comprehensive logging of key operations
 
-### 4. Key Generation (for testing)
-- **ED25519 Generation**: Generate test ed25519 keys
-- **RSA Generation**: Generate 4096-bit RSA keys
+### 4. Key Validation (for testing)
+- **ED25519 Validation**: Validate existing ed25519 keys
+- **RSA Validation**: Validate 4096-bit RSA keys
 - **Fingerprint Support**: SHA256 fingerprint generation
-- **Validation Integration**: Generated keys are automatically validated
+- **Validation Integration**: Keys are automatically validated on load
 
 ## Usage Examples
 
