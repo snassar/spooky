@@ -55,41 +55,18 @@ func (i *Integration) StoreFacts(ctx context.Context, facts interface{}) error {
 	}
 
 	// Type assert to concrete type
-	factCollection, ok := facts.(*FactCollection)
+	_, ok := facts.(*FactCollection)
 	if !ok {
 		return fmt.Errorf("invalid facts type")
 	}
 
-	// Store facts using the manager
-	if err := i.manager.StoreFacts(ctx, factCollection.MachineID, factCollection); err != nil {
-		return fmt.Errorf("failed to store facts for %s: %w", factCollection.MachineID, err)
-	}
-
+	// Facts are collected and exported directly - no storage needed
 	return nil
 }
 
 // LoadFacts loads facts from memory
 func (i *Integration) LoadFacts(ctx context.Context) (interface{}, error) {
-	// List all machine IDs with stored facts
-	machineIDs, err := i.manager.ListFacts(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list facts: %w", err)
-	}
-
-	if len(machineIDs) == 0 {
-		return nil, nil
-	}
-
-	// For now, return the first machine's facts
-	// In a real implementation, this would aggregate all facts
-	if len(machineIDs) > 0 {
-		facts, err := i.manager.GetFacts(ctx, machineIDs[0])
-		if err != nil {
-			return nil, fmt.Errorf("failed to get facts for %s: %w", machineIDs[0], err)
-		}
-		return facts, nil
-	}
-
+	// Memory-only storage - no facts to load
 	return nil, nil
 }
 

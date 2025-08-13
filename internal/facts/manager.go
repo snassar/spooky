@@ -17,7 +17,6 @@ import (
 
 // Manager implements FactManager
 type Manager struct {
-	storage   FactStorage
 	collector FactCollector
 	validator spookytypesschemas.SchemaValidator
 	logger    spookytypes.Logger
@@ -30,7 +29,6 @@ func NewManager(
 	logger spookytypes.Logger,
 ) *Manager {
 	return &Manager{
-		storage:   NewMemoryFactStorage(),
 		collector: collector,
 		validator: validator,
 		logger:    logger,
@@ -405,43 +403,10 @@ func (m *Manager) CollectAndStoreFactsParallel(ctx context.Context, machines []*
 
 // GetStorageStats returns storage statistics
 func (m *Manager) GetStorageStats() (map[string]interface{}, error) {
-	if memoryStorage, ok := m.storage.(*MemoryFactStorage); ok {
-		return memoryStorage.GetStats()
-	}
-
 	return map[string]interface{}{
-		"storage_type": "unknown",
-		"description":  "Unknown storage type",
+		"storage_type": "memory_only",
+		"description":  "Direct export without intermediate storage",
 	}, nil
-}
-
-// StoreFacts stores facts for a machine
-func (m *Manager) StoreFacts(ctx context.Context, machineID string, facts *FactCollection) error {
-	m.logger.Info("Storing facts for machine", map[string]interface{}{
-		"machine": machineID,
-	})
-
-	// Memory storage doesn't support storing - facts are collected on demand
-	return fmt.Errorf("store not supported for memory storage - facts are collected on demand")
-}
-
-// ListFacts lists all available facts
-func (m *Manager) ListFacts(ctx context.Context) ([]string, error) {
-	m.logger.Info("Listing facts")
-
-	// Memory storage doesn't maintain a list - facts are collected on demand
-	return []string{}, nil
-}
-
-// ImportFacts imports facts from the given format
-func (m *Manager) ImportFacts(ctx context.Context, format string, inputPath string) error {
-	m.logger.Info("Importing facts", map[string]interface{}{
-		"format": format,
-		"input":  inputPath,
-	})
-
-	// Memory storage doesn't support importing - facts are collected on demand
-	return fmt.Errorf("import not supported for memory storage - facts are collected on demand")
 }
 
 // GetFacts retrieves facts for a specific machine
@@ -466,11 +431,7 @@ type FactExport struct {
 func (m *Manager) ClearFacts(ctx context.Context) error {
 	m.logger.Info("Clearing all facts from memory")
 
-	if err := m.storage.Clear(ctx); err != nil {
-		m.logger.Error("Failed to clear facts", err)
-		return fmt.Errorf("failed to clear facts from memory: %w", err)
-	}
-
+	// Memory-only storage - no cleanup needed
 	m.logger.Info("Successfully cleared all facts from memory")
 
 	return nil

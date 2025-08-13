@@ -165,14 +165,14 @@ func handleFactsExport(cmd *cobra.Command, projectPath string) error {
 		return fmt.Errorf("failed to get underlying fact manager")
 	}
 
-	// Get all machine IDs with stored facts
-	machineIDs, err := manager.ListFacts(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to list facts: %w", err)
+	// Extract machine hostnames for export
+	var machineIDs []string
+	for _, machine := range machines {
+		machineIDs = append(machineIDs, machine.Hostname)
 	}
 
 	if len(machineIDs) == 0 {
-		return fmt.Errorf("no facts found to export")
+		return fmt.Errorf("no machines found to export")
 	}
 
 	// Export facts using the manager's export functionality
