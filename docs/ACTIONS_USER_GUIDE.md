@@ -2,7 +2,7 @@
 
 ## Overview
 
-The spooky actions system provides comprehensive action orchestration capabilities for running commands, scripts, templates, and service controls on remote machines. This guide covers everything from basic action configuration to advanced features like dependency management, parallel execution, and service control.
+The spooky actions system provides comprehensive action orchestration capabilities for running commands, scripts, templates, and service controls on remote machines. This guide covers everything from basic action configuration to advanced features like dependency management, parallel running, and service control.
 
 ## Getting Started
 
@@ -41,8 +41,8 @@ The spooky actions system provides comprehensive action orchestration capabiliti
 
 Actions are operations that can be performed on machines, such as:
 
-- **Running commands** - Execute shell commands on remote machines
-- **Running scripts** - Execute script files with template processing
+- **Running commands** - Run shell commands on remote machines
+- **Running scripts** - Run script files with template processing
 - **Deploying templates** - Render and deploy template files
 - **Copying files** - Transfer files between machines
 - **Controlling services** - Start, stop, restart system services
@@ -51,7 +51,7 @@ Actions are operations that can be performed on machines, such as:
 
 The actions system supports several types of actions:
 
-1. **command** - Execute shell commands
+1. **command** - Run shell commands
 2. **script** - Run script files (with template support)
 3. **template_deploy** - Deploy template files
 4. **file_copy** - Copy files between machines
@@ -59,14 +59,14 @@ The actions system supports several types of actions:
 
 ### Action Lifecycle
 
-The action execution process follows these steps:
+The action run process follows these steps:
 
 1. **Action Loading** - Load actions from `actions.hcl` and `actions/` directory
-2. **Dependency Resolution** - Resolve action dependencies and create execution order
+2. **Dependency Resolution** - Resolve action dependencies and create run order
 3. **Machine Targeting** - Determine target machines based on configuration
-4. **Execution Planning** - Create execution plan with `--plan` flag
-5. **Action Execution** - Execute actions on target machines via SSH
-6. **Result Collection** - Collect and report execution results
+4. **Run Planning** - Create run plan with `--plan` flag
+5. **Action Running** - Run actions on target machines via SSH
+6. **Result Collection** - Collect and report run results
 
 ## Basic Usage
 
@@ -136,7 +136,7 @@ action "action-name" {
   machines = ["machine1", "machine2"]  # Target specific machines
   tags = ["web", "production"]         # Target machines by tags
   
-  # Execution configuration
+  # Run configuration
   parallel = false                     # Run sequentially (default)
   timeout = 300                        # Timeout in seconds
   retries = 3                          # Number of retries
@@ -159,7 +159,7 @@ action "action-name" {
 
 #### Command Actions
 
-Execute shell commands on remote machines:
+Run shell commands on remote machines:
 
 ```hcl
 action "check-disk-space" {
@@ -186,7 +186,7 @@ action "update-packages" {
 
 #### Script Actions
 
-Execute script files with optional template processing:
+Run script files with optional template processing:
 
 ```hcl
 action "backup-database" {
@@ -344,7 +344,7 @@ action "update-load-balancer" {
 
 ## Advanced Usage
 
-### Parallel Execution
+### Parallel Running
 
 Run actions in parallel across machines:
 
@@ -355,7 +355,7 @@ action "parallel-update" {
   
   machines = ["web-1", "web-2", "web-3", "web-4"]
   parallel = true  # Run on all machines simultaneously
-  max_concurrent = 4  # Limit concurrent executions
+  max_concurrent = 4  # Limit concurrent runs
 }
 ```
 
@@ -377,7 +377,7 @@ action "unreliable-operation" {
 
 ### Environment Variables
 
-Set environment variables for action execution:
+Set environment variables for action running:
 
 ```hcl
 action "deploy-with-env" {
@@ -397,7 +397,7 @@ action "deploy-with-env" {
 
 ### Resource Limits
 
-Set resource limits for action execution:
+Set resource limits for action running:
 
 ```hcl
 action "resource-intensive" {
@@ -416,13 +416,13 @@ action "resource-intensive" {
 
 ### Dry Run Mode
 
-Test actions without actually executing them:
+Test actions without actually running them:
 
 ```bash
-# Show what would be executed
+# Show what would be run
 spooky actions run ./my-project --dry-run
 
-# Show execution plan
+# Show run plan
 spooky actions run ./my-project --plan
 ```
 
@@ -489,8 +489,8 @@ Common options across actions commands:
 - `--parallel`: Number of parallel workers
 - `--timeout`: Action timeout in seconds
 - `--verbose`: Verbose output
-- `--plan`: Show execution plan without running
-- `--dry-run`: Simulate execution without running
+- `--plan`: Show run plan without running
+- `--dry-run`: Simulate running without making changes
 
 ## Best Practices
 
@@ -515,16 +515,16 @@ Common options across actions commands:
 1. **Configure Retries** - Use retries for unreliable operations
 2. **Set Timeouts** - Use appropriate timeouts for long-running operations
 3. **Handle Dependencies** - Use dependencies to ensure proper order
-4. **Validate Before Running** - Always validate actions before execution
+4. **Validate Before Running** - Always validate actions before running
 5. **Use Dry Run Mode** - Test actions with dry-run mode first
 
 ### Performance Optimization
 
-1. **Use Parallel Execution** - Enable parallel execution when possible
+1. **Use Parallel Running** - Enable parallel running when possible
 2. **Limit Concurrent Operations** - Use max_concurrent to prevent overload
 3. **Optimize Dependencies** - Minimize unnecessary dependencies
 4. **Use Resource Limits** - Set appropriate resource limits
-5. **Monitor Execution** - Monitor action execution performance
+5. **Monitor Running** - Monitor action run performance
 
 ### Security Considerations
 
@@ -699,7 +699,7 @@ spooky actions validate ./my-project --verbose
 spooky actions validate ./my-project --strict
 ```
 
-#### Execution Failures
+#### Run Failures
 
 ```bash
 # Check SSH connectivity
@@ -792,19 +792,19 @@ action "os-specific-command" {
 
 - **Basic Action Types**: Command, script, template deploy, file copy, service control
 - **Action Configuration**: HCL-based configuration with validation
-- **Dependency Management**: Action dependency resolution and execution order
+- **Dependency Management**: Action dependency resolution and run order
 - **Machine Targeting**: Support for machine names and tags
-- **Parallel Execution**: Parallel action execution across machines
+- **Parallel Running**: Parallel action running across machines
 - **CLI Integration**: Complete CLI command set
 - **Validation**: Action configuration validation
-- **Planning Mode**: Execution planning with `--plan` flag
+- **Planning Mode**: Run planning with `--plan` flag
 - **Dry Run Mode**: Simulation mode with `--dry-run` flag
 
 ### 📋 Future Enhancements
 
-- **Advanced Scripting**: Enhanced script execution with better error handling
+- **Advanced Scripting**: Enhanced script running with better error handling
 - **Template Functions**: Additional template functions and helpers
-- **Action History**: Track action execution history
+- **Action History**: Track action run history
 - **Rollback Support**: Automatic rollback capabilities
 - **Advanced Scheduling**: Time-based action scheduling
 - **Action Metrics**: Performance metrics and monitoring
@@ -814,6 +814,6 @@ action "os-specific-command" {
 
 The spooky actions system provides comprehensive action orchestration capabilities for managing remote machine operations. The system is designed to be flexible, reliable, and easy to use while supporting complex deployment scenarios.
 
-Start with simple actions and gradually build more complex workflows. Always validate your configurations and use dry-run mode to test before actual execution.
+Start with simple actions and gradually build more complex workflows. Always validate your configurations and use dry-run mode to test before actual running.
 
 For more advanced usage and troubleshooting, refer to the [API Reference](ACTIONS_API_REFERENCE.md) and [Troubleshooting Guide](ACTIONS_TROUBLESHOOTING.md).

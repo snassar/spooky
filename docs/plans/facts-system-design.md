@@ -15,7 +15,7 @@ The facts system integrates with other core Spooky systems to provide fact manag
 ### **Project System Integration**
 - **Project Context**: Facts collection uses project machine inventory for target identification
 - **Project Path**: Facts export uses project paths for machine inventory loading
-- **Project Validation**: Facts operations validate project structure before execution
+- **Project Validation**: Facts operations validate project structure before running
 
 ### **CLI System Integration**
 - **Facts Commands**: Facts management through `spooky facts export` command

@@ -16,7 +16,7 @@ This document provides a comprehensive overview of the spooky actions system doc
 - Getting started with action configuration
 - Basic and advanced usage patterns
 - Action types and configuration
-- Dependency management and execution
+- Dependency management and running
 - CLI commands and options
 - Real-world examples and use cases
 
@@ -45,7 +45,7 @@ This document provides a comprehensive overview of the spooky actions system doc
 - Configuration problems and fixes
 - Performance issues and optimization
 - Network and connectivity issues
-- Dependency and execution problems
+- Dependency and running problems
 - Recovery procedures and prevention strategies
 
 **When to use:** Use this when encountering problems or need to debug issues with the actions system.
@@ -115,7 +115,7 @@ This document provides a comprehensive overview of the spooky actions system doc
 
 #### Troubleshooting
 - **Action loading failures?** → [Troubleshooting Guide](ACTIONS_TROUBLESHOOTING.md) - Action Loading Errors section
-- **Execution failures?** → [Troubleshooting Guide](ACTIONS_TROUBLESHOOTING.md) - Action Execution Errors section
+- **Run failures?** → [Troubleshooting Guide](ACTIONS_TROUBLESHOOTING.md) - Action Run Errors section
 - **Dependency issues?** → [Troubleshooting Guide](ACTIONS_TROUBLESHOOTING.md) - Dependency Errors section
 
 #### Development
@@ -131,11 +131,11 @@ This document provides a comprehensive overview of the spooky actions system doc
 - **Troubleshooting** → [Troubleshooting Guide](ACTIONS_TROUBLESHOOTING.md) - Action Configuration Issues
 - **API** → [API Reference](ACTIONS_API_REFERENCE.md) - Action Type
 
-#### Action Execution
+#### Action Running
 - **Overview** → [User Guide](ACTIONS_USER_GUIDE.md) - Action Lifecycle
 - **Configuration** → [User Guide](ACTIONS_USER_GUIDE.md) - Running Actions
-- **Troubleshooting** → [Troubleshooting Guide](ACTIONS_TROUBLESHOOTING.md) - Action Execution Errors
-- **API** → [API Reference](ACTIONS_API_REFERENCE.md) - ActionExecutionContext Type
+- **Troubleshooting** → [Troubleshooting Guide](ACTIONS_TROUBLESHOOTING.md) - Action Run Errors
+- **API** → [API Reference](ACTIONS_API_REFERENCE.md) - ActionRunContext Type
 
 #### Dependency Management
 - **Overview** → [User Guide](ACTIONS_USER_GUIDE.md) - Action Dependencies
@@ -155,30 +155,30 @@ This document provides a comprehensive overview of the spooky actions system doc
 
 The actions system consists of several key components:
 
-1. **Action** - Individual operations to be executed on machines
+1. **Action** - Individual operations to be run on machines
 2. **ActionCollection** - Groups of related actions
-3. **ActionPlan** - Execution plan with dependency resolution
+3. **ActionPlan** - Run plan with dependency resolution
 4. **ActionsIntegration** - Primary interface for action management
 5. **ActionValidator** - Validation of action configurations
-6. **SSHManager** - SSH connection and execution capabilities
+6. **SSHManager** - SSH connection and running capabilities
 7. **CLI Commands** - User interface for action management
 
 ### Data Flow
 
 1. **Action Loading** - Load actions from HCL configuration files
 2. **Validation** - Validate action configurations against schema
-3. **Dependency Resolution** - Resolve action dependencies and create execution order
+3. **Dependency Resolution** - Resolve action dependencies and create run order
 4. **Machine Targeting** - Determine target machines for each action
-5. **Execution Planning** - Create execution plan with proper ordering
-6. **Action Execution** - Execute actions on target machines via SSH
-7. **Result Collection** - Collect and aggregate execution results
+5. **Run Planning** - Create run plan with proper ordering
+6. **Action Running** - Run actions on target machines via SSH
+7. **Result Collection** - Collect and aggregate run results
 
 ### Action Types
 
 The system supports several types of actions:
 
-- **Command Actions** - Execute shell commands on remote machines
-- **Script Actions** - Execute script files with template processing
+- **Command Actions** - Run shell commands on remote machines
+- **Script Actions** - Run script files with template processing
 - **Template Deploy Actions** - Deploy template files with variable substitution
 - **File Copy Actions** - Copy files between machines
 - **Service Control Actions** - Control system services
@@ -227,16 +227,16 @@ action "deploy-application" {
 - **Core Action Management**
   - Action configuration with HCL schema validation
   - Multiple action types (command, script, template_deploy, file_copy, service_control)
-  - Action dependency resolution and execution ordering
+  - Action dependency resolution and run ordering
   - Machine targeting by names and tags
-  - Parallel execution support
+  - Parallel running support
   - Comprehensive validation and error handling
 
 - **Advanced Features**
   - Template deployment with variable substitution
   - Service control with systemd integration
   - File copy operations with permissions
-  - Script execution with template processing
+  - Script running with template processing
   - Resource limits and timeout management
   - Retry logic and error recovery
 
@@ -247,9 +247,9 @@ action "deploy-application" {
 
 ### 🚧 In Progress / Planned Features
 
-- **Advanced Scripting** - Enhanced script execution with better error handling
+- **Advanced Scripting** - Enhanced script running with better error handling
 - **Template Functions** - Additional template functions and helpers
-- **Action History** - Track action execution history
+- **Action History** - Track action run history
 - **Rollback Support** - Automatic rollback capabilities
 - **Advanced Scheduling** - Time-based action scheduling
 - **Action Metrics** - Performance metrics and monitoring
@@ -296,7 +296,7 @@ When contributing to the actions system:
 2. **Add Comprehensive Tests** - Include unit and integration tests
 3. **Update Documentation** - Keep documentation current with changes
 4. **Follow Error Handling** - Use structured error types and patterns
-5. **Consider Performance** - Optimize for efficient action execution
+5. **Consider Performance** - Optimize for efficient action running
 
 ## Conclusion
 
@@ -342,7 +342,7 @@ action "deploy-with-vars" {
 
 ### Facts Integration
 
-Actions can use machine facts for conditional execution:
+Actions can use machine facts for conditional running:
 
 ```hcl
 action "os-specific-command" {
@@ -356,7 +356,7 @@ action "os-specific-command" {
 
 ### SSH Integration
 
-Actions use SSH for remote execution:
+Actions use SSH for remote running:
 
 - **SSH Connections**: Secure SSH connections to target machines
 - **Authentication**: SSH key and password authentication
@@ -368,9 +368,9 @@ Actions use SSH for remote execution:
 Actions integrate with the logging system:
 
 - **Component Logging**: Actions use the "actions" logging component
-- **Execution Logging**: Log action execution details and results
+- **Run Logging**: Log action run details and results
 - **Error Logging**: Log action errors and failures
-- **Performance Logging**: Log action execution performance metrics
+- **Performance Logging**: Log action run performance metrics
 
 ## Best Practices
 
@@ -395,16 +395,16 @@ Actions integrate with the logging system:
 1. **Configure Retries** - Use retries for unreliable operations
 2. **Set Timeouts** - Use appropriate timeouts for long-running operations
 3. **Handle Dependencies** - Use dependencies to ensure proper order
-4. **Validate Before Running** - Always validate actions before execution
+4. **Validate Before Running** - Always validate actions before running
 5. **Use Dry Run Mode** - Test actions with dry-run mode first
 
 ### Performance Optimization
 
-1. **Use Parallel Execution** - Enable parallel execution when possible
+1. **Use Parallel Running** - Enable parallel running when possible
 2. **Limit Concurrent Operations** - Use max_concurrent to prevent overload
 3. **Optimize Dependencies** - Minimize unnecessary dependencies
 4. **Use Resource Limits** - Set appropriate resource limits
-5. **Monitor Execution** - Monitor action execution performance
+5. **Monitor Running** - Monitor action run performance
 
 ### Security Considerations
 

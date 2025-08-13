@@ -464,7 +464,7 @@ type SSHCommand struct {
     Stdin        string `json:"stdin,omitempty" hcl:"stdin,optional"`
     CaptureOutput bool  `json:"capture_output" hcl:"capture_output" default:"true"`
 
-    // Execution configuration
+    // Run configuration
     Timeout      time.Duration `json:"timeout,omitempty" hcl:"timeout,optional"`
     Priority     int           `json:"priority" hcl:"priority" default:"0"`
     ScheduledAt  time.Time     `json:"scheduled_at" hcl:"scheduled_at"`
@@ -484,14 +484,14 @@ type SSHCommandResult struct {
     Command *SSHCommand `json:"command" hcl:"command"`
     Session *Session    `json:"session" hcl:"session"`
 
-    // Execution results
+    // Run results
     Success   bool   `json:"success" hcl:"success"`
     ExitCode  int    `json:"exit_code" hcl:"exit_code"`
     Stdout    string `json:"stdout,omitempty" hcl:"stdout,optional"`
     Stderr    string `json:"stderr,omitempty" hcl:"stderr,optional"`
     Error     string `json:"error,omitempty" hcl:"error,optional"`
 
-    // Execution metrics
+    // Run metrics
     StartTime time.Time     `json:"start_time" hcl:"start_time"`
     EndTime   time.Time     `json:"end_time" hcl:"end_time"`
     Duration  time.Duration `json:"duration" hcl:"duration"`

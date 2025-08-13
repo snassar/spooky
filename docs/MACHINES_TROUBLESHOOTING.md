@@ -382,7 +382,7 @@ machine "prod-db-server" {
 
 ### Slow Connectivity Testing
 
-#### Parallel Execution
+#### Parallel Running
 ```bash
 # Use parallel running for large inventories
 spooky machines ping ./my-project --parallel 10

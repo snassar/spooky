@@ -98,7 +98,7 @@ if err != nil {
 }
 ```
 
-### Command Execution
+### Command Running
 ```go
 // Run command
 command := &spookytypes.SSHCommand{

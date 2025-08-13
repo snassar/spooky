@@ -257,9 +257,9 @@ The SSH system implements robust retry logic:
 3. **Timeout Handling**: Configurable timeouts for different operations
 4. **Error Reporting**: Detailed error messages for troubleshooting
 
-## Command Execution
+## Command Running
 
-### Basic Command Execution
+### Basic Command Running
 
 Commands are run through the actions system:
 
@@ -305,7 +305,7 @@ Command output is automatically captured and processed:
 - **Standard Output**: Captured and available for processing
 - **Standard Error**: Captured and reported separately
 - **Exit Codes**: Available for error handling
-- **Execution Time**: Tracked for performance monitoring
+- **Run Time**: Tracked for performance monitoring
 
 ## Advanced Features
 

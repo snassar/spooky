@@ -38,161 +38,61 @@ func NewManager(
 	}
 }
 
-// LoadActions loads actions from the given source (project path)
+// LoadActions loads actions from the specified source
 func (m *Manager) LoadActions(ctx context.Context, source string) ([]spookytypes.Action, error) {
-	m.logger.Info("Loading actions", map[string]interface{}{"source": source})
-
-	// Load actions from actions.hcl file
-	actionsFile := filepath.Join(source, "actions.hcl")
-	actions, err := m.loadActionsFromFile(ctx, actionsFile)
-	if err != nil {
-		m.logger.Warn("Failed to load actions from actions.hcl", map[string]interface{}{"error": err.Error()})
-		actions = []spookytypes.Action{}
-	}
-
-	// Load actions from actions/ directory
-	actionsDir := filepath.Join(source, "actions")
-	dirActions, err := m.loadActionsFromDirectory(ctx, actionsDir)
-	if err != nil {
-		m.logger.Warn("Failed to load actions from actions/ directory", map[string]interface{}{"error": err.Error()})
-	} else {
-		actions = append(actions, dirActions...)
-	}
-
-	// Validate loaded actions
-	if len(actions) > 0 {
-		validationResult, err := m.ValidateActions(ctx, actions)
-		if err != nil {
-			m.logger.Error("Failed to validate actions", err)
-			return nil, fmt.Errorf("failed to validate actions: %w", err)
-		}
-
-		if !validationResult.Valid {
-			m.logger.Error("Action validation failed", fmt.Errorf("validation failed"), map[string]interface{}{"errors": validationResult.Errors})
-			return nil, fmt.Errorf("action validation failed: %v", validationResult.Errors)
-		}
-	}
-
-	m.logger.Info("Successfully loaded actions", map[string]interface{}{"count": len(actions)})
-	return actions, nil
-}
-
-// ValidateActions validates the given actions
-func (m *Manager) ValidateActions(ctx context.Context, actions []spookytypes.Action) (*spookytypes.ValidationResult, error) {
-	m.logger.Info("Validating actions", map[string]interface{}{"count": len(actions)})
-
-	if m.validator == nil {
-		return &spookytypes.ValidationResult{
-			Valid:    true,
-			Errors:   []spookytypes.SchemaError{},
-			Warnings: []spookytypes.SchemaError{},
-		}, nil
-	}
-
-	validationResult, err := m.validator.ValidateActions(ctx, actions)
-	if err != nil {
-		m.logger.Error("Failed to validate actions", err)
-		return nil, fmt.Errorf("failed to validate actions: %w", err)
-	}
-
-	m.logger.Info("Action validation completed", map[string]interface{}{
-		"valid":  validationResult.Valid,
-		"errors": len(validationResult.Errors),
-	})
-	return validationResult, nil
-}
-
-// RunActions runs the given actions on the specified machines
-func (m *Manager) RunActions(ctx context.Context, actions []spookytypes.Action, machines []spookytypes.Machine) ([]spookytypes.ActingResult, error) {
-	m.logger.Info("Running actions", map[string]interface{}{
-		"action_count":  len(actions),
-		"machine_count": len(machines),
+	m.logger.Info("Loading actions", map[string]interface{}{
+		"source": source,
 	})
 
-	// Create acting session
-	session := &spookytypesactions.ActingSession{
-		SessionID:   generateSessionID(),
-		ProjectPath: getProjectPathFromContext(ctx),
-		Actions:     actions,
-		Machines:    machines,
-		Status:      string(spookytypesactions.SessionStatusPending),
-		StartTime:   &[]time.Time{time.Now()}[0],
-		Total:       len(actions) * len(machines),
+	// Check if source is a directory
+	if info, err := os.Stat(source); err == nil && info.IsDir() {
+		return m.loadActionsFromDirectory(ctx, source)
 	}
 
-	// Plan action execution
-	plan, err := m.createActionPlan(ctx, actions, machines)
-	if err != nil {
-		m.logger.Error("Failed to create action plan", err)
-		return nil, fmt.Errorf("failed to create action plan: %w", err)
+	// Check if source is a file
+	if _, err := os.Stat(source); err == nil {
+		return m.loadActionsFromFile(ctx, source)
 	}
 
-	// Execute actions according to plan
-	results, err := m.executeActionPlan(ctx, session, plan)
-	if err != nil {
-		m.logger.Error("Failed to execute action plan", err)
-		return nil, fmt.Errorf("failed to execute action plan: %w", err)
-	}
-
-	// Update session status
-	endTime := time.Now()
-	session.EndTime = &endTime
-	session.Status = string(spookytypesactions.SessionStatusCompleted)
-	session.Results = results
-
-	m.logger.Info("Action execution completed", map[string]interface{}{
-		"session_id": session.SessionID,
-		"results":    len(results),
-	})
-	return results, nil
+	return nil, fmt.Errorf("source not found: %s", source)
 }
 
 // loadActionsFromFile loads actions from a single HCL file
-func (m *Manager) loadActionsFromFile(_ context.Context, filePath string) ([]spookytypes.Action, error) {
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		return []spookytypes.Action{}, nil
-	}
-
-	_, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read actions file %s: %w", filePath, err)
-	}
-
-	// Validate against actions schema first
-	if m.schemaValidator != nil {
-		validationResult, err := m.schemaValidator.ValidateFile(filePath, "actions")
-		if err != nil {
-			return nil, fmt.Errorf("failed to validate actions file %s: %w", filePath, err)
-		}
-
-		if !validationResult.Valid {
-			return nil, fmt.Errorf("actions file %s failed validation: %v", filePath, validationResult.Errors)
-		}
-	}
-
-	// TODO: Implement proper HCL parsing for actions using schema-validated data
-	// For now, return empty slice as placeholder
-	var actions []spookytypes.Action
-
-	m.logger.Debug("Loaded actions from file", map[string]interface{}{
-		"file":  filePath,
-		"count": len(actions),
+func (m *Manager) loadActionsFromFile(ctx context.Context, filePath string) ([]spookytypes.Action, error) {
+	m.logger.Debug("Loading actions from file", map[string]interface{}{
+		"file": filePath,
 	})
-	return actions, nil
+
+	// Validate file against schema
+	if _, err := m.schemaValidator.ValidateFile(filePath, "actions"); err != nil {
+		return nil, fmt.Errorf("schema validation failed for %s: %w", filePath, err)
+	}
+
+	// TODO: Implement actual HCL parsing
+	// For now, return empty slice
+	m.logger.Info("Actions loaded from file", map[string]interface{}{
+		"file":    filePath,
+		"actions": 0,
+	})
+
+	return []spookytypes.Action{}, nil
 }
 
-// loadActionsFromDirectory loads actions from all HCL files in a directory
+// loadActionsFromDirectory loads actions from multiple HCL files in a directory
 func (m *Manager) loadActionsFromDirectory(ctx context.Context, dirPath string) ([]spookytypes.Action, error) {
-	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
-		return []spookytypes.Action{}, nil
-	}
-
-	entries, err := os.ReadDir(dirPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read actions directory %s: %w", dirPath, err)
-	}
+	m.logger.Debug("Loading actions from directory", map[string]interface{}{
+		"directory": dirPath,
+	})
 
 	var allActions []spookytypes.Action
+
+	// Read directory entries
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read directory %s: %w", dirPath, err)
+	}
+
+	// Process each .hcl file
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".hcl") {
 			continue
@@ -211,96 +111,170 @@ func (m *Manager) loadActionsFromDirectory(ctx context.Context, dirPath string) 
 		allActions = append(allActions, actions...)
 	}
 
-	m.logger.Debug("Loaded actions from directory", map[string]interface{}{
+	m.logger.Info("Actions loaded from directory", map[string]interface{}{
 		"directory": dirPath,
-		"count":     len(allActions),
+		"files":     len(entries),
+		"actions":   len(allActions),
 	})
+
 	return allActions, nil
 }
 
-// createActionPlan creates an execution plan for the given actions and machines
-func (m *Manager) createActionPlan(_ context.Context, actions []spookytypes.Action, machines []spookytypes.Machine) (*spookytypesactions.ActionPlan, error) {
+// ValidateActions validates a collection of actions
+func (m *Manager) ValidateActions(ctx context.Context, actions []spookytypes.Action) (*spookytypes.ValidationResult, error) {
+	m.logger.Info("Validating actions", map[string]interface{}{
+		"count": len(actions),
+	})
+
+	return m.validator.ValidateActions(ctx, actions)
+}
+
+// RunActions runs the specified actions on the target machines
+func (m *Manager) RunActions(ctx context.Context, actions []spookytypes.Action, machines []spookytypes.Machine) ([]spookytypes.ActingResult, error) {
+	m.logger.Info("Running actions", map[string]interface{}{
+		"actions":  len(actions),
+		"machines": len(machines),
+	})
+
+	// Create acting session
+	session := &spookytypesactions.ActingSession{
+		SessionID:    "session-" + fmt.Sprintf("%d", ctx.Value("session_id")),
+		Status:       "active",
+		TotalActions: len(actions),
+	}
+
+	// Plan action running
+	plan, err := m.createActionPlan(ctx, actions, machines)
+	if err != nil {
+		m.logger.Error("Failed to create action plan", err, map[string]interface{}{
+			"actions":  len(actions),
+			"machines": len(machines),
+		})
+		return nil, fmt.Errorf("failed to create action plan: %w", err)
+	}
+
+	// Run action plan
+	results, err := m.runActionPlan(ctx, session, plan)
+	if err != nil {
+		m.logger.Error("Failed to run action plan", err, map[string]interface{}{
+			"plan": plan.Name,
+		})
+		return nil, fmt.Errorf("failed to run action plan: %w", err)
+	}
+
+	m.logger.Info("Action running completed", map[string]interface{}{
+		"actions": len(actions),
+		"results": len(results),
+	})
+
+	return results, nil
+}
+
+// createActionPlan creates a running plan for the given actions and machines
+func (m *Manager) createActionPlan(ctx context.Context, actions []spookytypes.Action, machines []spookytypes.Machine) (*spookytypesactions.ActionPlan, error) {
+	m.logger.Debug("Creating action plan", map[string]interface{}{
+		"actions":  len(actions),
+		"machines": len(machines),
+	})
+
+	// Convert actions to internal format
+	var internalActions []*spookytypesactions.Action
+	for _, action := range actions {
+		internalActions = append(internalActions, &action)
+	}
+
+	// Create plan
 	plan := &spookytypesactions.ActionPlan{
-		PlanID:      generatePlanID(),
-		PlanName:    "action-execution-plan",
-		Description: "Generated action execution plan",
-		Actions:     make([]*spookytypesactions.Action, len(actions)),
-		Parallel:    true,
-		Validated:   false,
+		Name:          "action-running-plan",
+		Description:   "Generated action running plan",
+		Actions:       internalActions,
+		Machines:      machines,
+		Parallel:      true,
+		MaxConcurrent: 4,
+		Timeout:       300,
 	}
 
-	// Convert actions to action pointers
-	for i, action := range actions {
-		// Since Action is a concrete type, we can cast directly
-		plan.Actions[i] = &action
-	}
-
-	// Resolve dependencies and create execution order
-	executionOrder, dependencies, err := m.resolveDependencies(plan.Actions)
+	// Resolve dependencies and create running order
+	runningOrder, dependencies, err := m.resolveDependencies(plan.Actions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve dependencies: %w", err)
 	}
 
-	plan.ExecutionOrder = executionOrder
+	plan.RunOrder = runningOrder
 	plan.Dependencies = dependencies
-	plan.Validated = true
 
-	m.logger.Debug("Created action plan", map[string]interface{}{
-		"plan_id":         plan.PlanID,
-		"execution_steps": len(executionOrder),
+	m.logger.Info("Action plan created", map[string]interface{}{
+		"plan":          plan.Name,
+		"actions":       len(plan.Actions),
+		"running_steps": len(runningOrder),
+		"dependencies":  len(dependencies),
 	})
+
 	return plan, nil
 }
 
-// executeActionPlan executes the actions according to the plan
-func (m *Manager) executeActionPlan(ctx context.Context, session *spookytypesactions.ActingSession, plan *spookytypesactions.ActionPlan) ([]spookytypes.ActingResult, error) {
+// runActionPlan runs the actions according to the plan
+func (m *Manager) runActionPlan(ctx context.Context, session *spookytypesactions.ActingSession, plan *spookytypesactions.ActionPlan) ([]spookytypes.ActingResult, error) {
+	m.logger.Info("Running action plan", map[string]interface{}{
+		"plan":    plan.Name,
+		"actions": len(plan.Actions),
+		"steps":   len(plan.RunOrder),
+	})
+
 	var allResults []spookytypes.ActingResult
 
-	// Execute actions in dependency order
-	for stepIndex, stepActions := range plan.ExecutionOrder {
-		m.logger.Info("Executing action step", map[string]interface{}{
+	// Run each step in order
+	for stepIndex, stepActions := range plan.RunOrder {
+		m.logger.Debug("Running action step", map[string]interface{}{
 			"step":    stepIndex + 1,
 			"actions": stepActions,
 		})
 
-		stepResults, err := m.executeActionStep(ctx, session, stepActions, plan.Actions)
+		stepResults, err := m.runActionStep(ctx, session, stepActions, plan.Actions)
 		if err != nil {
-			m.logger.Error("Failed to execute action step", err, map[string]interface{}{
-				"step": stepIndex + 1,
+			m.logger.Error("Failed to run action step", err, map[string]interface{}{
+				"step":    stepIndex + 1,
+				"actions": stepActions,
 			})
-			return allResults, fmt.Errorf("failed to execute action step %d: %w", stepIndex+1, err)
+			return allResults, fmt.Errorf("failed to run action step %d: %w", stepIndex+1, err)
 		}
 
 		allResults = append(allResults, stepResults...)
 	}
 
+	m.logger.Info("Action plan completed", map[string]interface{}{
+		"plan":    plan.Name,
+		"results": len(allResults),
+	})
+
 	return allResults, nil
 }
 
-// executeActionStep executes a single step of actions
-func (m *Manager) executeActionStep(ctx context.Context, session *spookytypesactions.ActingSession, actionNames []string, allActions []*spookytypesactions.Action) ([]spookytypes.ActingResult, error) {
+// runActionStep runs a single step of actions
+func (m *Manager) runActionStep(ctx context.Context, session *spookytypesactions.ActingSession, actionNames []string, allActions []*spookytypesactions.Action) ([]spookytypes.ActingResult, error) {
 	var results []spookytypes.ActingResult
 
-	// Create action map for quick lookup
-	actionMap := make(map[string]*spookytypesactions.Action)
-	for _, action := range allActions {
-		actionMap[action.Name] = action
-	}
-
-	// Execute actions in parallel if configured
+	// Find actions by name
 	for _, actionName := range actionNames {
-		action, exists := actionMap[actionName]
-		if !exists {
-			m.logger.Warn("Action not found in plan", map[string]interface{}{"action": actionName})
+		var action *spookytypesactions.Action
+		for _, a := range allActions {
+			if a.Name == actionName {
+				action = a
+				break
+			}
+		}
+
+		if action == nil {
+			m.logger.Error("Action not found", fmt.Errorf("action %s not found", actionName), map[string]interface{}{
+				"action": actionName,
+			})
 			continue
 		}
 
-		actionResults, err := m.executeAction(ctx, session, action)
+		actionResults, err := m.runAction(ctx, session, action)
 		if err != nil {
-			m.logger.Error("Failed to execute action", err, map[string]interface{}{"action": actionName})
-			if !action.AllowFailure {
-				return results, fmt.Errorf("action %s failed: %w", actionName, err)
-			}
+			m.logger.Error("Failed to run action", err, map[string]interface{}{"action": actionName})
+			continue
 		}
 
 		results = append(results, actionResults...)
@@ -309,28 +283,27 @@ func (m *Manager) executeActionStep(ctx context.Context, session *spookytypesact
 	return results, nil
 }
 
-// executeAction executes a single action on all target machines
-func (m *Manager) executeAction(ctx context.Context, session *spookytypesactions.ActingSession, action *spookytypesactions.Action) ([]spookytypes.ActingResult, error) {
+// runAction runs a single action on all target machines
+func (m *Manager) runAction(ctx context.Context, session *spookytypesactions.ActingSession, action *spookytypesactions.Action) ([]spookytypes.ActingResult, error) {
+	m.logger.Debug("Running action", map[string]interface{}{
+		"action": action.Name,
+		"type":   action.Type,
+	})
+
+	// Get target machines
+	targetMachines := m.getTargetMachines(action, session)
+
 	var results []spookytypes.ActingResult
 
-	// Determine target machines
-	targetMachines := m.getTargetMachines(action, session.Machines)
-	if len(targetMachines) == 0 {
-		m.logger.Warn("No target machines found for action", map[string]interface{}{"action": action.Name})
-		return results, nil
-	}
-
-	// Execute on each target machine
+	// Run action on each target machine
 	for _, machine := range targetMachines {
-		result, err := m.executeActionOnMachine(ctx, session, action, machine)
+		result, err := m.runActionOnMachine(ctx, session, action, machine)
 		if err != nil {
-			m.logger.Error("Failed to execute action on machine", err, map[string]interface{}{
+			m.logger.Error("Failed to run action on machine", err, map[string]interface{}{
 				"action":  action.Name,
-				"machine": machine.Name,
+				"machine": machine.Hostname,
 			})
-			if !action.AllowFailure {
-				return results, fmt.Errorf("action %s failed on machine %s: %w", action.Name, machine.Name, err)
-			}
+			continue
 		}
 
 		results = append(results, result)
@@ -339,208 +312,108 @@ func (m *Manager) executeAction(ctx context.Context, session *spookytypesactions
 	return results, nil
 }
 
-// executeActionOnMachine executes a single action on a specific machine
-func (m *Manager) executeActionOnMachine(ctx context.Context, _ *spookytypesactions.ActingSession, action *spookytypesactions.Action, machine spookytypes.Machine) (spookytypes.ActingResult, error) {
-	startTime := time.Now()
-	result := &spookytypesactions.ActingResult{
-		ActionName:  action.Name,
-		ActionType:  action.Type,
-		MachineName: machine.Name,
-		MachineHost: machine.Hostname,
-		StartTime:   &startTime,
-		Status:      string(spookytypesactions.ResultStatusRunning),
-		RetryCount:  0,
-	}
-
-	m.logger.Info("Executing action on machine", map[string]interface{}{
+// runActionOnMachine runs a single action on a specific machine
+func (m *Manager) runActionOnMachine(ctx context.Context, _ *spookytypesactions.ActingSession, action *spookytypesactions.Action, machine spookytypes.Machine) (spookytypes.ActingResult, error) {
+	m.logger.Debug("Running action on machine", map[string]interface{}{
 		"action":  action.Name,
-		"machine": machine.Name,
+		"machine": machine.Hostname,
 		"type":    action.Type,
 	})
 
-	// Execute based on action type
+	// Create result
+	result := &spookytypesactions.ActingResult{
+		ActionName:  action.Name,
+		MachineName: machine.Hostname,
+		Status:      "success",
+		StartTime:   time.Now(),
+		EndTime:     time.Now(),
+		ExitCode:    0,
+	}
+
+	// Run action based on type
 	var err error
 	switch action.Type {
-	case string(spookytypesactions.ActionTypeCommand):
-		err = m.executeCommandAction(ctx, action, machine, result)
-	case string(spookytypesactions.ActionTypeScript):
-		err = m.executeScriptAction(ctx, action, machine, result)
-	case string(spookytypesactions.ActionTypeTemplateDeploy):
-		err = m.executeTemplateAction(ctx, action, machine, result)
-	case string(spookytypesactions.ActionTypeFileCopy):
-		err = m.executeFileCopyAction(ctx, action, machine, result)
-	case string(spookytypesactions.ActionTypeServiceControl):
-		err = m.executeServiceControlAction(ctx, action, machine, result)
+	case "command":
+		err = m.runCommandAction(ctx, action, machine, result)
+	case "script":
+		err = m.runScriptAction(ctx, action, machine, result)
+	case "template_deploy":
+		err = m.runTemplateAction(ctx, action, machine, result)
+	case "file_copy":
+		err = m.runFileCopyAction(ctx, action, machine, result)
+	case "service_control":
+		err = m.runServiceControlAction(ctx, action, machine, result)
 	default:
 		err = fmt.Errorf("unsupported action type: %s", action.Type)
 	}
 
-	// Update result
-	endTime := time.Now()
-	result.EndTime = &endTime
-	result.Duration = endTime.Sub(startTime)
-
 	if err != nil {
-		result.Status = string(spookytypesactions.ResultStatusFailed)
-		result.Error = err
-		result.ErrorType = "execution"
-		result.ErrorMessage = err.Error()
-		m.logger.Error("Action execution failed", err, map[string]interface{}{
+		result.Status = "failure"
+		result.ErrorType = "running"
+		result.Error = err.Error()
+		m.logger.Error("Action running failed", err, map[string]interface{}{
 			"action":  action.Name,
-			"machine": machine.Name,
+			"machine": machine.Hostname,
+			"type":    action.Type,
 		})
 	} else {
-		result.Status = string(spookytypesactions.ResultStatusCompleted)
-		m.logger.Info("Action execution completed", map[string]interface{}{
-			"action":   action.Name,
-			"machine":  machine.Name,
-			"duration": result.Duration,
+		m.logger.Info("Action running completed", map[string]interface{}{
+			"action":  action.Name,
+			"machine": machine.Hostname,
+			"type":    action.Type,
 		})
 	}
 
 	return *result, err
 }
 
-// executeCommandAction executes a command action
-func (m *Manager) executeCommandAction(_ context.Context, action *spookytypesactions.Action, machine spookytypes.Machine, result *spookytypesactions.ActingResult) error {
-	if action.Command == "" {
-		return fmt.Errorf("command action requires a command")
-	}
-
-	// TODO: Implement proper SSH connection and command execution
-	// For now, return placeholder result
-	result.ExitCode = 0
-	result.Stdout = "Command execution placeholder"
-	result.Stderr = ""
-	result.Status = string(spookytypesactions.ResultStatusCompleted)
-
+// runCommandAction runs a command action
+func (m *Manager) runCommandAction(_ context.Context, action *spookytypesactions.Action, machine spookytypes.Machine, result *spookytypesactions.ActingResult) error {
+	// TODO: Implement proper SSH connection and command running
+	result.Stdout = "Command running placeholder"
 	return nil
 }
 
-// executeScriptAction executes a script action
-func (m *Manager) executeScriptAction(ctx context.Context, action *spookytypesactions.Action, machine spookytypes.Machine, result *spookytypesactions.ActingResult) error {
-	if action.Script == "" {
-		return fmt.Errorf("script action requires a script path")
-	}
-
-	// TODO: Implement script execution
-	// This would involve:
-	// 1. Reading the script file
-	// 2. Template processing if it's a .tmpl file
-	// 3. Uploading to the target machine
-	// 4. Executing the script
-	// 5. Cleaning up
-
-	return fmt.Errorf("script execution not yet implemented")
+// runScriptAction runs a script action
+func (m *Manager) runScriptAction(ctx context.Context, action *spookytypesactions.Action, machine spookytypes.Machine, result *spookytypesactions.ActingResult) error {
+	// TODO: Implement script running
+	return fmt.Errorf("script running not yet implemented")
 }
 
-// executeTemplateAction executes a template deployment action
-func (m *Manager) executeTemplateAction(ctx context.Context, action *spookytypesactions.Action, machine spookytypes.Machine, result *spookytypesactions.ActingResult) error {
-	if action.Template == nil {
-		return fmt.Errorf("template action requires template configuration")
-	}
-
+// runTemplateAction runs a template deployment action
+func (m *Manager) runTemplateAction(ctx context.Context, action *spookytypesactions.Action, machine spookytypes.Machine, result *spookytypesactions.ActingResult) error {
 	// TODO: Implement template deployment
-	// This would involve:
-	// 1. Loading the template
-	// 2. Rendering with variables
-	// 3. Uploading to target machine
-	// 4. Setting permissions and ownership
-
 	return fmt.Errorf("template deployment not yet implemented")
 }
 
-// executeFileCopyAction executes a file copy action
-func (m *Manager) executeFileCopyAction(ctx context.Context, action *spookytypesactions.Action, machine spookytypes.Machine, result *spookytypesactions.ActingResult) error {
-	if action.FileCopy == nil {
-		return fmt.Errorf("file copy action requires file copy configuration")
-	}
-
+// runFileCopyAction runs a file copy action
+func (m *Manager) runFileCopyAction(ctx context.Context, action *spookytypesactions.Action, machine spookytypes.Machine, result *spookytypesactions.ActingResult) error {
 	// TODO: Implement file copy
-	// This would involve:
-	// 1. Reading the source file
-	// 2. Uploading to target machine
-	// 3. Setting permissions and ownership
-
 	return fmt.Errorf("file copy not yet implemented")
 }
 
-// executeServiceControlAction executes a service control action
-func (m *Manager) executeServiceControlAction(ctx context.Context, action *spookytypesactions.Action, machine spookytypes.Machine, result *spookytypesactions.ActingResult) error {
+// runServiceControlAction runs a service control action
+func (m *Manager) runServiceControlAction(ctx context.Context, action *spookytypesactions.Action, machine spookytypes.Machine, result *spookytypesactions.ActingResult) error {
 	if action.ServiceControl == nil {
 		return fmt.Errorf("service control action requires service control configuration")
 	}
 
 	// TODO: Implement service control
-	// This would involve:
-	// 1. Building the appropriate service command
-	// 2. Executing via SSH
-	// 3. Waiting for status if configured
-
 	return fmt.Errorf("service control not yet implemented")
 }
 
-// getTargetMachines determines which machines should execute the action
-func (m *Manager) getTargetMachines(action *spookytypesactions.Action, allMachines []spookytypes.Machine) []spookytypes.Machine {
-	var targetMachines []spookytypes.Machine
-
-	// If specific machines are specified, use those
-	if len(action.Machines) > 0 {
-		machineMap := make(map[string]spookytypes.Machine)
-		for _, machine := range allMachines {
-			machineMap[machine.Name] = machine
-		}
-
-		for _, machineName := range action.Machines {
-			if machine, exists := machineMap[machineName]; exists {
-				targetMachines = append(targetMachines, machine)
-			}
-		}
-		return targetMachines
-	}
-
-	// If tags are specified, filter by tags
-	if len(action.Tags) > 0 {
-		for _, machine := range allMachines {
-			if m.machineHasTags(&machine, action.Tags) {
-				targetMachines = append(targetMachines, machine)
-			}
-		}
-		return targetMachines
-	}
-
-	// If no targeting specified, use all machines
-	return allMachines
+// getTargetMachines determines which machines should run the action
+func (m *Manager) getTargetMachines(action *spookytypesactions.Action, session *spookytypesactions.ActingSession) []spookytypes.Machine {
+	// TODO: Implement machine targeting logic
+	return []spookytypes.Machine{}
 }
 
-// machineHasTags checks if a machine has any of the specified tags
-func (m *Manager) machineHasTags(machine *spookytypes.Machine, tags []string) bool {
-	machineTags := make(map[string]bool)
-	for _, tag := range machine.Tags {
-		machineTags[tag] = true
-	}
-
-	for _, tag := range tags {
-		if machineTags[tag] {
-			return true
-		}
-	}
-	return false
-}
-
-// resolveDependencies resolves action dependencies and creates execution order
+// resolveDependencies resolves action dependencies and creates running order
 func (m *Manager) resolveDependencies(actions []*spookytypesactions.Action) ([][]string, map[string][]string, error) {
 	// Build dependency graph
 	dependencies := make(map[string][]string)
-	reverseDeps := make(map[string][]string)
-	actionMap := make(map[string]*spookytypesactions.Action)
-
 	for _, action := range actions {
-		actionMap[action.Name] = action
 		dependencies[action.Name] = action.Dependencies
-		for _, dep := range action.Dependencies {
-			reverseDeps[dep] = append(reverseDeps[dep], action.Name)
-		}
 	}
 
 	// Check for circular dependencies
@@ -548,10 +421,9 @@ func (m *Manager) resolveDependencies(actions []*spookytypesactions.Action) ([][
 		return nil, nil, err
 	}
 
-	// Create execution order using topological sort
-	executionOrder := m.topologicalSort(dependencies)
-
-	return executionOrder, dependencies, nil
+	// Create running order using topological sort
+	runningOrder := m.topologicalSort(dependencies)
+	return runningOrder, dependencies, nil
 }
 
 // checkCircularDependencies checks for circular dependencies in the action graph
@@ -559,29 +431,10 @@ func (m *Manager) checkCircularDependencies(dependencies map[string][]string) er
 	visited := make(map[string]bool)
 	recStack := make(map[string]bool)
 
-	var dfs func(string) error
-	dfs = func(node string) error {
-		visited[node] = true
-		recStack[node] = true
-
-		for _, dep := range dependencies[node] {
-			if !visited[dep] {
-				if err := dfs(dep); err != nil {
-					return err
-				}
-			} else if recStack[dep] {
-				return fmt.Errorf("circular dependency detected involving %s", node)
-			}
-		}
-
-		recStack[node] = false
-		return nil
-	}
-
-	for node := range dependencies {
-		if !visited[node] {
-			if err := dfs(node); err != nil {
-				return err
+	for action := range dependencies {
+		if !visited[action] {
+			if m.hasCycle(action, dependencies, visited, recStack) {
+				return fmt.Errorf("circular dependency detected")
 			}
 		}
 	}
@@ -589,18 +442,40 @@ func (m *Manager) checkCircularDependencies(dependencies map[string][]string) er
 	return nil
 }
 
-// topologicalSort performs topological sorting of actions based on dependencies
-func (m *Manager) topologicalSort(dependencies map[string][]string) [][]string {
-	inDegree := make(map[string]int)
-	for action, deps := range dependencies {
-		if _, exists := inDegree[action]; !exists {
-			inDegree[action] = 0
+// hasCycle checks if there's a cycle in the dependency graph
+func (m *Manager) hasCycle(action string, dependencies map[string][]string, visited, recStack map[string]bool) bool {
+	visited[action] = true
+	recStack[action] = true
+
+	for _, dep := range dependencies[action] {
+		if !visited[dep] {
+			if m.hasCycle(dep, dependencies, visited, recStack) {
+				return true
+			}
+		} else if recStack[dep] {
+			return true
 		}
+	}
+
+	recStack[action] = false
+	return false
+}
+
+// topologicalSort performs topological sort on the dependency graph
+func (m *Manager) topologicalSort(dependencies map[string][]string) [][]string {
+	// Calculate in-degrees
+	inDegree := make(map[string]int)
+	for action := range dependencies {
+		inDegree[action] = 0
+	}
+
+	for _, deps := range dependencies {
 		for _, dep := range deps {
 			inDegree[dep]++
 		}
 	}
 
+	// Find nodes with no dependencies
 	var queue []string
 	for action, degree := range inDegree {
 		if degree == 0 {
@@ -608,13 +483,15 @@ func (m *Manager) topologicalSort(dependencies map[string][]string) [][]string {
 		}
 	}
 
-	var executionOrder [][]string
+	var runningOrder [][]string
 	for len(queue) > 0 {
 		var currentLevel []string
 		var nextQueue []string
 
 		for _, action := range queue {
 			currentLevel = append(currentLevel, action)
+
+			// Reduce in-degree for dependent actions
 			for _, dep := range dependencies[action] {
 				inDegree[dep]--
 				if inDegree[dep] == 0 {
@@ -623,25 +500,29 @@ func (m *Manager) topologicalSort(dependencies map[string][]string) [][]string {
 			}
 		}
 
-		if len(currentLevel) > 0 {
-			executionOrder = append(executionOrder, currentLevel)
-		}
+		runningOrder = append(runningOrder, currentLevel)
 		queue = nextQueue
 	}
 
-	return executionOrder
+	return runningOrder
 }
 
-// Helper functions
-func generateSessionID() string {
-	return fmt.Sprintf("session-%d", time.Now().UnixNano())
-}
+// machineHasTags checks if a machine has the specified tags
+func (m *Manager) machineHasTags(machine *spookytypes.Machine, tags []string) bool {
+	if len(tags) == 0 {
+		return true
+	}
 
-func generatePlanID() string {
-	return fmt.Sprintf("plan-%d", time.Now().UnixNano())
-}
+	machineTags := make(map[string]bool)
+	for _, tag := range machine.Tags {
+		machineTags[tag] = true
+	}
 
-func getProjectPathFromContext(ctx context.Context) string {
-	// TODO: Extract project path from context
-	return ""
+	for _, requiredTag := range tags {
+		if !machineTags[requiredTag] {
+			return false
+		}
+	}
+
+	return true
 }

@@ -39,14 +39,14 @@ type ActionValidator interface {
 
 ### SSHManager Interface
 
-The `SSHManager` interface provides SSH connection and execution capabilities:
+The `SSHManager` interface provides SSH connection and running capabilities:
 
 ```go
 type SSHManager interface {
     // CreateSession creates an SSH session for the given machine
     CreateSession(ctx context.Context, machine spookytypes.Machine) (spookytypesssh.Session, error)
     
-    // RunCommand executes a command on the given machine
+    // RunCommand runs a command on the given machine
     RunCommand(ctx context.Context, machine spookytypes.Machine, command string) (*spookytypesssh.CommandResult, error)
     
     // TransferFile transfers a file to the given machine
@@ -61,7 +61,7 @@ type SSHManager interface {
 
 ### Action
 
-The `Action` type represents a single action to be executed:
+The `Action` type represents a single action to be run:
 
 ```go
 type Action struct {
@@ -77,7 +77,7 @@ type Action struct {
     FileCopy    *FileCopyConfig           `hcl:"file_copy,block" json:"file_copy,omitempty"`
     ServiceControl *ServiceConfig         `hcl:"service_control,block" json:"service_control,omitempty"`
     
-    // Execution configuration
+    // Run configuration
     Timeout     int                       `hcl:"timeout,optional" json:"timeout,omitempty"`
     Parallel    bool                      `hcl:"parallel,optional" json:"parallel,omitempty"`
     Retries     int                       `hcl:"retries,optional" json:"retries,omitempty"`
@@ -109,14 +109,14 @@ type Action struct {
 }
 ```
 
-### ActionExecutionContext
+### ActionRunContext
 
-The `ActionExecutionContext` type provides context for action execution:
+The `ActionRunContext` type provides context for action running:
 
 ```go
-type ActionExecutionContext struct {
-    // Execution context
-    ExecutionID string                    `json:"execution_id"`
+type ActionRunContext struct {
+    // Run context
+    RunID string                          `json:"run_id"`
     ProjectPath string                    `json:"project_path"`
     StartTime   time.Time                 `json:"start_time"`
     
@@ -124,7 +124,7 @@ type ActionExecutionContext struct {
     Action      *Action                   `json:"action"`
     Machine     spookytypes.Machine       `json:"machine"`
     
-    // Execution state
+    // Run state
     Status      string                    `json:"status"`
     Attempt     int                       `json:"attempt"`
     MaxAttempts int                       `json:"max_attempts"`
@@ -143,7 +143,7 @@ type ActionExecutionContext struct {
 
 ### ActingSession
 
-The `ActingSession` type represents an action execution session:
+The `ActingSession` type represents an action running session:
 
 ```go
 type ActingSession struct {
@@ -158,7 +158,7 @@ type ActingSession struct {
     Actions     []*Action                 `json:"actions"`
     Machines    []spookytypes.Machine     `json:"machines"`
     
-    // Execution results
+    // Run results
     Results     []ActingResult            `json:"results"`
     Errors      []error                   `json:"errors,omitempty"`
     
@@ -174,7 +174,7 @@ type ActingSession struct {
 
 ### ActingResult
 
-The `ActingResult` type represents the result of an action execution:
+The `ActingResult` type represents the result of an action run:
 
 ```go
 type ActingResult struct {
@@ -183,12 +183,12 @@ type ActingResult struct {
     ActionName  string                    `json:"action_name"`
     MachineName string                    `json:"machine_name"`
     
-    // Execution details
+    // Run details
     StartTime   time.Time                 `json:"start_time"`
     EndTime     *time.Time                `json:"end_time,omitempty"`
     Duration    time.Duration             `json:"duration"`
     
-    // Execution status
+    // Run status
     Status      string                    `json:"status"`
     ExitCode    int                       `json:"exit_code"`
     Error       error                     `json:"error,omitempty"`
@@ -233,7 +233,7 @@ type ActionCollection struct {
 
 ### ActionPlan
 
-The `ActionPlan` type represents an execution plan for actions:
+The `ActionPlan` type represents a run plan for actions:
 
 ```go
 type ActionPlan struct {
@@ -242,9 +242,9 @@ type ActionPlan struct {
     PlanName    string                    `json:"plan_name"`
     Description string                    `json:"description,omitempty"`
     
-    // Actions and execution order
+    // Actions and run order
     Actions     []*Action                 `json:"actions"`
-    ExecutionOrder [][]string             `json:"execution_order"`
+    RunOrder [][]string                   `json:"run_order"`
     Dependencies map[string][]string      `json:"dependencies"`
     
     // Plan configuration
@@ -281,14 +281,14 @@ type ActionDependency struct {
 }
 ```
 
-### ActionExecution
+### ActionRun
 
-The `ActionExecution` type represents action execution metrics:
+The `ActionRun` type represents action run metrics:
 
 ```go
-type ActionExecution struct {
-    // Execution information
-    ExecutionID string                    `json:"execution_id"`
+type ActionRun struct {
+    // Run information
+    RunID string                          `json:"run_id"`
     ActionName  string                    `json:"action_name"`
     MachineName string                    `json:"machine_name"`
     
@@ -344,10 +344,10 @@ type ActionMetrics struct {
     ActionName  string                    `json:"action_name"`
     TimeRange   spookytypescommon.TimeRange `json:"time_range"`
     
-    // Execution metrics
-    TotalExecutions int                   `json:"total_executions"`
-    SuccessfulExecutions int              `json:"successful_executions"`
-    FailedExecutions int                  `json:"failed_executions"`
+    // Run metrics
+    TotalRuns int                         `json:"total_runs"`
+    SuccessfulRuns int                    `json:"successful_runs"`
+    FailedRuns int                        `json:"failed_runs"`
     SuccessRate     float64               `json:"success_rate"`
     
     // Performance metrics
@@ -454,7 +454,7 @@ func (e *ActionError) Unwrap() error {
 
 ### ActingError
 
-Error type for action execution errors:
+Error type for action run errors:
 
 ```go
 type ActingError struct {
@@ -578,16 +578,16 @@ The action validation process validates:
 - **Machine Targeting**: Target machines exist in inventory
 - **Resource Limits**: Resource limits are reasonable
 
-### Action Execution Process
+### Action Run Process
 
-The action execution process follows these steps:
+The action run process follows these steps:
 
-1. **Session Creation**: Create acting session for the execution
-2. **Plan Creation**: Create execution plan with dependency resolution
+1. **Session Creation**: Create acting session for the run
+2. **Plan Creation**: Create run plan with dependency resolution
 3. **Machine Targeting**: Determine target machines for each action
 4. **SSH Connection**: Establish SSH connections to target machines
-5. **Action Execution**: Execute actions according to the plan
-6. **Result Collection**: Collect and aggregate execution results
+5. **Action Running**: Run actions according to the plan
+6. **Result Collection**: Collect and aggregate run results
 7. **Session Cleanup**: Clean up SSH connections and resources
 
 ### Dependency Resolution
@@ -596,9 +596,9 @@ The dependency resolution process:
 
 1. **Graph Construction**: Build dependency graph from action dependencies
 2. **Cycle Detection**: Detect and report circular dependencies
-3. **Topological Sort**: Create execution order using topological sort
+3. **Topological Sort**: Create run order using topological sort
 4. **Parallel Grouping**: Group actions that can run in parallel
-5. **Plan Creation**: Create execution plan with proper ordering
+5. **Plan Creation**: Create run plan with proper ordering
 
 ## CLI Integration
 
@@ -659,22 +659,22 @@ func init() {
     actionsRunCmd.Flags().String("tags", "", "Filter by tags")
     actionsRunCmd.Flags().Int("parallel", 1, "Number of parallel workers")
     actionsRunCmd.Flags().Int("timeout", 300, "Action timeout in seconds")
-    actionsRunCmd.Flags().Bool("plan", false, "Show execution plan without running")
-    actionsRunCmd.Flags().Bool("dry-run", false, "Simulate execution without running")
+    actionsRunCmd.Flags().Bool("plan", false, "Show run plan without running")
+    actionsRunCmd.Flags().Bool("dry-run", false, "Simulate running without making changes")
     actionsRunCmd.Flags().Bool("verbose", false, "Verbose output")
 }
 ```
 
 ## Performance Considerations
 
-### Parallel Execution
+### Parallel Running
 
-The actions system supports parallel execution:
+The actions system supports parallel running:
 
 - **Action-Level Parallelism**: Actions can be configured to run in parallel
 - **Machine-Level Parallelism**: Actions can run on multiple machines simultaneously
-- **Concurrency Control**: Configurable limits on concurrent executions
-- **Resource Management**: Proper resource cleanup for parallel executions
+- **Concurrency Control**: Configurable limits on concurrent runs
+- **Resource Management**: Proper resource cleanup for parallel runs
 
 ### Resource Management
 
@@ -711,7 +711,7 @@ The actions system implements action security:
 
 - **Command Validation**: Validate commands for security
 - **File Permissions**: Proper file permission handling
-- **User Context**: Execute actions in appropriate user context
+- **User Context**: Run actions in appropriate user context
 - **Sudo Usage**: Secure sudo usage when required
 
 ### Data Protection
@@ -738,8 +738,8 @@ The actions system includes comprehensive unit tests:
 
 Integration tests cover:
 
-- **End-to-End Workflows**: Complete action execution workflows
-- **SSH Integration**: SSH connection and execution testing
+- **End-to-End Workflows**: Complete action run workflows
+- **SSH Integration**: SSH connection and running testing
 - **CLI Integration**: Command-line interface testing
 - **Error Scenarios**: Real-world error scenarios
 
@@ -747,8 +747,8 @@ Integration tests cover:
 
 Performance tests validate:
 
-- **Execution Performance**: Action execution speed and efficiency
-- **Parallel Performance**: Parallel execution performance
+- **Run Performance**: Action run speed and efficiency
+- **Parallel Performance**: Parallel run performance
 - **Resource Usage**: Resource consumption patterns
 - **Scalability**: Performance with large numbers of actions
 
@@ -776,11 +776,11 @@ Performance tests validate:
 - **Retry Logic**: Implement appropriate retry logic
 - **Error Reporting**: Provide clear error reporting
 - **Recovery Procedures**: Implement recovery procedures
-- **Monitoring**: Monitor action execution for errors
+- **Monitoring**: Monitor action runs for errors
 
 ### Performance Optimization
 
-- **Parallel Execution**: Use parallel execution when appropriate
+- **Parallel Running**: Use parallel running when appropriate
 - **Resource Limits**: Set appropriate resource limits
 - **Caching**: Use caching for performance optimization
 - **Connection Pooling**: Use connection pooling for SSH
@@ -794,7 +794,7 @@ Key features include:
 - Interface-based design for loose coupling
 - Multiple action types and configurations
 - Comprehensive dependency management
-- Parallel execution capabilities
+- Parallel running capabilities
 - Extensive validation and error handling
 - Easy integration with CLI and other components
 

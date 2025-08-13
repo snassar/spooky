@@ -44,8 +44,8 @@ func (i *Integration) LoadActions(ctx context.Context, source string) ([]spookyt
 	return i.manager.LoadActions(ctx, source)
 }
 
-// ValidateActions validates actions
-func (i *Integration) ValidateActions(ctx context.Context, actions []spookytypes.Action) (*spookytypes.ValidationResult, error) {
+// ValidateActions validates a collection of actions
+func (i *Integration) ValidateActions(ctx context.Context, actions []spookytypes.Action) (*spookytypesactions.ActionValidation, error) {
 	return i.manager.ValidateActions(ctx, actions)
 }
 
@@ -54,7 +54,7 @@ func (i *Integration) RunActions(ctx context.Context, actions []spookytypes.Acti
 	return i.manager.RunActions(ctx, actions, machines)
 }
 
-// CreateActionPlan creates an execution plan for the given actions and machines
+// CreateActionPlan creates a running plan for the given actions and machines
 // This method is exposed for CLI use
 func (i *Integration) CreateActionPlan(ctx context.Context, actions []spookytypes.Action, machines []spookytypes.Machine) (*spookytypesactions.ActionPlan, error) {
 	return i.manager.createActionPlan(ctx, actions, machines)

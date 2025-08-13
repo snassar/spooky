@@ -206,9 +206,9 @@ machines {
 }
 ```
 
-### Action Execution Errors
+### Action Run Errors
 
-#### "Failed to execute action: SSH connection failed"
+#### "Failed to run action: SSH connection failed"
 
 **Problem:** Cannot establish SSH connection to target machine.
 
@@ -240,9 +240,9 @@ machines {
 }
 ```
 
-#### "Failed to execute action: command execution failed"
+#### "Failed to run action: command run failed"
 
-**Problem:** Command execution failed on target machine.
+**Problem:** Command run failed on target machine.
 
 **Solution:**
 ```bash
@@ -268,7 +268,7 @@ action "test-command" {
 }
 ```
 
-#### "Failed to execute action: service control failed"
+#### "Failed to run action: service control failed"
 
 **Problem:** Service control operation failed.
 
@@ -365,7 +365,7 @@ action "action2" {
   machines = ["web-server"]
 }
 
-# ✅ CORRECT - Sequential execution
+# ✅ CORRECT - Sequential running
 action "action1" {
   type = "command"
   command = "echo 'action1'"
@@ -414,13 +414,13 @@ action "valid-action" {
 ```hcl
 # Supported action types:
 action "command-action" {
-  type = "command"                # Execute shell commands
+  type = "command"                # Run shell commands
   command = "echo 'test'"
   machines = ["web-server"]
 }
 
 action "script-action" {
-  type = "script"                 # Execute script files
+  type = "script"                 # Run script files
   script = "files/test.sh"
   machines = ["web-server"]
 }
@@ -546,7 +546,7 @@ ls -la files/test.sh
 mkdir -p files
 cat > files/test.sh << 'EOF'
 #!/bin/bash
-echo "Test script executed"
+echo "Test script run"
 EOF
 chmod +x files/test.sh
 ```
@@ -564,19 +564,19 @@ action "run-script" {
 
 ## Performance Issues
 
-### Slow Action Execution
+### Slow Action Running
 
-**Problem:** Action execution is taking too long.
+**Problem:** Action running is taking too long.
 
 **Solution:**
 ```bash
-# Use parallel execution
+# Use parallel running
 spooky actions run ./my-project --parallel 4
 
 # Increase timeout
 spooky actions run ./my-project --timeout 600
 
-# Profile execution
+# Profile running
 spooky actions run ./my-project --verbose
 ```
 
@@ -589,13 +589,13 @@ action "optimized-action" {
   machines = ["web-server", "web-server-2", "web-server-3"]
   parallel = true              # Run in parallel
   timeout = 300                # Set appropriate timeout
-  max_concurrent = 4           # Limit concurrent executions
+  max_concurrent = 4           # Limit concurrent runs
 }
 ```
 
 ### High Resource Usage
 
-**Problem:** Action execution is consuming too many resources.
+**Problem:** Action running is consuming too many resources.
 
 **Solution:**
 ```bash
@@ -626,7 +626,7 @@ action "resource-limited" {
 
 ### Network Connectivity Issues
 
-**Problem:** Network issues affecting action execution.
+**Problem:** Network issues affecting action running.
 
 **Solution:**
 ```bash
@@ -683,10 +683,10 @@ spooky actions run ./my-project
 
 ### Use Planning Mode
 
-Use planning mode to understand what will be executed:
+Use planning mode to understand what will be run:
 
 ```bash
-# Show execution plan
+# Show run plan
 spooky actions run ./my-project --plan
 
 # Show plan with details
@@ -698,10 +698,10 @@ spooky actions run ./my-project --plan | grep -A 5 -B 5 "dependency"
 
 ### Use Dry Run Mode
 
-Use dry run mode to test without actual execution:
+Use dry run mode to test without actual running:
 
 ```bash
-# Simulate execution
+# Simulate running
 spooky actions run ./my-project --dry-run
 
 # Simulate with verbose output
@@ -761,12 +761,12 @@ df -h
 
 ## Recovery Procedures
 
-### Action Execution Recovery
+### Action Run Recovery
 
-Recover from failed action execution:
+Recover from failed action running:
 
 ```bash
-# Check execution status
+# Check run status
 spooky actions run ./my-project --verbose
 
 # Retry failed actions
@@ -855,10 +855,10 @@ spooky actions run ./staging-project
 
 ### Monitoring
 
-Monitor action execution:
+Monitor action running:
 
 ```bash
-# Monitor execution logs
+# Monitor run logs
 tail -f /var/log/spooky/actions.log
 
 # Monitor system resources
@@ -941,7 +941,7 @@ Validate configurations frequently:
 # Validate after every change
 spooky actions validate ./my-project
 
-# Validate before execution
+# Validate before running
 spooky actions validate ./my-project && spooky actions run ./my-project
 
 # Validate in scripts
@@ -973,13 +973,13 @@ action "robust-action" {
 
 ### 5. Monitor and Log
 
-Monitor action execution and maintain logs:
+Monitor action running and maintain logs:
 
 ```bash
 # Enable verbose logging
 spooky actions run ./my-project --verbose
 
-# Monitor execution
+# Monitor running
 watch -n 1 'ps aux | grep spooky'
 
 # Check logs
@@ -996,7 +996,7 @@ tail -f /var/log/spooky/actions.log
 
 ### Common Questions
 
-#### "Why aren't my actions executing?"
+#### "Why aren't my actions running?"
 
 1. Check action validation
 2. Verify machine connectivity
@@ -1032,7 +1032,7 @@ spooky actions validate ./my-project --verbose
 #### "How do I optimize action performance?"
 
 ```bash
-# Use parallel execution
+# Use parallel running
 spooky actions run ./my-project --parallel 4
 
 # Set resource limits

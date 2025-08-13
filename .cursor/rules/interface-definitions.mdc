@@ -83,7 +83,7 @@ Context objects provide state and configuration for operations:
 - **FactsContext**: Provides facts data for integrations
 - **VariablesContext**: Provides variables data for integrations
 - **TemplatesContext**: Provides templates data for integrations
-- **ActionExecutionContext**: Provides acting context for actions
+- **ActionRunContext**: Provides acting context for actions
 
 **Key Requirements:**
 - Contexts must be passed to operations that need state

@@ -546,7 +546,7 @@ machine "optimized-server" {
 }
 ```
 
-### Command Execution Timeouts
+### Command Run Timeouts
 
 #### Problem: Commands timing out
 ```bash

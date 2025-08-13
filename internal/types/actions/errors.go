@@ -7,37 +7,33 @@ import (
 	spookytypescommon "spooky/internal/types/common"
 )
 
-// ActionError represents an error that occurred during action execution
+// ActionError represents an error that occurred during action running
 type ActionError struct {
 	spookytypescommon.ErrorDetails
+	ActionName  string `json:"action_name"`
+	ActionType  string `json:"action_type"`
+	MachineName string `json:"machine_name,omitempty"`
+	ExitCode    int    `json:"exit_code,omitempty"`
+	Stdout      string `json:"stdout,omitempty"`
+	Stderr      string `json:"stderr,omitempty"`
+}
 
-	// Action identification
-	ActionName string `json:"action_name"`
-	ActionType string `json:"action_type"`
-
-	// Error context
-	ErrorType    string `json:"error_type"`
-	ErrorMessage string `json:"error_message"`
-
-	// Execution context
-	MachineName string     `json:"machine_name,omitempty"`
-	StartTime   *time.Time `json:"start_time,omitempty"`
-	EndTime     *time.Time `json:"end_time,omitempty"`
-
-	// Error details
-	ExitCode   int    `json:"exit_code,omitempty"`
-	Stdout     string `json:"stdout,omitempty"`
-	Stderr     string `json:"stderr,omitempty"`
-	RetryCount int    `json:"retry_count"`
-	MaxRetries int    `json:"max_retries"`
+// NewActionError creates a new ActionError
+func NewActionError(actionName, actionType, message string) *ActionError {
+	return &ActionError{
+		ErrorDetails: spookytypescommon.ErrorDetails{
+			Message:   message,
+			Code:      "ACTION_ERROR",
+			Timestamp: time.Now(),
+		},
+		ActionName: actionName,
+		ActionType: actionType,
+	}
 }
 
 // Error returns the error message
 func (e *ActionError) Error() string {
-	if e.MachineName != "" {
-		return fmt.Sprintf("action '%s' failed on machine '%s': %s", e.ActionName, e.MachineName, e.ErrorMessage)
-	}
-	return fmt.Sprintf("action '%s' failed: %s", e.ActionName, e.ErrorMessage)
+	return fmt.Sprintf("action error [%s/%s]: %s", e.ActionName, e.ActionType, e.Message)
 }
 
 // Unwrap returns the underlying error
@@ -45,50 +41,31 @@ func (e *ActionError) Unwrap() error {
 	return nil
 }
 
-// NewActionError creates a new action error
-func NewActionError(actionName, actionType, errorType, errorMessage string) *ActionError {
-	return &ActionError{
-		ErrorDetails: spookytypescommon.ErrorDetails{
-			Timestamp: time.Now(),
-		},
-		ActionName:   actionName,
-		ActionType:   actionType,
-		ErrorType:    errorType,
-		ErrorMessage: errorMessage,
-	}
-}
-
-// ActingError represents an error that occurred during action acting
+// ActingError represents an error that occurred during acting
 type ActingError struct {
 	spookytypescommon.ErrorDetails
+	SessionID   string `json:"session_id"`
+	ActionName  string `json:"action_name"`
+	MachineName string `json:"machine_name,omitempty"`
+	Status      string `json:"status"`
+}
 
-	// Acting identification
-	SessionID  string `json:"session_id"`
-	ActionName string `json:"action_name"`
-
-	// Error context
-	ErrorType    string `json:"error_type"`
-	ErrorMessage string `json:"error_message"`
-
-	// Acting context
-	MachineName string     `json:"machine_name,omitempty"`
-	StartTime   *time.Time `json:"start_time,omitempty"`
-	EndTime     *time.Time `json:"end_time,omitempty"`
-
-	// Error details
-	ExitCode   int    `json:"exit_code,omitempty"`
-	Stdout     string `json:"stdout,omitempty"`
-	Stderr     string `json:"stderr,omitempty"`
-	RetryCount int    `json:"retry_count"`
-	MaxRetries int    `json:"max_retries"`
+// NewActingError creates a new ActingError
+func NewActingError(sessionID, actionName, message string) *ActingError {
+	return &ActingError{
+		ErrorDetails: spookytypescommon.ErrorDetails{
+			Message:   message,
+			Code:      "ACTING_ERROR",
+			Timestamp: time.Now(),
+		},
+		SessionID:  sessionID,
+		ActionName: actionName,
+	}
 }
 
 // Error returns the error message
 func (e *ActingError) Error() string {
-	if e.MachineName != "" {
-		return fmt.Sprintf("acting session '%s' action '%s' failed on machine '%s': %s", e.SessionID, e.ActionName, e.MachineName, e.ErrorMessage)
-	}
-	return fmt.Sprintf("acting session '%s' action '%s' failed: %s", e.SessionID, e.ActionName, e.ErrorMessage)
+	return fmt.Sprintf("acting error [%s/%s]: %s", e.SessionID, e.ActionName, e.Message)
 }
 
 // Unwrap returns the underlying error
@@ -96,47 +73,29 @@ func (e *ActingError) Unwrap() error {
 	return nil
 }
 
-// NewActingError creates a new acting error
-func NewActingError(sessionID, actionName, errorType, errorMessage string) *ActingError {
-	return &ActingError{
-		ErrorDetails: spookytypescommon.ErrorDetails{
-			Timestamp: time.Now(),
-		},
-		SessionID:    sessionID,
-		ActionName:   actionName,
-		ErrorType:    errorType,
-		ErrorMessage: errorMessage,
-	}
-}
-
 // PlanningError represents an error that occurred during action planning
 type PlanningError struct {
 	spookytypescommon.ErrorDetails
+	PlanName   string   `json:"plan_name"`
+	ActionName string   `json:"action_name,omitempty"`
+	Issues     []string `json:"issues,omitempty"`
+}
 
-	// Planning identification
-	PlanID   string `json:"plan_id"`
-	PlanName string `json:"plan_name"`
-
-	// Error context
-	ErrorType    string `json:"error_type"`
-	ErrorMessage string `json:"error_message"`
-
-	// Planning context
-	ActionName string `json:"action_name,omitempty"`
-	Step       string `json:"step,omitempty"`
-
-	// Error details
-	ValidationErrors []string `json:"validation_errors,omitempty"`
-	DependencyErrors []string `json:"dependency_errors,omitempty"`
-	ResourceErrors   []string `json:"resource_errors,omitempty"`
+// NewPlanningError creates a new PlanningError
+func NewPlanningError(planName, message string) *PlanningError {
+	return &PlanningError{
+		ErrorDetails: spookytypescommon.ErrorDetails{
+			Message:   message,
+			Code:      "PLANNING_ERROR",
+			Timestamp: time.Now(),
+		},
+		PlanName: planName,
+	}
 }
 
 // Error returns the error message
 func (e *PlanningError) Error() string {
-	if e.ActionName != "" {
-		return fmt.Sprintf("planning failed for plan '%s' action '%s': %s", e.PlanName, e.ActionName, e.ErrorMessage)
-	}
-	return fmt.Sprintf("planning failed for plan '%s': %s", e.PlanName, e.ErrorMessage)
+	return fmt.Sprintf("planning error [%s]: %s", e.PlanName, e.Message)
 }
 
 // Unwrap returns the underlying error
@@ -144,48 +103,34 @@ func (e *PlanningError) Unwrap() error {
 	return nil
 }
 
-// NewPlanningError creates a new planning error
-func NewPlanningError(planID, planName, errorType, errorMessage string) *PlanningError {
-	return &PlanningError{
-		ErrorDetails: spookytypescommon.ErrorDetails{
-			Timestamp: time.Now(),
-		},
-		PlanID:       planID,
-		PlanName:     planName,
-		ErrorType:    errorType,
-		ErrorMessage: errorMessage,
-	}
-}
-
-// ValidationError represents an error that occurred during action validation
+// ValidationError represents a validation error for actions
 type ValidationError struct {
 	spookytypescommon.ErrorDetails
+	ActionName string `json:"action_name,omitempty"`
+	Field      string `json:"field,omitempty"`
+	Value      string `json:"value,omitempty"`
+	Rule       string `json:"rule,omitempty"`
+}
 
-	// Validation identification
-	ValidationID string `json:"validation_id"`
-	ActionName   string `json:"action_name"`
-
-	// Error context
-	ErrorType    string `json:"error_type"`
-	ErrorMessage string `json:"error_message"`
-
-	// Validation context
-	Field string `json:"field,omitempty"`
-	Value string `json:"value,omitempty"`
-	Rule  string `json:"rule,omitempty"`
-
-	// Error details
-	SchemaErrors     []string `json:"schema_errors,omitempty"`
-	DependencyErrors []string `json:"dependency_errors,omitempty"`
-	ResourceErrors   []string `json:"resource_errors,omitempty"`
+// NewValidationError creates a new ValidationError
+func NewValidationError(actionName, field, message string) *ValidationError {
+	return &ValidationError{
+		ErrorDetails: spookytypescommon.ErrorDetails{
+			Message:   message,
+			Code:      "VALIDATION_ERROR",
+			Timestamp: time.Now(),
+		},
+		ActionName: actionName,
+		Field:      field,
+	}
 }
 
 // Error returns the error message
 func (e *ValidationError) Error() string {
-	if e.Field != "" {
-		return fmt.Sprintf("validation failed for action '%s' field '%s': %s", e.ActionName, e.Field, e.ErrorMessage)
+	if e.ActionName != "" && e.Field != "" {
+		return fmt.Sprintf("validation error [%s.%s]: %s", e.ActionName, e.Field, e.Message)
 	}
-	return fmt.Sprintf("validation failed for action '%s': %s", e.ActionName, e.ErrorMessage)
+	return fmt.Sprintf("validation error: %s", e.Message)
 }
 
 // Unwrap returns the underlying error
@@ -193,44 +138,30 @@ func (e *ValidationError) Unwrap() error {
 	return nil
 }
 
-// NewValidationError creates a new validation error
-func NewValidationError(validationID, actionName, errorType, errorMessage string) *ValidationError {
-	return &ValidationError{
-		ErrorDetails: spookytypescommon.ErrorDetails{
-			Timestamp: time.Now(),
-		},
-		ValidationID: validationID,
-		ActionName:   actionName,
-		ErrorType:    errorType,
-		ErrorMessage: errorMessage,
-	}
-}
-
-// DependencyError represents an error that occurred during dependency resolution
+// DependencyError represents an error with action dependencies
 type DependencyError struct {
 	spookytypescommon.ErrorDetails
+	ActionName     string     `json:"action_name"`
+	Dependencies   []string   `json:"dependencies"`
+	MissingActions []string   `json:"missing_actions,omitempty"`
+	CircularDeps   [][]string `json:"circular_deps,omitempty"`
+}
 
-	// Dependency identification
-	FromAction string `json:"from_action"`
-	ToAction   string `json:"to_action"`
-
-	// Error context
-	ErrorType    string `json:"error_type"`
-	ErrorMessage string `json:"error_message"`
-
-	// Dependency context
-	DependencyType string `json:"dependency_type"`
-	Condition      string `json:"condition,omitempty"`
-
-	// Error details
-	CircularDependencies []string `json:"circular_dependencies,omitempty"`
-	MissingDependencies  []string `json:"missing_dependencies,omitempty"`
-	InvalidDependencies  []string `json:"invalid_dependencies,omitempty"`
+// NewDependencyError creates a new DependencyError
+func NewDependencyError(actionName, message string) *DependencyError {
+	return &DependencyError{
+		ErrorDetails: spookytypescommon.ErrorDetails{
+			Message:   message,
+			Code:      "DEPENDENCY_ERROR",
+			Timestamp: time.Now(),
+		},
+		ActionName: actionName,
+	}
 }
 
 // Error returns the error message
 func (e *DependencyError) Error() string {
-	return fmt.Sprintf("dependency error from '%s' to '%s': %s", e.FromAction, e.ToAction, e.ErrorMessage)
+	return fmt.Sprintf("dependency error [%s]: %s", e.ActionName, e.Message)
 }
 
 // Unwrap returns the underlying error
@@ -238,17 +169,38 @@ func (e *DependencyError) Unwrap() error {
 	return nil
 }
 
-// NewDependencyError creates a new dependency error
-func NewDependencyError(fromAction, toAction, errorType, errorMessage string) *DependencyError {
-	return &DependencyError{
+// ConfigurationError represents an error with action configuration
+type ConfigurationError struct {
+	spookytypescommon.ErrorDetails
+	ActionName string `json:"action_name,omitempty"`
+	Field      string `json:"field,omitempty"`
+	ConfigType string `json:"config_type,omitempty"`
+}
+
+// NewConfigurationError creates a new ConfigurationError
+func NewConfigurationError(actionName, field, message string) *ConfigurationError {
+	return &ConfigurationError{
 		ErrorDetails: spookytypescommon.ErrorDetails{
+			Message:   message,
+			Code:      "CONFIGURATION_ERROR",
 			Timestamp: time.Now(),
 		},
-		FromAction:   fromAction,
-		ToAction:     toAction,
-		ErrorType:    errorType,
-		ErrorMessage: errorMessage,
+		ActionName: actionName,
+		Field:      field,
 	}
+}
+
+// Error returns the error message
+func (e *ConfigurationError) Error() string {
+	if e.ActionName != "" && e.Field != "" {
+		return fmt.Sprintf("configuration error [%s.%s]: %s", e.ActionName, e.Field, e.Message)
+	}
+	return fmt.Sprintf("configuration error: %s", e.Message)
+}
+
+// Unwrap returns the underlying error
+func (e *ConfigurationError) Unwrap() error {
+	return nil
 }
 
 // Error type constants

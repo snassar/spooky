@@ -165,7 +165,7 @@ All action processing follows the Acting pattern:
 
 ```go
 type ActingManager interface {
-    CreateSession(ctx interfaces.ActionExecutionContext) (ActingSession, error)
+    CreateSession(ctx interfaces.ActionRunContext) (ActingSession, error)
     RunAction(session ActingSession, action interfaces.Action) error
     ProcessResults(session ActingSession) ([]ActingResult, error)
 }
@@ -194,7 +194,7 @@ All components support validation through interfaces:
 type ActionValidator interface {
     ValidateAction(action interfaces.Action) (ValidationResult, error)
     ValidateCollection(actions []interfaces.Action) (ValidationResult, error)
-    ValidateContext(ctx interfaces.ActionExecutionContext) (ValidationResult, error)
+    ValidateContext(ctx interfaces.ActionRunContext) (ValidationResult, error)
 }
 ```
 

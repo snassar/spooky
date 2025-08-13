@@ -1,144 +1,135 @@
 package spookytypesactions
 
 import (
+	"context"
 	"time"
 
 	spookytypescommon "spooky/internal/types/common"
-	spookytypesmachines "spooky/internal/types/machines"
-	spookytypesvariables "spooky/internal/types/variables"
 )
 
-// ActionExecutionContext represents the context for action execution
-type ActionExecutionContext struct {
-	spookytypescommon.TimestampedEntity
+// ActionRunContext represents the context for action running
+type ActionRunContext struct {
+	spookytypescommon.CompleteEntity
+
+	// Context identification
+	ContextID string    `json:"context_id" hcl:"context_id"`
+	SessionID string    `json:"session_id" hcl:"session_id"`
+	CreatedAt time.Time `json:"created_at" hcl:"created_at"`
 
 	// Project context
-	ProjectPath string `json:"project_path"`
-	ProjectName string `json:"project_name"`
+	ProjectPath string `json:"project_path" hcl:"project_path"`
+	ProjectName string `json:"project_name" hcl:"project_name"`
 
 	// Action context
-	ActionName string `json:"action_name"`
-	ActionType string `json:"action_type"`
+	ActionName string `json:"action_name" hcl:"action_name"`
+	ActionType string `json:"action_type" hcl:"action_type"`
 
 	// Machine context
-	TargetMachines []spookytypesmachines.Machine `json:"target_machines"`
-	MachineNames   []string                      `json:"machine_names"`
+	MachineName string `json:"machine_name" hcl:"machine_name"`
+	MachineHost string `json:"machine_host" hcl:"machine_host"`
 
-	// Variable context
-	Variables map[string]*spookytypesvariables.Variable `json:"variables"`
-	Resolved  map[string]interface{}                    `json:"resolved"`
+	// Running context
+	UserID      string            `json:"user_id" hcl:"user_id"`
+	Environment map[string]string `json:"environment" hcl:"environment,optional"`
+	Variables   map[string]string `json:"variables" hcl:"variables,optional"`
 
-	// Execution settings
-	Parallel     bool          `json:"parallel"`
-	Timeout      time.Duration `json:"timeout"`
-	Retries      int           `json:"retries"`
-	RetryDelay   time.Duration `json:"retry_delay"`
-	DryRun       bool          `json:"dry_run"`
-	AllowFailure bool          `json:"allow_failure"`
+	// Configuration
+	Timeout    time.Duration `json:"timeout" hcl:"timeout,optional"`
+	RetryCount int           `json:"retry_count" hcl:"retry_count,optional"`
+	MaxRetries int           `json:"max_retries" hcl:"max_retries,optional"`
+	Parallel   bool          `json:"parallel" hcl:"parallel,optional"`
 
-	// Environment
-	Environment      map[string]string `json:"environment"`
-	WorkingDirectory string            `json:"working_directory"`
-	User             string            `json:"user"`
-	Sudo             bool              `json:"sudo"`
+	// State
+	Status    string     `json:"status" hcl:"status"` // "pending", "running", "completed", "failed", "cancelled"
+	StartTime *time.Time `json:"start_time" hcl:"start_time,optional"`
+	EndTime   *time.Time `json:"end_time" hcl:"end_time,optional"`
 
-	// Resource limits
-	MaxConcurrent  int             `json:"max_concurrent"`
-	ResourceLimits *ResourceLimits `json:"resource_limits,omitempty"`
+	// Results
+	ExitCode int    `json:"exit_code" hcl:"exit_code,optional"`
+	Stdout   string `json:"stdout" hcl:"stdout,optional"`
+	Stderr   string `json:"stderr" hcl:"stderr,optional"`
+	Error    string `json:"error" hcl:"error,optional"`
 
-	// Execution state
-	StartTime *time.Time     `json:"start_time,omitempty"`
-	EndTime   *time.Time     `json:"end_time,omitempty"`
-	Status    string         `json:"status"`
-	Error     error          `json:"error,omitempty"`
-	Results   []ActingResult `json:"results,omitempty"`
+	// Metadata
+	Tags     []string          `json:"tags" hcl:"tags,optional"`
+	Metadata map[string]string `json:"metadata" hcl:"metadata,optional"`
+
+	// Go context
+	Context context.Context `json:"-" hcl:"-"`
 }
 
 // ActingSession represents a session for running actions
 type ActingSession struct {
-	spookytypescommon.TimestampedEntity
+	spookytypescommon.CompleteEntity
 
 	// Session identification
-	SessionID   string `json:"session_id"`
-	ProjectPath string `json:"project_path"`
+	SessionID string    `json:"session_id" hcl:"session_id"`
+	CreatedAt time.Time `json:"created_at" hcl:"created_at"`
+	ExpiresAt time.Time `json:"expires_at" hcl:"expires_at"`
 
-	// Actions to run
-	Actions []Action `json:"actions"`
-
-	// Target machines
-	Machines []spookytypesmachines.Machine `json:"machines"`
-
-	// Execution context
-	Context *ActionExecutionContext `json:"context"`
+	// Session context
+	UserID      string `json:"user_id" hcl:"user_id"`
+	ProjectPath string `json:"project_path" hcl:"project_path"`
+	ProjectName string `json:"project_name" hcl:"project_name"`
 
 	// Session state
-	Status    string     `json:"status"`
-	StartTime *time.Time `json:"start_time,omitempty"`
-	EndTime   *time.Time `json:"end_time,omitempty"`
-	Progress  float64    `json:"progress"`
-	Completed int        `json:"completed"`
-	Total     int        `json:"total"`
-	Failed    int        `json:"failed"`
-	Skipped   int        `json:"skipped"`
+	Status    string     `json:"status" hcl:"status"` // "active", "completed", "failed", "cancelled"
+	StartTime *time.Time `json:"start_time" hcl:"start_time,optional"`
+	EndTime   *time.Time `json:"end_time" hcl:"end_time,optional"`
 
-	// Results
-	Results []ActingResult `json:"results,omitempty"`
-	Errors  []error        `json:"errors,omitempty"`
+	// Session configuration
+	Parallel      bool          `json:"parallel" hcl:"parallel,optional"`
+	MaxConcurrent int           `json:"max_concurrent" hcl:"max_concurrent,optional"`
+	Timeout       time.Duration `json:"timeout" hcl:"timeout,optional"`
+	AllowFailures bool          `json:"allow_failures" hcl:"allow_failures,optional"`
+
+	// Session results
+	TotalActions     int     `json:"total_actions" hcl:"total_actions"`
+	CompletedActions int     `json:"completed_actions" hcl:"completed_actions"`
+	FailedActions    int     `json:"failed_actions" hcl:"failed_actions"`
+	SuccessRate      float64 `json:"success_rate" hcl:"success_rate"`
+
+	// Session metadata
+	Tags     []string          `json:"tags" hcl:"tags,optional"`
+	Metadata map[string]string `json:"metadata" hcl:"metadata,optional"`
+
+	// Go context
+	Context context.Context `json:"-" hcl:"-"`
 }
 
 // ActingResult represents the result of running an action
 type ActingResult struct {
-	spookytypescommon.TimestampedEntity
+	spookytypescommon.CompleteEntity
 
-	// Action identification
-	ActionName string `json:"action_name"`
-	ActionType string `json:"action_type"`
+	// Result identification
+	ResultID    string `json:"result_id" hcl:"result_id"`
+	SessionID   string `json:"session_id" hcl:"session_id"`
+	ActionName  string `json:"action_name" hcl:"action_name"`
+	MachineName string `json:"machine_name" hcl:"machine_name"`
 
-	// Machine identification
-	MachineName string `json:"machine_name"`
-	MachineHost string `json:"machine_host"`
+	// Result state
+	Status    string        `json:"status" hcl:"status"` // "success", "failure", "cancelled"
+	StartTime time.Time     `json:"start_time" hcl:"start_time"`
+	EndTime   time.Time     `json:"end_time" hcl:"end_time"`
+	Duration  time.Duration `json:"duration" hcl:"duration"`
 
-	// Execution details
-	StartTime *time.Time    `json:"start_time,omitempty"`
-	EndTime   *time.Time    `json:"end_time,omitempty"`
-	Duration  time.Duration `json:"duration"`
-	Status    string        `json:"status"`
-	ExitCode  int           `json:"exit_code"`
+	// Result data
+	ExitCode  int    `json:"exit_code" hcl:"exit_code"`
+	Stdout    string `json:"stdout" hcl:"stdout,optional"`
+	Stderr    string `json:"stderr" hcl:"stderr,optional"`
+	Error     string `json:"error" hcl:"error,optional"`
+	ErrorType string `json:"error_type" hcl:"error_type,optional"`
 
-	// Output
-	Stdout   string `json:"stdout,omitempty"`
-	Stderr   string `json:"stderr,omitempty"`
-	Combined string `json:"combined,omitempty"`
+	// Performance data
+	CPUUsage    float64 `json:"cpu_usage" hcl:"cpu_usage,optional"`
+	MemoryUsage int64   `json:"memory_usage" hcl:"memory_usage,optional"`
+	DiskUsage   int64   `json:"disk_usage" hcl:"disk_usage,optional"`
 
-	// Error information
-	Error        error  `json:"error,omitempty"`
-	ErrorType    string `json:"error_type,omitempty"`
-	ErrorMessage string `json:"error_message,omitempty"`
+	// Retry information
+	RetryCount int `json:"retry_count" hcl:"retry_count"`
+	MaxRetries int `json:"max_retries" hcl:"max_retries"`
 
 	// Metadata
-	RetryCount int               `json:"retry_count"`
-	Metadata   map[string]string `json:"metadata,omitempty"`
+	Tags     []string          `json:"tags" hcl:"tags,optional"`
+	Metadata map[string]string `json:"metadata" hcl:"metadata,optional"`
 }
-
-// SessionStatus represents the status of an acting session
-type SessionStatus string
-
-const (
-	SessionStatusPending   SessionStatus = "pending"
-	SessionStatusRunning   SessionStatus = "running"
-	SessionStatusCompleted SessionStatus = "completed"
-	SessionStatusFailed    SessionStatus = "failed"
-	SessionStatusCancelled SessionStatus = "cancelled"
-)
-
-// ResultStatus represents the status of an action result
-type ResultStatus string
-
-const (
-	ResultStatusPending   ResultStatus = "pending"
-	ResultStatusRunning   ResultStatus = "running"
-	ResultStatusCompleted ResultStatus = "completed"
-	ResultStatusFailed    ResultStatus = "failed"
-	ResultStatusSkipped   ResultStatus = "skipped"
-	ResultStatusCancelled ResultStatus = "cancelled"
-)
