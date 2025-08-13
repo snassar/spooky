@@ -324,7 +324,7 @@ run_features = {
             items = {
               type = "string"
             }
-            value = ["exec", "system", "eval", "import", "reflect", "os"]
+            value = ["run", "system", "eval", "import", "reflect", "os"]
             description = "Reserved function names"
           }
           max_name_length = {
@@ -414,8 +414,8 @@ run_features = {
               type = "string"
             }
             value = [
-              "{{.*os\\.Exec.*}}",
-              "{{.*exec.*}}",
+              "{{.*os\\.Run.*}}",
+              "{{.*run.*}}",
               "{{.*system.*}}",
               "{{.*eval.*}}",
               "{{.*import.*}}",

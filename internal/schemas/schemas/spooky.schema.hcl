@@ -8,16 +8,16 @@ spooky {
     type = {
       type = "string"
       required = false
-      enum = ["badgerdb", "json"]
-      default = "badgerdb"
-      description = "Storage backend type"
+      enum = ["memory", "json"]
+      default = "memory"
+      description = "Storage backend type (memory for in-memory storage)"
     }
     
     path = {
       type = "string"
       required = false
-      default = "$XDG_DATA_HOME/spooky/facts.db"
-      description = "Storage path for facts database"
+      default = ""
+      description = "Storage path for facts export (not used for memory storage)"
     }
     
     compression = {

@@ -20,7 +20,7 @@ This facts system integrates with other core Spooky systems to provide comprehen
 
 ### **Configuration System Integration**
 - **Global Configuration**: Facts collection settings from `$XDG_CONFIG_HOME/spooky/spooky.hcl` (see [Configuration System](../configuration-system.md))
-- **Facts Settings**: Collection timeouts, caching TTL, parallel collection, retry attempts
+- **Facts Settings**: Collection timeouts, parallel collection, retry attempts
 - **Storage Configuration**: BadgerDB/JSON storage settings, compression, encryption
 - **Performance Settings**: Concurrent fact collectors, memory limits, cache sizes
 - **Configuration Precedence**: CLI flags → Project config → Global config → Environment variables → Defaults
@@ -94,25 +94,25 @@ internal/facts/
 └── stub_collector.go  # Stub implementations
 ```
 
-## Storage Architecture
+## Memory Architecture
 
-### **1. Project Facts Storage**
+### **1. In-Memory Facts Storage**
 
-Based on our analysis and the architectural principles outlined in [Spooky Design](../spooky-design.md), we've decided on a project-focused approach for facts storage:
+Based on our analysis and the architectural principles outlined in [Spooky Design](../spooky-design.md), we've decided on an in-memory approach for facts storage:
 
 ```
 project/
-├── facts.db/                                # Project-specific facts
 ├── project.hcl                              # Project configuration
 ├── machines.hcl                             # Machine inventory
 ├── actions.hcl                              # Action definitions
 ├── variables.hcl                            # Variable definitions
 └── ...
+# Facts are stored in memory during action runs
 ```
 
 ### **2. Fact Classification**
 
-**Project Facts** (stored in `project/facts.db/`):
+**In-Memory Facts** (stored in memory during action runs):
 - ✅ **gopsutil facts** (hardware, system, network)
 - ✅ **BIOS information** (vendor, version, date)
 - ✅ **SSH host keys** (public keys)
@@ -278,32 +278,32 @@ template "config.tmpl" {
 
 ### **5. Benefits of This Approach**
 
-1. **Project Isolation**: Facts stored per project, no cross-project leakage
-2. **Clear Boundaries**: Project facts are explicit and isolated
-3. **Performance**: Efficient fact collection and storage per project
-4. **Simplicity**: One project database, clear access patterns
-5. **Project Isolation**: Project facts don't leak between projects
-6. **Project Intelligence**: Facts available within project context
+1. **Session-Based**: Facts stored in memory for the duration of action runs
+2. **Clear Boundaries**: Facts are ephemeral and isolated to each run
+3. **Performance**: No disk I/O overhead, fast fact access
+4. **Simplicity**: No database management, clear access patterns
+5. **Fresh Data**: Facts are always fresh since they're collected before each run
+6. **Memory Efficiency**: Optimized memory usage for fact storage
 
-### **6. Storage Types**
+### **6. Memory Types**
 
-#### **BadgerDB (Default)**
-- **Format**: Embedded key-value database
-- **Performance**: High performance for large datasets
-- **Use Case**: Production deployments, large server fleets
-- **Location**: `<project>/facts.db/` directory
+#### **In-Memory Storage (Default)**
+- **Format**: Go structs in memory
+- **Performance**: High performance for all deployments
+- **Use Case**: All deployments, from small to large server fleets
+- **Location**: Memory during action runs
 
-#### **JSON Storage**
-- **Format**: Human-readable JSON files
-- **Performance**: Good for small to medium deployments
-- **Use Case**: Development, testing, small deployments
-- **Location**: `<project>/facts.json` file
+#### **Memory Pooling**
+- **Format**: Reused memory structures
+- **Performance**: Optimized memory allocation
+- **Use Case**: Large deployments with many machines
+- **Location**: Memory pool during action runs
 
-#### **HCL Storage**
-- **Format**: HashiCorp Configuration Language
-- **Performance**: Good for configuration-heavy deployments
-- **Use Case**: Configuration management, infrastructure as code
-- **Location**: `<project>/facts.hcl` file
+#### **Memory-Efficient Storage**
+- **Format**: Compressed memory structures
+- **Performance**: Reduced memory usage
+- **Use Case**: Memory-constrained environments
+- **Location**: Memory during action runs
 
 ## Custom Facts Integration
 
@@ -366,102 +366,7 @@ action "configure-monitoring" {
 }
 ```
 
-### **2. Dynamic Facts**
 
-You can also use runnable scripts in `/etc/spooky/facts/` to provide facts at runtime:
-
-```bash
-#!/bin/bash
-# /etc/spooky/facts/deployment.fact (runnable)
-
-# Get current deployment status
-DEPLOYMENT_STATE=$(systemctl is-active nginx)
-LAST_DEPLOY=$(stat -c %Y /var/www/html/index.html)
-
-# Output as HCL
-cat << EOF
-deployment_state = "${DEPLOYMENT_STATE}"
-last_deploy = ${LAST_DEPLOY}
-uptime = $(uptime -p | sed 's/up //')
-EOF
-```
-
-**Example dynamic fact usage:**
-```hcl
-# In templates
-{{if eq .facts.custom.deployment.deployment_state "active"}}
-  # Server is running
-  status = "healthy"
-{{else}}
-  # Server is down
-  status = "unhealthy"
-{{end}}
-
-# Show last deployment time
-last_updated = "{{.facts.custom.deployment.last_deploy}}"
-```
-
-### **3. Summary**
-
-**Custom facts are files on the remote host, discovered at runtime, and merged into the fact namespace.**
-
-### **4. Implementation Details**
-
-#### **Fact Discovery Process**
-
-```go
-// internal/facts/local_collector.go
-func (c *LocalCollector) CollectCustomFacts() (map[string]interface{}, error) {
-    customFacts := make(map[string]interface{})
-    factsDir := "/etc/spooky/facts"
-    
-    // Read all .fact files in /etc/spooky/facts/
-    entries, err := os.ReadDir(factsDir)
-    if err != nil {
-        if os.IsNotExist(err) {
-            return customFacts, nil // Directory doesn't exist, no custom facts
-        }
-        return nil, err
-    }
-    
-    for _, entry := range entries {
-        if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".fact") {
-            continue
-        }
-        
-        filePath := filepath.Join(factsDir, entry.Name())
-        factName := strings.TrimSuffix(entry.Name(), ".fact")
-        
-        // Check if file is runnable
-        if info, err := os.Stat(filePath); err == nil && info.Mode()&0111 != 0 {
-            // Run dynamic fact script
-            customFacts[factName] = c.runDynamicFact(filePath)
-        } else {
-            // Parse static HCL fact file
-            customFacts[factName] = c.parseStaticFact(filePath)
-        }
-    }
-    
-    return customFacts, nil
-}
-```
-
-#### **Template Context Integration**
-
-```go
-// internal/cli/template_context.go
-func (ctx *TemplateContext) buildFactsContext() map[string]interface{} {
-    facts := make(map[string]interface{})
-    
-    // System facts from gopsutil
-    facts["hostname"] = ctx.SystemFacts.Hostname
-    facts["os"] = ctx.SystemFacts.OS
-    facts["cpu"] = ctx.SystemFacts.CPU
-    facts["memory"] = ctx.SystemFacts.Memory
-    facts["network"] = ctx.SystemFacts.Network
-    
-    // Custom facts from /etc/spooky/facts/
-    facts["custom"] = ctx.CustomFacts
     
     return facts
 }
@@ -502,94 +407,13 @@ Exported 3 machines with system and custom facts to facts.json
 2. **✅ Node-Local Facts** - Facts live on the target system where they belong
 3. **✅ Runtime Discovery** - Facts are discovered when `spooky facts gather` runs
 4. **✅ Simple Structure** - Just HCL files in a directory
-5. **✅ Dynamic Support** - Executable scripts for runtime facts
+
 6. **✅ Clear Namespace** - Custom facts under `.facts.custom.*`
 7. **✅ No Import Step** - Facts are automatically discovered and available
 
-## Dynamic Facts and Collision Handling
+## Collision Handling
 
-### **1. Dynamic Facts Overview**
-
-**Dynamic facts** (similar to Ansible's dynamic facts) allow importing custom fact data from external sources:
-
-```go
-// Dynamic fact sources
-type DynamicFactSource struct {
-    Type     string `json:"type"`      // "json", "script", "yaml", "hcl"
-    Path     string `json:"path"`      // File path or script location
-    Timeout  int    `json:"timeout"`   // Execution timeout in seconds
-    Priority int    `json:"priority"`  // Fact precedence (higher = more important)
-}
-
-// Example dynamic fact sources
-dynamic_facts = [
-    {
-        type = "json"
-        path = "facts.d/app-versions.json"
-        priority = 100
-    },
-    {
-        type = "script" 
-        path = "facts.d/deployment-state.sh"
-        timeout = 30
-        priority = 200
-    },
-    {
-        type = "yaml"
-        path = "facts.d/custom-facts.yaml"
-        priority = 50
-    }
-]
-```
-
-### **2. Dynamic Facts Collision Resolution**
-
-**Problem**: When multiple sources provide the same fact key, we need clear precedence rules.
-
-**Solution**: Priority-based collision resolution with explicit merging strategies:
-
-```go
-type FactCollision struct {
-    Key        string                 // The conflicting fact key
-    Sources    []FactSource           // All sources providing this fact
-    Values     []interface{}          // The conflicting values
-    Priorities []int                  // Priority of each source
-    Resolution CollisionResolution    // How to resolve the conflict
-}
-
-type CollisionResolution string
-const (
-    ResolutionHighestPriority CollisionResolution = "highest_priority"  // Use highest priority
-    ResolutionMerge           CollisionResolution = "merge"            // Merge all values
-    ResolutionConcatenate     CollisionResolution = "concatenate"      // Join as strings
-    ResolutionAppend          CollisionResolution = "append"           // Add to array
-    ResolutionWarn            CollisionResolution = "warn"             // Warn and use first
-    ResolutionError           CollisionResolution = "error"            // Fail on collision
-)
-
-// Collision resolution strategy
-func resolveFactCollision(collision *FactCollision) (interface{}, error) {
-    switch collision.Resolution {
-    case ResolutionHighestPriority:
-        return selectHighestPriority(collision)
-    case ResolutionMerge:
-        return mergeFactValues(collision)
-    case ResolutionConcatenate:
-        return concatenateFactValues(collision)
-    case ResolutionAppend:
-        return appendFactValues(collision)
-    case ResolutionWarn:
-        logCollisionWarning(collision)
-        return collision.Values[0], nil
-    case ResolutionError:
-        return nil, fmt.Errorf("fact collision for key '%s': %v", collision.Key, collision.Values)
-    default:
-        return collision.Values[0], nil // Default to first value
-    }
-}
-```
-
-### **3. Machine ID Collision Detection**
+### **1. Machine ID Collision Detection**
 
 **Problem**: When machines are cloned (VMs, containers, etc.), `/etc/machine-id` is often not updated, leading to duplicate machine IDs across different systems.
 
@@ -703,99 +527,7 @@ func DetectCollision(storage FactStorage, newFacts *MachineFacts) (*CollisionRes
 }
 ```
 
-### **5. Fact TTL and Change Detection**
 
-**TTL (Time To Live) Configuration**:
-
-```hcl
-# project.hcl - Project-specific TTL settings
-fact_ttl = "6h"                    # Global facts expire after 6 hours
-dynamic_fact_ttl = "1h"            # Dynamic facts expire after 1 hour
-system_fact_ttl = "24h"            # System facts expire after 24 hours
-
-# Per-fact-type TTL overrides
-fact_ttl_overrides = {
-    "cpu" = "1h"                   # CPU facts expire quickly (frequent changes)
-    "memory" = "30m"               # Memory facts expire very quickly
-    "disk" = "6h"                  # Disk facts expire moderately
-    "network" = "2h"               # Network facts expire quickly
-    "app_version" = "24h"          # App versions change slowly
-    "deployment_state" = "5m"      # Deployment state changes frequently
-}
-
-# ~/.config/spooky/config.hcl - User-wide TTL settings
-fact_ttl = "12h"                   # Default TTL for all projects
-dynamic_fact_ttl = "2h"            # Default dynamic fact TTL
-system_fact_ttl = "48h"            # Default system fact TTL
-```
-
-**What happens when facts change**:
-
-```go
-// Enhanced fact collection with change detection
-func (e *EnhancedFactManager) CollectAndStoreFacts(machine string) error {
-    // 1. Get existing facts for comparison
-    existingFacts, _ := e.globalStorage.GetMachineFacts(machine)
-    
-    // 2. Collect fresh facts
-    freshFacts, err := e.collectFreshFacts(machine)
-    if err != nil {
-        return err
-    }
-    
-    // 3. Detect changes and handle accordingly
-    changes := e.detectFactChanges(existingFacts, freshFacts)
-    
-    if len(changes) > 0 {
-        // Log what changed
-        e.logFactChanges(machine, changes)
-        
-        // Check if changes are significant enough to update
-        if e.shouldUpdateFacts(changes) {
-            // Update facts in global storage
-            return e.globalStorage.SetMachineFacts(machine, freshFacts)
-        } else {
-            // Minor changes - extend TTL but don't update
-            e.extendFactTTL(machine, existingFacts)
-            return nil
-        }
-    }
-    
-    // No changes - extend TTL
-    e.extendFactTTL(machine, existingFacts)
-    return nil
-}
-```
-
-**Example TTL scenarios**:
-
-```bash
-# Scenario 1: Facts haven't changed, TTL extended
-$ spooky act
-Using cached facts for server1 (TTL: 6h remaining)
-
-# Scenario 2: Facts expired, re-collecting
-$ spooky act
-Facts for server1 expired (TTL: 6h), re-collecting...
-Facts changed for server1:
-  memory.used: 8GB → 9GB (low impact)
-  uptime: 5d → 6d (low impact)
-Using updated facts
-
-# Scenario 3: Critical change detected
-$ spooky act
-Facts changed for server1:
-  cpu.cores: 4 → 8 (high impact)
-  memory.total: 16GB → 32GB (high impact)
-Updating facts due to high-impact changes
-
-# Scenario 4: Dynamic facts changed
-$ spooky act
-Facts changed for server1:
-  projects.myapp.app_version: 1.2.0 → 1.2.1 (medium impact)
-  projects.myapp.deployment_state: running → updating (medium impact)
-Updating facts due to medium-impact changes
-```
 
 ## CLI Integration
 
@@ -816,10 +548,10 @@ spooky facts export <project directory>     # Export facts to various formats
 ### Project Integration
 
 #### **Project Initialization**
-Following the project system architecture described in [Spooky Design](../spooky-design.md) and implemented in [Project System](../project-system.md), project initialization creates project-local facts storage:
+Following the project system architecture described in [Spooky Design](../spooky-design.md) and implemented in [Project System](../project-system.md), project initialization creates project structure:
 
 ```bash
-# Creates project-local facts.db during init
+# Creates project structure during init
 spooky project init my-project
 
 # Results in:
@@ -827,19 +559,19 @@ my-project/
 ├── project.hcl
 ├── machines.hcl
 ├── actions.hcl
-├── facts.db/           # BadgerDB database
 ├── templates/
 ├── data/
 └── logs/
+# Facts are collected and stored in memory during action runs
 ```
 
-#### **Facts Database Creation**
-- **Automatic Creation**: `spooky project init` creates a functioning BadgerDB
-- **Schema Validation**: Database is validated against facts schema
-- **Self-Check**: Project initialization includes database validation
-- **Error Handling**: Clear error messages if database creation fails
+#### **Facts Memory Management**
+- **Automatic Management**: `spooky facts gather` manages memory allocation
+- **Schema Validation**: Facts are validated against facts schema
+- **Self-Check**: Fact collection includes validation
+- **Error Handling**: Clear error messages if memory allocation fails
 
-### Storage Configuration
+### Memory Configuration
 
 #### **Project Configuration** (`project.hcl`)
 ```hcl
@@ -848,207 +580,65 @@ project {
   version = "1.0.0"
   environment = "production"
   
-  facts_storage {
-    type = "badgerdb"  # badgerdb, json, hcl
-    path = "facts.db"  # relative to project root
+  facts {
+    memory_limit = "1GB"  # memory limit for facts
+    memory_efficient = true  # use memory-efficient storage
+    parallel_workers = 10  # default parallelism for fact gathering
   }
-  
-  parallel = 10  # default parallelism for fact gathering
 }
 ```
 
 #### **Global Configuration** (`$XDG_CONFIG_HOME/spooky/spooky.hcl`)
-Following the configuration system architecture described in [Spooky Design](../spooky-design.md), global configuration provides system-wide facts storage settings:
+Following the configuration system architecture described in [Spooky Design](../spooky-design.md), global configuration provides system-wide facts memory settings:
 
 ```hcl
 spooky {
-  facts_storage {
-    type = "badgerdb"  # badgerdb, json, hcl
-    path = "/var/lib/spooky/facts.db"  # absolute path
+  facts {
+    memory_limit = "2GB"  # global memory limit for facts
+    memory_efficient = true  # use memory-efficient storage
+    collision_policy = "warn"  # update, warn, skip, merge
   }
-  
-  collision_policy = "warn"  # update, warn, skip, merge
 }
 ```
 
 #### **Environment Variables**
 ```bash
-# Override storage type
-export SPOOKY_FACTS_FORMAT="json"
+# Override memory limit
+export SPOOKY_FACTS_MEMORY_LIMIT="1GB"
 
-# Override storage path
-export SPOOKY_FACTS_PATH="/custom/path/facts.db"
+# Override memory efficiency
+export SPOOKY_FACTS_MEMORY_EFFICIENT="true"
 
 # Override collision policy
 export SPOOKY_COLLISION_POLICY="warn"
 ```
 
-### Enhanced CLI Commands
 
-#### **TTL and Fact Update Commands**
-```bash
-# Force refresh facts (ignore TTL)
-$ spooky facts refresh server1
-Forcing fact refresh for server1...
-Facts changed for server1:
-  memory.used: 8GB → 9GB (low impact)
-  uptime: 5d → 6d (low impact)
-Updated facts for server1
-
-# Check fact TTL status
-$ spooky facts ttl server1
-Facts for server1:
-  Last updated: 2024-01-15 10:30:00
-  TTL: 6h (expires: 2024-01-15 16:30:00)
-  Status: Valid (2h remaining)
-
-# Extend TTL for specific facts
-$ spooky facts extend-ttl server1 --fact cpu --duration 12h
-Extended TTL for server1.cpu to 12h
-
-# Clear facts cache (force re-collection)
-$ spooky facts clear server1
-Cleared cached facts for server1
-Next spooky act will re-collect all facts
-
-# Show fact change history
-$ spooky facts history server1 --limit 10
-Fact change history for server1:
-  2024-01-15 10:30:00: memory.used 8GB → 9GB (low impact)
-  2024-01-15 09:15:00: app_version 1.2.0 → 1.2.1 (medium impact)
-  2024-01-15 08:00:00: cpu.cores 4 → 8 (high impact)
-```
-
-#### **Configuration Commands**
-```bash
-# Set project TTL
-$ spooky facts config --project --ttl 4h
-Set project fact TTL to 4h
-
-# Set per-fact TTL override
-$ spooky facts config --project --fact cpu --ttl 30m
-Set cpu fact TTL to 30m in project
-
-# Set change impact thresholds
-$ spooky facts config --project --update-on-medium
-Enable auto-update for medium impact changes
-
-# Show current configuration
-$ spooky facts config --show
-Fact configuration:
-  Project TTL: 6h
-  Dynamic fact TTL: 1h
-  System fact TTL: 24h
-  Update on medium changes: true
-  Update on low changes: false
-  TTL overrides:
-    cpu: 1h
-    memory: 30m
-    disk: 6h
-```
-
-#### **Advanced Fact Management Commands**
-```bash
-# Delete facts with filtering
-$ spooky facts delete --machine-name "web-001" --confirm
-Found 1 facts matching the criteria:
-  - web-001 (abc123) from actions/deploy-web.hcl
-Successfully deleted 1 facts.
-
-# Export facts with filtering
-$ spooky facts export --machine "web-001" --format json --output web-001-facts.json
-Successfully exported facts to web-001-facts.json
-
-# Import facts from file
-$ spooky facts import facts-backup.json
-Successfully imported facts from facts-backup.json
-
-# Collect facts from specific machine
-$ spooky facts collect web-001 actions/deploy-web.hcl
-Successfully gathered facts for web-001 (15 facts)
-
-# Show fact statistics
-$ spooky facts stats
-Fact database statistics:
-  Total machines: 25
-  Total facts: 375
-  Last updated: 2024-01-15 10:30:00
-  Storage size: 2.3MB
-  Average facts per machine: 15
-```
-
-#### **Dynamic Facts Management**
-```bash
-# List dynamic fact sources
-$ spooky facts dynamic list
-Dynamic fact sources:
-  - app-versions.json (priority: 100, type: json)
-  - deployment-state.sh (priority: 200, type: script)
-  - custom-facts.yaml (priority: 50, type: yaml)
-
-# Add new dynamic fact source
-$ spooky facts dynamic add --type script --path facts.d/monitoring.sh --priority 150
-Added dynamic fact source: facts.d/monitoring.sh
-
-# Remove dynamic fact source
-$ spooky facts dynamic remove facts.d/custom-facts.yaml
-Removed dynamic fact source: facts.d/custom-facts.yaml
-
-# Test dynamic fact source
-$ spooky facts dynamic test facts.d/deployment-state.sh
-Testing dynamic fact source: facts.d/deployment-state.sh
-Output: {"deployment_state": "running", "last_deploy": "2024-01-15T10:00:00Z"}
-```
-
-#### **Collision Management**
-```bash
-# List machine ID collisions
-$ spooky facts collisions list
-Machine ID collisions:
-  - abc123: web-001 (confidence: 0.8)
-    Evidence: hostname mismatch, IP mismatch
-    Resolution: warn
-
-# Resolve collision manually
-$ spooky facts collisions resolve abc123 --action create
-Created new machine record: abc123-web-001
-
-# Set collision policy
-$ spooky facts collisions policy --set warn
-Set collision policy to: warn
-
-# Show collision history
-$ spooky facts collisions history --limit 5
-Collision history:
-  2024-01-15 10:30:00: abc123 (web-001) - resolved by create
-  2024-01-15 09:15:00: def456 (db-001) - resolved by merge
-  2024-01-15 08:00:00: ghi789 (app-001) - resolved by update
-```
 
 ## Implementation Phases
 
-### **Phase 1: Project Facts Database Foundation (Week 1)**
-**Goal**: Create project facts database with automatic initialization
+### **Phase 1: In-Memory Facts Foundation (Week 1)**
+**Goal**: Create in-memory facts system with automatic management
 
 #### Tasks:
-1. **Add BadgerDB dependency**
+1. **Remove BadgerDB dependency**
    ```bash
-   go get github.com/dgraph-io/badger/v4
+   go mod tidy  # Remove unused dependencies
    ```
 
-2. **Create project facts storage** (`internal/facts/project_storage.go`)
-   - Implement `ensureProjectFactsDB()` function
-   - Add project directory compliance
-   - Create BadgerDB initialization
+2. **Create in-memory facts storage** (`internal/facts/memory_storage.go`)
+   - Implement `NewMemoryFactStorage()` function
+   - Add memory allocation management
+   - Create efficient memory structures
 
 3. **Update fact manager** (`internal/facts/manager.go`)
-   - Add project storage integration
-   - Implement fact persistence to project database
-   - Add fact retrieval from project database
+   - Add in-memory storage integration
+   - Implement fact storage in memory
+   - Add fact retrieval from memory
 
 4. **Schema validation integration**
-   - Integrate facts schema validation with project storage
-   - Add self-checking database creation
+   - Integrate facts schema validation with memory storage
+   - Add self-checking fact validation
    - Implement clear error handling
 
 ### **Phase 2: Enhanced Fact Collection (Week 2)**
@@ -1072,21 +662,20 @@ Collision history:
    - Make facts available within project context
 
 4. **Enhanced fact collection**
-   - Implement dynamic fact sources (JSON, scripts, YAML, HCL)
    - Add priority-based collision resolution
    - Create fact merging strategies
 
-### **Phase 3: Enhanced Project Facts Storage (Week 3)**
-**Goal**: Add enhanced project-specific fact storage
+### **Phase 3: Enhanced In-Memory Facts Storage (Week 3)**
+**Goal**: Add enhanced in-memory fact storage
 
 #### Tasks:
-1. **Enhanced project facts storage** (`internal/facts/project_storage.go`)
-   - Implement enhanced project-specific fact storage
-   - Add project isolation
-   - Create project fact access patterns
+1. **Enhanced in-memory facts storage** (`internal/facts/memory_storage.go`)
+   - Implement enhanced in-memory fact storage
+   - Add memory optimization
+   - Create efficient fact access patterns
 
 2. **Fact organization** (`internal/facts/organizer.go`)
-   - Organize project facts efficiently
+   - Organize facts efficiently in memory
    - Implement clear access patterns
    - Add fact categorization rules
 
@@ -1095,10 +684,7 @@ Collision history:
    - Add confidence-based collision handling
    - Create collision resolution strategies
 
-4. **TTL and change detection**
-   - Implement fact TTL configuration
-   - Add change impact assessment
-   - Create automatic update policies
+
 
 ### **Phase 4: CLI Integration and Management (Week 3)**
 **Goal**: Add comprehensive facts management to CLI
@@ -1119,7 +705,7 @@ Collision history:
 
 3. **Enhanced CLI examples**
    - Add comprehensive usage examples
-   - Include TTL and collision scenarios
+   - Include collision scenarios
    - Provide configuration examples
 
 ### **Phase 5: Testing and Documentation (Week 4)**
@@ -1131,7 +717,6 @@ Collision history:
    - Enhanced collector tests
    - Fact merging tests
    - Collision detection tests
-   - TTL and change detection tests
 
 2. **Integration tests**
    - End-to-end fact collection and storage
@@ -1150,7 +735,7 @@ Collision history:
 
 ### ✅ **Completed Features**
 
-#### **1. Storage Interface**
+#### **1. Memory Storage Interface**
 ```go
 type FactStorage interface {
     GetMachineFacts(machineID string) (*MachineFacts, error)
@@ -1164,30 +749,23 @@ type FactStorage interface {
 }
 ```
 
-#### **2. Storage Factory**
+#### **2. Memory Storage Factory**
 ```go
 // Clear separation of concerns
-func NewFactStorage(opts StorageOptions) (FactStorage, error)  // For creating new storage
-func OpenFactStorage(opts StorageOptions) (FactStorage, error) // For reading existing storage
+func NewFactStorage(opts StorageOptions) (FactStorage, error)  // For creating new memory storage
+func OpenFactStorage(opts StorageOptions) (FactStorage, error) // For reading existing memory storage
 ```
 
-#### **3. BadgerDB Implementation**
-- ✅ Full BadgerDB storage backend
-- ✅ ACID transactions
-- ✅ Efficient querying
+#### **3. In-Memory Implementation**
+- ✅ Full in-memory storage backend
+- ✅ Memory-efficient operations
+- ✅ Fast querying
 - ✅ Export/import functionality
-- ✅ Read-only operations for export
+- ✅ Memory-optimized operations
 
-#### **4. JSON Storage Implementation**
-- ✅ File-based JSON storage
-- ✅ Thread-safe operations
-- ✅ Export/import functionality
-- ✅ Human-readable format
 
-#### **5. HCL Storage Implementation**
-- ✅ HCL-based storage backend
-- ✅ Configuration-friendly format
-- ✅ Export/import functionality
+
+
 
 #### **6. CLI Integration**
 - ✅ `spooky facts gather` - Collect facts from machines
@@ -1196,22 +774,22 @@ func OpenFactStorage(opts StorageOptions) (FactStorage, error) // For reading ex
 - ✅ `spooky facts export` - Export facts to JSON/HCL
 
 #### **7. Project Integration**
-- ✅ `spooky project init` creates facts.db
-- ✅ Schema validation during initialization
-- ✅ Self-checking database creation
+- ✅ `spooky project init` creates project structure
+- ✅ Schema validation during fact collection
+- ✅ Self-checking fact validation
 - ✅ Clear error handling
 
 #### **8. Export Safety**
-- ✅ Export only works with existing databases
+- ✅ Export only works with existing facts in memory
 - ✅ No database creation during export
-- ✅ Clear error messages for missing databases
+- ✅ Clear error messages for missing facts
 
 ### 🔄 **In Progress Features**
 
-#### **1. Project Facts Database**
-- 🔄 Project facts storage initialization
-- 🔄 Project fact storage
-- 🔄 Project directory compliance
+#### **1. In-Memory Facts Database**
+- 🔄 In-memory facts storage initialization
+- 🔄 In-memory fact storage
+- 🔄 Memory allocation compliance
 
 #### **2. Enhanced Fact Collection**
 - 🔄 Package manager detection
@@ -1221,8 +799,6 @@ func OpenFactStorage(opts StorageOptions) (FactStorage, error) // For reading ex
 - 🔄 BIOS information collection
 
 #### **3. Dynamic Facts System**
-- 🔄 Dynamic fact sources (JSON, scripts, YAML, HCL)
-- 🔄 Priority-based collision resolution
 - 🔄 Fact merging strategies
 
 ### ❌ **Planned Features**
@@ -1232,17 +808,10 @@ func OpenFactStorage(opts StorageOptions) (FactStorage, error) // For reading ex
 - ❌ Collision resolution strategies
 - ❌ Confidence-based collision handling
 
-#### **2. TTL and Change Detection**
-- ❌ Fact TTL configuration
-- ❌ Change impact assessment
-- ❌ Automatic update policies
+
 
 #### **3. Advanced CLI Commands**
 - ❌ `spooky facts delete` - Delete specific facts
-- ❌ `spooky facts refresh` - Force refresh facts
-- ❌ `spooky facts ttl` - TTL management
-- ❌ `spooky facts config` - Configuration management
-- ❌ `spooky facts dynamic` - Dynamic facts management
 - ❌ `spooky facts collisions` - Collision management
 
 #### **4. Encryption Support**
@@ -1250,13 +819,13 @@ func OpenFactStorage(opts StorageOptions) (FactStorage, error) // For reading ex
 - ❌ Field-level encryption
 - ❌ File-level encryption
 
-#### **5. Cloud Storage Backends**
-- ❌ S3/MinIO storage support
-- ❌ HTTP storage endpoints
-- ❌ Multi-backend synchronization
+#### **5. Advanced Memory Management**
+- ❌ Memory pooling for large deployments
+- ❌ Memory compression for efficiency
+- ❌ Memory monitoring and profiling
 
 #### **6. Statistics and Monitoring**
-- ❌ Database statistics
+- ❌ Memory usage statistics
 - ❌ Performance metrics
 - ❌ Health monitoring
 
@@ -1264,29 +833,21 @@ func OpenFactStorage(opts StorageOptions) (FactStorage, error) // For reading ex
 
 ### Schema Files
 
-The fact storage system uses three schema files to validate data across different storage formats:
+The fact storage system uses schema files to validate data across different formats:
 
-#### **BadgerDB Schema** (`internal/schemas/schemas/facts-badger.hcl`)
-- **Purpose**: Validates facts stored in BadgerDB format
-- **Location**: `<project>/facts.db/` directory
-- **Validation**: Checks for BadgerDB files (`MANIFEST`, `KEYREGISTRY`, `.vlog`)
+#### **Facts Schema** (`internal/schemas/schemas/facts-structure.hcl`)
+- **Purpose**: Validates facts structure and format
+- **Location**: Embedded in binary
+- **Validation**: Checks for facts structure compliance
 
-#### **JSON Schema** (`internal/schemas/schemas/facts-json.hcl`)
-- **Purpose**: Validates facts stored in JSON format
-- **Location**: `<project>/facts.json` file
-- **Format**: Human-readable JSON with structured facts
 
-#### **HCL Schema** (`internal/schemas/schemas/facts-hcl.hcl`)
-- **Purpose**: Validates facts stored in HCL format
-- **Location**: `<project>/facts.hcl` file
-- **Format**: HashiCorp Configuration Language with facts blocks
 
 ### Schema-Based Data Structure
 
-All three schema files define the same core structure for facts data:
+The schema file defines the core structure for facts data:
 
 ```hcl
-# Core facts structure (from facts-badger.hcl, facts-json.hcl, facts-hcl.hcl)
+# Core facts structure (from facts-badger.hcl)
 facts {
   # Machine ID (32-character hex string from /etc/machine-id)
   machine_id = "a1b2c3d4e5f678901234567890123456"
@@ -1294,8 +855,7 @@ facts {
   # Collection timestamp (ISO 8601 format)
   collected_at = "2024-07-28T12:00:00Z"
   
-  # Time-to-live (optional, e.g., "24h", "30m")
-  ttl = "24h"
+
   
   # Collection of facts
   facts {
@@ -1374,7 +934,7 @@ The Go implementation provides a clean interface that maps to the schema structu
 type MachineFacts struct {
     MachineID   string                 `json:"machine_id"`   // 32-char hex from /etc/machine-id
     CollectedAt time.Time              `json:"collected_at"` // ISO 8601 timestamp
-    TTL         string                 `json:"ttl,omitempty"` // Optional TTL
+
     Facts       map[string]interface{} `json:"facts"`        // Schema-compliant facts structure
 }
 
@@ -1423,44 +983,33 @@ The storage system uses the actual machine ID (from `/etc/machine-id`) as the pr
 4. **Real-world Mapping**: Direct correlation to actual hardware
 5. **Schema Compliance**: Matches the `machine_id` field pattern `^[a-f0-9]{32}$`
 
-### Data Segmentation and Storage Location
+### Data Segmentation and Memory Location
 
-#### **Project-Local Storage Structure**
+#### **In-Memory Storage Structure**
 ```
 my-project/
 ├── project.hcl
 ├── machines.hcl
 ├── actions.hcl
-├── facts.db/                    # BadgerDB database directory
-│   ├── 000001.vlog
-│   ├── 000002.sst
-│   └── MANIFEST
-├── facts.json                   # JSON storage file (if using JSON backend)
-├── facts.hcl                    # HCL storage file (if using HCL backend)
 ├── templates/
 ├── data/
 └── logs/
+# Facts stored in memory during action runs
 ```
 
-#### **Global Storage Structure** (Optional)
+#### **Global Configuration Structure**
 ```
 $HOME/.local/share/spooky/
-├── facts.db/                    # Global BadgerDB database
-│   ├── 000001.vlog
-│   ├── 000002.sst
-│   └── MANIFEST
-├── facts.json                   # Global JSON storage file
-├── facts.hcl                    # Global HCL storage file
 └── config/                      # Spooky configuration
     └── spooky.hcl
+# Facts stored in memory during action runs
 ```
 
-#### **BadgerDB Key-Value Structure**
+#### **In-Memory Key-Value Structure**
 ```
 ├── "6538b193d562410ab480b1ce22469fe6" → {
 │     machine_id: "6538b193d562410ab480b1ce22469fe6",
 │     collected_at: "2024-07-28T12:00:00Z",
-│     ttl: "24h",
 │     facts: {
 │       system: {
 │         os: { name: "Ubuntu", version: "22.04 LTS" },
@@ -1473,7 +1022,6 @@ $HOME/.local/share/spooky/
 ├── "a1b2c3d4e5f6789012345678901234567" → {
 │     machine_id: "a1b2c3d4e5f6789012345678901234567", 
 │     collected_at: "2024-07-28T12:00:00Z",
-│     ttl: "24h",
 │     facts: {
 │       system: {
 │         os: { name: "CentOS", version: "8" },
@@ -1487,9 +1035,9 @@ $HOME/.local/share/spooky/
 
 ## CLI Examples
 
-### **Project-Local Facts Operations**
+### **In-Memory Facts Operations**
 ```bash
-# Initialize project with facts database
+# Initialize project structure
 spooky project init my-project
 
 # Gather facts from all machines in project
@@ -1501,7 +1049,7 @@ spooky facts gather ./my-project --machine "web-001"
 # Gather facts with specific tags
 spooky facts gather ./my-project --tags "production"
 
-# List all facts in project
+# List all facts in memory
 spooky facts list ./my-project
 
 # List facts for specific machine
@@ -1522,96 +1070,87 @@ spooky facts export ./my-project --machine "web-001" --format json --output web-
 
 
 
-### **Storage Configuration Examples**
+### **Memory Configuration Examples**
 ```bash
-# Use JSON storage for project
-spooky project init my-project
-# Edit project.hcl to set facts_storage.type = "json"
-
-# Use custom storage path
-export SPOOKY_FACTS_PATH="/custom/path/facts.db"
-spooky facts gather ./my-project
-
-# Use HCL storage format
-export SPOOKY_FACTS_FORMAT="hcl"
+# Use custom memory limit
+export SPOOKY_FACTS_MEMORY_LIMIT="1GB"
 spooky facts gather ./my-project
 ```
 
 ## Benefits
 
 ### **Immediate Benefits**
-- **Persistent fact storage** across spooky sessions
+- **Session-based fact storage** during spooky action runs
 - **Automatic deduplication** using machine IDs
-- **Project-specific fact storage** with portable project names
-- **Efficient querying** with BadgerDB backend
+- **In-memory fact storage** with fast access
+- **Efficient querying** with memory backend
 - **Data portability** with JSON export/import
-- **Project isolation** for application-specific facts
-- **Project fact storage** for system-level information
+- **Session isolation** for application-specific facts
+- **Fresh fact collection** for system-level information
 - **Enhanced fact collection** with package managers, service managers, etc.
 
 ### **Long-term Benefits**
 - **Scalable fact management** for large infrastructures
-- **Historical fact tracking** with timestamps
-- **Team collaboration** with shared fact databases
+- **Real-time fact tracking** with timestamps
+- **Team collaboration** with shared fact collection
 - **Automated collision detection** for cloned systems
 - **Integration with CI/CD** for fact validation
-- **Dynamic fact sources** for custom data collection
-- **TTL-based caching** for performance optimization
-- **Change impact assessment** for intelligent updates
+
+
+
 
 ### **Architectural Benefits**
-- **Project-focused approach** solves the "Ansible variable passing problem"
-- **Clear boundaries** for project facts
-- **Efficient storage** of system information
-- **Performance optimization** through intelligent caching
-- **Flexible storage** with multiple backend options
+- **Session-focused approach** solves the "Ansible variable passing problem"
+- **Clear boundaries** for session facts
+- **Efficient memory usage** of system information
+- **Performance optimization** through intelligent memory management
+- **Flexible memory** with multiple optimization options
 - **Schema validation** ensures data integrity
 - **Collision resolution** handles complex scenarios
 
 ## Success Metrics
 
 ### **Functionality Metrics**
-- [ ] Facts can be stored and retrieved from BadgerDB
-- [ ] Facts can be stored and retrieved from JSON files
-- [ ] Facts can be stored and retrieved from HCL files
+- [ ] Facts can be stored and retrieved from memory
+- [ ] Facts can be exported to JSON files
+- [ ] Facts can be exported to HCL files
 - [ ] Machine ID collision detection works correctly
 - [ ] Collision resolution strategies function properly
 - [ ] Fact querying with filters works as expected
 - [ ] Export/import functionality preserves data integrity
 - [ ] XDG Base Directory compliance is maintained
 - [ ] CLI commands provide clear feedback and error messages
-- [ ] Project facts are stored per project
-- [ ] Project facts are isolated per project
-- [ ] Dynamic fact sources work correctly
-- [ ] TTL-based caching functions properly
-- [ ] Change detection and impact assessment work
+- [ ] Facts are stored in memory per session
+- [ ] Facts are isolated per session
+
+
+
 
 ### **Performance Metrics**
-- [ ] BadgerDB storage handles 10,000+ machine facts efficiently
-- [ ] JSON storage performs well for small to medium datasets
-- [ ] HCL storage performs well for configuration-heavy deployments
+- [ ] In-memory storage handles 10,000+ machine facts efficiently
+
 - [ ] Query performance scales linearly with dataset size
 - [ ] Memory usage stays reasonable for large fact collections
 - [ ] Export/import operations complete within acceptable timeframes
-- [ ] Fact collection with TTL caching reduces collection time by 80%
-- [ ] Project fact storage reduces duplicate collection by 90%
+
+- [ ] In-memory fact storage reduces duplicate collection by 90%
 
 ### **User Experience Metrics**
-- [ ] Storage configuration is intuitive and follows XDG standards
+- [ ] Memory configuration is intuitive and follows XDG standards
 - [ ] Collision warnings are clear and actionable
 - [ ] CLI commands provide helpful usage information
 - [ ] Error messages are descriptive and actionable
 - [ ] Documentation is comprehensive and up-to-date
-- [ ] TTL configuration is flexible and user-friendly
-- [ ] Dynamic fact sources are easy to configure
+
+
 - [ ] Fact access patterns are intuitive in templates
 
 ### **Integration Metrics**
-- [ ] Facts storage integrates seamlessly with project initialization
-- [ ] Schema validation works during project creation
-- [ ] Export safety prevents accidental database creation
-- [ ] Project facts are available in project context
-- [ ] Project facts are properly isolated
+- [ ] Facts memory management integrates seamlessly with project initialization
+- [ ] Schema validation works during fact collection
+- [ ] Export safety prevents accidental memory allocation
+- [ ] Facts are available in session context
+- [ ] Facts are properly isolated per session
 - [ ] CLI integration follows noun-verb patterns
 - [ ] Configuration precedence works correctly
 - [ ] Environment variable overrides function properly
@@ -1619,19 +1158,19 @@ spooky facts gather ./my-project
 ## Risk Assessment
 
 ### **Technical Risks**
-- **BadgerDB corruption** - Mitigation: Regular backups and validation
+- **Memory corruption** - Mitigation: Memory validation and error handling
 - **Machine ID collisions** - Mitigation: Robust detection and resolution
-- **Performance degradation** - Mitigation: Efficient algorithms and indexing
-- **Data loss** - Mitigation: Atomic operations and error handling
-- **Memory usage** - Mitigation: Efficient BadgerDB implementation
+- **Performance degradation** - Mitigation: Efficient algorithms and memory management
+- **Data loss** - Mitigation: Memory protection and error handling
+- **Memory usage** - Mitigation: Efficient memory implementation
 - **Schema validation complexity** - Mitigation: Clear validation rules
 
 ### **User Experience Risks**
 - **Configuration complexity** - Mitigation: Sensible defaults and clear documentation
 - **Collision confusion** - Mitigation: Clear warnings and resolution options
-- **Storage location confusion** - Mitigation: XDG compliance and clear paths
-- **TTL configuration complexity** - Mitigation: Hierarchical configuration with defaults
-- **Dynamic facts complexity** - Mitigation: Clear examples and documentation
+- **Memory usage confusion** - Mitigation: Clear memory monitoring and limits
+
+
 
 ### **Implementation Risks**
 - **Scope creep** - Mitigation: Focus on core functionality first
@@ -1643,8 +1182,8 @@ spooky facts gather ./my-project
 ## Out of Scope
 
 - **External databases**: No PostgreSQL, MySQL, etc.
-- **Distributed storage**: No clustering or replication
-- **Real-time sync**: No live synchronization between storage types
+- **Persistent storage**: No disk-based fact storage
+- **Real-time sync**: No live synchronization between sessions
 - **Custom protocols**: No custom fact collection protocols
 - **External APIs**: No external fact collection services
 
@@ -1748,71 +1287,9 @@ func (m *Manager) PersistFacts(server string, collection *FactCollection) error 
 }
 ```
 
-#### **Adding TTL Support**
 
-1. **Add TTL configuration**:
-```go
-type TTLConfig struct {
-    DefaultTTL    time.Duration            `json:"default_ttl"`
-    FactTypeTTLs  map[string]time.Duration `json:"fact_type_ttls"`
-    UpdatePolicy  UpdatePolicy             `json:"update_policy"`
-}
 
-type UpdatePolicy struct {
-    UpdateOnLow    bool `json:"update_on_low"`
-    UpdateOnMedium bool `json:"update_on_medium"`
-    UpdateOnHigh   bool `json:"update_on_high"`
-}
-```
 
-2. **Implement TTL checking**:
-```go
-func (s *FactStorage) IsFactsValid(machineID string) (bool, time.Duration, error) {
-    facts, err := s.GetMachineFacts(machineID)
-    if err != nil {
-        return false, 0, err
-    }
-    
-    ttl := s.getTTLForFacts(facts)
-    remaining := ttl - time.Since(facts.UpdatedAt)
-    
-    return remaining > 0, remaining, nil
-}
-```
-
-#### **Adding Dynamic Facts**
-
-1. **Create dynamic fact collector**:
-```go
-type DynamicFactCollector struct {
-    sources []DynamicFactSource
-    timeout time.Duration
-}
-
-func (d *DynamicFactCollector) Collect() (map[string]*Fact, error) {
-    // Implementation from the dynamic facts section
-}
-```
-
-2. **Integrate with fact manager**:
-```go
-func (m *Manager) CollectAllFacts(machine string) (*FactCollection, error) {
-    // Collect system facts
-    systemFacts, err := m.collectSystemFacts(machine)
-    if err != nil {
-        return nil, err
-    }
-    
-    // Collect dynamic facts
-    dynamicFacts, err := m.dynamicCollector.Collect()
-    if err != nil {
-        return nil, err
-    }
-    
-    // Merge with collision resolution
-    return m.mergeFactsWithCollisionResolution(systemFacts, dynamicFacts), nil
-}
-```
 
 ### **5. Template Integration with Data Variables**
 

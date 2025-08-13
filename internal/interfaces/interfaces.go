@@ -149,16 +149,19 @@ type CLIManager interface {
 // FactsIntegration provides fact collection and storage
 type FactsIntegration interface {
 	// CollectFacts collects facts from the given source
-	CollectFacts(ctx context.Context, source string) (*spookytypes.FactCollection, error)
+	CollectFacts(ctx context.Context, source string) (interface{}, error)
 
 	// StoreFacts stores facts in the given storage
-	StoreFacts(ctx context.Context, facts *spookytypes.FactCollection, storage spookytypes.FactStorage) error
+	StoreFacts(ctx context.Context, facts interface{}, storage spookytypes.FactStorage) error
 
 	// LoadFacts loads facts from the given storage
-	LoadFacts(ctx context.Context, storage spookytypes.FactStorage) (*spookytypes.FactCollection, error)
+	LoadFacts(ctx context.Context, storage spookytypes.FactStorage) (interface{}, error)
 
 	// ValidateFacts validates facts
-	ValidateFacts(ctx context.Context, facts *spookytypes.FactCollection) (*spookytypes.ValidationResult, error)
+	ValidateFacts(ctx context.Context, facts interface{}) (*spookytypes.ValidationResult, error)
+
+	// GetManager returns the underlying fact manager
+	GetManager() interface{}
 }
 
 // ActionsIntegration provides action management and orchestration

@@ -7,6 +7,7 @@ import (
 	spookytypescli "spooky/internal/types/cli"
 	spookytypescommon "spooky/internal/types/common"
 	spookytypesconfig "spooky/internal/types/config"
+	spookytypesfacts "spooky/internal/types/facts"
 	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesmachines "spooky/internal/types/machines"
 	spookytypesproject "spooky/internal/types/project"
@@ -320,6 +321,68 @@ const (
 	ValidationLevelWarning = spookytypesssh.ValidationLevelWarning
 	ValidationLevelInfo    = spookytypesssh.ValidationLevelInfo
 )
+
+// Facts types
+type Facts = spookytypesfacts.Facts
+type SystemFacts = spookytypesfacts.SystemFacts
+type OSFacts = spookytypesfacts.OSFacts
+type HardwareFacts = spookytypesfacts.HardwareFacts
+type CPUFacts = spookytypesfacts.CPUFacts
+type CPUTimes = spookytypesfacts.CPUTimes
+type CPUCoreDetail = spookytypesfacts.CPUCoreDetail
+type MemoryFacts = spookytypesfacts.MemoryFacts
+type SwapFacts = spookytypesfacts.SwapFacts
+type VirtualMemoryFacts = spookytypesfacts.VirtualMemoryFacts
+type DiskFacts = spookytypesfacts.DiskFacts
+type DiskIOCounters = spookytypesfacts.DiskIOCounters
+type PartitionFacts = spookytypesfacts.PartitionFacts
+type DiskIOFacts = spookytypesfacts.DiskIOFacts
+type NetworkFacts = spookytypesfacts.NetworkFacts
+type NetworkInterface = spookytypesfacts.NetworkInterface
+type NetworkProtocols = spookytypesfacts.NetworkProtocols
+type TCPStats = spookytypesfacts.TCPStats
+type UDPStats = spookytypesfacts.UDPStats
+type ICMPStats = spookytypesfacts.ICMPStats
+type NetworkConnection = spookytypesfacts.NetworkConnection
+type NetworkInterfaceStats = spookytypesfacts.NetworkInterfaceStats
+type NetfilterConntrack = spookytypesfacts.NetfilterConntrack
+type LoadAverageFacts = spookytypesfacts.LoadAverageFacts
+type ProcessFacts = spookytypesfacts.ProcessFacts
+type ProcessInfo = spookytypesfacts.ProcessInfo
+type DetailedProcessInfo = spookytypesfacts.DetailedProcessInfo
+type ProcessMemoryInfo = spookytypesfacts.ProcessMemoryInfo
+type ProcessMemoryMap = spookytypesfacts.ProcessMemoryMap
+type ProcessOpenFile = spookytypesfacts.ProcessOpenFile
+type ProcessIOCounters = spookytypesfacts.ProcessIOCounters
+type ProcessPageFaults = spookytypesfacts.ProcessPageFaults
+type EnhancedFacts = spookytypesfacts.EnhancedFacts
+type VirtualizationFacts = spookytypesfacts.VirtualizationFacts
+type PackageManagerFacts = spookytypesfacts.PackageManagerFacts
+type ServiceManagerFacts = spookytypesfacts.ServiceManagerFacts
+type SELinuxFacts = spookytypesfacts.SELinuxFacts
+type SSHKeysFacts = spookytypesfacts.SSHKeysFacts
+type BIOSFacts = spookytypesfacts.BIOSFacts
+type SensorsFacts = spookytypesfacts.SensorsFacts
+type TemperatureSensors = spookytypesfacts.TemperatureSensors
+type FanSensors = spookytypesfacts.FanSensors
+type DockerFacts = spookytypesfacts.DockerFacts
+type DockerCgroupsCPU = spookytypesfacts.DockerCgroupsCPU
+type DockerCgroupsMemory = spookytypesfacts.DockerCgroupsMemory
+type ApplicationFacts = spookytypesfacts.ApplicationFacts
+type ApplicationVersions = spookytypesfacts.ApplicationVersions
+type ApplicationConfig = spookytypesfacts.ApplicationConfig
+type ConfigPaths = spookytypesfacts.ConfigPaths
+type LogPaths = spookytypesfacts.LogPaths
+type DeploymentFacts = spookytypesfacts.DeploymentFacts
+type DeploymentState = spookytypesfacts.DeploymentState
+type DeploymentInfo = spookytypesfacts.DeploymentInfo
+type DeploymentServices = spookytypesfacts.DeploymentServices
+type EnvironmentFacts = spookytypesfacts.EnvironmentFacts
+type EnvironmentVariables = spookytypesfacts.EnvironmentVariables
+type InfrastructureFacts = spookytypesfacts.InfrastructureFacts
+type MonitoringFacts = spookytypesfacts.MonitoringFacts
+type MonitoringEndpoints = spookytypesfacts.MonitoringEndpoints
+type HealthCheckFacts = spookytypesfacts.HealthCheckFacts
 
 // Placeholder types for interfaces (to be implemented)
 type FactCollection = interface{}

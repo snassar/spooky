@@ -212,8 +212,8 @@ actions {
 
 # Storage configuration
 storage {
-  # Default storage format for facts databases
-  facts_format = "badgerdb"
+  # Default storage format for facts (memory for in-memory storage)
+  facts_format = "memory"
   
   # Enable compression for storage
   compression = true

@@ -305,16 +305,14 @@ func TestHCLConfigParsing(t *testing.T) {
 }
 ```
 
-### BadgerDB Storage Testing
+### Memory Storage Testing
 For storage operations:
 
 ```go
-// Test BadgerDB storage operations
-func TestBadgerDBStorage(t *testing.T) {
-    db := createTestDB(t)
-    defer cleanupTestDB(t, db)
-    
-    storage := NewBadgerDBStorage(db)
+// Test memory storage operations
+func TestMemoryStorage(t *testing.T) {
+    // Create test storage
+    storage := NewMemoryStorage()
     
     // Test storage operations
     err := storage.Set("test-key", "test-value")

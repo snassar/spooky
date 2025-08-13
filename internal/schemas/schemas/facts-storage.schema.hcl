@@ -1,390 +1,335 @@
 # Facts Storage Schema
-# BadgerDB storage specifics for facts
-# This schema defines storage constraints and features for facts in BadgerDB format
+# Memory storage specifics for facts
+# This schema defines storage constraints and features for facts in memory format
 
-# Facts storage in BadgerDB format
+# Facts storage in memory format
 facts_storage {
   # Include the base facts structure
   include = "facts-structure"
   
-  # BadgerDB-specific metadata
-  storage_type = "badgerdb"
-  storage_location = "<project>/facts.db"
-  description = "Facts stored in BadgerDB format"
+  # Memory-specific metadata
+  storage_type = "memory"
+  storage_location = "in-memory"
+  description = "Facts stored in memory format"
   
-  # BadgerDB-specific features
-  badger_features = {
-    # BadgerDB compression
-    compression = {
+  # Memory-specific features
+  memory_features = {
+    # Memory allocation
+    allocation = {
       enabled = true
-      algorithm = "zstd"
-      level = 3
-      description = "BadgerDB compression for fact storage"
+      strategy = "dynamic"
+      description = "Dynamic memory allocation for fact storage"
     }
     
-    # BadgerDB encryption
-    encryption = {
-      enabled = true
-      algorithm = "age"
-      description = "Age encryption for sensitive facts"
+    # Memory pooling
+    pooling = {
+      enabled = false
+      description = "Memory pooling for efficient allocation"
       
       properties = {
-        recipients = {
-          type = "array"
-          description = "Age recipient keys for encryption"
+        pool_size = {
+          type = "integer"
+          description = "Size of memory pool in bytes"
         }
         
-        identity_file = {
+        pre_allocate = {
+          type = "boolean"
+          description = "Pre-allocate memory pool"
+        }
+      }
+    }
+    
+    # Memory limits
+    limits = {
+      enabled = true
+      description = "Memory usage limits for fact storage"
+      
+      properties = {
+        max_memory = {
           type = "string"
-          description = "Path to age identity file"
-        }
-      }
-    }
-    
-    # BadgerDB transactions
-    transactions = {
-      enabled = true
-      description = "ACID transactions for fact operations"
-      
-      properties = {
-        read_only = {
-          type = "boolean"
-          description = "Read-only transaction mode"
-        }
-        
-        serializable = {
-          type = "boolean"
-          description = "Serializable isolation level"
-        }
-      }
-    }
-    
-    # BadgerDB indexing
-    indexing = {
-      enabled = true
-      description = "Automatic indexing for fact queries"
-      
-      properties = {
-        prefix_indexing = {
-          type = "boolean"
-          description = "Prefix-based indexing"
-        }
-        
-        value_indexing = {
-          type = "boolean"
-          description = "Value-based indexing"
-        }
-      }
-    }
-    
-    # BadgerDB garbage collection
-    garbage_collection = {
-      enabled = true
-      description = "Automatic garbage collection"
-      
-      properties = {
-        gc_interval = {
-          type = "string"
-          value = "1h"
-          description = "Garbage collection interval"
-        }
-        
-        gc_discard_ratio = {
-          type = "number"
-          value = 0.1
-          description = "Garbage collection discard ratio"
-        }
-      }
-    }
-  }
-  
-  # BadgerDB-specific validation
-  badger_validation = {
-    # Valid BadgerDB key format
-    valid_key_format = {
-      rule = "regex"
-      pattern = "^facts:[a-f0-9]{32}$"
-      message = "BadgerDB keys must be in format: facts:<machine_id>"
-    }
-    
-    # Valid BadgerDB value format
-    valid_value_format = {
-      rule = "json"
-      message = "BadgerDB values must be valid JSON"
-    }
-    
-    # Valid BadgerDB transaction
-    valid_transaction = {
-      rule = "badger_transaction"
-      message = "BadgerDB operations must be within valid transactions"
-    }
-    
-    # Valid BadgerDB encryption
-    valid_encryption = {
-      rule = "age_encryption"
-      message = "Encrypted facts must use valid age encryption"
-    }
-    
-    # Valid BadgerDB compression
-    valid_compression = {
-      rule = "zstd_compression"
-      message = "Compressed facts must use valid zstd compression"
-    }
-    
-    # Valid BadgerDB key size
-    valid_key_size = {
-      rule = "range"
-      min = 1
-      max = 65536
-      message = "BadgerDB keys must be between 1 and 65536 bytes"
-    }
-    
-    # Valid BadgerDB value size
-    valid_value_size = {
-      rule = "range"
-      min = 1
-      max = 1048576
-      message = "BadgerDB values must be between 1 and 1MB"
-    }
-  }
-  
-  # BadgerDB-specific constraints
-  badger_constraints = {
-    # BadgerDB storage constraints
-    storage_constraints = {
-      type = "object"
-      description = "BadgerDB storage constraints"
-      
-      properties = {
-        max_db_size = {
-          type = "integer"
-          value = 1073741824
-          description = "Maximum database size in bytes (1GB)"
-        }
-        
-        max_value_size = {
-          type = "integer"
-          value = 1048576
-          description = "Maximum value size in bytes (1MB)"
-        }
-        
-        max_key_size = {
-          type = "integer"
-          value = 65536
-          description = "Maximum key size in bytes (64KB)"
+          value = "1GB"
+          description = "Maximum memory usage for facts"
         }
         
         max_entries = {
           type = "integer"
-          value = 1000000
-          description = "Maximum number of entries"
-        }
-      }
-    }
-    
-    # BadgerDB performance constraints
-    performance_constraints = {
-      type = "object"
-      description = "BadgerDB performance constraints"
-      
-      properties = {
-        max_concurrent_reads = {
-          type = "integer"
-          value = 100
-          description = "Maximum concurrent read operations"
-        }
-        
-        max_concurrent_writes = {
-          type = "integer"
-          value = 10
-          description = "Maximum concurrent write operations"
-        }
-        
-        max_transaction_size = {
-          type = "integer"
           value = 10000
-          description = "Maximum transaction size in entries"
-        }
-        
-        max_memory_usage = {
-          type = "integer"
-          value = 1073741824
-          description = "Maximum memory usage in bytes (1GB)"
+          description = "Maximum number of fact entries"
         }
       }
     }
     
-    # BadgerDB encryption constraints
-    encryption_constraints = {
-      type = "object"
-      description = "BadgerDB encryption constraints"
+    # Memory cleanup
+    cleanup = {
+      enabled = true
+      description = "Automatic memory cleanup"
       
       properties = {
-        encryption_enabled = {
-          type = "boolean"
-          value = true
-          description = "Whether encryption is enabled"
-        }
-        
-        encryption_algorithm = {
+        gc_interval = {
           type = "string"
-          value = "age"
-          description = "Encryption algorithm (age)"
+          value = "5m"
+          description = "Garbage collection interval"
         }
         
-        max_recipients = {
-          type = "integer"
-          value = 10
-          description = "Maximum number of encryption recipients"
-        }
-        
-        key_rotation = {
+        cleanup_on_exit = {
           type = "boolean"
           value = true
-          description = "Whether key rotation is supported"
+          description = "Clean up memory on application exit"
         }
       }
     }
   }
   
-  # BadgerDB-specific structure extensions
-  badger_extensions = {
-    # BadgerDB key structure
-    key_structure = {
+  # Memory-specific validation
+  memory_validation = {
+    # Valid memory key format
+    key_format = {
+      rule = "memory_key_format"
+      message = "Memory keys must be valid machine IDs"
+    }
+    
+    # Valid memory value format
+    value_format = {
+      rule = "memory_value_format"
+      message = "Memory values must be valid fact collections"
+    }
+    
+    # Valid memory size
+    size_limits = {
+      rule = "memory_size_limits"
+      message = "Memory usage must be within configured limits"
+    }
+    
+    # Valid memory cleanup
+    cleanup_validation = {
+      rule = "memory_cleanup"
+      message = "Memory cleanup must be performed regularly"
+    }
+  }
+  
+  # Memory-specific constraints
+  memory_constraints = {
+    # Memory storage constraints
+    storage_constraints = {
       type = "object"
-      description = "BadgerDB key structure for facts"
+      description = "Memory storage constraints"
       
       properties = {
-        prefix = {
-          type = "string"
-          value = "facts:"
-          description = "Key prefix for facts"
+        max_concurrent_access = {
+          type = "integer"
+          value = 100
+          description = "Maximum concurrent access to memory storage"
         }
         
-        machine_id = {
-          type = "string"
-          pattern = "^[a-f0-9]{32}$"
-          description = "32-character machine ID"
+        thread_safety = {
+          type = "boolean"
+          value = true
+          description = "Thread-safe memory operations"
         }
         
-        key_format = {
-          type = "string"
-          value = "facts:<machine_id>"
-          description = "Complete key format"
+        atomic_operations = {
+          type = "boolean"
+          value = true
+          description = "Atomic memory operations"
         }
       }
     }
     
-    # BadgerDB value structure
+    # Memory performance constraints
+    performance_constraints = {
+      type = "object"
+      description = "Memory performance constraints"
+      
+      properties = {
+        read_latency = {
+          type = "string"
+          value = "1ms"
+          description = "Maximum read latency"
+        }
+        
+        write_latency = {
+          type = "string"
+          value = "1ms"
+          description = "Maximum write latency"
+        }
+        
+        memory_efficiency = {
+          type = "number"
+          value = 0.9
+          description = "Minimum memory efficiency ratio"
+        }
+      }
+    }
+    
+    # Memory security constraints
+    security_constraints = {
+      type = "object"
+      description = "Memory security constraints"
+      
+      properties = {
+        data_isolation = {
+          type = "boolean"
+          value = true
+          description = "Data isolation between different fact collections"
+        }
+        
+        access_control = {
+          type = "boolean"
+          value = true
+          description = "Access control for memory operations"
+        }
+        
+        memory_protection = {
+          type = "boolean"
+          value = true
+          description = "Memory protection against corruption"
+        }
+      }
+    }
+  }
+  
+  # Memory-specific structure extensions
+  memory_extensions = {
+    # Memory key structure
+    key_structure = {
+      type = "object"
+      description = "Memory key structure for facts"
+      
+      properties = {
+        machine_id = {
+          type = "string"
+          pattern = "^[a-f0-9]{32}$"
+          description = "32-character hexadecimal machine ID"
+        }
+        
+        collection_timestamp = {
+          type = "string"
+          format = "datetime"
+          description = "Timestamp when facts were collected"
+        }
+        
+        version = {
+          type = "string"
+          pattern = "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+          description = "Fact collection version"
+        }
+      }
+    }
+    
+    # Memory value structure
     value_structure = {
       type = "object"
-      description = "BadgerDB value structure for facts"
+      description = "Memory value structure for facts"
       
       properties = {
         fact_collection = {
           type = "object"
-          description = "Serialized fact collection"
-          
-          properties = {
-            machine_id = { type = "string" }
-            collected_at = { type = "string" }
-            facts = { type = "object" }
-            encrypted = { type = "boolean" }
-            compression = { type = "string" }
-          }
+          description = "Complete fact collection data"
+          include = "facts-structure"
         }
         
         metadata = {
           type = "object"
-          description = "Value metadata"
+          description = "Additional metadata for the fact collection"
           
           properties = {
-            version = { type = "string" }
-            created_at = { type = "string" }
-            updated_at = { type = "string" }
-            checksum = { type = "string" }
+            collection_method = {
+              type = "string"
+              description = "Method used to collect facts"
+            }
+            
+            collector_version = {
+              type = "string"
+              description = "Version of the fact collector"
+            }
+            
+            validation_status = {
+              type = "string"
+              enum = ["valid", "invalid", "unknown"]
+              description = "Validation status of the facts"
+            }
           }
         }
       }
     }
     
-    # BadgerDB query structure
+    # Memory query structure
     query_structure = {
       type = "object"
-      description = "BadgerDB query structure for facts"
+      description = "Memory query structure for facts"
       
       properties = {
-        prefix_queries = {
-          type = "object"
-          description = "Prefix-based queries"
-          
-          properties = {
-            all_facts = {
-              type = "string"
-              value = "facts:"
-              description = "Query all facts"
-            }
-            
-            machine_facts = {
-              type = "string"
-              value = "facts:<machine_id>"
-              description = "Query facts for specific machine"
-            }
-          }
+        query_type = {
+          type = "string"
+          enum = ["exact", "prefix", "range", "filter"]
+          description = "Type of memory query"
         }
         
-        range_queries = {
+        query_parameters = {
           type = "object"
-          description = "Range-based queries"
+          description = "Parameters for the memory query"
           
           properties = {
-            time_range = {
-              type = "object"
-              description = "Time-based range queries"
+            machine_id = {
+              type = "string"
+              description = "Machine ID to query"
             }
             
-            value_range = {
+            time_range = {
               type = "object"
-              description = "Value-based range queries"
+              description = "Time range for query"
+              
+              properties = {
+                start = {
+                  type = "string"
+                  format = "datetime"
+                  description = "Start time for query"
+                }
+                
+                end = {
+                  type = "string"
+                  format = "datetime"
+                  description = "End time for query"
+                }
+              }
+            }
+            
+            filters = {
+              type = "object"
+              description = "Additional filters for query"
             }
           }
         }
       }
     }
     
-    # BadgerDB backup structure
-    backup_structure = {
+    # Memory export structure
+    export_structure = {
       type = "object"
-      description = "BadgerDB backup structure"
+      description = "Memory export structure"
       
       properties = {
-        backup_format = {
+        export_format = {
           type = "string"
-          value = "badger"
-          description = "Backup format"
+          enum = ["json", "hcl", "yaml"]
+          description = "Format for exported facts"
         }
         
-        backup_compression = {
-          type = "string"
-          value = "gzip"
-          description = "Backup compression"
-        }
-        
-        backup_encryption = {
-          type = "string"
-          value = "age"
-          description = "Backup encryption"
-        }
-        
-        backup_metadata = {
+        export_data = {
           type = "object"
-          description = "Backup metadata"
+          description = "Exported fact data"
           
           properties = {
-            created_at = { type = "string" }
-            version = { type = "string" }
-            checksum = { type = "string" }
-            size = { type = "integer" }
+            exported_at = {
+              type = "string"
+              format = "datetime"
+              description = "Timestamp when facts were exported"
+            }
+            
+            facts = {
+              type = "object"
+              description = "Exported facts data"
+            }
           }
         }
       }

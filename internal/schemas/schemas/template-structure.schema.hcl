@@ -352,8 +352,8 @@ template_structure {
           description = "Regex patterns that are not allowed in templates"
         }
         default = [
-          "{{.*os\\.Exec.*}}",
-          "{{.*exec.*}}",
+          "{{.*os\\.Run.*}}",
+          "{{.*run.*}}",
           "{{.*system.*}}",
           "{{.*eval.*}}",
           "{{.*import.*}}",
@@ -637,8 +637,8 @@ run_time_limits = {
     no_dangerous_patterns = {
       rule = "forbidden_patterns"
       patterns = [
-        "{{.*os\\.Exec.*}}",
-        "{{.*exec.*}}",
+        "{{.*os\\.Run.*}}",
+        "{{.*run.*}}",
         "{{.*system.*}}",
         "{{.*eval.*}}",
         "{{.*import.*}}",

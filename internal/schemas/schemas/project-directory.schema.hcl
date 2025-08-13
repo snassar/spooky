@@ -109,20 +109,13 @@ project_directory "project_root" {
     validate = "directory_exists"
   }
   
-  # Facts database directory
-  directory "facts.db" {
-    type = "directory"
-    required = true
-    description = "Facts database directory (initialized during project creation)"
-    validate = "badgerdb_initialized"
-  }
+  # Facts are now stored in memory - no database directory required
   
   # Cross-file validation rules
   validation_rules = [
     "machines_file_or_directory_exists",
     "actions_file_or_directory_exists", 
     "variables_file_or_directory_exists",
-    "facts_database_initialized",
     "no_circular_references",
     "logging_file_output_requires_logs_directory",
     "logging_file_path_validation"

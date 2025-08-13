@@ -1,7 +1,7 @@
 # Facts Structure Schema
 # Common fact structure definitions for all storage and export formats
 # This file defines the structure of facts that can be stored and exported
-# Used for validation of facts data regardless of format (BadgerDB, JSON, HCL)
+# Used for validation of facts data regardless of format (memory, JSON, HCL)
 
 # Common facts structure
 facts_structure {

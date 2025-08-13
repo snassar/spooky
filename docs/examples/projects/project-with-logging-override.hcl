@@ -20,7 +20,7 @@ project {
     max_parallel = 5
     retry_attempts = 3
     retry_delay = 5
-    storage_format = "badgerdb"
+    storage_format = "memory"
     compression = true
     encryption = false
   }

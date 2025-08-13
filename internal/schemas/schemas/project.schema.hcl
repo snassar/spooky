@@ -165,9 +165,9 @@ run = {
       storage_format = {
         type = "string"
         required = false
-        enum = ["badgerdb", "json"]
-        default = "badgerdb"
-        description = "Storage format for project facts database"
+        enum = ["memory", "json"]
+        default = "memory"
+        description = "Storage format for project facts (memory for in-memory storage)"
       }
       
       compression = {

@@ -151,7 +151,7 @@ Storage operations follow consistent patterns:
 
 **Key Requirements:**
 - Storage backends must implement StorageBackend interface
-- Storage should support multiple formats (JSON, HCL, BadgerDB)
+- Storage should support multiple formats (JSON, HCL, memory)
 - Storage should support encryption/decryption
 - Storage should provide query capabilities
 

@@ -291,7 +291,7 @@ func (m *Manager) createREADME(project *spookytypes.Project) error {
 This project follows the spooky project-directory.schema.hcl structure:
 
 - ` + "`" + `project.hcl` + "`" + ` - Main project configuration
-- ` + "`" + `facts.db/` + "`" + ` - Facts database (BadgerDB)
+- ` + "`" + `facts.db/` + "`" + ` - Facts database (in-memory storage, no directory needed)
 - ` + "`" + `files/` + "`" + ` - Static files for deployment
 - ` + "`" + `logs/` + "`" + ` - Log files directory
 

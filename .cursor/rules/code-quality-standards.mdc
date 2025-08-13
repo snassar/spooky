@@ -135,7 +135,7 @@ For SSH-related code:
 
 ### Configuration and Storage
 - **HCL configuration validation** using project schemas
-- **BadgerDB storage operations** follow established patterns
+- **Memory storage operations** follow established patterns
 - **SSH operations** use gliderlabs/ssh library correctly
 - **Template rendering** uses proper variable resolution
 - **Facts collection** follows established collector patterns

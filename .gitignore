@@ -56,16 +56,16 @@ examples/actions/small-scale-example-*.hcl
 .facts.db
 examples/projects/development/facts.db
 
-# BadgerDB files (database files that can be large)
-*.sst
-*.vlog
-*.mem
-DISCARD
-KEYREGISTRY
-MANIFEST
-LOCK
+# Memory storage files (no longer used - facts are stored in memory)
+# *.sst
+# *.vlog
+# *.mem
+# DISCARD
+# KEYREGISTRY
+# MANIFEST
+# LOCK
 
-# Test database directories
-tests/*/facts.db/
-tests/*/*/facts.db/
-internal/storage/badger/:memory:/
+# Test database directories (no longer used - facts are stored in memory)
+# tests/*/facts.db/
+# tests/*/*/facts.db/
+# internal/storage/badger/:memory:/
