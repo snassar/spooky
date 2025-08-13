@@ -3,7 +3,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -70,23 +69,7 @@ Examples:
 	},
 }
 
-// factsListCmd represents the facts list command
-var factsListCmd = &cobra.Command{
-	Use:   "list [project-path]",
-	Short: "List stored facts",
-	Long: `List all machines with stored facts in the project.
 
-This command displays information about all machines that have facts
-stored in memory, including collection timestamps and fact summaries.
-
-Examples:
-  spooky facts list ./my-project
-  spooky facts list ./my-project --machine web-server`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return handleFactsList(cmd, args[0])
-	},
-}
 
 // factsExportCmd represents the facts export command
 var factsExportCmd = &cobra.Command{
@@ -195,47 +178,6 @@ func handleFactsGather(cmd *cobra.Command, projectPath string) error {
 	return nil
 }
 
-// handleFactsList handles listing facts using the FactsIntegration interface
-func handleFactsList(cmd *cobra.Command, projectPath string) error {
-	ctx := context.Background()
-
-	// Initialize dependencies if not already done
-	if factsManager == nil {
-		if err := InitializeFactsDependencies(); err != nil {
-			return fmt.Errorf("failed to initialize facts dependencies: %w", err)
-		}
-	}
-
-	// Get flags
-	format, _ := cmd.Flags().GetString("format")
-
-	// Load facts from storage
-	facts, err := factsManager.LoadFacts(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("failed to load facts: %w", err)
-	}
-
-	if facts == nil {
-		fmt.Println("No facts found in storage")
-		return nil
-	}
-
-	// Display facts based on format
-	switch format {
-	case "json":
-		data, err := json.MarshalIndent(facts, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal facts to JSON: %w", err)
-		}
-		fmt.Println(string(data))
-
-	default:
-		fmt.Printf("Facts loaded: %+v\n", facts)
-	}
-
-	return nil
-}
-
 
 
 // handleFactsExport handles exporting facts using the FactsManager interface
@@ -297,16 +239,11 @@ func filterMachines(machines []spookytypes.Machine, filter string) []spookytypes
 	return filtered
 }
 
-
-
 func init() {
 	// Add flags to facts gather command
 	factsGatherCmd.Flags().String("machine", "", "Filter to specific machine")
 	factsGatherCmd.Flags().Int("parallel", 1, "Number of parallel workers")
 	factsGatherCmd.Flags().Bool("verbose", false, "Verbose output")
-
-	// Add flags to facts list command
-	factsListCmd.Flags().String("format", "summary", "Output format (summary, table, json)")
 
 
 
@@ -317,7 +254,6 @@ func init() {
 
 	// Add commands to facts command
 	factsCmd.AddCommand(factsGatherCmd)
-	factsCmd.AddCommand(factsListCmd)
 	factsCmd.AddCommand(factsExportCmd)
 
 	// Add facts command to root

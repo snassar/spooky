@@ -241,7 +241,7 @@ func (m *Manager) ExportFacts(ctx context.Context, machineIDs []string, format s
 				"errors":     len(validationResult.Errors),
 				"warnings":   len(validationResult.Warnings),
 			})
-			
+
 			// Log validation errors for debugging
 			for _, validationErr := range validationResult.Errors {
 				m.logger.Debug("Validation error", map[string]interface{}{
@@ -249,7 +249,7 @@ func (m *Manager) ExportFacts(ctx context.Context, machineIDs []string, format s
 					"error":      validationErr.Message,
 				})
 			}
-			
+
 			// Continue with export but log the validation issues
 			m.logger.Info("Proceeding with export despite validation issues", map[string]interface{}{"machine_id": machineID})
 		}

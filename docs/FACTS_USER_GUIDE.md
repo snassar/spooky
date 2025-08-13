@@ -25,10 +25,7 @@ The spooky facts system provides comprehensive fact collection and storage capab
    spooky facts gather ./my-project
    ```
 
-3. **List Stored Facts**
-   ```bash
-   spooky facts list ./my-project
-   ```
+
 
 
 

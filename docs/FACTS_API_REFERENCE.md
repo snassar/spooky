@@ -261,7 +261,6 @@ The facts CLI provides these commands:
 
 ```bash
 spooky facts gather [project-path]     # Collect facts from machines
-spooky facts list [project-path]       # List stored facts
 spooky facts export [project-path]     # Export facts to file (includes internal validation)
 ```
 
