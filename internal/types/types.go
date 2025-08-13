@@ -35,6 +35,9 @@ import (
 
 	// Variable types
 	spookytypesvariables "spooky/internal/types/variables"
+
+	// SSH types
+	spookyssh "spooky/internal/types/ssh"
 )
 
 // =============================================================================
@@ -154,12 +157,21 @@ type LogConfig = spookytypeslogging.LogConfig
 // LogEntry is a type alias for spookytypeslogging.LogEntry
 type LogEntry = spookytypeslogging.LogEntry
 
+// Logger is a type alias for spookytypeslogging.Logger
+type Logger = spookytypeslogging.Logger
+
+// LogLevel is a type alias for spookytypeslogging.LogLevel
+type LogLevel = spookytypeslogging.LogLevel
+
 // =============================================================================
 // Machine Types
 // =============================================================================
 
 // Machine is a type alias for spookytypesmachines.Machine
 type Machine = spookytypesmachines.Machine
+
+// MachineStatus is a type alias for spookytypesmachines.MachineStatus
+type MachineStatus = spookytypesmachines.MachineStatus
 
 // =============================================================================
 // Project Types
@@ -174,6 +186,9 @@ type ProjectMetadata = spookytypesproject.ProjectMetadata
 // ProjectSettings is a type alias for spookytypesproject.ProjectSettings
 type ProjectSettings = spookytypesproject.ProjectSettings
 
+// ProjectConfig is a type alias for spookytypesproject.ProjectConfig
+type ProjectConfig = spookytypesproject.ProjectConfig
+
 // =============================================================================
 // Schema Types
 // =============================================================================
@@ -186,6 +201,9 @@ type SchemaValidation = spookytypesschemas.SchemaValidation
 
 // SchemaError is a type alias for spookytypesschemas.SchemaError
 type SchemaError = spookytypesschemas.SchemaError
+
+// ValidationResult is a type alias for spookytypesschemas.ValidationResult
+type ValidationResult = spookytypesschemas.ValidationResult
 
 // =============================================================================
 // Template Types
@@ -204,8 +222,57 @@ type TemplateContext = spookytypestemplates.TemplateContext
 // Variable is a type alias for spookytypesvariables.Variable
 type Variable = spookytypesvariables.Variable
 
+// VariableContext is a type alias for spookytypesvariables.VariableContext
+type VariableContext = spookytypesvariables.VariableContext
+
+// VariableResolutionResult is a type alias for spookytypesvariables.VariableResolutionResult
+type VariableResolutionResult = spookytypesvariables.VariableResolutionResult
+
 // VariableValidation is a type alias for spookytypesvariables.VariableValidation
 type VariableValidation = spookytypesvariables.VariableValidation
 
 // VariableDependency is a type alias for spookytypesvariables.VariableDependency
 type VariableDependency = spookytypesvariables.VariableDependency
+
+// =============================================================================
+// SSH Types
+// =============================================================================
+
+// ClientConfig is a type alias for spookyssh.ClientConfig
+type ClientConfig = spookyssh.ClientConfig
+
+// Client is a type alias for spookyssh.Client
+type Client = spookyssh.Client
+
+// ConnectionRequest is a type alias for spookyssh.ConnectionRequest
+type ConnectionRequest = spookyssh.ConnectionRequest
+
+// ConnectionResult is a type alias for spookyssh.ConnectionResult
+type ConnectionResult = spookyssh.ConnectionResult
+
+// Connection is a type alias for spookyssh.Connection
+type Connection = spookyssh.Connection
+
+// Authentication is a type alias for spookyssh.Authentication
+type Authentication = spookyssh.Authentication
+
+// AuthenticationResult is a type alias for spookyssh.AuthenticationResult
+type AuthenticationResult = spookyssh.AuthenticationResult
+
+// Session is a type alias for spookyssh.Session
+type Session = spookyssh.Session
+
+// Command is a type alias for spookyssh.Command
+type SSHCommand = spookyssh.Command
+
+// CommandResult is a type alias for spookyssh.CommandResult
+type SSHCommandResult = spookyssh.CommandResult
+
+// FileTransfer is a type alias for spookyssh.FileTransfer
+type FileTransfer = spookyssh.FileTransfer
+
+// FileTransferResult is a type alias for spookyssh.FileTransferResult
+type FileTransferResult = spookyssh.FileTransferResult
+
+// ConnectionPool is a type alias for spookyssh.ConnectionPool
+type ConnectionPool = spookyssh.ConnectionPool
