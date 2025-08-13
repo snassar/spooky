@@ -209,7 +209,7 @@ just check              # Run all checks before committing
 ### Command Structure
 
 #### Command Patterns
-- **Noun-verb**: `spooky project init`, `spooky facts gather`
+- **Noun-verb**: `spooky project init`, `spooky facts export`
 - **Long-form flags**: Use `--flag` instead of `-f`
 - **Consistent help**: Clear descriptions and examples
 - **Error handling**: User-friendly error messages

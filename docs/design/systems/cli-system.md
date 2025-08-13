@@ -29,18 +29,33 @@ The CLI system integrates with the implemented Spooky systems to provide command
 - **Variables Discovery**: `spooky variables list` for variable discovery and filtering
 - **Variables Resolution**: `spooky variables resolve` for variable resolution with context
 
+### **Facts System Integration**
+- **Facts Commands**: `spooky facts` commands for fact management
+- **Facts Export**: `spooky facts export` for exporting facts to files
+- **Facts Collection**: Automatic fact collection during export operations
+
 ### **Configuration System Integration**
-- **Auto-Setup**: Automatic configuration directory creation and validation
-- **OS-Specific Configuration**: XDG compliance on Linux/BSD, macOS, and Windows support
-- **Configuration Validation**: HCL syntax validation for configuration files
+- **Auto-Setup**: Automatic configuration directory creation and validation with enhanced error reporting
+- **OS-Specific Configuration**: XDG compliance on Linux/BSD, macOS, and Windows support with extended BSD variants
+- **Configuration Validation**: Comprehensive HCL syntax validation with line-specific error reporting and multi-level validation
 
 ## Implemented CLI Design
 
-```
-# Core project and system management
+For a comprehensive reference of all implemented commands, flags, and usage examples, see the [CLI Reference](../CLI_REFERENCE.md).
+
+**Core Command Categories:**
+```bash
+# Project management
 spooky project {init, validate} <project directory>
+
+# Machine inventory management  
 spooky machines {list, validate, ping} <project directory>
+
+# Variable management
 spooky variables {list, validate, resolve} <project directory>
+
+# Facts management
+spooky facts {export} <project directory>
 
 # Global flags
 spooky --version                   # show version information
@@ -61,6 +76,7 @@ spooky <noun> <verb> [arguments]
 - `project` - Project management and validation
 - `machines` - Machine inventory operations
 - `variables` - Variable management and resolution
+- `facts` - Facts collection and export
 
 **Available Verbs:**
 - `init` - Initialize new resources (project)
@@ -68,6 +84,7 @@ spooky <noun> <verb> [arguments]
 - `list` - List resources (machines, variables)
 - `ping` - Test connectivity (machines)
 - `resolve` - Resolve with context (variables)
+- `export` - Export data to files (facts)
 
 ### **Project Commands**
 
@@ -171,6 +188,21 @@ Resolves variables with the given context and displays resolved values.
 - Displays resolved values
 - Shows resolution context
 
+### **Facts Commands**
+
+#### `spooky facts export`
+```bash
+spooky facts export [project-path]
+```
+Exports facts from machines in the project inventory.
+
+**Features:**
+- Collects facts from all machines in inventory
+- Supports filtering by machine, tags, and groups
+- Exports to JSON or HCL format
+- Supports parallel processing
+- Requires --output flag for output file
+
 ## Configuration Integration
 
 ### **Auto-Setup Configuration**
@@ -195,8 +227,15 @@ func AutoSetupConfig() error {
 
 ### **Configuration Files**
 
-- `spooky.hcl` - Main configuration file
-- `logging.hcl` - Logging configuration
+- `spooky.hcl` - Main configuration file with comprehensive settings
+- `logging.hcl` - Logging configuration with performance optimization options
+
+### **Enhanced Configuration Features**
+
+- **Multi-level validation** with file existence, read access, and syntax checks
+- **Line-specific error reporting** for precise problem identification
+- **Extended OS support** for additional BSD variants (dragonfly BSD)
+- **Comprehensive error context** with file paths and operation details
 
 ## Error Handling
 
@@ -212,8 +251,9 @@ func handleCommand(cmd *cobra.Command, args []string) error {
 
 ### **Validation Error Reporting**
 - Clear error messages with file and line information
-- Structured validation results
-- Actionable error suggestions
+- Line-specific error reporting for precise problem identification
+- Multi-level validation with comprehensive error detection
+- Structured validation results with actionable error suggestions
 
 ## Benefits of the Current Design
 
@@ -230,16 +270,19 @@ func handleCommand(cmd *cobra.Command, args []string) error {
 - Project initialization and validation
 - Machine inventory management and connectivity testing
 - Variable management and resolution
-- Auto-setup configuration system
-- Cross-platform configuration support
-- Schema-based validation
+- Facts collection and export
+- Auto-setup configuration system with enhanced error reporting
+- Cross-platform configuration support with extended BSD variants
+- Schema-based validation with line-specific error reporting
+- Shell completion support
+- Multi-level configuration validation
+- Comprehensive HCL syntax checking
 
 ### **📋 Future Enhancements**
-- Additional command nouns (facts, actions, templates)
+- Additional command nouns (actions, templates)
 - Enhanced filtering and search capabilities
-- Shell completion support
 - Configuration management commands
-- Export and import functionality
+- Import functionality for all systems
 
 ## Integration with Other Rules
 
@@ -250,6 +293,7 @@ This CLI system works in conjunction with:
 - **Schema System**: Uses schema validation for all operations
 
 ### Cross-References
+- **See [CLI Reference](../CLI_REFERENCE.md)**: For complete command documentation and examples
 - **See [Project System](../project-system.md)**: For project management details
 - **See [Machines System](../machines-system.md)**: For machine inventory details
 - **See [Variables System](../variables-system.md)**: For variable management details

@@ -40,12 +40,12 @@ func InitializeFactsDependencies() error {
 // factsCmd represents the facts command
 var factsCmd = &cobra.Command{
 	Use:   "facts",
-	Short: "Manage machine facts",
-	Long: `Manage machine facts including collection, storage, and validation.
+	Short: "Export machine facts",
+	Long: `Export machine facts to files in various formats.
 
 Facts are system information collected from machines including OS details,
-hardware information, network configuration, and custom data. Facts are
-stored in memory and can be used for decision making in actions.`,
+hardware information, network configuration, and custom data. Facts can be
+exported to JSON or HCL format for backup, analysis, or transfer to other systems.`,
 }
 
 // factsExportCmd represents the facts export command
@@ -61,7 +61,10 @@ or transfer to other systems.
 Examples:
   spooky facts export ./my-project --output facts.hcl
   spooky facts export ./my-project --format json --output facts.json
-  spooky facts export ./my-project --machine web-server --output web-server-facts.hcl`,
+  spooky facts export ./my-project --machine web-server --output web-server-facts.hcl
+  spooky facts export ./my-project --tags environment=production --output prod-facts.hcl
+  spooky facts export ./my-project --groups webservers,database --output app-facts.hcl
+  spooky facts export ./my-project --tags role=web --groups production --output web-prod-facts.hcl`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return handleFactsExport(cmd, args[0])
@@ -83,6 +86,8 @@ func handleFactsExport(cmd *cobra.Command, projectPath string) error {
 	format, _ := cmd.Flags().GetString("format")
 	outputPath, _ := cmd.Flags().GetString("output")
 	machineFilter, _ := cmd.Flags().GetString("machine")
+	tagsFilter, _ := cmd.Flags().GetStringSlice("tags")
+	groupsFilter, _ := cmd.Flags().GetStringSlice("groups")
 	parallel, _ := cmd.Flags().GetInt("parallel")
 	verbose, _ := cmd.Flags().GetBool("verbose")
 
@@ -93,10 +98,10 @@ func handleFactsExport(cmd *cobra.Command, projectPath string) error {
 	}
 
 	// Filter machines if specified
-	if machineFilter != "" {
-		machines = filterMachines(machines, machineFilter)
+	if machineFilter != "" || len(tagsFilter) > 0 || len(groupsFilter) > 0 {
+		machines = filterMachinesAdvanced(machines, machineFilter, tagsFilter, groupsFilter)
 		if len(machines) == 0 {
-			return fmt.Errorf("no machines found matching filter: %s", machineFilter)
+			return fmt.Errorf("no machines found matching filters")
 		}
 	}
 
@@ -197,12 +202,84 @@ func filterMachines(machines []spookytypes.Machine, filter string) []spookytypes
 	return filtered
 }
 
+func filterMachinesAdvanced(machines []spookytypes.Machine, machineFilter string, tagsFilter []string, groupsFilter []string) []spookytypes.Machine {
+	var filtered []spookytypes.Machine
+
+	for _, machine := range machines {
+		// Check if machine matches all filters
+		if matchesMachineFilter(machine, machineFilter) &&
+			matchesTagsFilter(machine, tagsFilter) &&
+			matchesGroupsFilter(machine, groupsFilter) {
+			filtered = append(filtered, machine)
+		}
+	}
+
+	return filtered
+}
+
+func matchesMachineFilter(machine spookytypes.Machine, filter string) bool {
+	if filter == "" {
+		return true
+	}
+	return strings.Contains(machine.Hostname, filter)
+}
+
+func matchesTagsFilter(machine spookytypes.Machine, tagsFilter []string) bool {
+	if len(tagsFilter) == 0 {
+		return true
+	}
+
+	// Check if machine has any of the specified tags
+	for _, tag := range tagsFilter {
+		if machine.Tags != nil {
+			for machineTagKey, machineTagValue := range machine.Tags {
+				// Support both key=value and key-only filtering
+				if strings.Contains(tag, "=") {
+					// Key=value format
+					parts := strings.SplitN(tag, "=", 2)
+					if len(parts) == 2 && machineTagKey == parts[0] && machineTagValue == parts[1] {
+						return true
+					}
+				} else {
+					// Key-only format
+					if machineTagKey == tag {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+func matchesGroupsFilter(machine spookytypes.Machine, groupsFilter []string) bool {
+	if len(groupsFilter) == 0 {
+		return true
+	}
+
+	// Check if machine belongs to any of the specified groups
+	for _, group := range groupsFilter {
+		if machine.Groups != nil {
+			for _, machineGroup := range machine.Groups {
+				if machineGroup == group {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
 func init() {
 
 	// Add flags to facts export command
 	factsExportCmd.Flags().String("format", "hcl", "Export format (hcl, json)")
 	factsExportCmd.Flags().String("output", "", "Output file path (required)")
 	factsExportCmd.Flags().String("machine", "", "Filter to specific machine")
+	factsExportCmd.Flags().StringSlice("tags", []string{}, "Filter by tags (supports key=value or key-only)")
+	factsExportCmd.Flags().StringSlice("groups", []string{}, "Filter by groups")
 	factsExportCmd.Flags().Int("parallel", 1, "Number of parallel workers")
 	factsExportCmd.Flags().Bool("verbose", false, "Verbose output")
 	factsExportCmd.MarkFlagRequired("output")

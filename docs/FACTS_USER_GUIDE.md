@@ -2,7 +2,7 @@
 
 ## Overview
 
-The spooky facts system provides comprehensive fact collection and storage capabilities for gathering system information from machines. This guide covers everything from basic fact collection to advanced features like validation, export/import, and integration with other spooky components.
+The spooky facts system provides fact collection and export capabilities for gathering system information from machines. This guide covers the current implementation of fact collection and export functionality.
 
 ## Getting Started
 
@@ -25,10 +25,6 @@ The spooky facts system provides comprehensive fact collection and storage capab
    spooky facts export ./my-project --format json --output facts.json
    ```
 
-
-
-
-
 ## Facts System Concepts
 
 ### What are Facts?
@@ -49,16 +45,16 @@ The fact collection process works as follows:
 2. **SSH Connection**: Establish secure connection to each machine
 3. **Data Collection**: Use gopsutil to gather system information
 4. **Data Processing**: Convert and validate collected data
-5. **Storage**: Store facts in BadgerDB with machine ID as key
+5. **Storage**: Store facts in memory during the export operation
 
 ### Fact Storage
 
-Facts are stored in memory during the action run with the following structure:
+Facts are stored in memory during the export operation with the following structure:
 
 - **Key**: Machine ID (32-character hex string)
 - **Value**: Fact collection with timestamp
 - **Metadata**: Collection metadata and validation status
-- **Lifetime**: Facts persist for the duration of the action run
+- **Lifetime**: Facts persist for the duration of the export operation
 
 ## Basic Usage
 
@@ -85,6 +81,8 @@ spooky facts export ./my-project --format json --output facts.json
 - `--format`: Export format (hcl, json) (default: hcl)
 - `--output`: Output file path (required)
 - `--machine`: Target specific machine (default: all machines)
+- `--tags`: Filter by tags (supports key=value or key-only format)
+- `--groups`: Filter by groups (comma-separated list)
 - `--parallel`: Number of parallel workers (default: 1)
 - `--verbose`: Verbose output
 
@@ -101,8 +99,6 @@ INFO: Successfully collected facts from 3 machines
 INFO: Exporting facts to facts.hcl
 Successfully exported facts to: facts.hcl
 ```
-
-
 
 ### Fact Validation
 
@@ -129,12 +125,63 @@ spooky facts export ./my-project --format hcl --output facts.hcl
 
 # Export facts for specific machines
 spooky facts export ./my-project --machine web-server --format json --output web-server-facts.json
+
+# Export facts by tags
+spooky facts export ./my-project --tags "environment=production" --output prod-facts.hcl
+spooky facts export ./my-project --tags "role=web,role=database" --output app-facts.hcl
+
+# Export facts by groups
+spooky facts export ./my-project --groups "webservers,database" --output app-facts.hcl
+
+# Export facts with multiple filters
+spooky facts export ./my-project --tags "role=web" --groups "production" --output web-prod-facts.hcl
 ```
 
 #### Export Formats
 
 - **HCL**: HashiCorp Configuration Language format (default)
 - **JSON**: Standard JSON format for data exchange
+
+#### Filtering Options
+
+The facts export command supports multiple filtering options to target specific subsets of machines:
+
+**Machine Filter:**
+```bash
+# Filter by hostname (partial match)
+spooky facts export ./my-project --machine "web" --output web-facts.hcl
+```
+
+**Tag Filtering:**
+```bash
+# Filter by tag key=value
+spooky facts export ./my-project --tags "environment=production" --output prod-facts.hcl
+
+# Filter by tag key only (any value)
+spooky facts export ./my-project --tags "monitored" --output monitored-facts.hcl
+
+# Multiple tag filters (OR logic)
+spooky facts export ./my-project --tags "role=web,role=database" --output app-facts.hcl
+```
+
+**Group Filtering:**
+```bash
+# Filter by single group
+spooky facts export ./my-project --groups "webservers" --output web-facts.hcl
+
+# Filter by multiple groups (OR logic)
+spooky facts export ./my-project --groups "webservers,database" --output app-facts.hcl
+```
+
+**Combined Filtering:**
+```bash
+# Combine machine, tag, and group filters (AND logic)
+spooky facts export ./my-project \
+  --machine "web" \
+  --tags "environment=production" \
+  --groups "webservers" \
+  --output web-prod-facts.hcl
+```
 
 #### Example JSON Output
 
@@ -145,26 +192,25 @@ spooky facts export ./my-project --machine web-server --format json --output web
       "machine_id": "1234567890abcdef1234567890abcdef",
       "collected_at": "2024-01-15T10:30:45Z",
       "facts": {
-        "system": {
-          "os": {
-            "name": "Ubuntu",
-            "version": "22.04.3 LTS",
-            "arch": "x86_64",
-            "kernel": "5.15.0-91-generic"
-          },
-          "hardware": {
-            "cpu": {
-              "cores": 4,
-              "model": "Intel(R) Core(TM) i7-7700K",
-              "frequency": 4200.0
-            },
-            "memory": {
-              "total": 17179869184,
-              "available": 8589934592,
-              "used": 8589934592,
-              "free": 0
+        "os": {
+          "name": "Linux",
+          "version": "Ubuntu 22.04.3 LTS",
+          "architecture": "x86_64",
+          "kernel": "5.15.0-88-generic"
+        },
+        "hardware": {
+          "cpu_count": 4,
+          "memory_total": 8589934592,
+          "disk_total": 107374182400
+        },
+        "network": {
+          "interfaces": [
+            {
+              "name": "eth0",
+              "address": "192.168.1.10",
+              "netmask": "255.255.255.0"
             }
-          }
+          ]
         }
       }
     }
@@ -174,481 +220,163 @@ spooky facts export ./my-project --machine web-server --format json --output web
 
 ## Advanced Usage
 
-### Project Configuration
+### Parallel Processing
 
-Facts collection can be configured in the project configuration:
-
-```hcl
-project {
-  name = "my-project"
-  description = "Example project with facts configuration"
-  
-  facts {
-    # Collection settings
-    parallel_workers = 4
-    timeout_seconds = 60
-    retry_attempts = 3
-    
-    # Memory settings
-    memory_limit = "1GB"
-    memory_efficient = true
-    
-    # Validation settings
-    strict_validation = true
-    required_facts = ["system", "hardware", "network"]
-    
-    # Custom facts
-    custom_facts = {
-      "environment" = "production"
-      "team" = "platform"
-      "region" = "us-west-2"
-    }
-  }
-}
-```
-
-### Machine-Specific Configuration
-
-Individual machines can have fact collection settings:
-
-```hcl
-machines {
-  machine "web-server" {
-    hostname = "web.example.com"
-    port = 22
-    user = "admin"
-    
-    authentication {
-      method = "ssh_key"
-      key_path = "~/.ssh/id_rsa"
-    }
-    
-    # Fact collection settings
-    facts {
-      timeout_seconds = 30
-      retry_attempts = 2
-      include_processes = true
-      include_network_connections = true
-      
-      # Custom facts for this machine
-      custom_facts = {
-        "role" = "web-server"
-        "tier" = "frontend"
-        "load_balancer" = "true"
-      }
-    }
-  }
-}
-```
-
-### Parallel Collection
-
-For large environments, use parallel collection to improve performance:
+The facts export command supports parallel processing to improve performance when collecting facts from multiple machines:
 
 ```bash
-# Use 8 parallel workers for faster collection
-spooky facts gather ./my-project --parallel 8
+# Use 4 parallel workers for fact collection
+spooky facts export ./my-project --parallel 4 --output facts.hcl
 
-# Monitor collection progress
-spooky facts gather ./my-project --parallel 4 --verbose
+# Use 8 parallel workers for large inventories
+spooky facts export ./my-project --parallel 8 --output facts.hcl
 ```
 
-### Custom Fact Collection
+**Note**: The `--parallel` flag must be 2 or larger. Values 0 and 1 are invalid.
 
-You can extend fact collection with custom facts:
+### Verbose Output
 
-```hcl
-project {
-  name = "my-project"
-  
-  facts {
-    # Custom fact collection scripts
-    custom_collectors = [
-      "scripts/collect-docker-info.sh",
-      "scripts/collect-kubernetes-info.sh",
-      "scripts/collect-application-metrics.sh"
-    ]
-    
-    # Custom fact validation
-    custom_validators = [
-      "scripts/validate-docker-facts.sh",
-      "scripts/validate-kubernetes-facts.sh"
-    ]
-  }
-}
-```
-
-### Fact Retention and Cleanup
-
-Configure fact retention policies:
-
-```hcl
-project {
-  name = "my-project"
-  
-  facts {
-    # Memory settings
-    memory_limit = "2GB"
-    memory_efficient = true
-    
-    # Performance settings
-    memory_pooling = true
-    garbage_collection = true
-    
-    # Monitoring settings
-    memory_monitoring = true
-    memory_profile = true
-  }
-}
-```
-
-## Integration with Other Components
-
-### Variables Integration
-
-Facts can be used in variable resolution:
-
-```hcl
-variables {
-  # Use facts in variable definitions
-  web_server_cpu_cores = "{{ facts.web-server.system.hardware.cpu.cores }}"
-  total_memory_gb = "{{ facts.web-server.system.hardware.memory.total / 1024 / 1024 / 1024 }}"
-  
-  # Conditional variables based on facts
-  deployment_strategy = "{{ if facts.web-server.system.hardware.memory.total > 8589934592 }}rolling{{ else }}recreate{{ end }}"
-}
-```
-
-### Templates Integration
-
-Facts can be used in template rendering:
+Enable verbose output to see detailed information about the fact collection process:
 
 ```bash
-# Template using facts
-cat > deploy.sh.tmpl << 'EOF'
-#!/bin/bash
-# Deploy application based on system facts
-
-echo "Deploying to {{ .Machine.Hostname }}"
-echo "CPU Cores: {{ .Facts.System.Hardware.CPU.Cores }}"
-echo "Memory: {{ .Facts.System.Hardware.Memory.Total }} bytes"
-
-# Adjust deployment based on system capabilities
-if [ {{ .Facts.System.Hardware.CPU.Cores }} -gt 4 ]; then
-    echo "High-performance deployment"
-    export WORKER_THREADS={{ .Facts.System.Hardware.CPU.Cores }}
-else
-    echo "Standard deployment"
-    export WORKER_THREADS=2
-fi
-EOF
-
-# Render template with facts
-spooky templates render deploy.sh.tmpl --machine web-server --output deploy.sh
+# Enable verbose output for detailed logging
+spooky facts export ./my-project --verbose --output facts.hcl
 ```
 
-### Actions Integration
+Verbose output includes:
+- Machine discovery information
+- SSH connection details
+- Fact collection progress
+- Validation results
+- Export statistics
 
-Facts can be used in action definitions:
+### Error Handling
 
-```hcl
-actions {
-  action "deploy-web" {
-    description = "Deploy web application"
-    
-    machines = ["web-server"]
-    parallel = true
-    
-    # Use facts in action logic
-    condition = "facts.system.hardware.memory.available > 1073741824"  # 1GB
-    
-    template {
-      source = "templates/deploy.sh.tmpl"
-      destination = "/tmp/deploy.sh"
-      permissions = "0755"
-    }
-    
-    command = "/tmp/deploy.sh"
-  }
-}
-```
+The facts export command handles errors gracefully:
 
-## Monitoring and Maintenance
-
-### Fact Collection Monitoring
-
-Monitor fact collection health:
-
-```bash
-# Check fact collection status
-spooky facts list ./my-project --verbose
-
-# Validate fact integrity
-spooky facts validate ./my-project
-
-# Check fact freshness
-spooky facts list ./my-project --check-freshness
-```
-
-### Memory Management
-
-Monitor fact memory usage:
-
-```bash
-# Check memory usage
-free -h
-
-# Monitor memory during collection
-spooky facts gather ./my-project --monitor-memory
-
-# Profile memory usage
-spooky facts gather ./my-project --profile
-```
-
-### Performance Optimization
-
-Optimize fact collection performance:
-
-```bash
-# Use parallel collection for multiple machines
-spooky facts gather ./my-project --parallel 8
-
-# Adjust timeouts for slow networks
-spooky facts gather ./my-project --timeout 120s
-
-# Use connection pooling
-spooky facts gather ./my-project --connection-pool 10
-```
-
-## Best Practices
-
-### Fact Collection
-
-- **Regular Collection**: Collect facts regularly (daily or weekly)
-- **Parallel Processing**: Use parallel collection for multiple machines
-- **Error Handling**: Monitor collection failures and retry
-- **Validation**: Always validate collected facts
-
-### Memory Management
-
-- **Memory Monitoring**: Monitor memory usage during fact collection
-- **Garbage Collection**: Proper cleanup of temporary objects
-- **Memory Pooling**: Reuse memory structures for better performance
-- **Memory Limits**: Set appropriate memory limits for large collections
-
-### Security
-
-- **Memory Protection**: Facts stored in memory are not persisted to disk
-- **Access Control**: Facts are only accessible during the action run
-- **Audit Logging**: Log fact collection and usage
-- **Data Sanitization**: Remove sensitive information before collection
-
-### Performance
-
-- **Parallel Collection**: Use parallel workers for faster collection
-- **Timeout Tuning**: Adjust timeouts based on network conditions
-- **Memory Tuning**: Optimize memory allocation and usage
-- **Memory Management**: Monitor memory usage during collection
+- **Individual Machine Failures**: If fact collection fails for one machine, the command continues with other machines
+- **Network Timeouts**: SSH connection timeouts are handled with retry logic
+- **Authentication Failures**: Clear error messages for SSH authentication issues
+- **Validation Errors**: Invalid facts are logged but don't stop the export process
 
 ## Troubleshooting
 
 ### Common Issues
 
-#### Collection Failures
+#### SSH Connection Failures
 
 ```bash
-# Check SSH connectivity
-ssh -i ~/.ssh/id_rsa user@machine.example.com
+# Check SSH connectivity manually
+ssh user@hostname
 
-# Test fact collection manually
-spooky facts gather ./my-project --machine machine.example.com --verbose
+# Verify SSH key permissions
+ls -la ~/.ssh/id_rsa
+# Should show: -rw------- (600 permissions)
 
-# Check machine configuration
-spooky machines list ./my-project
+# Test SSH connection with verbose output
+ssh -v user@hostname
 ```
 
-#### Memory Issues
+#### Machine Inventory Issues
 
 ```bash
-# Check memory usage
-free -h
+# Validate machine inventory
+spooky machines validate ./my-project
 
-# Monitor memory during collection
-spooky facts gather ./my-project --monitor-memory
-
-# Validate facts integrity
-spooky facts validate ./my-project
+# Check machine inventory file
+cat ./my-project/machines.hcl
 ```
 
-#### Validation Errors
+#### Fact Collection Failures
 
 ```bash
-# Check validation errors
-spooky facts validate ./my-project --verbose
+# Enable verbose output for detailed error information
+spooky facts export ./my-project --verbose --output facts.hcl
 
-# Export and inspect facts
-spooky facts export ./my-project --format json --output debug.json
-
-# Re-collect facts if needed
-spooky facts gather ./my-project --machine problematic-machine
+# Check system requirements on target machines
+# - gopsutil library support
+# - /etc/machine-id file exists
+# - Sufficient permissions for fact collection
 ```
 
-### Debugging
+### Debug Information
 
-#### Enable Debug Logging
+When troubleshooting fact collection issues, enable verbose output to get detailed information:
 
 ```bash
-# Enable debug logging for facts
-export SPOOKY_LOG_LEVEL=debug
-spooky facts gather ./my-project --verbose
+# Enable verbose output
+spooky facts export ./my-project --verbose --output facts.hcl
 ```
 
-#### Check Fact Details
+This will show:
+- Machine discovery process
+- SSH connection attempts
+- Fact collection progress
+- Validation results
+- Error details for failed operations
 
-```bash
-# Export facts for inspection
-spooky facts export ./my-project --format json --output facts-debug.json
+## Integration with Other Systems
 
-# Validate specific machine
-spooky facts validate ./my-project --machine specific-machine --verbose
-```
+### Project Integration
 
-#### Performance Analysis
+Facts collection integrates with the project system:
 
-```bash
-# Profile fact collection
-spooky facts gather ./my-project --profile
+- **Machine Inventory**: Uses machines.hcl for target identification
+- **Project Structure**: Follows project directory structure
+- **Configuration**: Uses project-specific configuration
 
-# Check collection timing
-spooky facts gather ./my-project --timing
-```
+### CLI Integration
 
-## Examples
+Facts commands integrate with the CLI system:
 
-### Basic Project Setup
+- **Command Structure**: Follows `spooky facts export` pattern
+- **Global Flags**: Supports global CLI flags
+- **Error Handling**: Uses consistent error handling patterns
 
-```bash
-# Create a new project
-mkdir my-project
-cd my-project
+## Current Implementation Status
 
-# Create project configuration
-cat > project.hcl << 'EOF'
-project {
-  name = "my-project"
-  description = "Example project with facts"
-  
-  facts {
-    parallel_workers = 4
-    timeout_seconds = 60
-  }
-}
+### ✅ Implemented Features
 
-machines {
-  machine "web-server" {
-    hostname = "web.example.com"
-    port = 22
-    user = "admin"
-    
-    authentication {
-      method = "ssh_key"
-      key_path = "~/.ssh/id_rsa"
-    }
-  }
-}
-EOF
+- **Basic Fact Collection**: System fact collection using gopsutil
+- **Memory Storage**: In-memory fact storage during export operations
+- **Export Functionality**: Facts export to JSON and HCL formats
+- **CLI Integration**: `spooky facts export` command with filtering options
+- **Machine Integration**: Facts collection from project machine inventory
+- **Basic Validation**: Fact collection validation and error handling
+- **Parallel Processing**: Support for parallel fact collection
+- **Filtering**: Support for machine, tag, and group filtering
 
-# Gather facts
-spooky facts gather .
+### 📋 Future Enhancements
 
-# List facts
-spooky facts list .
+- **Persistent Storage**: Long-term fact storage in databases
+- **Fact History**: Historical fact tracking and comparison
+- **Advanced Collectors**: Custom fact collectors for specific data
+- **Fact Validation**: Enhanced validation and schema checking
+- **Fact Import**: Import facts from external sources
+- **Fact Comparison**: Compare facts across machines and time periods
 
-# Validate facts
-spooky facts validate .
-```
+## Best Practices
 
-### Advanced Configuration
+### Performance Optimization
 
-```hcl
-project {
-  name = "production-cluster"
-  description = "Production cluster with comprehensive fact collection"
-  
-  facts {
-    # Performance settings
-    parallel_workers = 8
-    timeout_seconds = 120
-    retry_attempts = 3
-    
-    # Storage settings
-    storage_path = "cluster-facts.db"
-    compression_enabled = true
-    
-    # Validation settings
-    strict_validation = true
-    required_facts = ["system", "hardware", "network", "processes"]
-    
-    # Custom facts
-    custom_facts = {
-      "environment" = "production"
-      "cluster" = "primary"
-      "datacenter" = "us-west-2"
-    }
-    
-    # Retention settings
-    retention_days = 90
-    auto_cleanup = true
-    cleanup_schedule = "0 3 * * *"  # Daily at 3 AM
-  }
-}
+1. **Use Parallel Processing**: Use the `--parallel` flag for large inventories
+2. **Filter Appropriately**: Use machine, tag, and group filters to target specific machines
+3. **Monitor Resource Usage**: Fact collection can be resource-intensive on target machines
 
-machines {
-  machine "web-1" {
-    hostname = "web-1.example.com"
-    port = 22
-    user = "admin"
-    
-    authentication {
-      method = "ssh_key"
-      key_path = "~/.ssh/production-key"
-    }
-    
-    facts {
-      timeout_seconds = 60
-      include_processes = true
-      include_network_connections = true
-      
-      custom_facts = {
-        "role" = "web-server"
-        "tier" = "frontend"
-        "load_balancer" = "true"
-      }
-    }
-  }
-  
-  machine "db-1" {
-    hostname = "db-1.example.com"
-    port = 22
-    user = "admin"
-    
-    authentication {
-      method = "ssh_key"
-      key_path = "~/.ssh/production-key"
-    }
-    
-    facts {
-      timeout_seconds = 90
-      include_processes = true
-      
-      custom_facts = {
-        "role" = "database"
-        "tier" = "backend"
-        "database_type" = "postgresql"
-      }
-    }
-  }
-}
-```
+### Security Considerations
 
-This comprehensive user guide provides everything needed to effectively use the spooky facts system for collecting, managing, and utilizing machine facts in your infrastructure automation workflows.
+1. **SSH Key Management**: Ensure SSH keys have proper permissions (600)
+2. **Network Security**: Use secure networks for fact collection
+3. **Data Sensitivity**: Be aware of sensitive information in collected facts
+
+### Maintenance
+
+1. **Regular Exports**: Export facts regularly for backup and analysis
+2. **Validation**: Validate fact exports for data integrity
+3. **Storage Management**: Manage exported fact files appropriately
+
+## Conclusion
+
+The spooky facts system provides essential fact collection and export capabilities for gathering system information from machines. The current implementation focuses on the core functionality needed for basic fact management, with a clear path for future enhancements.
+
+The system integrates well with other spooky components and provides a solid foundation for more advanced fact management features in the future.

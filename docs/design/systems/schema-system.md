@@ -547,7 +547,7 @@ Validates variable definitions and file merging (see [Variables System](../varia
 
 **Schema Integration Points:**
 - **`spooky project validate`**: Uses embedded schemas for all validation operations
-- **`spooky facts validate`**: Uses composed facts schemas for data validation
+- **`spooky facts export`**: Uses composed facts schemas for data validation
 - **`spooky project validate`**: Uses project schemas for structure validation
 - **`spooky variables validate`**: Uses variable schemas for configuration validation
 - **`spooky templates validate`**: Uses template schemas for syntax validation
@@ -645,7 +645,7 @@ facts {
 ### Phase 3: Internal Schema Integration (Week 5-6)
 1. **Schema validation integration**
    - Integrate embedded schemas into existing `spooky project validate` command
-   - Add facts schema validation to `spooky facts validate`
+   - Add facts schema validation to `spooky facts export`
    - Add project schema validation to `spooky project validate`
    - Add variable schema validation to `spooky variables validate`
    - Add template schema validation to `spooky templates validate`

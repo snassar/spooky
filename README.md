@@ -8,12 +8,25 @@ This is a work-in-progress implementation of spooky. The CLI is now built using 
 
 ### ✅ What's Working
 
-The basic CLI structure is in place and supports the following commands:
+The CLI is fully functional and supports comprehensive project management, machine inventory, variable management, and facts collection. For a complete reference of all available commands, see the [CLI Reference](docs/CLI_REFERENCE.md).
 
-- `spooky --version` - Show version information
-- `spooky --help` - Show comprehensive help information
-- `spooky project init <project>` - Initialize a new spooky project (placeholder implementation)
-- `spooky project validate <project>` - Validate a spooky project (placeholder implementation)
+**Available Command Categories:**
+- **Project Management**: `spooky project init`, `spooky project validate`
+- **Machine Inventory**: `spooky machines list`, `spooky machines validate`, `spooky machines ping`
+- **Variable Management**: `spooky variables list`, `spooky variables validate`, `spooky variables resolve`
+- **Facts Management**: `spooky facts export`
+
+**Quick Examples:**
+```bash
+# Initialize a new project
+spooky project init my-automation-project
+
+# List machines in project
+spooky machines list ./my-automation-project
+
+# Export facts from machines
+spooky facts export ./my-automation-project --output facts.hcl
+```
 
 ### 🚀 Enhanced Features with Cobra
 
@@ -82,14 +95,14 @@ To run spooky:
 # Show version
 ./spooky --version
 
-# Project commands
-./spooky project init my-project
-./spooky project validate my-project
-
 # Get help for specific commands
 ./spooky project --help
-./spooky project init --help
+./spooky machines --help
+./spooky variables --help
+./spooky facts --help
 ```
+
+For complete command documentation and examples, see the [CLI Reference](docs/CLI_REFERENCE.md).
 
 ## Shell Completion
 

@@ -2053,11 +2053,13 @@ $ spooky actions run ./my-project --action setup --machine web-server
 # Variables are available in action scripts and commands
 ```
 
-3. **Facts Gathering Commands**
+3. **Facts Export Commands**
 ```bash
-# Variables can be used in custom facts collection
-$ spooky facts gather ./my-project
-# Custom facts can reference variables for dynamic fact collection
+# Variables can be used in custom facts export
+$ spooky facts export ./my-project
+# Export facts with filtering
+$ spooky facts export ./my-project --tags "environment=production" --groups "webservers"
+# Custom facts can reference variables for dynamic fact export
 ```
 
 #### **Commands That Optionally Use Variables:**

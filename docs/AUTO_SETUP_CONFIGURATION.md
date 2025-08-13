@@ -2,7 +2,7 @@
 
 ## Overview
 
-The spooky CLI now includes an automatic configuration setup system that ensures users have proper configuration from the start. This system automatically creates and validates the spooky configuration directory and files when running any spooky command (except `--version` and `--help`).
+The spooky CLI includes an automatic configuration setup system that ensures users have proper configuration from the start. This system automatically creates and validates the spooky configuration directory and files when running any spooky command (except `--version` and `--help`).
 
 ## How It Works
 
@@ -181,12 +181,13 @@ logging {
 
 ### HCL Syntax Validation
 
-The system performs comprehensive HCL syntax validation:
+The system performs comprehensive HCL syntax validation with enhanced error reporting:
 
 1. **Balanced Braces**: Ensures all opening braces have corresponding closing braces
 2. **Basic Structure**: Validates that HCL blocks are properly structured
 3. **Assignment Syntax**: Checks that assignments follow `key = value` format
-4. **Line-by-Line Validation**: Validates each non-comment line for proper syntax
+4. **Line-by-Line Validation**: Validates each non-comment line for proper syntax with line-specific error reporting
+5. **Multi-Level Validation**: Performs file existence, read access, and syntax validation in sequence
 
 ### Validation Examples
 
@@ -207,6 +208,17 @@ cli {
 ```
 
 **Error**: `unbalanced braces in HCL content`
+
+#### Invalid HCL with Line-Specific Error Reporting
+```hcl
+cli {
+  default_timeout = 300
+  max_parallel = 10
+  invalid_syntax = 
+}
+```
+
+**Error**: `invalid HCL syntax at line 4: invalid_syntax =`
 
 ## Usage Examples
 
@@ -245,6 +257,11 @@ $ spooky project validate my-project
 $ spooky project init test-project
 
 Error: configuration setup failed: config validation failed: invalid HCL syntax in spooky.hcl: unbalanced braces in HCL content
+
+# User has syntax error with line-specific reporting
+$ spooky project init test-project
+
+Error: configuration setup failed: config validation failed: invalid HCL syntax in spooky.hcl: invalid HCL syntax at line 4: invalid_syntax =
 ```
 
 ### Version and Help Commands
@@ -281,7 +298,7 @@ Ensures required configuration files exist, creating them if missing.
 Validates that existing configuration files have valid HCL syntax.
 
 #### `validateHCLSyntax()`
-Performs comprehensive HCL syntax validation.
+Performs comprehensive HCL syntax validation with line-specific error reporting and multi-level validation.
 
 ### Integration with CLI
 
@@ -322,6 +339,8 @@ RootCmd = &cobra.Command{
 - Validates configuration before use
 - Prevents runtime errors from invalid configuration
 - Clear error messages guide users to fix issues
+- Line-specific error reporting for precise problem identification
+- Multi-level validation ensures comprehensive error detection
 
 ### 4. **Backward Compatibility**
 - Existing configurations continue to work
@@ -332,6 +351,8 @@ RootCmd = &cobra.Command{
 - Centralized configuration management
 - Consistent validation across all commands
 - Easy to extend with new configuration options
+- Enhanced error reporting for easier debugging
+- Robust validation system for reliable operation
 
 ## Testing
 
@@ -397,9 +418,19 @@ echo 'invalid hcl content { missing closing brace' > ~/.config/spooky/spooky.hcl
 2. **Sensible Defaults**: Default configuration provides good starting point
 3. **Easy Customization**: Edit configuration files to customize behavior
 
-## Future Enhancements
+## Implementation Status
 
-### Potential Improvements
+### Current Implementation Features
+
+The configuration system is **fully implemented** with the following capabilities:
+
+1. **Basic Auto-Setup**: Creates spooky.hcl and logging.hcl files automatically
+2. **OS Detection**: Supports Linux/BSD, macOS, and Windows
+3. **HCL Validation**: Basic syntax validation with error reporting
+4. **Error Handling**: Clear error messages for configuration issues
+5. **Cross-Platform**: Works consistently across operating systems
+
+### Future Enhancements
 
 1. **Configuration Migration**: Automatic migration of old configuration formats
 2. **Configuration Backup**: Automatic backup before making changes
@@ -417,3 +448,5 @@ echo 'invalid hcl content { missing closing brace' > ~/.config/spooky/spooky.hcl
 ## Conclusion
 
 The auto-setup configuration system provides a seamless user experience while ensuring robust configuration management. It eliminates the need for manual setup while providing comprehensive validation and error handling. The system is designed to be maintainable, extensible, and compatible with existing workflows.
+
+The current implementation focuses on the essential configuration files (spooky.hcl and logging.hcl) with basic validation and error handling. This provides a solid foundation for future enhancements while meeting the immediate needs of users.
