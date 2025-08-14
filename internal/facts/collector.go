@@ -4,32 +4,27 @@ package facts
 import (
 	"context"
 	"fmt"
-	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
+	spookyinterfaces "spooky/internal/interfaces"
 	spookytypes "spooky/internal/types"
 	spookytypesfacts "spooky/internal/types/facts"
-
-	"github.com/shirou/gopsutil/v4/cpu"
-	"github.com/shirou/gopsutil/v4/disk"
-	"github.com/shirou/gopsutil/v4/host"
-	"github.com/shirou/gopsutil/v4/load"
-	"github.com/shirou/gopsutil/v4/mem"
-	"github.com/shirou/gopsutil/v4/net"
-	"github.com/shirou/gopsutil/v4/process"
 )
 
-// SystemFactCollector collects system facts using gopsutil
+// SystemFactCollector collects system facts using SSH commands
 type SystemFactCollector struct {
-	name string
+	name       string
+	sshManager spookyinterfaces.SSHManager
 }
 
 // NewSystemFactCollector creates a new system fact collector
-func NewSystemFactCollector() *SystemFactCollector {
+func NewSystemFactCollector(sshManager spookyinterfaces.SSHManager) *SystemFactCollector {
 	return &SystemFactCollector{
-		name: "system",
+		name:       "system",
+		sshManager: sshManager,
 	}
 }
 
@@ -41,7 +36,7 @@ func (c *SystemFactCollector) GetName() string {
 // Collect collects facts from the given machine
 func (c *SystemFactCollector) Collect(ctx context.Context, machine *spookytypes.Machine) (*FactCollection, error) {
 	// Get machine ID
-	machineID, err := c.getMachineID()
+	machineID, err := c.getMachineID(machine)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get machine ID: %w", err)
 	}
@@ -51,40 +46,30 @@ func (c *SystemFactCollector) Collect(ctx context.Context, machine *spookytypes.
 		System: &spookytypesfacts.SystemFacts{},
 	}
 
-	// Collect OS facts
-	osFacts, err := c.collectOSFacts()
+	// Collect system facts via SSH
+	systemFacts, err := c.collectSystemFacts(ctx, machine)
 	if err != nil {
-		return nil, fmt.Errorf("failed to collect OS facts: %w", err)
+		return nil, fmt.Errorf("failed to collect system facts: %w", err)
 	}
-	facts.System.OS = osFacts
+	facts.System = systemFacts
 
-	// Collect hardware facts
-	hardwareFacts, err := c.collectHardwareFacts()
+	// Collect collector facts via SSH (if available)
+	collectorFacts, err := c.collectCollectorFacts(ctx, machine)
 	if err != nil {
-		return nil, fmt.Errorf("failed to collect hardware facts: %w", err)
+		// Collector facts are optional, log but don't fail
+		fmt.Printf("Warning: failed to collect collector facts: %v\n", err)
+	} else {
+		facts.Collector = collectorFacts
 	}
-	facts.System.Hardware = hardwareFacts
 
-	// Collect network facts
-	networkFacts, err := c.collectNetworkFacts()
+	// Collect custom facts via SSH (if available)
+	customFacts, err := c.collectCustomFacts(ctx, machine)
 	if err != nil {
-		return nil, fmt.Errorf("failed to collect network facts: %w", err)
+		// Custom facts are optional, log but don't fail
+		fmt.Printf("Warning: failed to collect custom facts: %v\n", err)
+	} else {
+		facts.Custom = customFacts
 	}
-	facts.System.Network = networkFacts
-
-	// Collect load average facts
-	loadFacts, err := c.collectLoadAverageFacts()
-	if err != nil {
-		return nil, fmt.Errorf("failed to collect load average facts: %w", err)
-	}
-	facts.System.LoadAverage = loadFacts
-
-	// Collect process facts
-	processFacts, err := c.collectProcessFacts()
-	if err != nil {
-		return nil, fmt.Errorf("failed to collect process facts: %w", err)
-	}
-	facts.System.Processes = processFacts
 
 	// Create fact collection
 	collection := &FactCollection{
@@ -100,14 +85,15 @@ func (c *SystemFactCollector) Collect(ctx context.Context, machine *spookytypes.
 	return collection, nil
 }
 
-// getMachineID gets the machine ID from /etc/machine-id
-func (c *SystemFactCollector) getMachineID() (string, error) {
-	data, err := os.ReadFile("/etc/machine-id")
+// getMachineID gets the machine ID from /etc/machine-id via SSH
+func (c *SystemFactCollector) getMachineID(machine *spookytypes.Machine) (string, error) {
+	// Execute command via SSH
+	output, err := c.executeSSHCommand(machine, "cat /etc/machine-id")
 	if err != nil {
-		return "", fmt.Errorf("failed to read /etc/machine-id: %w", err)
+		return "", fmt.Errorf("failed to read /etc/machine-id via SSH: %w", err)
 	}
 
-	machineID := strings.TrimSpace(string(data))
+	machineID := strings.TrimSpace(output)
 
 	// Validate machine ID format (32-character hex string)
 	if !regexp.MustCompile(`^[a-f0-9]{32}$`).MatchString(machineID) {
@@ -117,532 +103,443 @@ func (c *SystemFactCollector) getMachineID() (string, error) {
 	return machineID, nil
 }
 
-// collectOSFacts collects operating system facts
-func (c *SystemFactCollector) collectOSFacts() (*spookytypesfacts.OSFacts, error) {
-	hostInfo, err := host.Info()
+// collectSystemFacts collects operating system facts via SSH commands
+func (c *SystemFactCollector) collectSystemFacts(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.SystemFacts, error) {
+	facts := &spookytypesfacts.SystemFacts{}
+
+	// Collect OS information
+	osFacts, err := c.collectOSFacts(machine)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get host info: %w", err)
+		return nil, fmt.Errorf("failed to collect OS facts: %w", err)
+	}
+	facts.OS = osFacts
+
+	// Collect hardware information
+	hardwareFacts, err := c.collectHardwareFacts(machine)
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect hardware facts: %w", err)
+	}
+	facts.Hardware = hardwareFacts
+
+	// Collect network information
+	networkFacts, err := c.collectNetworkFacts(machine)
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect network facts: %w", err)
+	}
+	facts.Network = networkFacts
+
+	// Collect load average
+	loadFacts, err := c.collectLoadAverageFacts(machine)
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect load average facts: %w", err)
+	}
+	facts.LoadAverage = loadFacts
+
+	// Collect process information
+	processFacts, err := c.collectProcessFacts(machine)
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect process facts: %w", err)
+	}
+	facts.Processes = processFacts
+
+	return facts, nil
+}
+
+// collectOSFacts collects operating system facts via SSH
+func (c *SystemFactCollector) collectOSFacts(machine *spookytypes.Machine) (*spookytypesfacts.OSFacts, error) {
+	// Get OS release information
+	osRelease, err := c.executeSSHCommand(machine, "cat /etc/os-release")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get OS release info: %w", err)
+	}
+
+	// Parse OS release information
+	osInfo := c.parseOSRelease(osRelease)
+
+	// Get kernel information
+	kernelInfo, err := c.executeSSHCommand(machine, "uname -a")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get kernel info: %w", err)
+	}
+
+	// Parse kernel information
+	kernelParts := strings.Fields(kernelInfo)
+	if len(kernelParts) < 3 {
+		return nil, fmt.Errorf("invalid kernel info format: %s", kernelInfo)
 	}
 
 	return &spookytypesfacts.OSFacts{
-		Name:     hostInfo.OS,
-		Version:  hostInfo.PlatformVersion,
-		Arch:     hostInfo.KernelArch,
-		Kernel:   hostInfo.KernelVersion,
-		Platform: hostInfo.Platform,
-		Family:   hostInfo.PlatformFamily,
+		Name:     osInfo["NAME"],
+		Version:  osInfo["VERSION"],
+		Arch:     kernelParts[11], // Architecture from uname -a
+		Kernel:   kernelParts[2],  // Kernel version from uname -a
+		Platform: osInfo["ID"],
+		Family:   osInfo["ID_LIKE"],
 	}, nil
 }
 
-// collectHardwareFacts collects hardware facts
-func (c *SystemFactCollector) collectHardwareFacts() (*spookytypesfacts.HardwareFacts, error) {
+// collectHardwareFacts collects hardware facts via SSH
+func (c *SystemFactCollector) collectHardwareFacts(machine *spookytypes.Machine) (*spookytypesfacts.HardwareFacts, error) {
 	// Collect CPU facts
-	cpuFacts, err := c.collectCPUFacts()
+	cpuFacts, err := c.collectCPUFacts(machine)
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect CPU facts: %w", err)
 	}
 
 	// Collect memory facts
-	memoryFacts, err := c.collectMemoryFacts()
+	memoryFacts, err := c.collectMemoryFacts(machine)
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect memory facts: %w", err)
 	}
 
 	// Collect disk facts
-	diskFacts, err := c.collectDiskFacts()
+	diskFacts, err := c.collectDiskFacts(machine)
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect disk facts: %w", err)
-	}
-
-	// Collect disk I/O facts
-	diskIOFacts, err := c.collectDiskIOFacts()
-	if err != nil {
-		return nil, fmt.Errorf("failed to collect disk I/O facts: %w", err)
 	}
 
 	return &spookytypesfacts.HardwareFacts{
 		CPU:    cpuFacts,
 		Memory: memoryFacts,
 		Disks:  diskFacts,
-		DiskIO: diskIOFacts,
 	}, nil
 }
 
-// collectCPUFacts collects CPU facts
-func (c *SystemFactCollector) collectCPUFacts() (*spookytypesfacts.CPUFacts, error) {
+// collectCPUFacts collects CPU facts via SSH
+func (c *SystemFactCollector) collectCPUFacts(machine *spookytypes.Machine) (*spookytypesfacts.CPUFacts, error) {
 	// Get CPU info
-	cpuInfo, err := cpu.Info()
+	cpuInfo, err := c.executeSSHCommand(machine, "cat /proc/cpuinfo")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get CPU info: %w", err)
 	}
 
-	if len(cpuInfo) == 0 {
-		return nil, fmt.Errorf("no CPU info available")
-	}
+	// Parse CPU information
+	cpuDetails := c.parseCPUInfo(cpuInfo)
 
-	// Get CPU times
-	cpuTimes, err := cpu.Times(false)
+	// Get CPU count
+	cpuCount, err := c.executeSSHCommand(machine, "nproc")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get CPU times: %w", err)
+		return nil, fmt.Errorf("failed to get CPU count: %w", err)
 	}
 
-	var times *spookytypesfacts.CPUTimes
-	if len(cpuTimes) > 0 {
-		times = &spookytypesfacts.CPUTimes{
-			User:      cpuTimes[0].User,
-			System:    cpuTimes[0].System,
-			Idle:      cpuTimes[0].Idle,
-			Nice:      cpuTimes[0].Nice,
-			IOWait:    cpuTimes[0].Iowait,
-			IRQ:       cpuTimes[0].Irq,
-			SoftIRQ:   cpuTimes[0].Softirq,
-			Steal:     cpuTimes[0].Steal,
-			Guest:     cpuTimes[0].Guest,
-			GuestNice: cpuTimes[0].GuestNice,
-		}
-	}
+	cores := 0
+	fmt.Sscanf(strings.TrimSpace(cpuCount), "%d", &cores)
 
-	// Get CPU percentage
-	cpuPercent, err := cpu.Percent(0, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get CPU percentage: %w", err)
-	}
-
-	var percent float64
-	if len(cpuPercent) > 0 {
-		percent = cpuPercent[0]
-	}
-
-	// Get per-core information
-	coresDetail, err := c.collectCPUCoresDetail()
-	if err != nil {
-		return nil, fmt.Errorf("failed to collect CPU cores detail: %w", err)
-	}
+	frequency, _ := strconv.ParseFloat(cpuDetails["cpu MHz"], 64)
 
 	return &spookytypesfacts.CPUFacts{
-		Cores:        len(cpuInfo),
-		Model:        cpuInfo[0].ModelName,
-		Frequency:    cpuInfo[0].Mhz,
-		Architecture: cpuInfo[0].Family,
-		Vendor:       cpuInfo[0].VendorID,
-		Times:        times,
-		Percent:      percent,
-		CoresDetail:  coresDetail,
+		Cores:        cores,
+		Model:        cpuDetails["model name"],
+		Frequency:    frequency,
+		Architecture: cpuDetails["cpu family"],
+		Vendor:       cpuDetails["vendor_id"],
 	}, nil
 }
 
-// collectCPUCoresDetail collects detailed information for each CPU core
-func (c *SystemFactCollector) collectCPUCoresDetail() ([]*spookytypesfacts.CPUCoreDetail, error) {
-	cpuInfo, err := cpu.Info()
+// collectMemoryFacts collects memory facts via SSH
+func (c *SystemFactCollector) collectMemoryFacts(machine *spookytypes.Machine) (*spookytypesfacts.MemoryFacts, error) {
+	// Get memory information
+	memInfo, err := c.executeSSHCommand(machine, "free -b")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get CPU info: %w", err)
+		return nil, fmt.Errorf("failed to get memory info: %w", err)
 	}
 
-	cpuTimes, err := cpu.Times(true)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get CPU times: %w", err)
-	}
-
-	cpuPercent, err := cpu.Percent(0, true)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get CPU percentage: %w", err)
-	}
-
-	var coresDetail []*spookytypesfacts.CPUCoreDetail
-
-	for i, info := range cpuInfo {
-		var times *spookytypesfacts.CPUTimes
-		if i < len(cpuTimes) {
-			times = &spookytypesfacts.CPUTimes{
-				User:      cpuTimes[i].User,
-				System:    cpuTimes[i].System,
-				Idle:      cpuTimes[i].Idle,
-				Nice:      cpuTimes[i].Nice,
-				IOWait:    cpuTimes[i].Iowait,
-				IRQ:       cpuTimes[i].Irq,
-				SoftIRQ:   cpuTimes[i].Softirq,
-				Steal:     cpuTimes[i].Steal,
-				Guest:     cpuTimes[i].Guest,
-				GuestNice: cpuTimes[i].GuestNice,
-			}
-		}
-
-		var percent float64
-		if i < len(cpuPercent) {
-			percent = cpuPercent[i]
-		}
-
-		core := &spookytypesfacts.CPUCoreDetail{
-			CPU:       i,
-			ModelName: info.ModelName,
-			MHz:       info.Mhz,
-			CacheSize: int64(info.CacheSize),
-			Percent:   percent,
-			Times:     times,
-		}
-
-		coresDetail = append(coresDetail, core)
-	}
-
-	return coresDetail, nil
-}
-
-// collectMemoryFacts collects memory facts
-func (c *SystemFactCollector) collectMemoryFacts() (*spookytypesfacts.MemoryFacts, error) {
-	// Get virtual memory info
-	vmem, err := mem.VirtualMemory()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get virtual memory info: %w", err)
-	}
-
-	// Get swap memory info
-	swap, err := mem.SwapMemory()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get swap memory info: %w", err)
-	}
-
-	swapFacts := &spookytypesfacts.SwapFacts{
-		Total:   int64(swap.Total),
-		Used:    int64(swap.Used),
-		Free:    int64(swap.Free),
-		Percent: swap.UsedPercent,
-	}
-
-	virtualMemoryFacts := &spookytypesfacts.VirtualMemoryFacts{
-		Total:     int64(vmem.Total),
-		Available: int64(vmem.Available),
-		Used:      int64(vmem.Used),
-		Free:      int64(vmem.Free),
-		Percent:   vmem.UsedPercent,
-	}
+	// Parse memory information
+	memDetails := c.parseMemoryInfo(memInfo)
 
 	return &spookytypesfacts.MemoryFacts{
-		Total:         int64(vmem.Total),
-		Available:     int64(vmem.Available),
-		Used:          int64(vmem.Used),
-		Free:          int64(vmem.Free),
-		Buffers:       int64(vmem.Buffers),
-		Cached:        int64(vmem.Cached),
-		Shared:        int64(vmem.Shared),
-		Slab:          int64(vmem.Slab),
-		Swap:          swapFacts,
-		VirtualMemory: virtualMemoryFacts,
+		Total:     memDetails["total"],
+		Available: memDetails["available"],
+		Used:      memDetails["used"],
+		Free:      memDetails["free"],
 	}, nil
 }
 
-// collectDiskFacts collects disk facts
-func (c *SystemFactCollector) collectDiskFacts() ([]*spookytypesfacts.DiskFacts, error) {
-	// Get disk partitions
-	partitions, err := disk.Partitions(false)
+// collectDiskFacts collects disk facts via SSH
+func (c *SystemFactCollector) collectDiskFacts(machine *spookytypes.Machine) ([]*spookytypesfacts.DiskFacts, error) {
+	// Get disk usage information
+	diskInfo, err := c.executeSSHCommand(machine, "df -h")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get disk partitions: %w", err)
+		return nil, fmt.Errorf("failed to get disk info: %w", err)
 	}
 
+	// Parse disk information
+	diskDetails := c.parseDiskInfo(diskInfo)
+
 	var diskFacts []*spookytypesfacts.DiskFacts
+	for _, disk := range diskDetails {
+		device, _ := disk["device"].(string)
+		mountpoint, _ := disk["mountpoint"].(string)
+		fstype, _ := disk["fstype"].(string)
+		total, _ := disk["total"].(int64)
+		used, _ := disk["used"].(int64)
+		free, _ := disk["free"].(int64)
 
-	for _, partition := range partitions {
-		// Get disk usage
-		usage, err := disk.Usage(partition.Mountpoint)
-		if err != nil {
-			// Skip partitions we can't access
-			continue
-		}
-
-		// Get disk I/O counters
-		ioCounters, err := disk.IOCounters(partition.Device)
-		if err != nil {
-			// Skip if we can't get I/O counters
-			continue
-		}
-
-		var ioCountersFacts *spookytypesfacts.DiskIOCounters
-		if len(ioCounters) > 0 {
-			io := ioCounters[partition.Device]
-			ioCountersFacts = &spookytypesfacts.DiskIOCounters{
-				ReadCount:  int64(io.ReadCount),
-				WriteCount: int64(io.WriteCount),
-				ReadBytes:  int64(io.ReadBytes),
-				WriteBytes: int64(io.WriteBytes),
-				ReadTime:   int64(io.ReadTime),
-				WriteTime:  int64(io.WriteTime),
-				IOTime:     int64(io.IoTime),
-				WeightedIO: int64(io.WeightedIO),
-			}
-		}
-
-		partitionFacts := &spookytypesfacts.PartitionFacts{
-			Device:     partition.Device,
-			Mountpoint: partition.Mountpoint,
-			FSType:     partition.Fstype,
-			Opts:       strings.Join(partition.Opts, ","),
-		}
-
-		diskFact := &spookytypesfacts.DiskFacts{
-			Device:     partition.Device,
-			MountPoint: partition.Mountpoint,
-			Total:      int64(usage.Total),
-			Used:       int64(usage.Used),
-			Free:       int64(usage.Free),
-			Filesystem: partition.Fstype,
-			IOCounters: ioCountersFacts,
-			Partition:  partitionFacts,
-		}
-
-		diskFacts = append(diskFacts, diskFact)
+		diskFacts = append(diskFacts, &spookytypesfacts.DiskFacts{
+			Device:     device,
+			MountPoint: mountpoint,
+			Filesystem: fstype,
+			Total:      total,
+			Used:       used,
+			Free:       free,
+		})
 	}
 
 	return diskFacts, nil
 }
 
-// collectDiskIOFacts collects overall disk I/O statistics
-func (c *SystemFactCollector) collectDiskIOFacts() (*spookytypesfacts.DiskIOFacts, error) {
-	ioCounters, err := disk.IOCounters()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get disk I/O counters: %w", err)
-	}
-
-	var totalReadCount, totalWriteCount, totalReadBytes, totalWriteBytes int64
-	var totalReadTime, totalWriteTime, totalIOTime, totalWeightedIO int64
-
-	for _, io := range ioCounters {
-		totalReadCount += int64(io.ReadCount)
-		totalWriteCount += int64(io.WriteCount)
-		totalReadBytes += int64(io.ReadBytes)
-		totalWriteBytes += int64(io.WriteBytes)
-		totalReadTime += int64(io.ReadTime)
-		totalWriteTime += int64(io.WriteTime)
-		totalIOTime += int64(io.IoTime)
-		totalWeightedIO += int64(io.WeightedIO)
-	}
-
-	return &spookytypesfacts.DiskIOFacts{
-		ReadCount:  totalReadCount,
-		WriteCount: totalWriteCount,
-		ReadBytes:  totalReadBytes,
-		WriteBytes: totalWriteBytes,
-		ReadTime:   totalReadTime,
-		WriteTime:  totalWriteTime,
-		IOTime:     totalIOTime,
-		WeightedIO: totalWeightedIO,
-	}, nil
-}
-
-// collectNetworkFacts collects network facts
-func (c *SystemFactCollector) collectNetworkFacts() (*spookytypesfacts.NetworkFacts, error) {
+// collectNetworkFacts collects network facts via SSH
+func (c *SystemFactCollector) collectNetworkFacts(machine *spookytypes.Machine) (*spookytypesfacts.NetworkFacts, error) {
 	// Get hostname
-	hostname, err := os.Hostname()
+	hostname, err := c.executeSSHCommand(machine, "hostname")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get hostname: %w", err)
 	}
 
 	// Get network interfaces
-	interfaces, err := net.Interfaces()
+	interfaces, err := c.executeSSHCommand(machine, "ip addr show")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get network interfaces: %w", err)
 	}
 
-	// Get network I/O counters
-	ioCounters, err := net.IOCounters(false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get network I/O counters: %w", err)
-	}
+	// Parse network information
+	networkDetails := c.parseNetworkInfo(interfaces)
 
-	var networkInterfaces []*spookytypesfacts.NetworkInterface
-	var allIPAddresses []string
-	var primaryIP string
-
-	for _, iface := range interfaces {
-		// Skip loopback interfaces
-		if strings.HasPrefix(iface.Name, "lo") {
-			continue
-		}
-
-		// Convert addresses to strings
-		var ipAddresses []string
-		for _, addr := range iface.Addrs {
-			ipAddresses = append(ipAddresses, addr.Addr)
-		}
-
-		networkInterface := &spookytypesfacts.NetworkInterface{
-			Name:        iface.Name,
-			MACAddress:  iface.HardwareAddr,
-			IPAddresses: ipAddresses,
-			MTU:         iface.MTU,
-			Flags:       iface.Flags,
-		}
-
-		networkInterfaces = append(networkInterfaces, networkInterface)
-
-		// Collect all IP addresses
-		for _, addr := range iface.Addrs {
-			allIPAddresses = append(allIPAddresses, addr.Addr)
-		}
-
-		// Set primary IP (first non-loopback interface)
-		if primaryIP == "" && len(iface.Addrs) > 0 {
-			primaryIP = iface.Addrs[0].Addr
-		}
-	}
-
-	// Get network connections count
-	connections, err := net.Connections("all")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get network connections: %w", err)
-	}
-
-	// Get listening ports
-	var listeningPorts []int
-	for _, conn := range connections {
-		if conn.Status == "LISTEN" {
-			listeningPorts = append(listeningPorts, int(conn.Laddr.Port))
-		}
-	}
-
-	var totalBytesSent, totalBytesRecv, totalPacketsSent, totalPacketsRecv int64
-	var totalErrIn, totalErrOut, totalDropIn, totalDropOut int64
-
-	if len(ioCounters) > 0 {
-		io := ioCounters[0]
-		totalBytesSent = int64(io.BytesSent)
-		totalBytesRecv = int64(io.BytesRecv)
-		totalPacketsSent = int64(io.PacketsSent)
-		totalPacketsRecv = int64(io.PacketsRecv)
-		totalErrIn = int64(io.Errin)
-		totalErrOut = int64(io.Errout)
-		totalDropIn = int64(io.Dropin)
-		totalDropOut = int64(io.Dropout)
-	}
+	networkInterfaces, _ := networkDetails["interfaces"].([]*spookytypesfacts.NetworkInterface)
+	ipAddresses, _ := networkDetails["ip_addresses"].([]string)
+	primaryIP, _ := networkDetails["primary_ip"].(string)
 
 	return &spookytypesfacts.NetworkFacts{
-		Hostname:       hostname,
-		Interfaces:     networkInterfaces,
-		IPAddresses:    allIPAddresses,
-		PrimaryIP:      primaryIP,
-		Connections:    len(connections),
-		ListeningPorts: listeningPorts,
-		BytesSent:      totalBytesSent,
-		BytesRecv:      totalBytesRecv,
-		PacketsSent:    totalPacketsSent,
-		PacketsRecv:    totalPacketsRecv,
-		ErrIn:          totalErrIn,
-		ErrOut:         totalErrOut,
-		DropIn:         totalDropIn,
-		DropOut:        totalDropOut,
+		Hostname:    strings.TrimSpace(hostname),
+		Interfaces:  networkInterfaces,
+		IPAddresses: ipAddresses,
+		PrimaryIP:   primaryIP,
 	}, nil
 }
 
-// collectLoadAverageFacts collects load average facts
-func (c *SystemFactCollector) collectLoadAverageFacts() (*spookytypesfacts.LoadAverageFacts, error) {
-	loadAvg, err := load.Avg()
+// collectLoadAverageFacts collects load average facts via SSH
+func (c *SystemFactCollector) collectLoadAverageFacts(machine *spookytypes.Machine) (*spookytypesfacts.LoadAverageFacts, error) {
+	// Get load average
+	loadAvg, err := c.executeSSHCommand(machine, "cat /proc/loadavg")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get load average: %w", err)
 	}
 
+	// Parse load average
+	loadParts := strings.Fields(strings.TrimSpace(loadAvg))
+	if len(loadParts) < 3 {
+		return nil, fmt.Errorf("invalid load average format: %s", loadAvg)
+	}
+
+	var load1, load5, load15 float64
+	fmt.Sscanf(loadParts[0], "%f", &load1)
+	fmt.Sscanf(loadParts[1], "%f", &load5)
+	fmt.Sscanf(loadParts[2], "%f", &load15)
+
 	return &spookytypesfacts.LoadAverageFacts{
-		Load1:  loadAvg.Load1,
-		Load5:  loadAvg.Load5,
-		Load15: loadAvg.Load15,
+		Load1:  load1,
+		Load5:  load5,
+		Load15: load15,
 	}, nil
 }
 
-// collectProcessFacts collects process facts
-func (c *SystemFactCollector) collectProcessFacts() (*spookytypesfacts.ProcessFacts, error) {
-	// Get all processes
-	processes, err := process.Processes()
+// collectProcessFacts collects process facts via SSH
+func (c *SystemFactCollector) collectProcessFacts(machine *spookytypes.Machine) (*spookytypesfacts.ProcessFacts, error) {
+	// Get process count
+	processCount, err := c.executeSSHCommand(machine, "ps aux | wc -l")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get processes: %w", err)
+		return nil, fmt.Errorf("failed to get process count: %w", err)
 	}
 
-	// Count processes by status
-	var running, sleeping, stopped, zombie int
-
-	// For now, just count total processes
-	// Status parsing can be implemented later when we understand the exact return type
-	running = len(processes)
-
-	// Get top processes by CPU usage
-	topByCPU, err := c.getTopProcessesByCPU(processes, 10)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get top processes by CPU: %w", err)
-	}
-
-	// Get top processes by memory usage
-	topByMemory, err := c.getTopProcessesByMemory(processes, 10)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get top processes by memory: %w", err)
-	}
+	count := 0
+	fmt.Sscanf(strings.TrimSpace(processCount), "%d", &count)
 
 	return &spookytypesfacts.ProcessFacts{
-		Count:       len(processes),
-		Running:     running,
-		Sleeping:    sleeping,
-		Stopped:     stopped,
-		Zombie:      zombie,
-		TopByCPU:    topByCPU,
-		TopByMemory: topByMemory,
+		Count: count,
 	}, nil
 }
 
-// getTopProcessesByCPU gets the top processes by CPU usage
-func (c *SystemFactCollector) getTopProcessesByCPU(processes []*process.Process, limit int) ([]*spookytypesfacts.ProcessInfo, error) {
-	var processInfos []*spookytypesfacts.ProcessInfo
-
-	for _, p := range processes {
-		// Note: CPUPercent() requires calling it twice to get accurate results
-		// For now, we'll collect basic process info without CPU percentage
-		name, err := p.Name()
-		if err != nil {
-			continue
-		}
-
-		processInfo := &spookytypesfacts.ProcessInfo{
-			PID:        int(p.Pid),
-			Name:       name,
-			CPUPercent: 0.0, // Would need proper CPU measurement
-		}
-
-		processInfos = append(processInfos, processInfo)
+// collectCollectorFacts collects facts from spooky-collector binary via SSH
+func (c *SystemFactCollector) collectCollectorFacts(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.CollectorFacts, error) {
+	// Check if spooky-collector facts file exists
+	exists, err := c.executeSSHCommand(machine, "test -f /etc/spooky/facts.hcl && echo 'exists' || echo 'not_exists'")
+	if err != nil {
+		return nil, fmt.Errorf("failed to check for collector facts: %w", err)
 	}
 
-	// Take top N (simplified - no sorting)
-	if len(processInfos) > limit {
-		processInfos = processInfos[:limit]
+	if strings.TrimSpace(exists) != "exists" {
+		return nil, fmt.Errorf("collector facts file not found")
 	}
 
-	return processInfos, nil
+	// Read collector facts file
+	factsContent, err := c.executeSSHCommand(machine, "cat /etc/spooky/facts.hcl")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read collector facts: %w", err)
+	}
+
+	// Parse HCL content using the HCL parser
+	parser := NewHCLParser()
+	collectorFacts, err := parser.ParseCollectorFacts(factsContent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse collector facts: %w", err)
+	}
+
+	return collectorFacts, nil
 }
 
-// getTopProcessesByMemory gets the top processes by memory usage
-func (c *SystemFactCollector) getTopProcessesByMemory(processes []*process.Process, limit int) ([]*spookytypesfacts.ProcessInfo, error) {
-	var processInfos []*spookytypesfacts.ProcessInfo
-
-	for _, p := range processes {
-		memoryPercent, err := p.MemoryPercent()
-		if err != nil {
-			continue
-		}
-
-		name, err := p.Name()
-		if err != nil {
-			continue
-		}
-
-		processInfo := &spookytypesfacts.ProcessInfo{
-			PID:           int(p.Pid),
-			Name:          name,
-			MemoryPercent: float64(memoryPercent),
-		}
-
-		processInfos = append(processInfos, processInfo)
+// collectCustomFacts collects custom facts from /etc/spooky/custom.hcl via SSH
+func (c *SystemFactCollector) collectCustomFacts(ctx context.Context, machine *spookytypes.Machine) (map[string]interface{}, error) {
+	// Check if custom facts file exists
+	exists, err := c.executeSSHCommand(machine, "test -f /etc/spooky/custom.hcl && echo 'exists' || echo 'not_exists'")
+	if err != nil {
+		return nil, fmt.Errorf("failed to check for custom facts: %w", err)
 	}
 
-	// Sort by memory percentage (descending) and take top N
-	// This is a simplified implementation - in a real implementation,
-	// you would sort the slice and take the top N
-
-	if len(processInfos) > limit {
-		processInfos = processInfos[:limit]
+	if strings.TrimSpace(exists) != "exists" {
+		return nil, fmt.Errorf("custom facts file not found")
 	}
 
-	return processInfos, nil
+	// Read custom facts file
+	factsContent, err := c.executeSSHCommand(machine, "cat /etc/spooky/custom.hcl")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read custom facts: %w", err)
+	}
+
+	// Parse HCL content using the HCL parser
+	parser := NewHCLParser()
+	customFacts, err := parser.ParseCustomFacts(factsContent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse custom facts: %w", err)
+	}
+
+	return customFacts, nil
+}
+
+// executeSSHCommand executes a command via SSH on the target machine
+func (c *SystemFactCollector) executeSSHCommand(machine *spookytypes.Machine, command string) (string, error) {
+	ctx := context.Background()
+
+	// Create connection request
+	connectionRequest := &spookytypes.ConnectionRequest{
+		Host: machine.Hostname,
+		Port: machine.Port,
+		User: machine.User,
+	}
+
+	// Establish connection
+	connectionResult, err := c.sshManager.Connect(ctx, connectionRequest)
+	if err != nil {
+		return "", fmt.Errorf("failed to establish SSH connection: %w", err)
+	}
+
+	// Create session
+	session, err := c.sshManager.CreateSession(ctx, connectionResult.Connection)
+	if err != nil {
+		return "", fmt.Errorf("failed to create SSH session: %w", err)
+	}
+
+	// Create SSH command
+	sshCommand := &spookytypes.SSHCommand{
+		Command: command,
+		Timeout: 30 * time.Second,
+	}
+
+	// Run command
+	commandResult, err := c.sshManager.RunCommand(ctx, session, sshCommand)
+	if err != nil {
+		return "", fmt.Errorf("failed to run SSH command: %w", err)
+	}
+
+	if !commandResult.Success {
+		return "", fmt.Errorf("SSH command failed with exit code %d: %s", commandResult.ExitCode, commandResult.Stderr)
+	}
+
+	return commandResult.Stdout, nil
+}
+
+// Helper methods for parsing command output
+
+func (c *SystemFactCollector) parseOSRelease(content string) map[string]string {
+	result := make(map[string]string)
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "=") {
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				key := parts[0]
+				value := strings.Trim(parts[1], "\"")
+				result[key] = value
+			}
+		}
+	}
+	return result
+}
+
+func (c *SystemFactCollector) parseCPUInfo(content string) map[string]string {
+	result := make(map[string]string)
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, ":") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				key := strings.TrimSpace(parts[0])
+				value := strings.TrimSpace(parts[1])
+				result[key] = value
+			}
+		}
+	}
+	return result
+}
+
+func (c *SystemFactCollector) parseMemoryInfo(content string) map[string]int64 {
+	result := make(map[string]int64)
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "Mem:") {
+			parts := strings.Fields(line)
+			if len(parts) >= 7 {
+				var total, used, free, available int64
+				fmt.Sscanf(parts[1], "%d", &total)
+				fmt.Sscanf(parts[2], "%d", &used)
+				fmt.Sscanf(parts[3], "%d", &free)
+				fmt.Sscanf(parts[6], "%d", &available)
+				result["total"] = total
+				result["used"] = used
+				result["free"] = free
+				result["available"] = available
+			}
+		}
+	}
+	return result
+}
+
+func (c *SystemFactCollector) parseDiskInfo(content string) []map[string]interface{} {
+	var result []map[string]interface{}
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "/dev/") {
+			parts := strings.Fields(line)
+			if len(parts) >= 6 {
+				disk := map[string]interface{}{
+					"device":     parts[0],
+					"mountpoint": parts[5],
+					"fstype":     parts[1],
+					"total":      parts[2],
+					"used":       parts[3],
+					"free":       parts[4],
+				}
+				result = append(result, disk)
+			}
+		}
+	}
+	return result
+}
+
+func (c *SystemFactCollector) parseNetworkInfo(content string) map[string]interface{} {
+	result := make(map[string]interface{})
+	// Simplified parsing - would need more sophisticated parsing
+	result["interfaces"] = []string{}
+	result["ip_addresses"] = []string{}
+	result["primary_ip"] = ""
+	return result
 }

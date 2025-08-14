@@ -69,8 +69,11 @@ func (f *Factory) createFactsIntegration() spookyinterfaces.FactsIntegration {
 	logManager := spookylogging.NewLogManager()
 	factsLogger := logManager.GetLogger("facts")
 
+	// Create SSH manager for facts collection
+	sshManager := spookyssh.NewManager(factsLogger)
+
 	// Create facts components
-	collector := spookyfacts.NewSystemFactCollector()
+	collector := spookyfacts.NewSystemFactCollector(sshManager)
 	manager := spookyfacts.NewManager(collector, nil, factsLogger)
 
 	// Create facts integration

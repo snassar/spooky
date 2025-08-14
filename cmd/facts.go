@@ -10,6 +10,7 @@ import (
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
 	spookymachines "spooky/internal/machines"
+	spookyssh "spooky/internal/ssh"
 	spookytypes "spooky/internal/types"
 	spookytypeslogging "spooky/internal/types/logging"
 
@@ -28,8 +29,11 @@ func InitializeFactsDependencies() error {
 	logManager := spookylogging.NewLogManager()
 	factsLogger = logManager.GetLogger("facts")
 
+	// Create SSH manager for facts collection
+	sshManager := spookyssh.NewManager(factsLogger)
+
 	// Initialize facts components
-	collector := spookyfacts.NewSystemFactCollector()
+	collector := spookyfacts.NewSystemFactCollector(sshManager)
 	manager := spookyfacts.NewManager(collector, nil, factsLogger)
 
 	// Create facts integration

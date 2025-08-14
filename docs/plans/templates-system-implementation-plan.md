@@ -13,21 +13,64 @@ This document provides a comprehensive implementation plan for the templates sys
 ### What We Have ✅
 - **Basic template types** in `internal/types/templates/template.go`
 - **Template manager** with basic loading and rendering in `internal/templates/manager.go`
-- **Template integration** implementing `TemplatesIntegration` interface
+- **Template integration** implementing `TemplatesIntegration` interface in `internal/templates/integration.go`
 - **Template schemas** defined in `internal/schemas/schemas/template-structure.schema.hcl`
 - **Template system design documentation** in `docs/plans/template-system-design.md`
 - **Integration manager** that includes `GetTemplatesIntegration()` method
+- **Integration factory** with placeholder for templates integration creation
 
 ### What We Need 🔄
-- **CLI commands** for template management
-- **Enhanced template engine** with Go templates and custom functions
+- **CLI commands** for template management (`cmd/templates.go` missing)
+- **Enhanced template engine** with Go templates and custom functions (currently uses simple string replacement)
 - **Template context management** with facts, variables, and machine data
 - **Template validation** with comprehensive error reporting
 - **Template preview and debugging** capabilities
 - **Template caching** and performance optimization
 - **Template security** and sandboxing
 
+### Critical Issues ❌
+- **Integration factory returns nil** for templates integration in `internal/integration/factory.go`
+- **Template manager uses string replacement** instead of proper Go template engine
+- **No CLI commands** exist for template management
+- **No template context management** system exists
+- **No placeholder implementations** are acceptable - all code must be fully functional
+
 ## Implementation Plan
+
+### Phase 0: Critical Fixes (Immediate)
+
+#### 0.1 Fix Integration Factory
+**File**: `internal/integration/factory.go`
+- **Fix `createTemplatesIntegration()` method** to return proper integration instead of nil
+- **Create template manager instance** with proper logger dependency
+- **Create template integration instance** and return it
+- **Add proper logging** for templates integration creation
+- **Ensure integration manager** can access templates integration
+
+**Implementation** (fully functional, no placeholders):
+```go
+import (
+    spookyinterfaces "spooky/internal/interfaces"
+    spookylogging "spooky/internal/logging"
+    spookytemplates "spooky/internal/templates"
+    spookytypes "spooky/internal/types"
+)
+
+func (f *Factory) createTemplatesIntegration() spookyinterfaces.TemplatesIntegration {
+    // Create log manager for templates
+    logManager := spookylogging.NewLogManager()
+    templatesLogger := logManager.GetLogger("templates")
+
+    // Create templates manager with full functionality
+    manager := spookytemplates.NewManager(templatesLogger)
+
+    // Create templates integration with complete implementation
+    integration := spookytemplates.NewIntegration(manager)
+
+    f.logger.Info("Templates integration created successfully")
+    return integration
+}
+```
 
 ### Phase 1: Core Template Engine Enhancement
 
@@ -38,6 +81,55 @@ This document provides a comprehensive implementation plan for the templates sys
 - **Implement template context creation** with project, facts, machines data
 - **Add template caching** for performance
 - **Implement template validation** with syntax checking and function validation
+
+**Current Implementation Issues**:
+```go
+// CURRENT - Simple string replacement (needs replacement)
+result := template.Content
+for key, value := range data {
+    placeholder := fmt.Sprintf("{{.%s}}", key)
+    result = strings.ReplaceAll(result, placeholder, fmt.Sprintf("%v", value))
+}
+```
+
+**Required Implementation** (complete, no placeholders):
+```go
+// NEW - Proper Go template engine with full functionality
+tmpl, err := template.New(template.ID).Funcs(template.FuncMap{
+    "custom": func(path string) interface{} { 
+        return getNestedValue(data.Custom, path) 
+    },
+    "system": func(path string) interface{} { 
+        return getNestedValue(data.System, path) 
+    },
+    "env": func(key string) string { 
+        return data.Environment[key] 
+    },
+    "var": func(name string) interface{} { 
+        return data.Variables[name] 
+    },
+    "varOrDefault": func(name string, defaultValue interface{}) interface{} {
+        if value, exists := data.Variables[name]; exists {
+            return value
+        }
+        return defaultValue
+    },
+    "machines": func() []Machine {
+        return data.Machines
+    },
+    "machine": func(name string) *Machine {
+        for _, m := range data.Machines {
+            if m.Name == name {
+                return &m
+            }
+        }
+        return nil
+    },
+    "data": func(path string) interface{} {
+        return getNestedValue(data.CustomData, path)
+    }
+}).Parse(template.Content)
+```
 
 #### 1.2 Template Context Management
 **File**: `internal/templates/context.go` (new)
@@ -65,6 +157,43 @@ This document provides a comprehensive implementation plan for the templates sys
 - **Implement `spooky templates preview`** command
 - **Add proper flag handling** and argument validation
 - **Follow established CLI patterns** from other commands
+
+**CLI Structure** (following established patterns):
+```go
+// templatesCmd represents the templates command
+var templatesCmd = &cobra.Command{
+    Use:   "templates",
+    Short: "Manage project templates",
+    Long:  `Manage and render project templates with dynamic data integration.`,
+}
+
+// templatesListCmd represents the templates list command
+var templatesListCmd = &cobra.Command{
+    Use:   "list [project-path]",
+    Short: "List project templates",
+    Long:  `List all templates in the specified project.`,
+    Args:  cobra.ExactArgs(1),
+    RunE:  handleTemplatesList,
+}
+
+// templatesValidateCmd represents the templates validate command
+var templatesValidateCmd = &cobra.Command{
+    Use:   "validate [project-path]",
+    Short: "Validate project templates",
+    Long:  `Validate template syntax and configuration.`,
+    Args:  cobra.ExactArgs(1),
+    RunE:  handleTemplatesValidate,
+}
+
+// templatesRenderCmd represents the templates render command
+var templatesRenderCmd = &cobra.Command{
+    Use:   "render [project-path] [template-path]",
+    Short: "Render a template",
+    Long:  `Render a template with project data and facts.`,
+    Args:  cobra.ExactArgs(2),
+    RunE:  handleTemplatesRender,
+}
+```
 
 #### 2.2 Template Command Handlers
 **File**: `cmd/templates.go` (continued)
@@ -155,10 +284,10 @@ This document provides a comprehensive implementation plan for the templates sys
 
 #### 7.1 Integration Manager Updates
 **File**: `cmd/integrations.go`
-- **Add template integration initialization** to `InitializeIntegrationsDependencies()`
-- **Create template manager instance** with proper dependencies
-- **Register template integration** with integration manager
-- **Add template logging** setup
+- **Template integration initialization** already handled in `InitializeIntegrationsDependencies()`
+- **Template manager instance** creation handled in integration factory
+- **Template integration registration** handled in integration manager
+- **Template logging** setup handled in integration factory
 
 #### 7.2 Template Testing
 **Files**: `internal/templates/*_test.go`
@@ -175,31 +304,37 @@ This document provides a comprehensive implementation plan for the templates sys
 - **Create test data** for template validation
 - **Add template best practices** documentation
 
-## Implementation Order
+## Updated Implementation Order
+
+### Priority 0: Critical Fixes (Immediate)
+1. **Fix integration factory** - Implement proper templates integration creation (fully functional)
+2. **Verify integration manager** - Ensure templates integration is accessible
+3. **Remove all placeholder code** - Replace any "not implemented" or stub functions with complete implementations
+4. **Follow import alias patterns** - Use `spookytemplates` and `spookytypestemplates` consistently
 
 ### Priority 1: Core Functionality
-1. **Enhanced template manager** with Go template engine
-2. **Template context management** with data integration
-3. **Basic CLI commands** (list, validate, render)
-4. **Template validation** with error reporting
+1. **Enhanced template manager** - Replace string replacement with complete Go template engine implementation
+2. **Template context management** - Implement complete context creation and data integration using `spookytypes.TemplatesContext`
+3. **CLI commands** - Create `cmd/templates.go` with fully functional template commands
+4. **Template validation** - Implement comprehensive validation with complete error reporting using `spookytypes.TemplateValidationError`
 
 ### Priority 2: Integration
-1. **Facts integration** for template data access
-2. **Variables integration** for dynamic configuration
-3. **Machines integration** for machine-specific rendering
-4. **Integration manager updates**
+1. **Facts integration** - Complete template data access through facts integration using `spookyinterfaces.FactsIntegration`
+2. **Variables integration** - Complete template data access through variables integration using `spookyinterfaces.VariablesIntegration`
+3. **Machines integration** - Complete machine-specific rendering context using `spookyinterfaces.MachinesIntegration`
+4. **Template error types** - Complete dedicated error types and validation results using `spookytypes.TemplateError`
 
 ### Priority 3: Advanced Features
-1. **Template preview** and analysis
-2. **Template debugging** capabilities
-3. **Template security** and sandboxing
-4. **Template caching** and performance optimization
+1. **Template preview** - Complete template analysis and mock rendering functionality
+2. **Template debugging** - Complete step-by-step rendering and error context functionality
+3. **Template security** - Complete function whitelist and pattern blacklist implementation
+4. **Template caching** - Complete performance optimization with TTL implementation
 
 ### Priority 4: Testing and Documentation
-1. **Comprehensive testing** suite
-2. **Template examples** and documentation
-3. **CLI help** and usage documentation
-4. **Performance benchmarking**
+1. **Comprehensive testing** - Complete unit, integration, and performance test suites
+2. **Template examples** - Complete example templates and documentation
+3. **CLI help** - Complete usage documentation and examples
+4. **Performance benchmarking** - Complete template rendering performance test suite
 
 ## Key Implementation Details
 
@@ -295,11 +430,13 @@ type TemplateContext struct {
 ## Success Criteria
 
 ### Functional Requirements
-- ✅ **Template rendering** works with all data sources
-- ✅ **CLI commands** provide full template management
-- ✅ **Template validation** catches all syntax and security issues
-- ✅ **Template preview** shows accurate analysis and mock rendering
-- ✅ **Integration** works seamlessly with all other systems
+- ✅ **Template rendering** works with all data sources (no placeholder implementations)
+- ✅ **CLI commands** provide complete template management (fully functional)
+- ✅ **Template validation** catches all syntax and security issues (comprehensive implementation)
+- ✅ **Template preview** shows accurate analysis and mock rendering (complete functionality)
+- ✅ **Integration** works seamlessly with all other systems (no stub implementations)
+- ✅ **Import aliases** follow established patterns (`spookytemplates`, `spookytypestemplates`)
+- ✅ **Type safety** maintained through proper interface usage and type composition
 
 ### Performance Requirements
 - ✅ **Template caching** improves rendering performance
@@ -314,27 +451,51 @@ type TemplateContext struct {
 - ✅ **Memory limits** prevent resource exhaustion
 
 ### Quality Requirements
-- ✅ **Comprehensive testing** covers all functionality
-- ✅ **Error handling** provides actionable feedback
-- ✅ **Documentation** is complete and accurate
-- ✅ **Code quality** meets project standards
+- ✅ **Comprehensive testing** covers all functionality (no untested code)
+- ✅ **Error handling** provides actionable feedback (complete error handling)
+- ✅ **Documentation** is complete and accurate (no incomplete documentation)
+- ✅ **Code quality** meets project standards (no placeholder or stub code)
 
 ## Risk Mitigation
 
 ### Technical Risks
-- **Template engine complexity** - Mitigation: Incremental implementation with thorough testing
-- **Performance bottlenecks** - Mitigation: Caching and optimization strategies
-- **Security vulnerabilities** - Mitigation: Comprehensive security validation and sandboxing
-- **Integration issues** - Mitigation: Interface-based design with proper error handling
+- **Template engine complexity** - Mitigation: Complete implementation with thorough testing (no partial implementations)
+- **Performance bottlenecks** - Mitigation: Complete caching and optimization strategies (no placeholder optimizations)
+- **Security vulnerabilities** - Mitigation: Complete security validation and sandboxing (no stub security)
+- **Integration issues** - Mitigation: Complete interface-based design with proper error handling (no incomplete integrations)
 
 ### Implementation Risks
-- **Scope creep** - Mitigation: Strict adherence to implementation phases
-- **Testing complexity** - Mitigation: Comprehensive test scenarios and automation
-- **Performance issues** - Mitigation: Early performance testing and optimization
-- **Integration challenges** - Mitigation: Incremental integration with existing systems
+- **Scope creep** - Mitigation: Strict adherence to implementation phases with complete functionality at each phase
+- **Testing complexity** - Mitigation: Complete test scenarios and automation (no partial testing)
+- **Performance issues** - Mitigation: Complete performance testing and optimization (no placeholder performance)
+- **Integration challenges** - Mitigation: Complete integration with existing systems (no stub integrations)
+
+## Critical Dependencies
+
+### Phase 0 Dependencies
+- **Integration factory fix** must be completed before any other work (fully functional implementation)
+- **Integration manager** must properly initialize templates integration (complete initialization)
+
+### Phase 1 Dependencies
+- **Template manager enhancement** depends on integration factory fix (complete enhancement, no placeholders)
+- **CLI commands** depend on template manager enhancement (fully functional commands)
+- **Template context** depends on facts, variables, and machines integrations (complete context implementation)
+
+### Phase 2 Dependencies
+- **Template validation** depends on template engine implementation (complete validation)
+- **Template error types** depend on validation implementation (complete error handling)
+- **Integration features** depend on context management (complete integration features)
 
 ## Conclusion
 
-This implementation plan provides a comprehensive roadmap for building a robust templates system that integrates seamlessly with the existing spooky architecture. The phased approach ensures that core functionality is delivered first, followed by advanced features and optimizations.
+This updated implementation plan addresses the critical integration issue and provides a clear roadmap for building a robust templates system. The phased approach ensures that core functionality is delivered first, followed by advanced features and optimizations.
+
+**Critical Implementation Principle**: No placeholder implementations are acceptable. Every component must be fully functional and complete before moving to the next phase. This includes:
+- No "not implemented" errors or stub functions
+- No TODO comments without immediate implementation
+- No partial implementations that return errors or empty results
+- Complete functionality at each phase before proceeding
 
 The plan maintains consistency with existing codebase patterns, follows established architectural principles, and provides clear success criteria for implementation validation. By following this plan, the templates system will provide powerful dynamic content generation capabilities while maintaining security, performance, and usability standards.
+
+**Critical Note**: The integration factory fix (Phase 0) must be completed before any other work can proceed effectively, as it's a blocking dependency for all subsequent phases. All implementations must be complete and functional.

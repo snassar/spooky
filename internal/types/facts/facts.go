@@ -7,29 +7,17 @@ import (
 
 // Facts represents the complete facts structure for a machine
 type Facts struct {
-	// System-level facts (from gopsutil)
+	// System facts (from SSH commands - user level)
 	System *SystemFacts `json:"system" hcl:"system"`
 
-	// Enhanced system information
-	Enhanced *EnhancedFacts `json:"enhanced,omitempty" hcl:"enhanced,optional"`
+	// Collector facts (from spooky-collector binary - comprehensive gopsutil coverage)
+	Collector *CollectorFacts `json:"collector,omitempty" hcl:"collector,optional"`
 
-	// Application facts
-	Applications *ApplicationFacts `json:"applications,omitempty" hcl:"applications,optional"`
-
-	// Deployment facts
-	Deployment *DeploymentFacts `json:"deployment,omitempty" hcl:"deployment,optional"`
-
-	// Environment facts
-	Environment *EnvironmentFacts `json:"environment,omitempty" hcl:"environment,optional"`
-
-	// Monitoring facts
-	Monitoring *MonitoringFacts `json:"monitoring,omitempty" hcl:"monitoring,optional"`
-
-	// Custom facts (user-defined)
+	// Custom facts (user-defined from /etc/spooky/custom.hcl)
 	Custom map[string]interface{} `json:"custom,omitempty" hcl:"custom,optional"`
 }
 
-// SystemFacts represents system-level facts from gopsutil
+// SystemFacts represents system-level facts from SSH commands
 type SystemFacts struct {
 	// Operating system facts
 	OS *OSFacts `json:"os" hcl:"os"`
@@ -45,6 +33,48 @@ type SystemFacts struct {
 
 	// Process information
 	Processes *ProcessFacts `json:"processes,omitempty" hcl:"processes,optional"`
+}
+
+// CollectorFacts represents comprehensive system facts from spooky-collector binary
+type CollectorFacts struct {
+	// Host information (gopsutil/host)
+	Host *HostFacts `json:"host,omitempty" hcl:"host,optional"`
+
+	// CPU information (gopsutil/cpu)
+	CPU *CPUFacts `json:"cpu,omitempty" hcl:"cpu,optional"`
+
+	// Memory information (gopsutil/mem)
+	Memory *MemoryFacts `json:"memory,omitempty" hcl:"memory,optional"`
+
+	// Disk information (gopsutil/disk)
+	Disks []*DiskFacts `json:"disks,omitempty" hcl:"disks,optional"`
+
+	// Disk I/O information (gopsutil/disk)
+	DiskIO *DiskIOFacts `json:"disk_io,omitempty" hcl:"disk_io,optional"`
+
+	// Network information (gopsutil/net)
+	Network *NetworkFacts `json:"network,omitempty" hcl:"network,optional"`
+
+	// Process information (gopsutil/process)
+	Processes *ProcessFacts `json:"processes,omitempty" hcl:"processes,optional"`
+
+	// Load average information (gopsutil/load)
+	LoadAverage *LoadAverageFacts `json:"load_average,omitempty" hcl:"load_average,optional"`
+}
+
+// HostFacts represents host information from gopsutil
+type HostFacts struct {
+	Hostname             string `json:"hostname" hcl:"hostname"`
+	Uptime               int64  `json:"uptime" hcl:"uptime"`
+	BootTime             int64  `json:"boot_time" hcl:"boot_time"`
+	OS                   string `json:"os" hcl:"os"`
+	Platform             string `json:"platform" hcl:"platform"`
+	PlatformFamily       string `json:"platform_family" hcl:"platform_family"`
+	PlatformVersion      string `json:"platform_version" hcl:"platform_version"`
+	KernelVersion        string `json:"kernel_version" hcl:"kernel_version"`
+	KernelArch           string `json:"kernel_arch" hcl:"kernel_arch"`
+	VirtualizationSystem string `json:"virtualization_system,omitempty" hcl:"virtualization_system,optional"`
+	VirtualizationRole   string `json:"virtualization_role,omitempty" hcl:"virtualization_role,optional"`
 }
 
 // OSFacts represents operating system facts
