@@ -130,11 +130,54 @@ Use --dry-run to simulate running without making changes.`,
 
 			// Normal running mode
 			fmt.Printf("Running %d actions...\n", len(actions))
-			for _, action := range actions {
-				fmt.Printf("Running action: %s\n", action.Name)
-				// TODO: Implement actual action running
+
+			// Load machines from project for action execution
+			machinesIntegration := getIntegrationManager().GetMachinesIntegration()
+			if machinesIntegration == nil {
+				return fmt.Errorf("machines integration not available")
 			}
-			fmt.Println("Actions completed")
+
+			machines, err := machinesIntegration.LoadMachines(ctx, projectPath)
+			if err != nil {
+				return fmt.Errorf("failed to load machines: %w", err)
+			}
+
+			if len(machines) == 0 {
+				return fmt.Errorf("no machines found in project for action execution")
+			}
+
+			fmt.Printf("Found %d machines for action execution\n", len(machines))
+
+			// Run actions using the actions integration
+			results, err := actionsIntegration.RunActions(ctx, actions, machines)
+			if err != nil {
+				return fmt.Errorf("failed to run actions: %w", err)
+			}
+
+			// Display results
+			fmt.Printf("\n📊 Action Execution Results:\n")
+			fmt.Printf("Total actions executed: %d\n", len(results))
+
+			successCount := 0
+			failureCount := 0
+
+			for _, result := range results {
+				if result.Status == "success" {
+					successCount++
+					fmt.Printf("✅ %s on %s: Success\n", result.ActionName, result.MachineName)
+				} else {
+					failureCount++
+					fmt.Printf("❌ %s on %s: Failed - %s\n", result.ActionName, result.MachineName, result.Error)
+				}
+			}
+
+			fmt.Printf("\n📈 Summary: %d successful, %d failed\n", successCount, failureCount)
+
+			if failureCount > 0 {
+				return fmt.Errorf("action execution completed with %d failures", failureCount)
+			}
+
+			fmt.Println("🎉 All actions completed successfully!")
 			return nil
 		},
 	}

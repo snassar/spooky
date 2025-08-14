@@ -30,7 +30,8 @@ type Action struct {
 	StopOnFailure bool `json:"stop_on_failure" hcl:"stop_on_failure,optional"`
 
 	// Action configuration based on type
-	Command        *CommandConfig        `json:"command" hcl:"command,optional"`
+	CommandString  string                `json:"command_string" hcl:"command,optional"`
+	Command        *CommandConfig        `json:"command" hcl:"command_config,optional"`
 	Script         *ScriptConfig         `json:"script" hcl:"script,optional"`
 	Template       *TemplateConfig       `json:"template" hcl:"template,optional"`
 	FileCopy       *FileCopyConfig       `json:"file_copy" hcl:"file_copy,optional"`

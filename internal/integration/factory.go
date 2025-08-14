@@ -99,6 +99,15 @@ func (f *Factory) createActionsIntegration() spookyinterfaces.ActionsIntegration
 	// Create schema validator with the interface logger
 	schemaValidator := spookyschemas.NewValidator(actionsLoggerInterface)
 
+	// Load schemas from the schemas directory
+	schemasDir := "internal/schemas/schemas"
+	if err := schemaValidator.LoadSchemas(schemasDir); err != nil {
+		f.logger.Error("Failed to load schemas", err, map[string]interface{}{
+			"schemas_dir": schemasDir,
+		})
+		return nil
+	}
+
 	// Create actions integration with the concrete logger type
 	// Dereference the pointer to get the concrete type
 	integration := spookyactions.NewIntegration(*actionsLoggerPtr, nil, sshManager, schemaValidator)

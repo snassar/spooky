@@ -73,9 +73,18 @@ func (m *Manager) loadActionsFromFile(_ context.Context, filePath string) ([]spo
 	}
 
 	// Parse HCL file
-	var actions []spookytypes.Action
-	if err := hclsimple.DecodeFile(filePath, nil, &actions); err != nil {
+	var actionContainer struct {
+		Actions []*spookytypesactions.Action `hcl:"action,block"`
+	}
+	if err := hclsimple.DecodeFile(filePath, nil, &actionContainer); err != nil {
 		return nil, fmt.Errorf("failed to parse HCL content from %s: %w", filePath, err)
+	}
+
+	// Convert to spookytypes.Action slice
+	var actions []spookytypes.Action
+	for _, action := range actionContainer.Actions {
+		// Convert *spookytypesactions.Action to spookytypes.Action
+		actions = append(actions, *action)
 	}
 
 	m.logger.Info("Actions loaded from file", map[string]interface{}{
@@ -414,7 +423,7 @@ func (m *Manager) runCommandAction(ctx context.Context, action *spookytypesactio
 	m.logger.Debug("Running command action via SSH", map[string]interface{}{
 		"action":  action.Name,
 		"machine": machine.Hostname,
-		"command": action.Command,
+		"command": action.CommandString,
 	})
 
 	// Create SSH connection request
@@ -443,13 +452,47 @@ func (m *Manager) runCommandAction(ctx context.Context, action *spookytypesactio
 		return fmt.Errorf("failed to create SSH session for %s: %w", machine.Hostname, err)
 	}
 
+	// Determine command to run
+	var commandToRun string
+	var args []string
+	var workingDir string
+	var environment map[string]string
+	var timeout time.Duration
+
+	if action.CommandString != "" {
+		// Use CommandString if provided
+		commandToRun = action.CommandString
+		workingDir = action.WorkingDir
+		environment = action.Environment
+		timeout = time.Duration(action.Timeout) * time.Second
+	} else if action.Command != nil {
+		// Fall back to Command config if available
+		commandToRun = action.Command.Command
+		args = action.Command.Args
+		workingDir = action.Command.WorkingDir
+		if workingDir == "" {
+			workingDir = action.WorkingDir
+		}
+		environment = action.Command.Environment
+		if environment == nil {
+			environment = action.Environment
+		}
+		if action.Command.Timeout > 0 {
+			timeout = time.Duration(action.Command.Timeout) * time.Second
+		} else {
+			timeout = time.Duration(action.Timeout) * time.Second
+		}
+	} else {
+		return fmt.Errorf("no command specified for action %s", action.Name)
+	}
+
 	// Create SSH command
 	sshCommand := &spookytypes.SSHCommand{
-		Command:       action.Command.Command,
-		Args:          action.Command.Args,
-		WorkingDir:    action.WorkingDir,
-		Environment:   action.Environment,
-		Timeout:       time.Duration(action.Timeout) * time.Second,
+		Command:       commandToRun,
+		Args:          args,
+		WorkingDir:    workingDir,
+		Environment:   environment,
+		Timeout:       timeout,
 		CaptureOutput: true,
 	}
 
