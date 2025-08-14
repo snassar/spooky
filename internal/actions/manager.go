@@ -10,6 +10,7 @@ import (
 
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
+	spookymachines "spooky/internal/machines"
 	spookyschemas "spooky/internal/schemas"
 	spookytypes "spooky/internal/types"
 	spookytypesactions "spooky/internal/types/actions"
@@ -863,12 +864,34 @@ func (m *Manager) populateSessionWithMachineInventory(ctx context.Context, sessi
 }
 
 // loadMachinesFromProject loads machines from a project path
-// This is a helper method that would typically use the machines integration
-func (m *Manager) loadMachinesFromProject(_ context.Context, projectPath string) ([]spookytypes.Machine, error) {
-	// This is a placeholder implementation
-	// In a real implementation, this would use the machines integration
-	// For now, return empty slice to avoid compilation errors
-	return []spookytypes.Machine{}, nil
+// This is a helper method that loads machines from the project's machines.hcl file
+func (m *Manager) loadMachinesFromProject(ctx context.Context, projectPath string) ([]spookytypes.Machine, error) {
+	// Look for machines.hcl file in the project directory
+	machinesHCLPath := filepath.Join(projectPath, "machines.hcl")
+
+	// Check if machines.hcl exists
+	if _, err := os.Stat(machinesHCLPath); os.IsNotExist(err) {
+		m.logger.Debug("No machines.hcl found in project", map[string]interface{}{
+			"project_path": projectPath,
+		})
+		return []spookytypes.Machine{}, nil
+	}
+
+	// Create a machines loader to parse the machines.hcl file
+	loader := spookymachines.NewLoader(&m.logger)
+
+	// Load machines from the machines.hcl file
+	machines, err := loader.LoadMachinesFromFile(ctx, machinesHCLPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load machines from %s: %w", machinesHCLPath, err)
+	}
+
+	m.logger.Debug("Loaded machines from project", map[string]interface{}{
+		"project_path":  projectPath,
+		"machine_count": len(machines),
+	})
+
+	return machines, nil
 }
 
 // machineHasTags checks if a machine has the specified tags
@@ -1249,9 +1272,7 @@ func (m *Manager) manageCrossFileDependencies(ctx context.Context, filePaths []s
 	// Store execution order in dependencies map for later use
 	dependencies["__execution_order__"] = make([]string, 0)
 	for _, level := range executionOrder {
-		for _, action := range level {
-			dependencies["__execution_order__"] = append(dependencies["__execution_order__"], action)
-		}
+		dependencies["__execution_order__"] = append(dependencies["__execution_order__"], level...)
 	}
 
 	m.logger.Info("Cross-file dependencies managed successfully", map[string]interface{}{

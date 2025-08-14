@@ -9,6 +9,7 @@ import (
 	spookyfacts "spooky/internal/facts"
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
+	spookymachines "spooky/internal/machines"
 	spookytypes "spooky/internal/types"
 	spookytypeslogging "spooky/internal/types/logging"
 
@@ -187,9 +188,27 @@ func handleFactsExport(cmd *cobra.Command, projectPath string) error {
 // Helper functions
 
 func loadMachinesFromProject(projectPath string) ([]spookytypes.Machine, error) {
-	// This would load machines from the project's machines.hcl file
-	// For now, return a placeholder implementation
-	return []spookytypes.Machine{}, nil
+	// Create a log manager and get a logger for the machines manager
+	logManager := spookylogging.NewLogManager()
+	logger := logManager.GetLogger("machines")
+
+	// Create a machines loader
+	loader := spookymachines.NewLoader(logger)
+
+	// Create a machines validator
+	validator := spookymachines.NewValidator(logger)
+
+	// Create a machines manager with the loader and validator
+	manager := spookymachines.NewManager(logger, loader, validator)
+
+	// Load machines from the project using the manager
+	// This supports both machines.hcl file and machines/ directory
+	machines, err := manager.LoadMachines(context.Background(), projectPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load machines from project %s: %w", projectPath, err)
+	}
+
+	return machines, nil
 }
 
 func filterMachines(machines []spookytypes.Machine, filter string) []spookytypes.Machine {
@@ -282,7 +301,9 @@ func init() {
 	factsExportCmd.Flags().StringSlice("groups", []string{}, "Filter by groups")
 	factsExportCmd.Flags().Int("parallel", 1, "Number of parallel workers")
 	factsExportCmd.Flags().Bool("verbose", false, "Verbose output")
-	factsExportCmd.MarkFlagRequired("output")
+	if err := factsExportCmd.MarkFlagRequired("output"); err != nil {
+		panic(fmt.Sprintf("failed to mark output flag as required: %v", err))
+	}
 
 	// Add commands to facts command
 	factsCmd.AddCommand(factsExportCmd)

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/hcl/v2/hclparse"
+	"github.com/hashicorp/hcl/v2/hclsimple"
 
 	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesschemas "spooky/internal/types/schemas"
@@ -630,22 +631,37 @@ func (v *EnhancedValidator) shouldStopValidation(result *spookytypesschemas.Vali
 
 // parseHCLData parses HCL data
 func (v *EnhancedValidator) parseHCLData(data []byte, source string) (interface{}, error) {
-	_, diags := v.parser.ParseHCL(data, source)
-	if diags.HasErrors() {
-		return nil, fmt.Errorf("HCL parsing failed: %s", diags.Error())
+	// Use hclsimple to parse the HCL data
+	var result map[string]interface{}
+	err := hclsimple.Decode(source, data, nil, &result)
+	if err != nil {
+		return nil, fmt.Errorf("HCL parsing failed: %w", err)
 	}
-
-	// Convert HCL to a more usable format
-	var result interface{}
-	// Note: This is a simplified implementation
-	// In a real implementation, this would properly decode HCL to a structured format
 	return result, nil
 }
 
 // extractFieldValue extracts a field value from data
 func (v *EnhancedValidator) extractFieldValue(data interface{}, fieldPath string) interface{} {
-	// This is a simplified implementation
-	// In a real implementation, this would properly parse HCL and extract the field value
+	// Handle map[string]interface{} data structure
+	if dataMap, ok := data.(map[string]interface{}); ok {
+		// Simple field path extraction (supports dot notation)
+		parts := strings.Split(fieldPath, ".")
+		current := dataMap
+
+		for _, part := range parts {
+			if val, exists := current[part]; exists {
+				if nestedMap, isMap := val.(map[string]interface{}); isMap {
+					current = nestedMap
+				} else {
+					return val
+				}
+			} else {
+				return nil
+			}
+		}
+		return current
+	}
+
 	return nil
 }
 
@@ -672,9 +688,78 @@ func (v *EnhancedValidator) toFloat64(value interface{}) (float64, bool) {
 
 // evaluateCrossFieldCondition evaluates a cross-field condition
 func (v *EnhancedValidator) evaluateCrossFieldCondition(condition string, fieldValues map[string]interface{}) bool {
-	// This is a simplified implementation
-	// In a real implementation, this would evaluate expressions
-	return true
+	// Simple condition evaluation for common patterns
+	condition = strings.ToLower(strings.TrimSpace(condition))
+
+	// Handle common condition patterns
+	switch {
+	case strings.Contains(condition, "required"):
+		// Check if required fields are present
+		requiredFields := extractRequiredFields(condition)
+		for _, field := range requiredFields {
+			if value, exists := fieldValues[field]; !exists || value == nil || value == "" {
+				return false
+			}
+		}
+		return true
+
+	case strings.Contains(condition, "equals"):
+		// Check if two fields are equal
+		fields := extractFieldNames(condition)
+		if len(fields) >= 2 {
+			val1 := fieldValues[fields[0]]
+			val2 := fieldValues[fields[1]]
+			return fmt.Sprintf("%v", val1) == fmt.Sprintf("%v", val2)
+		}
+		return false
+
+	case strings.Contains(condition, "not_equals"):
+		// Check if two fields are not equal
+		fields := extractFieldNames(condition)
+		if len(fields) >= 2 {
+			val1 := fieldValues[fields[0]]
+			val2 := fieldValues[fields[1]]
+			return fmt.Sprintf("%v", val1) != fmt.Sprintf("%v", val2)
+		}
+		return false
+
+	default:
+		// Default to true for unknown conditions
+		return true
+	}
+}
+
+// Helper functions for condition evaluation
+func extractRequiredFields(condition string) []string {
+	// Simple extraction of field names from "required" conditions
+	// This is a basic implementation - could be enhanced with proper parsing
+	var fields []string
+	if strings.Contains(condition, "(") && strings.Contains(condition, ")") {
+		start := strings.Index(condition, "(")
+		end := strings.LastIndex(condition, ")")
+		if start < end {
+			fieldList := condition[start+1 : end]
+			fields = strings.Split(fieldList, ",")
+			for i, field := range fields {
+				fields[i] = strings.TrimSpace(field)
+			}
+		}
+	}
+	return fields
+}
+
+func extractFieldNames(condition string) []string {
+	// Simple extraction of field names from conditions
+	// This is a basic implementation - could be enhanced with proper parsing
+	var fields []string
+	words := strings.Fields(condition)
+	for _, word := range words {
+		if !strings.Contains(word, "(") && !strings.Contains(word, ")") &&
+			word != "equals" && word != "not_equals" && word != "required" {
+			fields = append(fields, word)
+		}
+	}
+	return fields
 }
 
 // getFileModTime gets file modification time

@@ -11,7 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/hcl/v2/hclwrite"
+	"github.com/zclconf/go-cty/cty"
+
 	spookyinterfaces "spooky/internal/interfaces"
+	spookylogging "spooky/internal/logging"
+	spookyssh "spooky/internal/ssh"
 	spookytypes "spooky/internal/types"
 	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesmachines "spooky/internal/types/machines"
@@ -105,6 +110,158 @@ func (m *Manager) LoadMachines(ctx context.Context, projectPath string) ([]spook
 	})
 
 	return allMachines, nil
+}
+
+// ExportMachines exports machines to HCL format according to machines schema
+func (m *Manager) ExportMachines(ctx context.Context, machines []spookytypes.Machine, outputPath string) error {
+	m.logger.Info("Exporting machines to HCL", map[string]interface{}{
+		"count":       len(machines),
+		"output_path": outputPath,
+	})
+
+	// Create HCL file
+	file := hclwrite.NewEmptyFile()
+	rootBody := file.Body()
+
+	// Create machines block
+	machinesBlock := rootBody.AppendNewBlock("machines", nil)
+	machinesBody := machinesBlock.Body()
+
+	// Add each machine
+	for _, machine := range machines {
+		machineBlock := machinesBody.AppendNewBlock("machine", []string{machine.Hostname})
+		machineBody := machineBlock.Body()
+
+		// Add basic attributes
+		if machine.Host != "" && machine.Host != machine.Hostname {
+			machineBody.SetAttributeValue("host", cty.StringVal(machine.Host))
+		}
+		if machine.Port != 22 {
+			machineBody.SetAttributeValue("port", cty.NumberIntVal(int64(machine.Port)))
+		}
+		if machine.User != "" {
+			machineBody.SetAttributeValue("user", cty.StringVal(machine.User))
+		}
+		if machine.KeyFile != "" {
+			machineBody.SetAttributeValue("key_file", cty.StringVal(machine.KeyFile))
+		}
+		if machine.Password != "" {
+			machineBody.SetAttributeValue("password", cty.StringVal(machine.Password))
+		}
+
+		// Add tags if present
+		if len(machine.Tags) > 0 {
+			tagsMap := make(map[string]cty.Value)
+			for k, v := range machine.Tags {
+				tagsMap[k] = cty.StringVal(v)
+			}
+			machineBody.SetAttributeValue("tags", cty.MapVal(tagsMap))
+		}
+
+		// Add groups if present
+		if len(machine.Groups) > 0 {
+			groupsList := make([]cty.Value, len(machine.Groups))
+			for i, group := range machine.Groups {
+				groupsList[i] = cty.StringVal(group)
+			}
+			machineBody.SetAttributeValue("groups", cty.ListVal(groupsList))
+		}
+
+		// Add roles if present
+		if len(machine.Roles) > 0 {
+			rolesList := make([]cty.Value, len(machine.Roles))
+			for i, role := range machine.Roles {
+				rolesList[i] = cty.StringVal(role)
+			}
+			machineBody.SetAttributeValue("roles", cty.ListVal(rolesList))
+		}
+
+		// Add classes if present
+		if len(machine.Classes) > 0 {
+			classesList := make([]cty.Value, len(machine.Classes))
+			for i, class := range machine.Classes {
+				classesList[i] = cty.StringVal(class)
+			}
+			machineBody.SetAttributeValue("classes", cty.ListVal(classesList))
+		}
+
+		// Add connection settings if different from defaults
+		if machine.ConnectionTimeout != 0 {
+			machineBody.SetAttributeValue("connection_timeout", cty.NumberIntVal(int64(machine.ConnectionTimeout)))
+		}
+		if machine.CommandTimeout != 0 {
+			machineBody.SetAttributeValue("command_timeout", cty.NumberIntVal(int64(machine.CommandTimeout)))
+		}
+		if machine.MaxConnections != 0 {
+			machineBody.SetAttributeValue("max_connections", cty.NumberIntVal(int64(machine.MaxConnections)))
+		}
+		if machine.RetryAttempts != 0 {
+			machineBody.SetAttributeValue("retry_attempts", cty.NumberIntVal(int64(machine.RetryAttempts)))
+		}
+		if machine.RetryDelay != 0 {
+			machineBody.SetAttributeValue("retry_delay", cty.NumberIntVal(int64(machine.RetryDelay)))
+		}
+
+		// Add resources block if present
+		if machine.Resources != nil {
+			resourcesBlock := machineBody.AppendNewBlock("resources", nil)
+			resourcesBody := resourcesBlock.Body()
+
+			if machine.Resources.CPUCores != 0 {
+				resourcesBody.SetAttributeValue("cpu_cores", cty.NumberIntVal(int64(machine.Resources.CPUCores)))
+			}
+			if machine.Resources.MemoryGB != 0 {
+				resourcesBody.SetAttributeValue("memory_gb", cty.NumberIntVal(int64(machine.Resources.MemoryGB)))
+			}
+			if machine.Resources.DiskGB != 0 {
+				resourcesBody.SetAttributeValue("disk_gb", cty.NumberIntVal(int64(machine.Resources.DiskGB)))
+			}
+			if machine.Resources.NetworkSpeed != "" {
+				resourcesBody.SetAttributeValue("network_speed", cty.StringVal(machine.Resources.NetworkSpeed))
+			}
+		}
+
+		// Add metadata block if present
+		if machine.MachineMetadata != nil {
+			metadataBlock := machineBody.AppendNewBlock("metadata", nil)
+			metadataBody := metadataBlock.Body()
+
+			if machine.MachineMetadata.Environment != "" {
+				metadataBody.SetAttributeValue("environment", cty.StringVal(machine.MachineMetadata.Environment))
+			}
+			if machine.MachineMetadata.Location != "" {
+				metadataBody.SetAttributeValue("location", cty.StringVal(machine.MachineMetadata.Location))
+			}
+			if machine.MachineMetadata.Owner != "" {
+				metadataBody.SetAttributeValue("owner", cty.StringVal(machine.MachineMetadata.Owner))
+			}
+			if len(machine.MachineMetadata.CustomFields) > 0 {
+				customFieldsMap := make(map[string]cty.Value)
+				for k, v := range machine.MachineMetadata.CustomFields {
+					customFieldsMap[k] = cty.StringVal(v)
+				}
+				metadataBody.SetAttributeValue("custom_fields", cty.MapVal(customFieldsMap))
+			}
+		}
+	}
+
+	// Ensure output directory exists
+	outputDir := filepath.Dir(outputPath)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	// Write HCL file
+	if err := os.WriteFile(outputPath, file.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write HCL file: %w", err)
+	}
+
+	m.logger.Info("Successfully exported machines to HCL", map[string]interface{}{
+		"output_path": outputPath,
+		"count":       len(machines),
+	})
+
+	return nil
 }
 
 // GetMachineByName looks up a machine by hostname
@@ -305,11 +462,7 @@ func (m *Manager) pingMachine(ctx context.Context, machine spookytypes.Machine) 
 		host = ips[0]
 	}
 
-	// Step 2: ICMP Ping (simulated for now - would need root privileges)
-	// In a real implementation, this would use raw sockets or external ping command
-	icmpReachable := true // Simulated for now
-
-	// Step 3: TCP Port Scan for SSH
+	// Step 2: TCP Port Scan for SSH
 	sshPort := strconv.Itoa(machine.Port)
 	conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, sshPort), 5*time.Second)
 	if err != nil {
@@ -323,18 +476,45 @@ func (m *Manager) pingMachine(ctx context.Context, machine spookytypes.Machine) 
 	}
 	conn.Close()
 
+	// Step 3: SSH Authentication Test (if SSH manager is available)
+	var sshStatus string
+	var sshError string
+
+	// Create SSH manager for authentication testing
+	logManager := spookylogging.NewLogManager()
+	sshLogger := logManager.GetLogger("ssh")
+	sshManager := spookyssh.NewManager(sshLogger)
+
+	// Test SSH connectivity with authentication
+	connectionRequest := &spookytypes.ConnectionRequest{
+		Host:     machine.Host,
+		Port:     machine.Port,
+		User:     machine.User,
+		Password: machine.Password,
+		KeyPath:  machine.KeyFile,
+		Timeout:  10 * time.Second, // Short timeout for ping
+	}
+
+	_, err = sshManager.Connect(ctx, connectionRequest)
+	if err != nil {
+		sshStatus = "ssh_unreachable"
+		sshError = err.Error()
+	} else {
+		sshStatus = "reachable"
+	}
+
 	// Calculate latency
 	latency := int(time.Since(startTime).Milliseconds())
-
-	// Step 4: SSH Authentication (skipped for now as requested)
-	// This would be implemented later when SSH functionality is added
 
 	// Determine final status
 	var status string
 	var errorMsg string
 
-	if icmpReachable && latency > 0 {
+	if sshStatus == "reachable" {
 		status = "online"
+	} else if sshStatus == "ssh_unreachable" {
+		status = "ssh_unreachable"
+		errorMsg = sshError
 	} else {
 		status = "offline"
 		errorMsg = "connectivity check failed"
@@ -522,7 +702,8 @@ func (m *Manager) validateAuthenticationConsistency(machines []spookytypes.Machi
 		if machine.KeyFile != "" {
 			keyBasedCount++
 		}
-		// Note: password authentication is not supported in current implementation
+		// Note: Both password and key-based authentication are supported
+		// Key-based authentication is recommended for security
 	}
 
 	// Recommend key-based authentication for all machines
@@ -754,9 +935,23 @@ func (m *Manager) applyMapFilter(machines []spookytypes.Machine, filter map[stri
 }
 
 // getProjectPathFromContext extracts project path from context
-// This is a placeholder - in a real implementation, this would be properly integrated
 func (m *Manager) getProjectPathFromContext(ctx context.Context) string {
-	// For now, return empty string - this would need to be properly implemented
-	// based on how the context is structured in the application
+	// Check if project path is stored in context
+	if projectPath, ok := ctx.Value("project_path").(string); ok && projectPath != "" {
+		return projectPath
+	}
+
+	// Check if project is stored in context
+	if project, ok := ctx.Value("project").(*spookytypes.Project); ok && project != nil {
+		return project.Path
+	}
+
+	// Check if project path is stored in context with different key
+	if projectPath, ok := ctx.Value("projectPath").(string); ok && projectPath != "" {
+		return projectPath
+	}
+
+	// If no project path found in context, return empty string
+	// This allows callers to handle the case appropriately
 	return ""
 }

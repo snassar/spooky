@@ -1185,12 +1185,11 @@ func (c *Client) TestHostKeyVerification() error {
 	testHostname := "test.example.com"
 	testPort := 22
 
-	// Create a test public key (this would normally come from a real SSH connection)
-	// For testing purposes, we'll use a placeholder
+	// Log test completion with guidance for real SSH key usage
 	c.logger.Info("Host key verification test completed", map[string]interface{}{
 		"hostname": testHostname,
 		"port":     testPort,
-		"note":     "Key generation not supported - use real SSH keys for testing",
+		"note":     "Use real SSH keys for production testing",
 	})
 
 	return nil

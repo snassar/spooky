@@ -5,6 +5,7 @@ package ssh
 import (
 	"context"
 	"fmt"
+	"net"
 	"time"
 
 	spookyinterfaces "spooky/internal/interfaces"
@@ -127,7 +128,7 @@ func (m *Manager) RunCommand(ctx context.Context, session *spookytypes.Session, 
 }
 
 // CreateActingSession creates a new SSH acting session
-func (m *Manager) CreateActingSession(ctx context.Context, connection *spookytypes.Connection) (*spookytypes.ActingSession, error) {
+func (m *Manager) CreateActingSession(ctx context.Context, connection *spookytypes.Connection) (*spookytypesactions.ActingSession, error) {
 	m.logger.Debug("Creating SSH acting session", map[string]interface{}{
 		"host": connection.Host,
 		"port": connection.Port,
@@ -159,10 +160,12 @@ func (m *Manager) RunAction(ctx context.Context, session *spookytypesactions.Act
 		"command":    action.CommandString,
 	})
 
-	// For now, we'll use a placeholder machine from the session
-	// In a real implementation, we would get the machine from the session's machine inventory
+	// Get the target machine from the session's machine inventory
 	var targetMachine *spookytypes.Machine
 	if len(session.MachineInventory) > 0 {
+		// Use the first machine in the inventory for now
+		// In a more sophisticated implementation, this could be based on
+		// action targeting rules or load balancing
 		targetMachine = &session.MachineInventory[0]
 	} else {
 		return &spookytypesactions.ActingResult{
@@ -259,18 +262,31 @@ func (m *Manager) CollectResults(ctx context.Context, sessions []*spookytypesact
 	var results []*spookytypesactions.ActingResult
 
 	for _, session := range sessions {
-		// For now, we'll collect results from completed sessions
-		// In a real implementation, this would poll for results or use callbacks
+		// Collect results from completed sessions
 		if session.Status == "completed" {
-			// This is a placeholder - in a real implementation, we would
-			// collect actual results from the session
+			// Create a result based on session information
 			result := &spookytypesactions.ActingResult{
-				ActionName:  "placeholder",
-				MachineName: "unknown",
+				ActionName:  session.Metadata["action_name"],  // Get from metadata
+				MachineName: session.Metadata["machine_name"], // Get from metadata
 				Status:      "success",
-				StartTime:   time.Now(),
-				EndTime:     time.Now(),
 			}
+
+			// Handle time fields (they are pointers)
+			if session.StartTime != nil {
+				result.StartTime = *session.StartTime
+			} else {
+				result.StartTime = time.Now()
+			}
+
+			if session.EndTime != nil {
+				result.EndTime = *session.EndTime
+				if session.StartTime != nil {
+					result.Duration = session.EndTime.Sub(*session.StartTime)
+				}
+			} else {
+				result.EndTime = time.Now()
+			}
+
 			results = append(results, result)
 		}
 	}
@@ -347,18 +363,30 @@ func (m *Manager) PingMachine(ctx context.Context, machine *spookytypes.Machine)
 
 // testDNSResolution tests DNS resolution for a host
 func (m *Manager) testDNSResolution(host string) error {
-	// This is a placeholder implementation
-	// In a real implementation, this would use net.LookupHost
-	// For now, we'll assume DNS resolution works
+	// Use net.LookupHost to test DNS resolution
+	_, err := net.LookupHost(host)
+	if err != nil {
+		return fmt.Errorf("DNS resolution failed for %s: %w", host, err)
+	}
 	return nil
 }
 
 // testICMPReachability tests ICMP reachability for a host
 func (m *Manager) testICMPReachability(host string) error {
-	// This is a placeholder implementation
-	// In a real implementation, this would use net.DialTimeout with ICMP
-	// For now, we'll assume ICMP is not available
-	return fmt.Errorf("ICMP not implemented")
+	// Use net.DialTimeout to test basic connectivity
+	// This is a lightweight alternative to ICMP ping
+	conn, err := net.DialTimeout("tcp", host+":80", 5*time.Second)
+	if err != nil {
+		// Try port 22 (SSH) as fallback
+		conn, err = net.DialTimeout("tcp", host+":22", 5*time.Second)
+		if err != nil {
+			return fmt.Errorf("connectivity test failed for %s: %w", host, err)
+		}
+	}
+	if conn != nil {
+		conn.Close()
+	}
+	return nil
 }
 
 // TransferFile transfers a file via SSH

@@ -1033,14 +1033,31 @@ func (m *Manager) parseMetadataBlock(block *hcl.Block) (map[string]interface{}, 
 
 // determineUpdateType determines the type of update
 func (m *Manager) determineUpdateType(fromVersion, toVersion string) string {
-	// Simplified version comparison
-	if fromVersion == toVersion {
-		return "none"
+	// Parse semantic versions
+	fromParts := strings.Split(fromVersion, ".")
+	toParts := strings.Split(toVersion, ".")
+
+	if len(fromParts) < 3 || len(toParts) < 3 {
+		// If versions don't follow semantic versioning, assume patch
+		return "patch"
 	}
 
-	// This is a simplified implementation
-	// In a real implementation, you would parse semantic versions
-	return "patch"
+	// Compare major version
+	if fromParts[0] != toParts[0] {
+		return "major"
+	}
+
+	// Compare minor version
+	if fromParts[1] != toParts[1] {
+		return "minor"
+	}
+
+	// Compare patch version
+	if fromParts[2] != toParts[2] {
+		return "patch"
+	}
+
+	return "none"
 }
 
 // calculateComplexityScore calculates a complexity score

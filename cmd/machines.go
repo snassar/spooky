@@ -92,6 +92,26 @@ problematic machines. Use --verbose for detailed output on all machines.`,
 	},
 }
 
+// machinesExportCmd represents the machines export command
+var machinesExportCmd = &cobra.Command{
+	Use:   "export [project-path]",
+	Short: "Export machines to HCL format",
+	Long: `Export machine inventory to HCL format according to machines schema.
+
+This command exports all machines from the project's inventory to a single HCL file
+that follows the machines schema specification. The exported file can be used for
+backup, analysis, or transfer to other systems.
+
+Examples:
+  spooky machines export ./my-project --output machines.hcl
+  spooky machines export ./my-project --machine web-server --output web-server.hcl
+  spooky machines export ./my-project --tags environment=production --output prod-machines.hcl`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return handleMachinesExport(cmd, args[0])
+	},
+}
+
 // handleMachinesList handles listing machines using the MachinesIntegration interface
 func handleMachinesList(projectPath string) error {
 	ctx := context.Background()
@@ -310,6 +330,80 @@ func handleMachinesPing(cmd *cobra.Command, projectPath string) error {
 	}
 }
 
+// handleMachinesExport handles exporting machines using the MachinesIntegration interface
+func handleMachinesExport(cmd *cobra.Command, projectPath string) error {
+	ctx := context.Background()
+
+	// Initialize dependencies if not already done
+	if machinesManager == nil {
+		if err := InitializeMachinesDependencies(); err != nil {
+			return fmt.Errorf("failed to initialize machine dependencies: %w", err)
+		}
+	}
+
+	// Get output path from flags
+	outputPath, err := cmd.Flags().GetString("output")
+	if err != nil {
+		return fmt.Errorf("failed to get output flag: %w", err)
+	}
+	if outputPath == "" {
+		return fmt.Errorf("--output flag is required")
+	}
+
+	// Load machines from project
+	machines, err := machinesManager.LoadMachines(ctx, projectPath)
+	if err != nil {
+		return fmt.Errorf("failed to load machines from project: %w", err)
+	}
+
+	// Apply filters if specified
+	filteredMachines := machines
+
+	// Filter by machine name if specified
+	if machineName, _ := cmd.Flags().GetString("machine"); machineName != "" {
+		var filtered []spookytypes.Machine
+		for _, machine := range machines {
+			if machine.Hostname == machineName {
+				filtered = append(filtered, machine)
+				break
+			}
+		}
+		if len(filtered) == 0 {
+			return fmt.Errorf("machine '%s' not found in project", machineName)
+		}
+		filteredMachines = filtered
+	}
+
+	// Filter by tags if specified
+	if tags, _ := cmd.Flags().GetStringArray("tags"); len(tags) > 0 {
+		taggedMachines, err := machinesManager.GetMachinesByTags(ctx, tags)
+		if err != nil {
+			return fmt.Errorf("failed to filter machines by tags: %w", err)
+		}
+		// Intersect with already filtered machines
+		var intersection []spookytypes.Machine
+		for _, tagged := range taggedMachines {
+			for _, filtered := range filteredMachines {
+				if tagged.Hostname == filtered.Hostname {
+					intersection = append(intersection, tagged)
+					break
+				}
+			}
+		}
+		filteredMachines = intersection
+	}
+
+	// Export machines to HCL
+	if err := machinesManager.ExportMachines(ctx, filteredMachines, outputPath); err != nil {
+		return fmt.Errorf("failed to export machines: %w", err)
+	}
+
+	// Output success message
+	fmt.Printf("✅ Successfully exported %d machines to: %s\n", len(filteredMachines), outputPath)
+
+	return nil
+}
+
 // outputPingResultsText outputs ping results in text format
 func outputPingResultsText(statuses []spookytypes.MachineStatus, verbose bool) error {
 	fmt.Printf("\n📊 Ping Results:\n")
@@ -469,9 +563,15 @@ func init() {
 	machinesPingCmd.Flags().Bool("verbose", false, "Show detailed output for all machines")
 	machinesPingCmd.Flags().Bool("auth", false, "Test authentication in addition to connectivity")
 
+	// Add flags to export command
+	machinesExportCmd.Flags().String("output", "", "Output file path (required)")
+	machinesExportCmd.Flags().String("machine", "", "Export specific machine by hostname")
+	machinesExportCmd.Flags().StringArray("tags", []string{}, "Filter machines by tags (key=value or key-only)")
+
 	// Add machines commands to root
 	machinesCmd.AddCommand(machinesListCmd)
 	machinesCmd.AddCommand(machinesValidateCmd)
 	machinesCmd.AddCommand(machinesPingCmd)
+	machinesCmd.AddCommand(machinesExportCmd)
 	RootCmd.AddCommand(machinesCmd)
 }

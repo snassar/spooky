@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	spookytypes "spooky/internal/types"
 	spookytypesschemas "spooky/internal/types/schemas"
@@ -31,7 +32,8 @@ func (i *Integration) GetManager() interface{} {
 
 // CollectFacts collects facts from the given source
 func (i *Integration) CollectFacts(ctx context.Context, source string) (interface{}, error) {
-	// Create a placeholder machine for local fact collection
+	// Create a machine representation for local fact collection
+	// The source parameter represents the local machine identifier
 	machine := &spookytypes.Machine{
 		Hostname: source,
 		Host:     source,
@@ -147,7 +149,88 @@ func (i *Integration) exportToJSON(facts *FactCollection, outputPath string) err
 
 // exportToHCL exports facts to HCL format
 func (i *Integration) exportToHCL(facts *FactCollection, outputPath string) error {
-	// For now, export as JSON since HCL export is not implemented
-	// In a real implementation, this would convert to HCL format
-	return i.exportToJSON(facts, outputPath)
+	// Convert facts to HCL format
+	hclContent := "fact_collection {\n"
+
+	// Add fact collection metadata
+	if facts.MachineID != "" {
+		hclContent += fmt.Sprintf("  machine_id = \"%s\"\n", facts.MachineID)
+	}
+	hclContent += fmt.Sprintf("  collected_at = \"%s\"\n", facts.CollectedAt.Format(time.RFC3339))
+
+	// Add facts block
+	if facts.Facts != nil {
+		hclContent += "  facts {\n"
+
+		// Add system facts if available
+		if facts.Facts.System != nil {
+			hclContent += "    system {\n"
+			if facts.Facts.System.OS != nil {
+				hclContent += "      os {\n"
+				hclContent += fmt.Sprintf("        name = \"%s\"\n", facts.Facts.System.OS.Name)
+				hclContent += fmt.Sprintf("        version = \"%s\"\n", facts.Facts.System.OS.Version)
+				hclContent += fmt.Sprintf("        arch = \"%s\"\n", facts.Facts.System.OS.Arch)
+				hclContent += fmt.Sprintf("        kernel = \"%s\"\n", facts.Facts.System.OS.Kernel)
+				if facts.Facts.System.OS.Platform != "" {
+					hclContent += fmt.Sprintf("        platform = \"%s\"\n", facts.Facts.System.OS.Platform)
+				}
+				if facts.Facts.System.OS.Family != "" {
+					hclContent += fmt.Sprintf("        family = \"%s\"\n", facts.Facts.System.OS.Family)
+				}
+				hclContent += "      }\n"
+			}
+			hclContent += "    }\n"
+		}
+
+		// Add custom facts if available
+		if len(facts.Facts.Custom) > 0 {
+			hclContent += "    custom {\n"
+			for key, value := range facts.Facts.Custom {
+				switch v := value.(type) {
+				case string:
+					hclContent += fmt.Sprintf("      %s = \"%s\"\n", key, v)
+				case int, int64:
+					hclContent += fmt.Sprintf("      %s = %v\n", key, v)
+				case float64:
+					hclContent += fmt.Sprintf("      %s = %f\n", key, v)
+				case bool:
+					hclContent += fmt.Sprintf("      %s = %t\n", key, v)
+				default:
+					hclContent += fmt.Sprintf("      %s = \"%v\"\n", key, v)
+				}
+			}
+			hclContent += "    }\n"
+		}
+
+		hclContent += "  }\n"
+	}
+
+	// Add metadata if available
+	if len(facts.Metadata) > 0 {
+		hclContent += "  metadata {\n"
+		for key, value := range facts.Metadata {
+			switch v := value.(type) {
+			case string:
+				hclContent += fmt.Sprintf("    %s = \"%s\"\n", key, v)
+			case int, int64:
+				hclContent += fmt.Sprintf("    %s = %v\n", key, v)
+			case float64:
+				hclContent += fmt.Sprintf("    %s = %f\n", key, v)
+			case bool:
+				hclContent += fmt.Sprintf("    %s = %t\n", key, v)
+			default:
+				hclContent += fmt.Sprintf("    %s = \"%v\"\n", key, v)
+			}
+		}
+		hclContent += "  }\n"
+	}
+
+	hclContent += "}\n"
+
+	// Write HCL content to file
+	if err := os.WriteFile(outputPath, []byte(hclContent), 0644); err != nil {
+		return fmt.Errorf("failed to write HCL file: %w", err)
+	}
+
+	return nil
 }

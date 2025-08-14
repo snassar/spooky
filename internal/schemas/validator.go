@@ -865,8 +865,26 @@ func (v *Validator) ListSchemas() []string {
 
 // extractFieldValue extracts a field value from data (simplified)
 func (v *Validator) extractFieldValue(data interface{}, fieldPath string) interface{} {
-	// This is a simplified implementation
-	// In a real implementation, this would parse HCL and extract the field value
+	// Handle map[string]interface{} data structure
+	if dataMap, ok := data.(map[string]interface{}); ok {
+		// Simple field path extraction (supports dot notation)
+		parts := strings.Split(fieldPath, ".")
+		current := dataMap
+
+		for _, part := range parts {
+			if val, exists := current[part]; exists {
+				if nestedMap, isMap := val.(map[string]interface{}); isMap {
+					current = nestedMap
+				} else {
+					return val
+				}
+			} else {
+				return nil
+			}
+		}
+		return current
+	}
+
 	return nil
 }
 
@@ -893,14 +911,106 @@ func (v *Validator) toFloat64(value interface{}) (float64, bool) {
 
 // evaluateCrossFieldCondition evaluates a cross-field condition (simplified)
 func (v *Validator) evaluateCrossFieldCondition(condition string, fieldValues map[string]interface{}) bool {
-	// This is a simplified implementation
-	// In a real implementation, this would evaluate expressions
-	return true
+	// Simple condition evaluation for common patterns
+	condition = strings.ToLower(strings.TrimSpace(condition))
+
+	// Handle common condition patterns
+	switch {
+	case strings.Contains(condition, "required"):
+		// Check if required fields are present
+		// Simple check for required fields
+		words := strings.Fields(condition)
+		for _, word := range words {
+			if word != "required" && !strings.Contains(word, "(") && !strings.Contains(word, ")") {
+				if value, exists := fieldValues[word]; !exists || value == nil || value == "" {
+					return false
+				}
+			}
+		}
+		return true
+
+	case strings.Contains(condition, "equals"):
+		// Check if two fields are equal
+		words := strings.Fields(condition)
+		var fields []string
+		for _, word := range words {
+			if word != "equals" && !strings.Contains(word, "(") && !strings.Contains(word, ")") {
+				fields = append(fields, word)
+			}
+		}
+		if len(fields) >= 2 {
+			val1 := fieldValues[fields[0]]
+			val2 := fieldValues[fields[1]]
+			return fmt.Sprintf("%v", val1) == fmt.Sprintf("%v", val2)
+		}
+		return false
+
+	case strings.Contains(condition, "not_equals"):
+		// Check if two fields are not equal
+		words := strings.Fields(condition)
+		var fields []string
+		for _, word := range words {
+			if word != "not_equals" && !strings.Contains(word, "(") && !strings.Contains(word, ")") {
+				fields = append(fields, word)
+			}
+		}
+		if len(fields) >= 2 {
+			val1 := fieldValues[fields[0]]
+			val2 := fieldValues[fields[1]]
+			return fmt.Sprintf("%v", val1) != fmt.Sprintf("%v", val2)
+		}
+		return false
+
+	default:
+		// Default to true for unknown conditions
+		return true
+	}
 }
 
-// executeCustomValidator executes a custom validator (simplified)
+// executeCustomValidator executes a custom validator
 func (v *Validator) executeCustomValidator(validator string, data interface{}) error {
-	// This is a simplified implementation
-	// In a real implementation, this would execute custom validation logic
-	return nil
+	// Custom validator implementation supporting common validation rules
+
+	switch validator {
+	case "required":
+		// Check if data is not empty
+		if data == nil {
+			return fmt.Errorf("field is required")
+		}
+		if str, ok := data.(string); ok && str == "" {
+			return fmt.Errorf("field cannot be empty")
+		}
+		return nil
+
+	case "email":
+		// Basic email validation
+		if str, ok := data.(string); ok {
+			if !strings.Contains(str, "@") {
+				return fmt.Errorf("invalid email format")
+			}
+		}
+		return nil
+
+	case "url":
+		// Basic URL validation
+		if str, ok := data.(string); ok {
+			if !strings.HasPrefix(str, "http://") && !strings.HasPrefix(str, "https://") {
+				return fmt.Errorf("invalid URL format")
+			}
+		}
+		return nil
+
+	case "positive":
+		// Check if numeric value is positive
+		if num, ok := data.(float64); ok {
+			if num <= 0 {
+				return fmt.Errorf("value must be positive")
+			}
+		}
+		return nil
+
+	default:
+		// Unknown validator - return success
+		return nil
+	}
 }

@@ -260,8 +260,24 @@ func (lm *LogManager) createReplacer() *strings.Replacer {
 
 // Flush flushes all pending log entries
 func (lm *LogManager) Flush() error {
-	// For now, no buffering, so nothing to flush
-	// In the future, this could flush buffered writers
+	lm.mutex.Lock()
+	defer lm.mutex.Unlock()
+
+	// Flush any buffered writers
+	if lm.outputFile != nil {
+		// Sync the file to ensure all data is written to disk
+		if err := lm.outputFile.Sync(); err != nil {
+			return fmt.Errorf("failed to sync output file: %w", err)
+		}
+	}
+
+	// Flush any buffered loggers
+	for _, logger := range lm.loggers {
+		// For now, individual loggers don't need flushing
+		// The slog logger handles its own buffering
+		_ = logger // Use logger to avoid unused variable warning
+	}
+
 	return nil
 }
 
@@ -577,13 +593,79 @@ func (h *StructuredHandler) buildLogEntry(r slog.Record) *spookytypeslogging.Log
 
 // formatEntry formats a log entry according to configuration
 func (h *StructuredHandler) formatEntry(entry *spookytypeslogging.LogEntry) string {
-	// For now, return JSON format
-	// In a full implementation, you'd implement custom formatting based on config
-	return fmt.Sprintf(`{"timestamp":"%s","level":"%s","message":"%s","fields":%v}`,
+	// Use default JSON format since format is not available in LogStructuredConfig
+	// The format is typically set in the main LogConfig
+	format := "json" // default format
+
+	switch format {
+	case "json":
+		return h.formatJSON(entry)
+	case "text":
+		return h.formatText(entry)
+	case "logfmt":
+		return h.formatLogfmt(entry)
+	default:
+		return h.formatJSON(entry)
+	}
+}
+
+// formatJSON formats entry as JSON
+func (h *StructuredHandler) formatJSON(entry *spookytypeslogging.LogEntry) string {
+	// Simple JSON formatting
+	fieldsJSON := "{}"
+	if len(entry.Fields) > 0 {
+		// Convert fields to JSON string (simplified)
+		var pairs []string
+		for k, v := range entry.Fields {
+			pairs = append(pairs, fmt.Sprintf(`"%s":"%v"`, k, v))
+		}
+		fieldsJSON = "{" + strings.Join(pairs, ",") + "}"
+	}
+
+	return fmt.Sprintf(`{"timestamp":"%s","level":"%s","message":"%s","fields":%s}`,
 		entry.Timestamp.Format(time.RFC3339),
 		entry.Level,
 		entry.Message,
-		entry.Fields)
+		fieldsJSON)
+}
+
+// formatText formats entry as human-readable text
+func (h *StructuredHandler) formatText(entry *spookytypeslogging.LogEntry) string {
+	fields := ""
+	if len(entry.Fields) > 0 {
+		var pairs []string
+		for k, v := range entry.Fields {
+			pairs = append(pairs, fmt.Sprintf("%s=%v", k, v))
+		}
+		fields = " " + strings.Join(pairs, " ")
+	}
+
+	return fmt.Sprintf("%s [%s] %s%s",
+		entry.Timestamp.Format("2006-01-02T15:04:05Z07:00"),
+		strings.ToUpper(string(entry.Level)),
+		entry.Message,
+		fields)
+}
+
+// formatLogfmt formats entry in logfmt format
+func (h *StructuredHandler) formatLogfmt(entry *spookytypeslogging.LogEntry) string {
+	var pairs []string
+
+	// Add timestamp
+	pairs = append(pairs, fmt.Sprintf("time=%s", entry.Timestamp.Format(time.RFC3339)))
+
+	// Add level
+	pairs = append(pairs, fmt.Sprintf("level=%s", strings.ToLower(string(entry.Level))))
+
+	// Add message
+	pairs = append(pairs, fmt.Sprintf("msg=%q", entry.Message))
+
+	// Add fields
+	for k, v := range entry.Fields {
+		pairs = append(pairs, fmt.Sprintf("%s=%v", k, v))
+	}
+
+	return strings.Join(pairs, " ")
 }
 
 // parseOctalPermissions parses octal permissions string

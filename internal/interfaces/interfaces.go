@@ -250,6 +250,9 @@ type MachinesIntegration interface {
 	// PingMachines pings machines to check connectivity
 	PingMachines(ctx context.Context, machines []spookytypes.Machine) ([]spookytypes.MachineStatus, error)
 
+	// ExportMachines exports machines to HCL format according to machines schema
+	ExportMachines(ctx context.Context, machines []spookytypes.Machine, outputPath string) error
+
 	// GetMachineByName looks up a machine by hostname
 	GetMachineByName(ctx context.Context, name string) (*spookytypes.Machine, error)
 

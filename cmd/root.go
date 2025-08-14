@@ -63,4 +63,7 @@ func init() {
 	// Set version template - only show version string
 	RootCmd.SetVersionTemplate(fmt.Sprintf(`%s
 `, Version))
+
+	// Add completion commands
+	RootCmd.AddCommand(completionCmd)
 }
