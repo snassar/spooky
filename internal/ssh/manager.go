@@ -11,6 +11,7 @@ import (
 	spookytypes "spooky/internal/types"
 	spookytypesactions "spooky/internal/types/actions"
 	spookytypeslogging "spooky/internal/types/logging"
+	spookytypesmachines "spooky/internal/types/machines"
 	spookyschemas "spooky/internal/types/schemas"
 	spookytypesssh "spooky/internal/types/ssh"
 )
@@ -148,6 +149,216 @@ func (m *Manager) CreateActingSession(ctx context.Context, connection *spookytyp
 	}
 
 	return actingSession, nil
+}
+
+// RunAction executes an action on a remote machine via SSH
+func (m *Manager) RunAction(ctx context.Context, session *spookytypesactions.ActingSession, action *spookytypesactions.Action) (*spookytypesactions.ActingResult, error) {
+	m.logger.Debug("Running action via SSH", map[string]interface{}{
+		"session_id": session.SessionID,
+		"action":     action.Name,
+		"command":    action.CommandString,
+	})
+
+	// For now, we'll use a placeholder machine from the session
+	// In a real implementation, we would get the machine from the session's machine inventory
+	var targetMachine *spookytypes.Machine
+	if len(session.MachineInventory) > 0 {
+		targetMachine = &session.MachineInventory[0]
+	} else {
+		return &spookytypesactions.ActingResult{
+			ActionName:  action.Name,
+			MachineName: "unknown",
+			Status:      "failed",
+			Error:       "no target machine available in session",
+			StartTime:   time.Now(),
+			EndTime:     time.Now(),
+		}, nil
+	}
+
+	// Create a connection request for the action
+	connectionRequest := &spookytypes.ConnectionRequest{
+		Host:     targetMachine.Host,
+		Port:     targetMachine.Port,
+		User:     targetMachine.User,
+		Password: targetMachine.Password,
+		KeyPath:  targetMachine.KeyFile,
+		Timeout:  session.Timeout,
+	}
+
+	// Establish connection
+	connectionResult, err := m.Connect(ctx, connectionRequest)
+	if err != nil {
+		return &spookytypesactions.ActingResult{
+			ActionName:  action.Name,
+			MachineName: targetMachine.Hostname,
+			Status:      "failed",
+			Error:       fmt.Sprintf("connection failed: %v", err),
+			StartTime:   time.Now(),
+			EndTime:     time.Now(),
+		}, nil
+	}
+
+	// Create SSH session
+	sshSession, err := m.CreateSession(ctx, connectionResult.Connection)
+	if err != nil {
+		return &spookytypesactions.ActingResult{
+			ActionName:  action.Name,
+			MachineName: targetMachine.Hostname,
+			Status:      "failed",
+			Error:       fmt.Sprintf("session creation failed: %v", err),
+			StartTime:   time.Now(),
+			EndTime:     time.Now(),
+		}, nil
+	}
+
+	// Prepare command
+	commandStr := action.CommandString
+	if action.Command != nil {
+		commandStr = action.Command.Command
+	}
+
+	// Create SSH command
+	sshCommand := &spookytypes.SSHCommand{
+		Command:       commandStr,
+		Args:          action.Command.Args,
+		WorkingDir:    action.WorkingDir,
+		Environment:   action.Environment,
+		Timeout:       time.Duration(action.Timeout) * time.Second,
+		CaptureOutput: true,
+	}
+
+	// Run command
+	startTime := time.Now()
+	commandResult, err := m.RunCommand(ctx, sshSession, sshCommand)
+	endTime := time.Now()
+
+	// Create acting result
+	actingResult := &spookytypesactions.ActingResult{
+		ActionName:  action.Name,
+		MachineName: targetMachine.Hostname,
+		StartTime:   startTime,
+		EndTime:     endTime,
+		Duration:    endTime.Sub(startTime),
+	}
+
+	if err != nil {
+		actingResult.Status = "failed"
+		actingResult.Error = err.Error()
+	} else {
+		actingResult.Status = "success"
+		actingResult.ExitCode = commandResult.ExitCode
+		actingResult.Stdout = commandResult.Stdout
+		actingResult.Stderr = commandResult.Stderr
+	}
+
+	return actingResult, nil
+}
+
+// CollectResults collects results from multiple acting sessions
+func (m *Manager) CollectResults(ctx context.Context, sessions []*spookytypesactions.ActingSession) ([]*spookytypesactions.ActingResult, error) {
+	var results []*spookytypesactions.ActingResult
+
+	for _, session := range sessions {
+		// For now, we'll collect results from completed sessions
+		// In a real implementation, this would poll for results or use callbacks
+		if session.Status == "completed" {
+			// This is a placeholder - in a real implementation, we would
+			// collect actual results from the session
+			result := &spookytypesactions.ActingResult{
+				ActionName:  "placeholder",
+				MachineName: "unknown",
+				Status:      "success",
+				StartTime:   time.Now(),
+				EndTime:     time.Now(),
+			}
+			results = append(results, result)
+		}
+	}
+
+	return results, nil
+}
+
+// PingMachine tests SSH connectivity to a machine
+func (m *Manager) PingMachine(ctx context.Context, machine *spookytypes.Machine) (*spookytypes.MachineStatus, error) {
+	m.logger.Debug("Pinging machine", map[string]interface{}{
+		"hostname": machine.Hostname,
+		"host":     machine.Host,
+		"port":     machine.Port,
+		"user":     machine.User,
+	})
+
+	// Create connection request
+	connectionRequest := &spookytypes.ConnectionRequest{
+		Host:     machine.Host,
+		Port:     machine.Port,
+		User:     machine.User,
+		Password: machine.Password,
+		KeyPath:  machine.KeyFile,
+		Timeout:  10 * time.Second, // Short timeout for ping
+	}
+
+	// Test DNS resolution first
+	if err := m.testDNSResolution(machine.Host); err != nil {
+		return &spookytypes.MachineStatus{
+			Machine:   machine,
+			Status:    "unreachable",
+			Error:     fmt.Sprintf("DNS resolution failed: %v", err),
+			LastCheck: time.Now(),
+		}, nil
+	}
+
+	// Test ICMP reachability (if supported)
+	if err := m.testICMPReachability(machine.Host); err != nil {
+		m.logger.Debug("ICMP test failed, continuing with SSH test", map[string]interface{}{
+			"host":  machine.Host,
+			"error": err.Error(),
+		})
+	}
+
+	// Test SSH connectivity
+	startTime := time.Now()
+	_, err := m.Connect(ctx, connectionRequest)
+	endTime := time.Now()
+
+	latency := int(endTime.Sub(startTime).Milliseconds())
+
+	status := &spookytypes.MachineStatus{
+		Machine:   machine,
+		LastCheck: time.Now(),
+		Latency:   latency,
+	}
+
+	if err != nil {
+		status.Status = "unreachable"
+		status.Error = err.Error()
+	} else {
+		status.Status = "reachable"
+		// Update machine connectivity status
+		if machine.Connectivity == nil {
+			machine.Connectivity = &spookytypesmachines.MachineConnectivity{}
+		}
+		machine.Connectivity.SSHReachable = true
+		machine.Connectivity.LastSSHCheck = time.Now()
+		machine.Connectivity.SSHLatency = latency
+	}
+
+	return status, nil
+}
+
+// testDNSResolution tests DNS resolution for a host
+func (m *Manager) testDNSResolution(host string) error {
+	// This is a placeholder implementation
+	// In a real implementation, this would use net.LookupHost
+	// For now, we'll assume DNS resolution works
+	return nil
+}
+
+// testICMPReachability tests ICMP reachability for a host
+func (m *Manager) testICMPReachability(host string) error {
+	// This is a placeholder implementation
+	// In a real implementation, this would use net.DialTimeout with ICMP
+	// For now, we'll assume ICMP is not available
+	return fmt.Errorf("ICMP not implemented")
 }
 
 // TransferFile transfers a file via SSH

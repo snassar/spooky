@@ -123,7 +123,11 @@ Use --dry-run to simulate running without making changes.`,
 			if isFlagSet(cmd, "dry-run") {
 				fmt.Println("Simulating running...")
 				for _, action := range actions {
-					fmt.Printf("[%s] Would run: %s\n", action.Name, action.Command)
+					commandStr := action.CommandString
+					if action.Command != nil {
+						commandStr = action.Command.Command
+					}
+					fmt.Printf("[%s] Would run: %s\n", action.Name, commandStr)
 				}
 				return nil
 			}
