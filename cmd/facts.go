@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	spookyfacts "spooky/internal/facts"
 	spookyinterfaces "spooky/internal/interfaces"
@@ -118,43 +119,8 @@ func handleFactsExport(cmd *cobra.Command, projectPath string) error {
 		})
 	}
 
-	// Collect facts from each machine
-	successCount := 0
-	errorCount := 0
-
-	for _, machine := range machines {
-		if verbose {
-			factsLogger.Info("Collecting facts for export", map[string]interface{}{
-				"machine": machine.Hostname,
-			})
-		}
-
-		// Collect facts using the integration
-		facts, err := factsManager.CollectFacts(ctx, machine.Hostname)
-		if err != nil {
-			errorCount++
-			factsLogger.Error("Failed to collect facts for export", err, map[string]interface{}{
-				"machine": machine.Hostname,
-			})
-			continue
-		}
-
-		// Store facts
-		if err := factsManager.StoreFacts(ctx, facts); err != nil {
-			errorCount++
-			factsLogger.Error("Failed to store facts for export", err, map[string]interface{}{
-				"machine": machine.Hostname,
-			})
-			continue
-		}
-
-		successCount++
-		if verbose {
-			factsLogger.Info("Successfully collected facts for export", map[string]interface{}{
-				"machine": machine.Hostname,
-			})
-		}
-	}
+	// Collect facts from machines in parallel
+	successCount, errorCount := collectFactsParallel(ctx, machines, factsManager, parallel, verbose, factsLogger)
 
 	if verbose {
 		fmt.Printf("Fact collection completed:\n")
@@ -293,6 +259,68 @@ func matchesGroupsFilter(machine spookytypes.Machine, groupsFilter []string) boo
 	}
 
 	return false
+}
+
+// collectFactsParallel collects facts from multiple machines in parallel
+func collectFactsParallel(ctx context.Context, machines []spookytypes.Machine, factsManager spookyinterfaces.FactsIntegration, parallel int, verbose bool, logger spookytypeslogging.Logger) (int, int) {
+	successCount := 0
+	errorCount := 0
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	// Create semaphore for parallel execution
+	semaphore := make(chan struct{}, parallel)
+
+	for _, machine := range machines {
+		wg.Add(1)
+		go func(m spookytypes.Machine) {
+			defer wg.Done()
+			semaphore <- struct{}{}        // Acquire
+			defer func() { <-semaphore }() // Release
+
+			if verbose {
+				logger.Info("Collecting facts for export", map[string]interface{}{
+					"machine": m.Hostname,
+				})
+			}
+
+			// Collect facts using the integration with actual machine object
+			facts, err := factsManager.CollectFacts(ctx, &m)
+			if err != nil {
+				mu.Lock()
+				errorCount++
+				mu.Unlock()
+				logger.Error("Failed to collect facts for export", err, map[string]interface{}{
+					"machine": m.Hostname,
+				})
+				return
+			}
+
+			// Store facts
+			if err := factsManager.StoreFacts(ctx, facts); err != nil {
+				mu.Lock()
+				errorCount++
+				mu.Unlock()
+				logger.Error("Failed to store facts for export", err, map[string]interface{}{
+					"machine": m.Hostname,
+				})
+				return
+			}
+
+			mu.Lock()
+			successCount++
+			mu.Unlock()
+
+			if verbose {
+				logger.Info("Successfully collected facts for export", map[string]interface{}{
+					"machine": m.Hostname,
+				})
+			}
+		}(machine)
+	}
+
+	wg.Wait()
+	return successCount, errorCount
 }
 
 func init() {

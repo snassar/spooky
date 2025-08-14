@@ -30,21 +30,16 @@ func (i *Integration) GetManager() interface{} {
 	return i.manager
 }
 
-// CollectFacts collects facts from the given source
-func (i *Integration) CollectFacts(ctx context.Context, source string) (interface{}, error) {
-	// Create a machine representation for local fact collection
-	// The source parameter represents the local machine identifier
-	machine := &spookytypes.Machine{
-		Hostname: source,
-		Host:     source,
-		Port:     22,
-		User:     "root",
+// CollectFacts collects facts from the given machine
+func (i *Integration) CollectFacts(ctx context.Context, machine *spookytypes.Machine) (interface{}, error) {
+	if machine == nil {
+		return nil, fmt.Errorf("machine cannot be nil")
 	}
 
-	// Collect facts using the manager
+	// Collect facts using the manager with actual machine configuration
 	facts, err := i.manager.CollectFacts(ctx, machine)
 	if err != nil {
-		return nil, fmt.Errorf("failed to collect facts from %s: %w", source, err)
+		return nil, fmt.Errorf("failed to collect facts from %s: %w", machine.Hostname, err)
 	}
 
 	return facts, nil

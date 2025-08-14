@@ -12,6 +12,7 @@ import (
 	spookyinterfaces "spooky/internal/interfaces"
 	spookytypes "spooky/internal/types"
 	spookytypesfacts "spooky/internal/types/facts"
+	spookytypesssh "spooky/internal/types/ssh"
 )
 
 // SystemFactCollector collects system facts using SSH commands
@@ -359,57 +360,60 @@ func (c *SystemFactCollector) collectProcessFacts(machine *spookytypes.Machine) 
 	}, nil
 }
 
-// collectCollectorFacts collects facts from spooky-collector binary via SSH
+// collectCollectorFacts collects facts from spooky-collector binary
 func (c *SystemFactCollector) collectCollectorFacts(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.CollectorFacts, error) {
-	// Check if spooky-collector facts file exists
-	exists, err := c.executeSSHCommand(machine, "test -f /etc/spooky/facts.hcl && echo 'exists' || echo 'not_exists'")
+	// Check if collector facts file exists
+	checkCmd := "test -f /etc/spooky/facts.hcl && echo 'exists' || echo 'not_found'"
+	result, err := c.executeSSHCommand(machine, checkCmd)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check for collector facts: %w", err)
+		return nil, fmt.Errorf("failed to check collector facts file on %s: %w", machine.Hostname, err)
 	}
 
-	if strings.TrimSpace(exists) != "exists" {
-		return nil, fmt.Errorf("collector facts file not found")
+	if strings.TrimSpace(result) == "not_found" {
+		return nil, fmt.Errorf("collector facts file not found on %s: /etc/spooky/facts.hcl", machine.Hostname)
 	}
 
 	// Read collector facts file
 	factsContent, err := c.executeSSHCommand(machine, "cat /etc/spooky/facts.hcl")
 	if err != nil {
-		return nil, fmt.Errorf("failed to read collector facts: %w", err)
+		return nil, fmt.Errorf("failed to read collector facts from %s: %w", machine.Hostname, err)
 	}
 
 	// Parse HCL content using the HCL parser
 	parser := NewHCLParser()
 	collectorFacts, err := parser.ParseCollectorFacts(factsContent)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse collector facts: %w", err)
+		return nil, fmt.Errorf("failed to parse collector facts from %s: %w", machine.Hostname, err)
 	}
 
 	return collectorFacts, nil
 }
 
-// collectCustomFacts collects custom facts from /etc/spooky/custom.hcl via SSH
+// collectCustomFacts collects custom facts from HCL files
 func (c *SystemFactCollector) collectCustomFacts(ctx context.Context, machine *spookytypes.Machine) (map[string]interface{}, error) {
-	// Check if custom facts file exists
-	exists, err := c.executeSSHCommand(machine, "test -f /etc/spooky/custom.hcl && echo 'exists' || echo 'not_exists'")
+	// Check if custom facts file exists (optional)
+	checkCmd := "test -f /etc/spooky/custom.hcl && echo 'exists' || echo 'not_found'"
+	result, err := c.executeSSHCommand(machine, checkCmd)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check for custom facts: %w", err)
+		return nil, fmt.Errorf("failed to check custom facts file on %s: %w", machine.Hostname, err)
 	}
 
-	if strings.TrimSpace(exists) != "exists" {
-		return nil, fmt.Errorf("custom facts file not found")
+	if strings.TrimSpace(result) == "not_found" {
+		// Custom facts are optional, return empty map
+		return make(map[string]interface{}), nil
 	}
 
 	// Read custom facts file
 	factsContent, err := c.executeSSHCommand(machine, "cat /etc/spooky/custom.hcl")
 	if err != nil {
-		return nil, fmt.Errorf("failed to read custom facts: %w", err)
+		return nil, fmt.Errorf("failed to read custom facts from %s: %w", machine.Hostname, err)
 	}
 
 	// Parse HCL content using the HCL parser
 	parser := NewHCLParser()
 	customFacts, err := parser.ParseCustomFacts(factsContent)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse custom facts: %w", err)
+		return nil, fmt.Errorf("failed to parse custom facts from %s: %w", machine.Hostname, err)
 	}
 
 	return customFacts, nil
@@ -419,23 +423,28 @@ func (c *SystemFactCollector) collectCustomFacts(ctx context.Context, machine *s
 func (c *SystemFactCollector) executeSSHCommand(machine *spookytypes.Machine, command string) (string, error) {
 	ctx := context.Background()
 
-	// Create connection request
+	// Create connection request with actual machine configuration
 	connectionRequest := &spookytypes.ConnectionRequest{
-		Host: machine.Hostname,
-		Port: machine.Port,
-		User: machine.User,
+		Host:       machine.Hostname,
+		Port:       machine.Port,
+		User:       machine.User,
+		Password:   machine.Password,
+		KeyPath:    machine.KeyFile,
+		Passphrase: machine.Passphrase,
+		AuthMethod: spookytypesssh.AuthMethodPublicKey, // Default to public key
+		Timeout:    30 * time.Second,
 	}
 
 	// Establish connection
 	connectionResult, err := c.sshManager.Connect(ctx, connectionRequest)
 	if err != nil {
-		return "", fmt.Errorf("failed to establish SSH connection: %w", err)
+		return "", fmt.Errorf("failed to establish SSH connection to %s: %w", machine.Hostname, err)
 	}
 
 	// Create session
 	session, err := c.sshManager.CreateSession(ctx, connectionResult.Connection)
 	if err != nil {
-		return "", fmt.Errorf("failed to create SSH session: %w", err)
+		return "", fmt.Errorf("failed to create SSH session on %s: %w", machine.Hostname, err)
 	}
 
 	// Create SSH command
@@ -447,14 +456,62 @@ func (c *SystemFactCollector) executeSSHCommand(machine *spookytypes.Machine, co
 	// Run command
 	commandResult, err := c.sshManager.RunCommand(ctx, session, sshCommand)
 	if err != nil {
-		return "", fmt.Errorf("failed to run SSH command: %w", err)
+		return "", fmt.Errorf("failed to run SSH command on %s: %w", machine.Hostname, err)
 	}
 
 	if !commandResult.Success {
-		return "", fmt.Errorf("SSH command failed with exit code %d: %s", commandResult.ExitCode, commandResult.Stderr)
+		return "", fmt.Errorf("SSH command failed on %s with exit code %d: %s",
+			machine.Hostname, commandResult.ExitCode, commandResult.Stderr)
 	}
 
 	return commandResult.Stdout, nil
+}
+
+// FactCollectionError represents fact collection errors
+type FactCollectionError struct {
+	Machine     string
+	ErrorType   string
+	Message     string
+	Recoverable bool
+}
+
+func (e *FactCollectionError) Error() string {
+	return fmt.Sprintf("fact collection error on %s (%s): %s", e.Machine, e.ErrorType, e.Message)
+}
+
+// classifyError classifies fact collection errors
+func classifyError(machine string, err error) *FactCollectionError {
+	if err == nil {
+		return nil
+	}
+
+	errorType := "unknown"
+	recoverable := false
+
+	switch {
+	case strings.Contains(err.Error(), "connection refused"):
+		errorType = "ssh_connection"
+		recoverable = false
+	case strings.Contains(err.Error(), "authentication failed"):
+		errorType = "ssh_auth"
+		recoverable = false
+	case strings.Contains(err.Error(), "permission denied"):
+		errorType = "permission"
+		recoverable = true
+	case strings.Contains(err.Error(), "file not found"):
+		errorType = "file_not_found"
+		recoverable = true
+	case strings.Contains(err.Error(), "timeout"):
+		errorType = "timeout"
+		recoverable = true
+	}
+
+	return &FactCollectionError{
+		Machine:     machine,
+		ErrorType:   errorType,
+		Message:     err.Error(),
+		Recoverable: recoverable,
+	}
 }
 
 // Helper methods for parsing command output

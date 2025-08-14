@@ -119,7 +119,13 @@ func TestIntegration_CollectFacts(t *testing.T) {
 	integration := NewIntegration(mockManager)
 
 	ctx := context.Background()
-	facts, err := integration.CollectFacts(ctx, "test-machine")
+	testMachine := &spookytypes.Machine{
+		Hostname: "test-machine",
+		Host:     "test-machine",
+		Port:     22,
+		User:     "testuser",
+	}
+	facts, err := integration.CollectFacts(ctx, testMachine)
 
 	if err != nil {
 		t.Fatalf("CollectFacts failed: %v", err)

@@ -148,8 +148,8 @@ type CLIManager interface {
 
 // FactsIntegration provides fact collection and memory storage
 type FactsIntegration interface {
-	// CollectFacts collects facts from the given source
-	CollectFacts(ctx context.Context, source string) (interface{}, error)
+	// CollectFacts collects facts from the given machine
+	CollectFacts(ctx context.Context, machine *spookytypes.Machine) (interface{}, error)
 
 	// StoreFacts stores facts in memory
 	StoreFacts(ctx context.Context, facts interface{}) error
