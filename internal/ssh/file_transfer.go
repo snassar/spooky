@@ -28,7 +28,6 @@ import (
 type FileTransferManager struct {
 	client *Client
 	logger spookytypeslogging.Logger
-	mu     sync.RWMutex
 }
 
 // NewFileTransferManager creates a new file transfer manager

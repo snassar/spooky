@@ -74,29 +74,46 @@ type ConnectionPoolMetrics struct {
 
 // AdvancedConnectionPool implements sophisticated connection pooling
 type AdvancedConnectionPool struct {
-	connections   map[string]*PooledConnection
-	mu            sync.RWMutex
-	metrics       *ConnectionPoolMetrics
-	config        *spookytypes.ClientConfig
-	logger        spookytypeslogging.Logger
-	ctx           context.Context
-	cancel        context.CancelFunc
-	cleanupTicker *time.Ticker
+	connections    map[string]*PooledConnection
+	mu             sync.RWMutex
+	metrics        *ConnectionPoolMetrics
+	config         *spookytypes.ClientConfig
+	logger         spookytypeslogging.Logger
+	hostKeyManager *HostKeyManager
+	ctx            context.Context
+	cancel         context.CancelFunc
+	cleanupTicker  *time.Ticker
 }
 
 // NewAdvancedConnectionPool creates a new advanced connection pool
 func NewAdvancedConnectionPool(config *spookytypes.ClientConfig, logger spookytypeslogging.Logger) *AdvancedConnectionPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Create host key manager for the pool
+	hostKeyManager := NewHostKeyManager(
+		config.KnownHostsPath,
+		config.StrictHostKeyCheck,
+		config.AllowInsecureHosts,
+		logger,
+	)
+
+	// Load known hosts
+	if err := hostKeyManager.LoadKnownHosts(); err != nil {
+		logger.Warn("Failed to load known hosts for connection pool", map[string]interface{}{
+			"error": err.Error(),
+		})
+	}
+
 	pool := &AdvancedConnectionPool{
 		connections: make(map[string]*PooledConnection),
 		metrics: &ConnectionPoolMetrics{
 			LastCleanup: time.Now(),
 		},
-		config: config,
-		logger: logger,
-		ctx:    ctx,
-		cancel: cancel,
+		config:         config,
+		logger:         logger,
+		hostKeyManager: hostKeyManager,
+		ctx:            ctx,
+		cancel:         cancel,
 	}
 
 	// Start background cleanup
@@ -310,10 +327,10 @@ func (p *AdvancedConnectionPool) removeConnection(connectionKey string) {
 func (p *AdvancedConnectionPool) createNewConnection(host string, port int, user string) (*PooledConnection, error) {
 	startTime := time.Now()
 
-	// Create SSH config (simplified for this example)
+	// Create SSH config with proper host key verification
 	config := &ssh.ClientConfig{
 		User:            user,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // Will be replaced by host key manager
+		HostKeyCallback: p.hostKeyManager.GetHostKeyCallback(),
 		Timeout:         p.config.DefaultTimeout,
 	}
 
@@ -851,228 +868,6 @@ func (c *Client) Connect(ctx context.Context, request *spookytypes.ConnectionReq
 	return result, nil
 }
 
-// createSSHConfig creates an SSH client configuration
-func (c *Client) createSSHConfig(request *spookytypes.ConnectionRequest) (*ssh.ClientConfig, error) {
-	config := &ssh.ClientConfig{
-		User:            request.User,
-		HostKeyCallback: c.hostKeyManager.GetHostKeyCallback(),
-		Timeout:         request.Timeout,
-	}
-
-	// Add authentication methods
-	var authMethods []ssh.AuthMethod
-
-	// Public key authentication with certificate support
-	if request.KeyPath != "" {
-		key, err := c.loadPrivateKey(request.KeyPath, request.Passphrase)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load private key: %w", err)
-		}
-		authMethods = append(authMethods, ssh.PublicKeys(key))
-	}
-
-	// SSH certificate authentication
-	if request.CertificatePath != "" {
-		cert, err := c.loadSSHCertificate(request.CertificatePath, request.KeyPath, request.Passphrase)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load SSH certificate: %w", err)
-		}
-		authMethods = append(authMethods, ssh.PublicKeys(cert))
-	}
-
-	// Password authentication
-	if request.Password != "" {
-		authMethods = append(authMethods, ssh.Password(request.Password))
-	}
-
-	// If no authentication method is provided, try to use default key
-	if len(authMethods) == 0 && c.config.DefaultKeyPath != "" {
-		key, err := c.loadPrivateKey(c.config.DefaultKeyPath, "")
-		if err != nil {
-			return nil, fmt.Errorf("failed to load default private key: %w", err)
-		}
-		authMethods = append(authMethods, ssh.PublicKeys(key))
-	}
-
-	if len(authMethods) == 0 {
-		return nil, fmt.Errorf("no authentication method provided")
-	}
-
-	config.Auth = authMethods
-	return config, nil
-}
-
-// loadPrivateKey loads and validates a private key from file
-func (c *Client) loadPrivateKey(keyPath, passphrase string) (ssh.Signer, error) {
-	// Expand tilde in path
-	if strings.HasPrefix(keyPath, "~") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get home directory: %w", err)
-		}
-		keyPath = filepath.Join(home, keyPath[1:])
-	}
-
-	keyData, err := os.ReadFile(keyPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read private key file: %w", err)
-	}
-
-	// Parse the key
-	var signer ssh.Signer
-	if passphrase != "" {
-		signer, err = ssh.ParsePrivateKeyWithPassphrase(keyData, []byte(passphrase))
-	} else {
-		signer, err = ssh.ParsePrivateKey(keyData)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse private key: %w", err)
-	}
-
-	// Validate the key type
-	if err := c.validateKeyType(signer); err != nil {
-		return nil, fmt.Errorf("key validation failed: %w", err)
-	}
-
-	return signer, nil
-}
-
-// loadSSHCertificate loads an SSH certificate with its private key
-func (c *Client) loadSSHCertificate(certPath, keyPath, passphrase string) (ssh.Signer, error) {
-	// Expand tilde in paths
-	if strings.HasPrefix(certPath, "~") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get home directory: %w", err)
-		}
-		certPath = filepath.Join(home, certPath[1:])
-	}
-
-	if strings.HasPrefix(keyPath, "~") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get home directory: %w", err)
-		}
-		keyPath = filepath.Join(home, keyPath[1:])
-	}
-
-	// Load certificate
-	certData, err := os.ReadFile(certPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read certificate file: %w", err)
-	}
-
-	// Load private key
-	keyData, err := os.ReadFile(keyPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read private key file: %w", err)
-	}
-
-	// Parse private key
-	var signer ssh.Signer
-	if passphrase != "" {
-		signer, err = ssh.ParsePrivateKeyWithPassphrase(keyData, []byte(passphrase))
-	} else {
-		signer, err = ssh.ParsePrivateKey(keyData)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse private key: %w", err)
-	}
-
-	// Parse certificate
-	cert, err := ssh.ParsePublicKey(certData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse SSH certificate: %w", err)
-	}
-
-	// Create certificate signer
-	certSigner, err := ssh.NewCertSigner(cert.(*ssh.Certificate), signer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create certificate signer: %w", err)
-	}
-
-	c.logger.Info("Loaded SSH certificate", map[string]interface{}{
-		"certificate_path": certPath,
-		"key_path":         keyPath,
-		"certificate_type": cert.Type(),
-	})
-
-	return certSigner, nil
-}
-
-// validateKeyType validates that the key is of a supported type
-func (c *Client) validateKeyType(signer ssh.Signer) error {
-	pubKey := signer.PublicKey()
-	keyType := pubKey.Type()
-
-	switch keyType {
-	case ssh.KeyAlgoED25519:
-		// Validate ed25519 key
-		if err := c.validateED25519Key(pubKey); err != nil {
-			return &KeyValidationError{KeyType: KeyTypeED25519, Reason: err.Error()}
-		}
-		c.logger.Info("Validated ed25519 key", map[string]interface{}{
-			"key_type": KeyTypeED25519,
-		})
-
-	case ssh.KeyAlgoRSA:
-		// Validate RSA key size
-		if err := c.validateRSAKey(pubKey); err != nil {
-			return &KeyValidationError{KeyType: KeyTypeRSA4096, Reason: err.Error()}
-		}
-		c.logger.Info("Validated RSA key", map[string]interface{}{
-			"key_type": KeyTypeRSA4096,
-		})
-
-	default:
-		return &KeyValidationError{
-			KeyType: keyType,
-			Reason: fmt.Sprintf("unsupported key type: %s. Supported types: %s, %s, %s",
-				keyType, KeyTypeED25519, KeyTypeED25519SK, KeyTypeRSA4096),
-		}
-	}
-
-	return nil
-}
-
-// validateED25519Key validates an ed25519 key
-func (c *Client) validateED25519Key(pubKey ssh.PublicKey) error {
-	// ed25519 keys are always valid - they have a fixed size
-	// We just need to ensure it's actually an ed25519 key
-	if pubKey.Type() != ssh.KeyAlgoED25519 {
-		return fmt.Errorf("expected ed25519 key, got %s", pubKey.Type())
-	}
-	return nil
-}
-
-// validateRSAKey validates an RSA key (must be 4096-bit)
-func (c *Client) validateRSAKey(pubKey ssh.PublicKey) error {
-	if pubKey.Type() != ssh.KeyAlgoRSA {
-		return fmt.Errorf("expected RSA key, got %s", pubKey.Type())
-	}
-
-	// Extract RSA public key to check key size
-	rsaPubKey, ok := pubKey.(ssh.CryptoPublicKey)
-	if !ok {
-		return fmt.Errorf("failed to extract RSA public key")
-	}
-
-	cryptoPubKey := rsaPubKey.CryptoPublicKey()
-	rsaKey, ok := cryptoPubKey.(*rsa.PublicKey)
-	if !ok {
-		return fmt.Errorf("failed to cast to RSA public key")
-	}
-
-	// Check key size
-	if rsaKey.Size()*8 < MinRSAKeySize {
-		return fmt.Errorf("RSA key size %d bits is less than minimum required %d bits",
-			rsaKey.Size()*8, MinRSAKeySize)
-	}
-
-	return nil
-}
-
 // RunCommand runs a command via SSH using the connection pool
 func (c *Client) RunCommand(ctx context.Context, connection *spookytypes.Connection, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error) {
 	if c.closed {
@@ -1185,6 +980,20 @@ func (c *Client) TestHostKeyVerification() error {
 	testHostname := "test.example.com"
 	testPort := 22
 
+	// Create a mock public key for testing
+	mockKey := &mockPublicKey{keyType: "ssh-rsa"}
+
+	// Test host key verification
+	err := c.hostKeyManager.VerifyHostKey(testHostname, testPort, mockKey)
+	if err != nil {
+		c.logger.Info("Host key verification test failed as expected", map[string]interface{}{
+			"hostname": testHostname,
+			"port":     testPort,
+			"error":    err.Error(),
+		})
+		return err
+	}
+
 	// Log test completion with guidance for real SSH key usage
 	c.logger.Info("Host key verification test completed", map[string]interface{}{
 		"hostname": testHostname,
@@ -1193,6 +1002,23 @@ func (c *Client) TestHostKeyVerification() error {
 	})
 
 	return nil
+}
+
+// mockPublicKey is a mock implementation for testing
+type mockPublicKey struct {
+	keyType string
+}
+
+func (m *mockPublicKey) Type() string {
+	return m.keyType
+}
+
+func (m *mockPublicKey) Marshal() []byte {
+	return []byte("mock-key-data")
+}
+
+func (m *mockPublicKey) Verify(data []byte, sig *ssh.Signature) error {
+	return fmt.Errorf("mock key verification not implemented")
 }
 
 // GetFileTransferManager returns the file transfer manager
