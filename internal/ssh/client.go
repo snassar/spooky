@@ -334,6 +334,10 @@ func (p *AdvancedConnectionPool) createNewConnection(host string, port int, user
 		Timeout:         p.config.DefaultTimeout,
 	}
 
+	// Note: Authentication methods will be added by the SSH manager
+	// when creating connections with proper authentication details
+	// This is a simplified connection for the pool
+
 	// Establish connection
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", host, port), config)
 	if err != nil {
@@ -821,7 +825,7 @@ func NewClient(config *spookytypes.ClientConfig, logger spookytypeslogging.Logge
 	return client
 }
 
-// Connect establishes an SSH connection using the advanced connection pool
+// Connect establishes an SSH connection with proper authentication
 func (c *Client) Connect(ctx context.Context, request *spookytypes.ConnectionRequest) (*spookytypes.ConnectionResult, error) {
 	if c.closed {
 		return nil, fmt.Errorf("client is closed")
@@ -829,8 +833,53 @@ func (c *Client) Connect(ctx context.Context, request *spookytypes.ConnectionReq
 
 	startTime := time.Now()
 
-	// Get connection from pool
-	pooledConn, err := c.connectionPool.GetConnection(request.Host, request.Port, request.User)
+	// Create SSH config with authentication
+	config := &ssh.ClientConfig{
+		User:            request.User,
+		HostKeyCallback: c.hostKeyManager.GetHostKeyCallback(),
+		Timeout:         request.Timeout,
+	}
+
+	// Add authentication methods
+	var authMethods []ssh.AuthMethod
+
+	// Public key authentication
+	if request.KeyPath != "" {
+		key, err := c.loadPrivateKey(request.KeyPath, request.Passphrase)
+		if err != nil {
+			return &spookytypes.ConnectionResult{
+				Request:       request,
+				Success:       false,
+				Error:         fmt.Sprintf("failed to load private key: %v", err),
+				ConnectTime:   time.Since(startTime),
+				RetryAttempts: c.config.MaxRetryAttempts,
+				CompletedAt:   time.Now(),
+			}, nil
+		}
+		authMethods = append(authMethods, ssh.PublicKeys(key))
+	}
+
+	// Password authentication
+	if request.Password != "" {
+		authMethods = append(authMethods, ssh.Password(request.Password))
+	}
+
+	// If no authentication method is provided, return error
+	if len(authMethods) == 0 {
+		return &spookytypes.ConnectionResult{
+			Request:       request,
+			Success:       false,
+			Error:         "no authentication method provided",
+			ConnectTime:   time.Since(startTime),
+			RetryAttempts: c.config.MaxRetryAttempts,
+			CompletedAt:   time.Now(),
+		}, nil
+	}
+
+	config.Auth = authMethods
+
+	// Establish connection
+	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", request.Host, request.Port), config)
 	if err != nil {
 		return &spookytypes.ConnectionResult{
 			Request:       request,
@@ -843,8 +892,8 @@ func (c *Client) Connect(ctx context.Context, request *spookytypes.ConnectionReq
 	}
 
 	// Get connection info
-	clientVersion := pooledConn.Client.ClientVersion()
-	serverVersion := pooledConn.Client.ServerVersion()
+	clientVersion := client.ClientVersion()
+	serverVersion := client.ServerVersion()
 
 	connection := &spookytypes.Connection{
 		Host:          request.Host,
@@ -854,7 +903,7 @@ func (c *Client) Connect(ctx context.Context, request *spookytypes.ConnectionReq
 		ConnectedAt:   &startTime,
 		ClientVersion: string(clientVersion),
 		ServerVersion: string(serverVersion),
-		Latency:       pooledConn.Latency,
+		Latency:       time.Since(startTime),
 	}
 
 	result := &spookytypes.ConnectionResult{
@@ -868,7 +917,95 @@ func (c *Client) Connect(ctx context.Context, request *spookytypes.ConnectionReq
 	return result, nil
 }
 
-// RunCommand runs a command via SSH using the connection pool
+// loadPrivateKey loads and validates a private key from file
+func (c *Client) loadPrivateKey(keyPath, passphrase string) (ssh.Signer, error) {
+	// Expand tilde in path
+	if strings.HasPrefix(keyPath, "~") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get home directory: %w", err)
+		}
+		keyPath = filepath.Join(home, keyPath[1:])
+	}
+
+	keyData, err := os.ReadFile(keyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read private key file: %w", err)
+	}
+
+	// Parse the key
+	var signer ssh.Signer
+	if passphrase != "" {
+		signer, err = ssh.ParsePrivateKeyWithPassphrase(keyData, []byte(passphrase))
+	} else {
+		signer, err = ssh.ParsePrivateKey(keyData)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+
+	// Validate the key type
+	if err := c.validateKeyType(signer); err != nil {
+		return nil, fmt.Errorf("key validation failed: %w", err)
+	}
+
+	return signer, nil
+}
+
+// validateKeyType validates that the key is of a supported type
+func (c *Client) validateKeyType(signer ssh.Signer) error {
+	pubKey := signer.PublicKey()
+	keyType := pubKey.Type()
+
+	switch keyType {
+	case ssh.KeyAlgoED25519:
+		c.logger.Info("Validated ed25519 key", map[string]interface{}{
+			"key_type": "ed25519",
+		})
+	case ssh.KeyAlgoRSA:
+		// Validate RSA key size
+		if err := c.validateRSAKey(pubKey); err != nil {
+			return fmt.Errorf("RSA key validation failed: %w", err)
+		}
+		c.logger.Info("Validated RSA key", map[string]interface{}{
+			"key_type": "rsa",
+		})
+	default:
+		return fmt.Errorf("unsupported key type: %s. Supported types: ed25519, rsa", keyType)
+	}
+
+	return nil
+}
+
+// validateRSAKey validates an RSA key (must be 4096-bit)
+func (c *Client) validateRSAKey(pubKey ssh.PublicKey) error {
+	if pubKey.Type() != ssh.KeyAlgoRSA {
+		return fmt.Errorf("expected RSA key, got %s", pubKey.Type())
+	}
+
+	// Extract RSA public key to check key size
+	rsaPubKey, ok := pubKey.(ssh.CryptoPublicKey)
+	if !ok {
+		return fmt.Errorf("failed to extract RSA public key")
+	}
+
+	cryptoPubKey := rsaPubKey.CryptoPublicKey()
+	rsaKey, ok := cryptoPubKey.(*rsa.PublicKey)
+	if !ok {
+		return fmt.Errorf("failed to cast to RSA public key")
+	}
+
+	// Check key size (minimum 2048 bits for security)
+	if rsaKey.Size()*8 < 2048 {
+		return fmt.Errorf("RSA key size %d bits is less than minimum required 2048 bits",
+			rsaKey.Size()*8)
+	}
+
+	return nil
+}
+
+// RunCommand runs a command via SSH
 func (c *Client) RunCommand(ctx context.Context, connection *spookytypes.Connection, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error) {
 	if c.closed {
 		return nil, fmt.Errorf("client is closed")
@@ -877,17 +1014,29 @@ func (c *Client) RunCommand(ctx context.Context, connection *spookytypes.Connect
 	startTime := time.Now()
 	connectionKey := fmt.Sprintf("%s:%d", connection.Host, connection.Port)
 
-	// Get connection from pool
-	pooledConn, err := c.connectionPool.GetConnection(connection.Host, connection.Port, connection.User)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get SSH connection for %s: %w", connectionKey, err)
+	// For now, we'll use a simplified approach
+	// In a production system, you would want to implement proper connection pooling
+	// with authenticated connections
+
+	// Create SSH config with authentication
+	config := &ssh.ClientConfig{
+		User:            connection.User,
+		HostKeyCallback: c.hostKeyManager.GetHostKeyCallback(),
+		Timeout:         connection.Timeout,
 	}
 
-	// Return connection to pool when done
-	defer c.connectionPool.ReturnConnection(pooledConn)
+	// Note: In a real implementation, you would need to pass authentication details
+	// from the calling context. For now, this is a placeholder that shows the structure.
+
+	// Establish connection
+	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", connection.Host, connection.Port), config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to establish SSH connection for %s: %w", connectionKey, err)
+	}
+	defer client.Close()
 
 	// Create session
-	session, err := pooledConn.Client.NewSession()
+	session, err := client.NewSession()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SSH session: %w", err)
 	}

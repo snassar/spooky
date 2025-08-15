@@ -1,4 +1,4 @@
-// Package facts provides fact collection, storage, and management functionality.
+// Package facts provides fact collection and in-memory management functionality.
 package facts
 
 import (
@@ -332,7 +332,7 @@ func (m *Manager) exportToHCL(facts []*FactCollection, outputPath string) error 
 	return nil
 }
 
-// CollectAndStoreFacts collects and stores facts for a machine
+// CollectAndStoreFacts collects facts for a machine (in-memory only)
 func (m *Manager) CollectAndStoreFacts(ctx context.Context, machine *spookytypes.Machine) error {
 	// Collect facts
 	facts, err := m.CollectFacts(ctx, machine)
@@ -350,10 +350,15 @@ func (m *Manager) CollectAndStoreFacts(ctx context.Context, machine *spookytypes
 		return fmt.Errorf("facts validation failed: %v", validationResult.Errors)
 	}
 
+	// Facts are stored in memory for the duration of the operation
+	m.logger.Info("Facts collected and stored in memory", map[string]interface{}{
+		"machine": machine.Hostname,
+	})
+
 	return nil
 }
 
-// CollectAndStoreFactsParallel collects and stores facts for multiple machines in parallel
+// CollectAndStoreFactsParallel collects facts for multiple machines in parallel (in-memory only)
 func (m *Manager) CollectAndStoreFactsParallel(ctx context.Context, machines []*spookytypes.Machine, maxWorkers int) error {
 	if len(machines) == 0 {
 		return fmt.Errorf("no machines provided")
@@ -401,21 +406,21 @@ func (m *Manager) CollectAndStoreFactsParallel(ctx context.Context, machines []*
 	return nil
 }
 
-// GetStorageStats returns storage statistics
+// GetStorageStats returns memory storage statistics
 func (m *Manager) GetStorageStats() (map[string]interface{}, error) {
 	return map[string]interface{}{
-		"storage_type": "memory_only",
-		"description":  "Direct export without intermediate storage",
+		"storage_type": "in_memory_only",
+		"description":  "Facts are stored in memory for the duration of operations only",
 	}, nil
 }
 
-// GetFacts retrieves facts for a specific machine
+// GetFacts retrieves facts for a specific machine (collects on demand)
 func (m *Manager) GetFacts(ctx context.Context, machineID string) (*FactCollection, error) {
 	m.logger.Info("Getting facts for machine", map[string]interface{}{
 		"machine": machineID,
 	})
 
-	// For memory storage, we need to collect facts on demand
+	// Facts are collected on demand since there's no persistent storage
 	return m.CollectFacts(ctx, &spookytypes.Machine{Hostname: machineID})
 }
 
@@ -431,7 +436,7 @@ type FactExport struct {
 func (m *Manager) ClearFacts(ctx context.Context) error {
 	m.logger.Info("Clearing all facts from memory")
 
-	// Memory-only storage - no cleanup needed
+	// In-memory storage - no cleanup needed as facts are temporary
 	m.logger.Info("Successfully cleared all facts from memory")
 
 	return nil

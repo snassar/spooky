@@ -4,10 +4,10 @@ import (
 	"context"
 
 	spookyinterfaces "spooky/internal/interfaces"
-	spookylogging "spooky/internal/logging"
 	spookyschemas "spooky/internal/schemas"
 	spookytypes "spooky/internal/types"
 	spookytypesactions "spooky/internal/types/actions"
+	spookytypeslogging "spooky/internal/types/logging"
 )
 
 // Integration implements the ActionsIntegration interface
@@ -17,7 +17,7 @@ type Integration struct {
 
 // NewIntegration creates a new actions integration
 func NewIntegration(
-	logger spookylogging.Logger,
+	logger spookytypeslogging.Logger,
 	validator spookyinterfaces.ActionValidator,
 	sshManager spookyinterfaces.SSHManager,
 	schemaValidator *spookyschemas.Validator,

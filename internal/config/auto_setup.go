@@ -210,16 +210,10 @@ actions {
   backup_before_changes = false
 }
 
-# Storage configuration
-storage {
-  # Default storage format for facts (memory for in-memory storage)
-  facts_format = "memory"
-  
-  # Enable compression for storage
-  compression = true
-  
-  # Enable encryption for sensitive data
-  encryption = false
+# Facts configuration
+facts {
+  # Facts are collected and used in-memory only
+  # No persistent storage is used
 }
 `
 

@@ -6,18 +6,18 @@ import (
 	"time"
 
 	spookyinterfaces "spooky/internal/interfaces"
-	spookylogging "spooky/internal/logging"
 	spookytypes "spooky/internal/types"
 	spookytypesactions "spooky/internal/types/actions"
+	spookytypeslogging "spooky/internal/types/logging"
 )
 
 // Validator implements the ActionValidator interface
 type Validator struct {
-	logger spookylogging.Logger
+	logger spookytypeslogging.Logger
 }
 
 // NewValidator creates a new action validator
-func NewValidator(logger spookylogging.Logger) spookyinterfaces.ActionValidator {
+func NewValidator(logger spookytypeslogging.Logger) spookyinterfaces.ActionValidator {
 	return &Validator{
 		logger: logger,
 	}

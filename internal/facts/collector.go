@@ -1,4 +1,4 @@
-// Package facts provides fact collection, storage, and management functionality.
+// Package facts provides fact collection and in-memory management functionality.
 package facts
 
 import (
@@ -88,8 +88,8 @@ func (c *SystemFactCollector) Collect(ctx context.Context, machine *spookytypes.
 
 // getMachineID gets the machine ID from /etc/machine-id via SSH
 func (c *SystemFactCollector) getMachineID(machine *spookytypes.Machine) (string, error) {
-	// Execute command via SSH
-	output, err := c.executeSSHCommand(machine, "cat /etc/machine-id")
+	// Run command via SSH
+	output, err := c.runSSHCommand(machine, "cat /etc/machine-id")
 	if err != nil {
 		return "", fmt.Errorf("failed to read /etc/machine-id via SSH: %w", err)
 	}
@@ -149,7 +149,7 @@ func (c *SystemFactCollector) collectSystemFacts(ctx context.Context, machine *s
 // collectOSFacts collects operating system facts via SSH
 func (c *SystemFactCollector) collectOSFacts(machine *spookytypes.Machine) (*spookytypesfacts.OSFacts, error) {
 	// Get OS release information
-	osRelease, err := c.executeSSHCommand(machine, "cat /etc/os-release")
+	osRelease, err := c.runSSHCommand(machine, "cat /etc/os-release")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get OS release info: %w", err)
 	}
@@ -158,7 +158,7 @@ func (c *SystemFactCollector) collectOSFacts(machine *spookytypes.Machine) (*spo
 	osInfo := c.parseOSRelease(osRelease)
 
 	// Get kernel information
-	kernelInfo, err := c.executeSSHCommand(machine, "uname -a")
+	kernelInfo, err := c.runSSHCommand(machine, "uname -a")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kernel info: %w", err)
 	}
@@ -209,7 +209,7 @@ func (c *SystemFactCollector) collectHardwareFacts(machine *spookytypes.Machine)
 // collectCPUFacts collects CPU facts via SSH
 func (c *SystemFactCollector) collectCPUFacts(machine *spookytypes.Machine) (*spookytypesfacts.CPUFacts, error) {
 	// Get CPU info
-	cpuInfo, err := c.executeSSHCommand(machine, "cat /proc/cpuinfo")
+	cpuInfo, err := c.runSSHCommand(machine, "cat /proc/cpuinfo")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get CPU info: %w", err)
 	}
@@ -218,7 +218,7 @@ func (c *SystemFactCollector) collectCPUFacts(machine *spookytypes.Machine) (*sp
 	cpuDetails := c.parseCPUInfo(cpuInfo)
 
 	// Get CPU count
-	cpuCount, err := c.executeSSHCommand(machine, "nproc")
+	cpuCount, err := c.runSSHCommand(machine, "nproc")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get CPU count: %w", err)
 	}
@@ -240,7 +240,7 @@ func (c *SystemFactCollector) collectCPUFacts(machine *spookytypes.Machine) (*sp
 // collectMemoryFacts collects memory facts via SSH
 func (c *SystemFactCollector) collectMemoryFacts(machine *spookytypes.Machine) (*spookytypesfacts.MemoryFacts, error) {
 	// Get memory information
-	memInfo, err := c.executeSSHCommand(machine, "free -b")
+	memInfo, err := c.runSSHCommand(machine, "free -b")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get memory info: %w", err)
 	}
@@ -259,7 +259,7 @@ func (c *SystemFactCollector) collectMemoryFacts(machine *spookytypes.Machine) (
 // collectDiskFacts collects disk facts via SSH
 func (c *SystemFactCollector) collectDiskFacts(machine *spookytypes.Machine) ([]*spookytypesfacts.DiskFacts, error) {
 	// Get disk usage information
-	diskInfo, err := c.executeSSHCommand(machine, "df -h")
+	diskInfo, err := c.runSSHCommand(machine, "df -h")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get disk info: %w", err)
 	}
@@ -292,13 +292,13 @@ func (c *SystemFactCollector) collectDiskFacts(machine *spookytypes.Machine) ([]
 // collectNetworkFacts collects network facts via SSH
 func (c *SystemFactCollector) collectNetworkFacts(machine *spookytypes.Machine) (*spookytypesfacts.NetworkFacts, error) {
 	// Get hostname
-	hostname, err := c.executeSSHCommand(machine, "hostname")
+	hostname, err := c.runSSHCommand(machine, "hostname")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get hostname: %w", err)
 	}
 
 	// Get network interfaces
-	interfaces, err := c.executeSSHCommand(machine, "ip addr show")
+	interfaces, err := c.runSSHCommand(machine, "ip addr show")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get network interfaces: %w", err)
 	}
@@ -321,7 +321,7 @@ func (c *SystemFactCollector) collectNetworkFacts(machine *spookytypes.Machine) 
 // collectLoadAverageFacts collects load average facts via SSH
 func (c *SystemFactCollector) collectLoadAverageFacts(machine *spookytypes.Machine) (*spookytypesfacts.LoadAverageFacts, error) {
 	// Get load average
-	loadAvg, err := c.executeSSHCommand(machine, "cat /proc/loadavg")
+	loadAvg, err := c.runSSHCommand(machine, "cat /proc/loadavg")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get load average: %w", err)
 	}
@@ -347,7 +347,7 @@ func (c *SystemFactCollector) collectLoadAverageFacts(machine *spookytypes.Machi
 // collectProcessFacts collects process facts via SSH
 func (c *SystemFactCollector) collectProcessFacts(machine *spookytypes.Machine) (*spookytypesfacts.ProcessFacts, error) {
 	// Get process count
-	processCount, err := c.executeSSHCommand(machine, "ps aux | wc -l")
+	processCount, err := c.runSSHCommand(machine, "ps aux | wc -l")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get process count: %w", err)
 	}
@@ -364,7 +364,7 @@ func (c *SystemFactCollector) collectProcessFacts(machine *spookytypes.Machine) 
 func (c *SystemFactCollector) collectCollectorFacts(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.CollectorFacts, error) {
 	// Check if collector facts file exists
 	checkCmd := "test -f /etc/spooky/facts.hcl && echo 'exists' || echo 'not_found'"
-	result, err := c.executeSSHCommand(machine, checkCmd)
+	result, err := c.runSSHCommand(machine, checkCmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check collector facts file on %s: %w", machine.Hostname, err)
 	}
@@ -374,7 +374,7 @@ func (c *SystemFactCollector) collectCollectorFacts(ctx context.Context, machine
 	}
 
 	// Read collector facts file
-	factsContent, err := c.executeSSHCommand(machine, "cat /etc/spooky/facts.hcl")
+	factsContent, err := c.runSSHCommand(machine, "cat /etc/spooky/facts.hcl")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read collector facts from %s: %w", machine.Hostname, err)
 	}
@@ -393,7 +393,7 @@ func (c *SystemFactCollector) collectCollectorFacts(ctx context.Context, machine
 func (c *SystemFactCollector) collectCustomFacts(ctx context.Context, machine *spookytypes.Machine) (map[string]interface{}, error) {
 	// Check if custom facts file exists (optional)
 	checkCmd := "test -f /etc/spooky/custom.hcl && echo 'exists' || echo 'not_found'"
-	result, err := c.executeSSHCommand(machine, checkCmd)
+	result, err := c.runSSHCommand(machine, checkCmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check custom facts file on %s: %w", machine.Hostname, err)
 	}
@@ -404,7 +404,7 @@ func (c *SystemFactCollector) collectCustomFacts(ctx context.Context, machine *s
 	}
 
 	// Read custom facts file
-	factsContent, err := c.executeSSHCommand(machine, "cat /etc/spooky/custom.hcl")
+	factsContent, err := c.runSSHCommand(machine, "cat /etc/spooky/custom.hcl")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read custom facts from %s: %w", machine.Hostname, err)
 	}
@@ -419,8 +419,8 @@ func (c *SystemFactCollector) collectCustomFacts(ctx context.Context, machine *s
 	return customFacts, nil
 }
 
-// executeSSHCommand executes a command via SSH on the target machine
-func (c *SystemFactCollector) executeSSHCommand(machine *spookytypes.Machine, command string) (string, error) {
+// runSSHCommand runs a command via SSH on the target machine
+func (c *SystemFactCollector) runSSHCommand(machine *spookytypes.Machine, command string) (string, error) {
 	ctx := context.Background()
 
 	// Create connection request with actual machine configuration

@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/zclconf/go-cty/cty"
 
+	spookytypes "spooky/internal/types"
 	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesschemas "spooky/internal/types/schemas"
 )
@@ -174,6 +175,36 @@ func (m *Manager) LoadEmbedded(name string) (*spookytypesschemas.Schema, error) 
 	return m.Load(schemaPath)
 }
 
+// LoadEmbeddedSchema loads an embedded schema (interface compatibility)
+func (m *Manager) LoadEmbeddedSchema(ctx context.Context, schemaName string) (*spookytypes.Schema, error) {
+	schema, err := m.LoadEmbedded(schemaName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert from spookytypesschemas.Schema to spookytypes.Schema
+	return &spookytypes.Schema{
+		Name:    schema.Name,
+		Content: schema.Content,
+		// Add other fields as needed
+	}, nil
+}
+
+// LoadSchema loads a schema from the given path (interface compatibility)
+func (m *Manager) LoadSchema(ctx context.Context, schemaPath string) (*spookytypes.Schema, error) {
+	schema, err := m.Load(schemaPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert from spookytypesschemas.Schema to spookytypes.Schema
+	return &spookytypes.Schema{
+		Name:    schema.Name,
+		Content: schema.Content,
+		// Add other fields as needed
+	}, nil
+}
+
 // LoadWithValidation loads a schema with validation
 func (m *Manager) LoadWithValidation(filePath string) (*spookytypesschemas.Schema, *spookytypesschemas.ValidationResult, error) {
 	schema, err := m.Load(filePath)
@@ -258,8 +289,27 @@ func (m *Manager) LoadSchemasFromDirectory(dirPath string) (map[string]*spookyty
 }
 
 // Validate validates data against a schema
-func (m *Manager) Validate(schema *spookytypesschemas.Schema, data interface{}) (*spookytypesschemas.ValidationResult, error) {
-	return m.validator.Validate(schema, data)
+func (m *Manager) Validate(ctx context.Context, schema *spookytypes.Schema, data interface{}) (*spookytypes.ValidationResult, error) {
+	// Convert from spookytypes.Schema to spookytypesschemas.Schema
+	schemasSchema := &spookytypesschemas.Schema{
+		Name:    schema.Name,
+		Content: schema.Content,
+		// Add other fields as needed
+	}
+
+	result, err := m.validator.Validate(schemasSchema, data)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert from spookytypesschemas.ValidationResult to spookytypes.ValidationResult
+	return &spookytypes.ValidationResult{
+		Valid:       result.Valid,
+		ValidatedAt: result.ValidatedAt,
+		Errors:      result.Errors,
+		Warnings:    result.Warnings,
+		Info:        result.Info,
+	}, nil
 }
 
 // ValidateWithEnhancedFeatures validates data with enhanced features
@@ -293,8 +343,15 @@ func (m *Manager) ValidateField(schema *spookytypesschemas.Schema, fieldPath str
 }
 
 // Register registers a new schema
-func (m *Manager) Register(schema *spookytypesschemas.Schema) error {
-	return m.registry.Register(schema)
+func (m *Manager) Register(ctx context.Context, schema *spookytypes.Schema) error {
+	// Convert from spookytypes.Schema to spookytypesschemas.Schema
+	schemasSchema := &spookytypesschemas.Schema{
+		Name:    schema.Name,
+		Content: schema.Content,
+		// Add other fields as needed
+	}
+
+	return m.registry.Register(schemasSchema)
 }
 
 // Get returns a schema by name and type

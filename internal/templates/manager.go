@@ -2,11 +2,13 @@
 package templates
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	spookytypes "spooky/internal/types"
 	spookytypeslogging "spooky/internal/types/logging"
@@ -40,14 +42,14 @@ func (m *Manager) LoadTemplate(ctx context.Context, templatePath string) (*spook
 	}
 
 	// Create template structure
-	template := &spookytypes.Template{
+	tmplData := &spookytypes.Template{
 		SourcePath: templatePath,
 		Content:    string(data),
 		ID:         filepath.Base(templatePath),
 	}
 
 	// Validate template
-	if err := m.validateTemplate(ctx, template); err != nil {
+	if err := m.validateTemplate(ctx, tmplData); err != nil {
 		return nil, fmt.Errorf("template validation failed: %w", err)
 	}
 
@@ -56,29 +58,40 @@ func (m *Manager) LoadTemplate(ctx context.Context, templatePath string) (*spook
 		"size": len(data),
 	})
 
-	return template, nil
+	return tmplData, nil
 }
 
-// RenderTemplate renders a template with the given data
-func (m *Manager) RenderTemplate(ctx context.Context, template *spookytypes.Template, data map[string]interface{}) (string, error) {
+// RenderTemplate renders a template with the given data using Go's text/template engine
+func (m *Manager) RenderTemplate(ctx context.Context, tmplData *spookytypes.Template, data map[string]interface{}) (string, error) {
 	m.logger.Info("Rendering template", map[string]interface{}{
-		"template":  template.ID,
+		"template":  tmplData.ID,
 		"data_keys": len(data),
 	})
 
-	// Basic template rendering implementation
-	// In a real implementation, this would use a proper template engine
-	result := template.Content
-
-	// Simple variable substitution for demonstration
-	// Replace {{.variable}} patterns with actual values
-	for key, value := range data {
-		placeholder := fmt.Sprintf("{{.%s}}", key)
-		result = strings.ReplaceAll(result, placeholder, fmt.Sprintf("%v", value))
+	// Parse the template using Go's text/template engine
+	tmpl, err := template.New(tmplData.ID).Parse(tmplData.Content)
+	if err != nil {
+		m.logger.Error("Failed to parse template", err, map[string]interface{}{
+			"template": tmplData.ID,
+			"error":    err.Error(),
+		})
+		return "", fmt.Errorf("failed to parse template %s: %w", tmplData.ID, err)
 	}
 
+	// Execute the template with the provided data
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		m.logger.Error("Failed to execute template", err, map[string]interface{}{
+			"template": tmplData.ID,
+			"error":    err.Error(),
+		})
+		return "", fmt.Errorf("failed to execute template %s: %w", tmplData.ID, err)
+	}
+
+	result := buf.String()
+
 	m.logger.Info("Template rendered successfully", map[string]interface{}{
-		"template":      template.ID,
+		"template":      tmplData.ID,
 		"result_length": len(result),
 	})
 
@@ -86,9 +99,9 @@ func (m *Manager) RenderTemplate(ctx context.Context, template *spookytypes.Temp
 }
 
 // ValidateTemplate validates a template
-func (m *Manager) ValidateTemplate(ctx context.Context, template *spookytypes.Template) (*spookytypesschemas.ValidationResult, error) {
+func (m *Manager) ValidateTemplate(ctx context.Context, tmplData *spookytypes.Template) (*spookytypesschemas.ValidationResult, error) {
 	m.logger.Info("Validating template", map[string]interface{}{
-		"template": template.ID,
+		"template": tmplData.ID,
 	})
 
 	// Basic validation
@@ -96,14 +109,14 @@ func (m *Manager) ValidateTemplate(ctx context.Context, template *spookytypes.Te
 	var warnings []spookytypesschemas.SchemaError
 
 	// Check if template has content
-	if template.Content == "" {
+	if tmplData.Content == "" {
 		errors = append(errors, spookytypesschemas.SchemaError{
 			Message: "template content cannot be empty",
 		})
 	}
 
 	// Check for basic template syntax
-	if strings.Contains(template.Content, "{{") && !strings.Contains(template.Content, "}}") {
+	if strings.Contains(tmplData.Content, "{{") && !strings.Contains(tmplData.Content, "}}") {
 		errors = append(errors, spookytypesschemas.SchemaError{
 			Message: "unclosed template variable",
 		})
@@ -112,7 +125,7 @@ func (m *Manager) ValidateTemplate(ctx context.Context, template *spookytypes.Te
 	valid := len(errors) == 0
 
 	m.logger.Info("Template validation completed", map[string]interface{}{
-		"template": template.ID,
+		"template": tmplData.ID,
 		"valid":    valid,
 		"errors":   len(errors),
 		"warnings": len(warnings),
@@ -126,8 +139,8 @@ func (m *Manager) ValidateTemplate(ctx context.Context, template *spookytypes.Te
 }
 
 // validateTemplate is a helper method for internal validation
-func (m *Manager) validateTemplate(ctx context.Context, template *spookytypes.Template) error {
-	result, err := m.ValidateTemplate(ctx, template)
+func (m *Manager) validateTemplate(ctx context.Context, tmplData *spookytypes.Template) error {
+	result, err := m.ValidateTemplate(ctx, tmplData)
 	if err != nil {
 		return err
 	}

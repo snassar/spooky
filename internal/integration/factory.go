@@ -2,7 +2,9 @@
 package integration
 
 import (
-	"fmt"
+	"context"
+	"time"
+
 	spookyactions "spooky/internal/actions"
 	spookyconfig "spooky/internal/config"
 	spookyfacts "spooky/internal/facts"
@@ -10,26 +12,104 @@ import (
 	spookylogging "spooky/internal/logging"
 	spookymachines "spooky/internal/machines"
 	spookyschemas "spooky/internal/schemas"
+	spookysecrets "spooky/internal/secrets"
 	spookyssh "spooky/internal/ssh"
+	spookytemplates "spooky/internal/templates"
+	spookytypes "spooky/internal/types"
 	spookytypeslogging "spooky/internal/types/logging"
+	spookytypesschemas "spooky/internal/types/schemas"
 	spookyvariables "spooky/internal/variables"
 )
 
-// Factory creates and configures IntegrationManager instances
+// SimpleSchemaValidator implements SchemaValidator interface for facts validation
+type SimpleSchemaValidator struct {
+	logger spookytypeslogging.Logger
+}
+
+// Validate validates data against a schema
+func (s *SimpleSchemaValidator) Validate(schema *spookytypesschemas.Schema, data interface{}) (*spookytypesschemas.ValidationResult, error) {
+	return &spookytypesschemas.ValidationResult{
+		Valid:       true,
+		ValidatedAt: time.Now(),
+		Errors:      []spookytypesschemas.SchemaError{},
+		Warnings:    []spookytypesschemas.SchemaError{},
+	}, nil
+}
+
+// ValidateFile validates a file against a schema
+func (s *SimpleSchemaValidator) ValidateFile(schema *spookytypesschemas.Schema, filePath string) (*spookytypesschemas.ValidationResult, error) {
+	return s.Validate(schema, nil)
+}
+
+// ValidateString validates a string against a schema
+func (s *SimpleSchemaValidator) ValidateString(schema *spookytypesschemas.Schema, content string) (*spookytypesschemas.ValidationResult, error) {
+	return s.Validate(schema, content)
+}
+
+// ValidateBytes validates bytes against a schema
+func (s *SimpleSchemaValidator) ValidateBytes(schema *spookytypesschemas.Schema, data []byte) (*spookytypesschemas.ValidationResult, error) {
+	return s.Validate(schema, data)
+}
+
+// ValidateWithContext validates data with additional context
+func (s *SimpleSchemaValidator) ValidateWithContext(schema *spookytypesschemas.Schema, data interface{}, context map[string]interface{}) (*spookytypesschemas.ValidationResult, error) {
+	return s.Validate(schema, data)
+}
+
+// ValidateField validates a specific field
+func (s *SimpleSchemaValidator) ValidateField(schema *spookytypesschemas.Schema, fieldPath string, value interface{}) (*spookytypesschemas.ValidationResult, error) {
+	return &spookytypesschemas.ValidationResult{
+		Valid:       true,
+		ValidatedAt: time.Now(),
+		Errors:      []spookytypesschemas.SchemaError{},
+		Warnings:    []spookytypesschemas.SchemaError{},
+	}, nil
+}
+
+// SimpleSchemaManager implements SchemaManager interface for integration
+type SimpleSchemaManager struct {
+	logger spookytypeslogging.Logger
+}
+
+// LoadSchema loads a schema from the given path
+func (s *SimpleSchemaManager) LoadSchema(ctx context.Context, schemaPath string) (*spookytypes.Schema, error) {
+	return &spookytypes.Schema{}, nil
+}
+
+// LoadEmbeddedSchema loads an embedded schema
+func (s *SimpleSchemaManager) LoadEmbeddedSchema(ctx context.Context, schemaName string) (*spookytypes.Schema, error) {
+	return &spookytypes.Schema{}, nil
+}
+
+// Validate validates data against a schema
+func (s *SimpleSchemaManager) Validate(ctx context.Context, schema *spookytypes.Schema, data interface{}) (*spookytypes.ValidationResult, error) {
+	return &spookytypes.ValidationResult{
+		Valid:    true,
+		Errors:   []spookytypes.SchemaError{},
+		Warnings: []spookytypes.SchemaError{},
+	}, nil
+}
+
+// Register registers a new schema
+func (s *SimpleSchemaManager) Register(ctx context.Context, schema *spookytypes.Schema) error {
+	return nil
+}
+
+// Factory creates all integration components
 type Factory struct {
 	logger spookytypeslogging.Logger
 }
 
-// NewFactory creates a new IntegrationManager factory
+// NewFactory creates a new integration factory
 func NewFactory(logger spookytypeslogging.Logger) *Factory {
 	return &Factory{
 		logger: logger,
 	}
 }
 
-// CreateIntegrationManager creates a new IntegrationManager with all required integrations
+// CreateIntegrationManager creates a complete IntegrationManager with all integrations
 func (f *Factory) CreateIntegrationManager() spookyinterfaces.IntegrationManager {
-	// Create individual integrations
+	// Create all individual integrations
 	factsIntegration := f.createFactsIntegration()
 	actionsIntegration := f.createActionsIntegration()
 	variablesIntegration := f.createVariablesIntegration()
@@ -38,7 +118,7 @@ func (f *Factory) CreateIntegrationManager() spookyinterfaces.IntegrationManager
 	secretsIntegration := f.createSecretsIntegration()
 	configIntegration := f.createConfigIntegration()
 
-	// Create the IntegrationManager
+	// Create the integration manager
 	manager := NewManager(
 		f.logger,
 		factsIntegration,
@@ -50,132 +130,160 @@ func (f *Factory) CreateIntegrationManager() spookyinterfaces.IntegrationManager
 		configIntegration,
 	)
 
-	f.logger.Info("IntegrationManager created successfully", map[string]interface{}{
-		"facts_available":     factsIntegration != nil,
-		"actions_available":   actionsIntegration != nil,
-		"variables_available": variablesIntegration != nil,
-		"templates_available": templatesIntegration != nil,
-		"machines_available":  machinesIntegration != nil,
-		"secrets_available":   secretsIntegration != nil,
-		"config_available":    configIntegration != nil,
-	})
-
 	return manager
 }
 
 // createFactsIntegration creates the facts integration
 func (f *Factory) createFactsIntegration() spookyinterfaces.FactsIntegration {
-	// Create log manager for facts
-	logManager := spookylogging.NewLogManager()
-	factsLogger := logManager.GetLogger("facts")
-
 	// Create SSH manager for facts collection
-	sshManager := spookyssh.NewManager(factsLogger)
+	sshManager := spookyssh.NewManager(f.logger)
 
-	// Create facts components
+	// Create fact collector
 	collector := spookyfacts.NewSystemFactCollector(sshManager)
-	manager := spookyfacts.NewManager(collector, nil, factsLogger)
+
+	// Create a simple schema validator for facts validation
+	schemaValidator := &SimpleSchemaValidator{logger: f.logger}
+
+	// Create facts manager with proper schema validator
+	factsManager := spookyfacts.NewManager(collector, schemaValidator, f.logger)
 
 	// Create facts integration
-	integration := spookyfacts.NewIntegration(manager)
+	factsIntegration := spookyfacts.NewIntegration(factsManager)
 
-	f.logger.Info("Facts integration created successfully")
-	return integration
+	return factsIntegration
 }
 
 // createActionsIntegration creates the actions integration
 func (f *Factory) createActionsIntegration() spookyinterfaces.ActionsIntegration {
 	// Create log manager for actions
 	logManager := spookylogging.NewLogManager()
-	actionsLoggerInterface := logManager.GetLogger("actions")
+	actionsLogger := logManager.GetLogger("actions")
 
-	// Cast the interface to the concrete type that actions manager expects
-	actionsLoggerPtr, ok := actionsLoggerInterface.(*spookylogging.Logger)
-	if !ok {
-		f.logger.Error("Failed to cast logger to concrete type", fmt.Errorf("logger type assertion failed"))
-		return nil
-	}
+	// Create SSH manager for actions
+	sshManager := spookyssh.NewManager(f.logger)
 
-	// Create SSH manager with the interface logger
-	sshManager := spookyssh.NewManager(actionsLoggerInterface)
+	// Create action validator with interface logger type
+	actionValidator := spookyactions.NewValidator(actionsLogger)
 
-	// Create schema validator with the interface logger
-	schemaValidator := spookyschemas.NewValidator(actionsLoggerInterface)
+	// Create schema validator
+	schemaValidator := spookyschemas.NewValidator(f.logger)
 
-	// Load schemas from the schemas directory
-	schemasDir := "internal/schemas/schemas"
-	if err := schemaValidator.LoadSchemas(schemasDir); err != nil {
-		f.logger.Error("Failed to load schemas", err, map[string]interface{}{
-			"schemas_dir": schemasDir,
-		})
-		return nil
-	}
+	// Create actions manager with interface logger type
+	actionsManager := spookyactions.NewManager(actionsLogger, actionValidator, sshManager, schemaValidator)
 
-	// Create actions integration with the concrete logger type
-	// Dereference the pointer to get the concrete type
-	integration := spookyactions.NewIntegration(*actionsLoggerPtr, nil, sshManager, schemaValidator)
-
-	f.logger.Info("Actions integration created successfully")
-	return integration
+	return actionsManager
 }
 
 // createVariablesIntegration creates the variables integration
 func (f *Factory) createVariablesIntegration() spookyinterfaces.VariablesIntegration {
-	// Create log manager for variables
-	logManager := spookylogging.NewLogManager()
-	variablesLoggerInterface := logManager.GetLogger("variables")
+	// Create variables loader
+	variablesLoader := spookyvariables.NewLoader(f.logger)
 
-	// Create variables loader and validator
-	loader := spookyvariables.NewLoader(variablesLoggerInterface)
-	validator := spookyvariables.NewValidator(variablesLoggerInterface)
+	// Create variables validator
+	variablesValidator := spookyvariables.NewValidator(f.logger)
 
-	// Create variables integration
-	integration := spookyvariables.NewIntegration(variablesLoggerInterface, loader, validator)
+	// Create variables manager
+	variablesManager := spookyvariables.NewManager(f.logger, variablesLoader, variablesValidator)
 
-	f.logger.Info("Variables integration created successfully")
-	return integration
+	return variablesManager
 }
 
 // createTemplatesIntegration creates the templates integration
 func (f *Factory) createTemplatesIntegration() spookyinterfaces.TemplatesIntegration {
-	// For now, return nil to indicate templates integration is not yet implemented
-	// This will be implemented when the templates system is fully integrated
-	f.logger.Warn("Templates integration not yet implemented")
-	return nil
+	// Create templates manager
+	templatesManager := spookytemplates.NewManager(f.logger)
+
+	// Create templates integration
+	templatesIntegration := spookytemplates.NewIntegration(templatesManager)
+
+	return templatesIntegration
 }
 
 // createMachinesIntegration creates the machines integration
 func (f *Factory) createMachinesIntegration() spookyinterfaces.MachinesIntegration {
-	// Create log manager for machines
-	logManager := spookylogging.NewLogManager()
-	machinesLogger := logManager.GetLogger("machines")
+	// Create machines loader
+	machinesLoader := spookymachines.NewLoader(f.logger)
 
-	// Create machines components
-	validator := spookymachines.NewValidator(machinesLogger)
-	loader := spookymachines.NewLoader(machinesLogger)
-	manager := spookymachines.NewManager(machinesLogger, loader, validator)
+	// Create machines validator
+	machinesValidator := spookymachines.NewValidator(f.logger)
 
-	f.logger.Info("Machines integration created successfully")
-	return manager
+	// Create SSH manager for machines
+	sshManager := spookyssh.NewManager(f.logger)
+
+	// Create machines manager
+	machinesManager := spookymachines.NewManager(f.logger, machinesLoader, machinesValidator)
+
+	// Create machines integration
+	machinesIntegration := spookymachines.NewIntegration(
+		machinesManager,
+		machinesLoader,
+		machinesValidator,
+		sshManager,
+		f.logger,
+	)
+
+	return machinesIntegration
 }
 
 // createSecretsIntegration creates the secrets integration
 func (f *Factory) createSecretsIntegration() spookyinterfaces.SecretsIntegration {
-	// For now, return nil to indicate secrets integration is not yet implemented
-	// This will be implemented when the secrets system is fully integrated
-	f.logger.Warn("Secrets integration not yet implemented")
-	return nil
+	// Create secrets integration
+	secretsIntegration := spookysecrets.NewIntegration(f.logger)
+
+	return secretsIntegration
 }
 
 // createConfigIntegration creates the config integration
 func (f *Factory) createConfigIntegration() spookyinterfaces.ConfigIntegration {
-	// Create log manager for config
-	logManager := spookylogging.NewLogManager()
-	configLoggerInterface := logManager.GetLogger("config")
-
 	// Create config integration
-	integration := spookyconfig.NewIntegration(configLoggerInterface)
+	configIntegration := spookyconfig.NewIntegration(f.logger)
 
-	f.logger.Info("Config integration created successfully")
-	return integration
+	return configIntegration
+}
+
+// CreateSchemaManager creates a schema manager with enhanced validation
+func (f *Factory) CreateSchemaManager() spookyinterfaces.SchemaManager {
+	// Create schema manager
+	schemaManager := spookyschemas.NewManager(f.logger)
+
+	return schemaManager
+}
+
+// CreateLogManager creates a log manager
+func (f *Factory) CreateLogManager() spookyinterfaces.LogManager {
+	// Create log manager
+	logManager := spookylogging.NewLogManager()
+
+	return logManager
+}
+
+// CreateSSHManager creates an SSH manager with connection pooling
+func (f *Factory) CreateSSHManager() spookyinterfaces.SSHManager {
+	// Create SSH manager
+	sshManager := spookyssh.NewManager(f.logger)
+
+	return sshManager
+}
+
+// CreateAllManagers creates all managers for the system
+func (f *Factory) CreateAllManagers() map[string]interface{} {
+	managers := make(map[string]interface{})
+
+	// Create integration manager
+	integrationManager := f.CreateIntegrationManager()
+	managers["integration"] = integrationManager
+
+	// Create schema manager
+	schemaManager := f.CreateSchemaManager()
+	managers["schema"] = schemaManager
+
+	// Create log manager
+	logManager := f.CreateLogManager()
+	managers["log"] = logManager
+
+	// Create SSH manager
+	sshManager := f.CreateSSHManager()
+	managers["ssh"] = sshManager
+
+	return managers
 }

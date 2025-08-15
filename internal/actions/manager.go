@@ -9,11 +9,11 @@ import (
 	"time"
 
 	spookyinterfaces "spooky/internal/interfaces"
-	spookylogging "spooky/internal/logging"
 	spookymachines "spooky/internal/machines"
 	spookyschemas "spooky/internal/schemas"
 	spookytypes "spooky/internal/types"
 	spookytypesactions "spooky/internal/types/actions"
+	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesmachines "spooky/internal/types/machines"
 
 	"github.com/hashicorp/hcl/v2/hclsimple"
@@ -21,7 +21,7 @@ import (
 
 // Manager implements the ActionsIntegration interface
 type Manager struct {
-	logger          spookylogging.Logger
+	logger          spookytypeslogging.Logger
 	validator       spookyinterfaces.ActionValidator
 	sshManager      spookyinterfaces.SSHManager
 	schemaValidator *spookyschemas.Validator
@@ -29,7 +29,7 @@ type Manager struct {
 
 // NewManager creates a new actions manager
 func NewManager(
-	logger spookylogging.Logger,
+	logger spookytypeslogging.Logger,
 	validator spookyinterfaces.ActionValidator,
 	sshManager spookyinterfaces.SSHManager,
 	schemaValidator *spookyschemas.Validator,
@@ -878,7 +878,7 @@ func (m *Manager) loadMachinesFromProject(ctx context.Context, projectPath strin
 	}
 
 	// Create a machines loader to parse the machines.hcl file
-	loader := spookymachines.NewLoader(&m.logger)
+	loader := spookymachines.NewLoader(m.logger)
 
 	// Load machines from the machines.hcl file
 	machines, err := loader.LoadMachinesFromFile(ctx, machinesHCLPath)

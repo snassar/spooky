@@ -1,4 +1,4 @@
-// Package facts provides fact collection, storage, and management functionality.
+// Package facts provides fact collection and in-memory management functionality.
 package facts
 
 import (
