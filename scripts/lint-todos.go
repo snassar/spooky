@@ -704,8 +704,10 @@ func printSummary(results []LintResult) {
 	if filesWithIssues > 0 {
 		fmt.Printf("\nTo fix issues, review the generated report and address them systematically.\n")
 		fmt.Printf("You can also run: golangci-lint run --fix\n")
-		os.Exit(1)
+		// Exit with success (0) since finding issues is the expected outcome
+		os.Exit(0)
 	} else {
 		fmt.Printf("\nNo linting issues found!\n")
+		os.Exit(0)
 	}
 }

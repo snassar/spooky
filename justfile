@@ -66,15 +66,12 @@ lint-todos:
     @echo "Running AI-optimized file-by-file linting analysis..."
     @go run scripts/lint-todos.go
 
-# Run linter on a specific file
+# Run AI-optimized linter on a specific file
 lint-file file:
-    @echo "Running linter on {{file}}..."
+    @echo "Running AI-optimized linter on {{file}}..."
     @LINT_FILE={{file}} go run scripts/lint-todos.go
 
-# Run linter on all files using find -exec (captures TODOs)
-lint-all-files:
-    @echo "Running linter on all Go files (file by file)..."
-    @find . -name "*.go" -exec ./scripts/lint-single.sh {} \;
+
 
 # Format code
 fmt:

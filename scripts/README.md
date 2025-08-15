@@ -44,46 +44,6 @@ LINT_FAST=true go run scripts/lint-todos.go
 5. **📈 Progress Tracking** - Current status and recommended action plan
 6. **🛠️ Common Fix Patterns** - Code examples for common issues
 
-## Bash Scripts
-
-### `lint-single.sh`
-Minimal script for use with `find -exec` to process files one by one.
-
-**Usage:**
-```bash
-# Process all Go files
-find . -name "*.go" -exec ./scripts/lint-single.sh {} \;
-
-# Process specific files
-./scripts/lint-single.sh ./cmd/root.go
-```
-
-**Output:**
-- ✓ for files with no issues
-- ✗ for files with issues, including TODO comments and the specific errors
-
-### `lint-file.sh`
-Simple script to lint a single file and show issues as TODO comments.
-
-**Usage:**
-```bash
-./scripts/lint-file.sh ./cmd/root.go
-```
-
-### `lint-todos.sh`
-Comprehensive bash script that processes all files in batches and generates a markdown report.
-
-**Usage:**
-```bash
-./scripts/lint-todos.sh
-```
-
-**Features:**
-- Processes files in configurable batches
-- Generates a markdown report (`lint-todos.md`)
-- Provides summary statistics
-- Includes suggested fixes
-
 ## Just Targets
 
 The following just targets are available:
@@ -97,9 +57,6 @@ just lint-todos
 
 # Run linter on a specific file (Go program)
 just lint-file <file.go>
-
-# Run linter on all files using find -exec (captures TODOs)
-just lint-all-files
 ```
 
 ## Why File-by-File Linting?
