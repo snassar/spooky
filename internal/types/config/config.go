@@ -185,20 +185,20 @@ type SecurityConfig struct {
 	CAPath string `json:"ca_path,omitempty" hcl:"ca_path,optional"`
 }
 
-// ConfigDefaults provides default configuration values
-type ConfigDefaults struct {
+// Defaults provides default configuration values
+type Defaults struct {
 	// Default configuration values
 	Defaults map[string]interface{} `json:"defaults" hcl:"defaults"`
 }
 
-// ConfigSupporting provides supporting configuration structures
-type ConfigSupporting struct {
+// Supporting provides supporting configuration structures
+type Supporting struct {
 	// Supporting configuration
 	Support map[string]interface{} `json:"support" hcl:"support"`
 }
 
-// ConfigEnvironment provides environment-specific configuration
-type ConfigEnvironment struct {
+// Environment provides environment-specific configuration
+type Environment struct {
 	// Environment name
 	Environment string `json:"environment" hcl:"environment"`
 
@@ -206,8 +206,8 @@ type ConfigEnvironment struct {
 	Settings map[string]interface{} `json:"settings" hcl:"settings"`
 }
 
-// ConfigError represents a configuration-related error
-type ConfigError struct {
+// Error represents a configuration-related error
+type Error struct {
 	// Error details
 	Code        string                 `json:"code" hcl:"code"`
 	Message     string                 `json:"message" hcl:"message"`
@@ -225,9 +225,9 @@ type ConfigError struct {
 	ConfigValue interface{} `json:"config_value,omitempty" hcl:"config_value,optional"`
 }
 
-// NewConfigError creates a new configuration error
-func NewConfigError(configPath, message string) *ConfigError {
-	return &ConfigError{
+// NewError creates a new configuration error
+func NewError(configPath, message string) *Error {
+	return &Error{
 		Code:        "config_error",
 		Message:     message,
 		Recoverable: true,
@@ -236,11 +236,11 @@ func NewConfigError(configPath, message string) *ConfigError {
 }
 
 // Error implements the error interface
-func (e *ConfigError) Error() string {
+func (e *Error) Error() string {
 	return e.Message
 }
 
 // Unwrap returns the underlying error
-func (e *ConfigError) Unwrap() error {
+func (e *Error) Unwrap() error {
 	return nil
 }

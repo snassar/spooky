@@ -227,7 +227,7 @@ type MachineValidator interface {
 	ValidateMachines(ctx context.Context, machines []spookytypes.Machine) (*spookytypes.ValidationResult, error)
 
 	// ValidateMachine validates a single machine
-	ValidateMachine(ctx context.Context, machine spookytypes.Machine) (*spookytypes.ValidationResult, error)
+	ValidateMachine(ctx context.Context, machine *spookytypes.Machine) (*spookytypes.ValidationResult, error)
 }
 
 // MachineLoader provides machine loading
@@ -284,7 +284,7 @@ type ActionValidator interface {
 	ValidateActions(ctx context.Context, actions []spookytypes.Action) (*spookytypes.ValidationResult, error)
 
 	// ValidateAction validates a single action
-	ValidateAction(ctx context.Context, action spookytypes.Action) (*spookytypes.ValidationResult, error)
+	ValidateAction(ctx context.Context, action *spookytypes.Action) (*spookytypes.ValidationResult, error)
 }
 
 // ConfigIntegration provides configuration management

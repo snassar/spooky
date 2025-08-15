@@ -22,6 +22,7 @@ import (
 // Manager provides comprehensive schema management functionality
 type Manager struct {
 	logger            spookytypeslogging.Logger
+	helpers           *SchemaHelpers
 	registry          *Registry
 	validator         *Validator
 	enhancedValidator *EnhancedValidator
@@ -45,6 +46,7 @@ func NewManager(logger spookytypeslogging.Logger) *Manager {
 
 	manager := &Manager{
 		logger:            logger,
+		helpers:           NewSchemaHelpers(logger),
 		registry:          registry,
 		validator:         validator,
 		enhancedValidator: enhancedValidator,
@@ -176,7 +178,7 @@ func (m *Manager) LoadEmbedded(name string) (*spookytypesschemas.Schema, error) 
 }
 
 // LoadEmbeddedSchema loads an embedded schema (interface compatibility)
-func (m *Manager) LoadEmbeddedSchema(ctx context.Context, schemaName string) (*spookytypes.Schema, error) {
+func (m *Manager) LoadEmbeddedSchema(_ context.Context, schemaName string) (*spookytypes.Schema, error) {
 	schema, err := m.LoadEmbedded(schemaName)
 	if err != nil {
 		return nil, err
@@ -191,7 +193,7 @@ func (m *Manager) LoadEmbeddedSchema(ctx context.Context, schemaName string) (*s
 }
 
 // LoadSchema loads a schema from the given path (interface compatibility)
-func (m *Manager) LoadSchema(ctx context.Context, schemaPath string) (*spookytypes.Schema, error) {
+func (m *Manager) LoadSchema(_ context.Context, schemaPath string) (*spookytypes.Schema, error) {
 	schema, err := m.Load(schemaPath)
 	if err != nil {
 		return nil, err
@@ -289,7 +291,7 @@ func (m *Manager) LoadSchemasFromDirectory(dirPath string) (map[string]*spookyty
 }
 
 // Validate validates data against a schema
-func (m *Manager) Validate(ctx context.Context, schema *spookytypes.Schema, data interface{}) (*spookytypes.ValidationResult, error) {
+func (m *Manager) Validate(_ context.Context, schema *spookytypes.Schema, data interface{}) (*spookytypes.ValidationResult, error) {
 	// Convert from spookytypes.Schema to spookytypesschemas.Schema
 	schemasSchema := &spookytypesschemas.Schema{
 		Name:    schema.Name,
@@ -313,8 +315,8 @@ func (m *Manager) Validate(ctx context.Context, schema *spookytypes.Schema, data
 }
 
 // ValidateWithEnhancedFeatures validates data with enhanced features
-func (m *Manager) ValidateWithEnhancedFeatures(ctx context.Context, schema *spookytypesschemas.Schema, data interface{}) (*spookytypesschemas.ValidationResult, error) {
-	return m.enhancedValidator.ValidateWithEnhancedFeatures(ctx, schema, data)
+func (m *Manager) ValidateWithEnhancedFeatures(_ context.Context, schema *spookytypesschemas.Schema, data interface{}) (*spookytypesschemas.ValidationResult, error) {
+	return m.enhancedValidator.ValidateWithEnhancedFeatures(context.Background(), schema, data)
 }
 
 // ValidateFile validates a file against a schema
@@ -343,7 +345,7 @@ func (m *Manager) ValidateField(schema *spookytypesschemas.Schema, fieldPath str
 }
 
 // Register registers a new schema
-func (m *Manager) Register(ctx context.Context, schema *spookytypes.Schema) error {
+func (m *Manager) Register(_ context.Context, schema *spookytypes.Schema) error {
 	// Convert from spookytypes.Schema to spookytypesschemas.Schema
 	schemasSchema := &spookytypesschemas.Schema{
 		Name:    schema.Name,
@@ -421,29 +423,7 @@ func (m *Manager) GetMigrationPathBetweenSchemas(fromSchema, toSchema *spookytyp
 
 // CheckForUpdates checks for schema updates
 func (m *Manager) CheckForUpdates(schema *spookytypesschemas.Schema) ([]spookytypesschemas.SchemaUpdate, error) {
-	if schema == nil {
-		return nil, fmt.Errorf("schema cannot be nil")
-	}
-
-	var updates []spookytypesschemas.SchemaUpdate
-
-	// Check for newer versions
-	for _, registeredSchema := range m.registry.List() {
-		if registeredSchema.Type == schema.Type && registeredSchema.Name == schema.Name {
-			if registeredSchema.Version != schema.Version {
-				update := spookytypesschemas.SchemaUpdate{
-					Type:        m.determineUpdateType(schema.Version, registeredSchema.Version),
-					Description: fmt.Sprintf("New version available: %s", registeredSchema.Version),
-					Version:     registeredSchema.Version,
-					Date:        registeredSchema.UpdatedAt,
-					Priority:    "medium",
-				}
-				updates = append(updates, update)
-			}
-		}
-	}
-
-	return updates, nil
+	return m.helpers.CheckForUpdates(schema, m.registry.List())
 }
 
 // ApplyMigration applies a migration to a schema
@@ -478,44 +458,7 @@ func (m *Manager) ApplyMigration(schema *spookytypesschemas.Schema, migration *s
 
 // ValidateMigration validates a migration
 func (m *Manager) ValidateMigration(schema *spookytypesschemas.Schema, migration *spookytypesschemas.SchemaMigration) (*spookytypesschemas.ValidationResult, error) {
-	if schema == nil || migration == nil {
-		return nil, fmt.Errorf("schema and migration cannot be nil")
-	}
-
-	result := &spookytypesschemas.ValidationResult{
-		Valid:       true,
-		ValidatedAt: time.Now(),
-		Errors:      []spookytypesschemas.SchemaError{},
-		Warnings:    []spookytypesschemas.SchemaError{},
-		Info:        []spookytypesschemas.SchemaError{},
-	}
-
-	// Validate migration version compatibility
-	if migration.FromVersion != schema.Version {
-		error := spookytypesschemas.NewSchemaError(schema.Name, schema.Type,
-			fmt.Sprintf("Migration from version %s cannot be applied to schema version %s",
-				migration.FromVersion, schema.Version))
-		error.Severity = "error"
-		result.Errors = append(result.Errors, *error)
-		result.Valid = false
-	}
-
-	// Validate migration prerequisites
-	if migration.Validation != nil {
-		for _, preValidation := range migration.Validation.PreValidation {
-			// Execute pre-validation (simplified)
-			m.logger.Debug("Executing pre-validation", map[string]interface{}{
-				"validation": preValidation,
-			})
-		}
-	}
-
-	// Update valid flag based on errors
-	if len(result.Errors) > 0 {
-		result.Valid = false
-	}
-
-	return result, nil
+	return m.helpers.ValidateMigration(schema, migration)
 }
 
 // AnalyzeSchema analyzes a schema
@@ -581,7 +524,8 @@ func (m *Manager) CompareSchemas(schema1, schema2 *spookytypesschemas.Schema) (*
 
 	// Check for breaking changes
 	if schema2.Evolution != nil {
-		for _, breakingChange := range schema2.Evolution.BreakingChanges {
+		for i := range schema2.Evolution.BreakingChanges {
+			breakingChange := &schema2.Evolution.BreakingChanges[i]
 			comparison.BreakingChanges = append(comparison.BreakingChanges, breakingChange.Field)
 		}
 		if len(comparison.BreakingChanges) > 0 {
@@ -629,7 +573,8 @@ func (m *Manager) GenerateDocumentation(schema *spookytypesschemas.Schema) (stri
 		// Validation rules
 		if len(schema.Validation.Rules) > 0 {
 			doc.WriteString("### Validation Rules\n\n")
-			for _, rule := range schema.Validation.Rules {
+			for i := range schema.Validation.Rules {
+				rule := &schema.Validation.Rules[i]
 				doc.WriteString(fmt.Sprintf("#### %s\n", rule.Name))
 				doc.WriteString(fmt.Sprintf("**Type:** %s\n", rule.Type))
 				doc.WriteString(fmt.Sprintf("**Severity:** %s\n", rule.Severity))
@@ -644,7 +589,8 @@ func (m *Manager) GenerateDocumentation(schema *spookytypesschemas.Schema) (stri
 
 		if len(schema.Evolution.Deprecations) > 0 {
 			doc.WriteString("### Deprecations\n\n")
-			for _, deprecation := range schema.Evolution.Deprecations {
+			for i := range schema.Evolution.Deprecations {
+				deprecation := &schema.Evolution.Deprecations[i]
 				doc.WriteString(fmt.Sprintf("- **%s:** %s\n", deprecation.Field, deprecation.Reason))
 				if deprecation.Replacement != "" {
 					doc.WriteString(fmt.Sprintf("  - **Replacement:** %s\n", deprecation.Replacement))
@@ -655,7 +601,8 @@ func (m *Manager) GenerateDocumentation(schema *spookytypesschemas.Schema) (stri
 
 		if len(schema.Evolution.BreakingChanges) > 0 {
 			doc.WriteString("### Breaking Changes\n\n")
-			for _, breakingChange := range schema.Evolution.BreakingChanges {
+			for i := range schema.Evolution.BreakingChanges {
+				breakingChange := &schema.Evolution.BreakingChanges[i]
 				doc.WriteString(fmt.Sprintf("- **%s:** %s\n", breakingChange.Field, breakingChange.Description))
 				doc.WriteString(fmt.Sprintf("  - **Impact:** %s\n", breakingChange.Impact))
 				if breakingChange.Mitigation != "" {
@@ -697,7 +644,7 @@ func (m *Manager) GenerateExamples(schema *spookytypesschemas.Schema) ([]string,
 // Helper methods
 
 // validateSchemaContent validates schema content
-func (m *Manager) validateSchemaContent(data []byte, source string) error {
+func (m *Manager) validateSchemaContent(data []byte, _ string) error {
 	// Basic validation - check if content is not empty
 	if len(data) == 0 {
 		return fmt.Errorf("schema content is empty")
@@ -749,58 +696,28 @@ func (m *Manager) validateMetadataBlock(metadata map[string]interface{}) error {
 	var errors []string
 
 	// Check required fields
-	requiredFields := []string{"schema_version", "schema_type", "schema_name", "last_updated", "description"}
-	for _, field := range requiredFields {
-		if value, exists := metadata[field]; !exists || value == nil {
-			errors = append(errors, fmt.Sprintf("required field '%s' is missing", field))
-		}
+	if err := m.validateRequiredFields(metadata); err != nil {
+		errors = append(errors, err.Error())
 	}
 
-	// Validate schema_version format (ScalVer: 0.YYYYMMDD.N)
-	if version, exists := metadata["schema_version"]; exists && version != nil {
-		if versionStr, ok := version.(string); ok {
-			if !m.isValidScalVerFormat(versionStr) {
-				errors = append(errors, fmt.Sprintf("schema_version must be in ScalVer format (0.YYYYMMDD.N), got: %s", versionStr))
-			}
-		} else {
-			errors = append(errors, "schema_version must be a string")
-		}
+	// Validate schema_version format
+	if err := m.validateSchemaVersion(metadata); err != nil {
+		errors = append(errors, err.Error())
 	}
 
-	// Validate schema_type format (lowercase with hyphens)
-	if schemaType, exists := metadata["schema_type"]; exists && schemaType != nil {
-		if typeStr, ok := schemaType.(string); ok {
-			if !m.isValidSchemaTypeFormat(typeStr) {
-				errors = append(errors, fmt.Sprintf("schema_type must be lowercase with hyphens only, got: %s", typeStr))
-			}
-		} else {
-			errors = append(errors, "schema_type must be a string")
-		}
+	// Validate schema_type format
+	if err := m.validateSchemaType(metadata); err != nil {
+		errors = append(errors, err.Error())
 	}
 
-	// Validate last_updated format (YYYY-MM-DD)
-	if lastUpdated, exists := metadata["last_updated"]; exists && lastUpdated != nil {
-		if dateStr, ok := lastUpdated.(string); ok {
-			if !m.isValidDateFormat(dateStr) {
-				errors = append(errors, fmt.Sprintf("last_updated must be in YYYY-MM-DD format, got: %s", dateStr))
-			}
-		} else {
-			errors = append(errors, "last_updated must be a string")
-		}
+	// Validate last_updated format
+	if err := m.validateLastUpdated(metadata); err != nil {
+		errors = append(errors, err.Error())
 	}
 
 	// Validate description length
-	if description, exists := metadata["description"]; exists && description != nil {
-		if descStr, ok := description.(string); ok {
-			if len(descStr) < 10 {
-				errors = append(errors, "description must be at least 10 characters long")
-			}
-			if len(descStr) > 500 {
-				errors = append(errors, "description must be at most 500 characters long")
-			}
-		} else {
-			errors = append(errors, "description must be a string")
-		}
+	if err := m.validateDescription(metadata); err != nil {
+		errors = append(errors, err.Error())
 	}
 
 	// If there are any errors, return them
@@ -830,6 +747,76 @@ func (m *Manager) isValidDateFormat(date string) bool {
 	// Simple regex check for YYYY-MM-DD format
 	matched, _ := regexp.MatchString(`^\d{4}-\d{2}-\d{2}$`, date)
 	return matched
+}
+
+// validateRequiredFields validates required fields in metadata
+func (m *Manager) validateRequiredFields(metadata map[string]interface{}) error {
+	requiredFields := []string{"schema_version", "schema_type", "schema_name", "last_updated", "description"}
+	for _, field := range requiredFields {
+		if value, exists := metadata[field]; !exists || value == nil {
+			return fmt.Errorf("required field '%s' is missing", field)
+		}
+	}
+	return nil
+}
+
+// validateSchemaVersion validates schema_version format
+func (m *Manager) validateSchemaVersion(metadata map[string]interface{}) error {
+	if version, exists := metadata["schema_version"]; exists && version != nil {
+		if versionStr, ok := version.(string); ok {
+			if !m.isValidScalVerFormat(versionStr) {
+				return fmt.Errorf("schema_version must be in ScalVer format (0.YYYYMMDD.N), got: %s", versionStr)
+			}
+		} else {
+			return fmt.Errorf("schema_version must be a string")
+		}
+	}
+	return nil
+}
+
+// validateSchemaType validates schema_type format
+func (m *Manager) validateSchemaType(metadata map[string]interface{}) error {
+	if schemaType, exists := metadata["schema_type"]; exists && schemaType != nil {
+		if typeStr, ok := schemaType.(string); ok {
+			if !m.isValidSchemaTypeFormat(typeStr) {
+				return fmt.Errorf("schema_type must be lowercase with hyphens only, got: %s", typeStr)
+			}
+		} else {
+			return fmt.Errorf("schema_type must be a string")
+		}
+	}
+	return nil
+}
+
+// validateLastUpdated validates last_updated format
+func (m *Manager) validateLastUpdated(metadata map[string]interface{}) error {
+	if lastUpdated, exists := metadata["last_updated"]; exists && lastUpdated != nil {
+		if dateStr, ok := lastUpdated.(string); ok {
+			if !m.isValidDateFormat(dateStr) {
+				return fmt.Errorf("last_updated must be in YYYY-MM-DD format, got: %s", dateStr)
+			}
+		} else {
+			return fmt.Errorf("last_updated must be a string")
+		}
+	}
+	return nil
+}
+
+// validateDescription validates description length
+func (m *Manager) validateDescription(metadata map[string]interface{}) error {
+	if description, exists := metadata["description"]; exists && description != nil {
+		if descStr, ok := description.(string); ok {
+			if len(descStr) < 10 {
+				return fmt.Errorf("description must be at least 10 characters long")
+			}
+			if len(descStr) > 500 {
+				return fmt.Errorf("description must be at most 500 characters long")
+			}
+		} else {
+			return fmt.Errorf("description must be a string")
+		}
+	}
+	return nil
 }
 
 // loadMetadataSchema loads the schema-metadata.schema.hcl file
@@ -1058,7 +1045,7 @@ func (m *Manager) parseMetadataBlock(block *hcl.Block) (map[string]interface{}, 
 				if val.CanIterateElements() {
 					// Handle arrays
 					var result []string
-					val.ForEachElement(func(key, value cty.Value) bool {
+					val.ForEachElement(func(_, value cty.Value) bool {
 						if value.Type() == cty.String {
 							result = append(result, value.AsString())
 						}
@@ -1086,35 +1073,6 @@ func (m *Manager) parseMetadataBlock(block *hcl.Block) (map[string]interface{}, 
 	}
 
 	return metadata, nil
-}
-
-// determineUpdateType determines the type of update
-func (m *Manager) determineUpdateType(fromVersion, toVersion string) string {
-	// Parse semantic versions
-	fromParts := strings.Split(fromVersion, ".")
-	toParts := strings.Split(toVersion, ".")
-
-	if len(fromParts) < 3 || len(toParts) < 3 {
-		// If versions don't follow semantic versioning, assume patch
-		return "patch"
-	}
-
-	// Compare major version
-	if fromParts[0] != toParts[0] {
-		return "major"
-	}
-
-	// Compare minor version
-	if fromParts[1] != toParts[1] {
-		return "minor"
-	}
-
-	// Compare patch version
-	if fromParts[2] != toParts[2] {
-		return "patch"
-	}
-
-	return "none"
 }
 
 // calculateComplexityScore calculates a complexity score
@@ -1216,7 +1174,7 @@ func (m *Manager) calculateCompleteness(schema *spookytypesschemas.Schema) float
 }
 
 // calculateConsistency calculates schema consistency
-func (m *Manager) calculateConsistency(schema *spookytypesschemas.Schema) float64 {
+func (m *Manager) calculateConsistency(_ *spookytypesschemas.Schema) float64 {
 	// Simplified consistency calculation
 	return 80.0 // Assume good consistency
 }
@@ -1272,9 +1230,7 @@ func (m *Manager) generateAnalysisRecommendations(analysis *spookytypesschemas.S
 }
 
 // compareFields compares fields between two schemas
-func (m *Manager) compareFields(fields1, fields2 map[string]*spookytypesschemas.FieldValidation) ([]string, []string, []string) {
-	var added, removed, modified []string
-
+func (m *Manager) compareFields(fields1, fields2 map[string]*spookytypesschemas.FieldValidation) (added, removed, modified []string) {
 	// Find added fields
 	for fieldName := range fields2 {
 		if _, exists := fields1[fieldName]; !exists {

@@ -21,8 +21,8 @@ func NewMockFactCollector() *MockFactCollector {
 	}
 }
 
-func (m *MockFactCollector) Collect(_ context.Context, machine *spookytypes.Machine) (*FactCollection, error) {
-	return &FactCollection{
+func (m *MockFactCollector) Collect(_ context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error) {
+	return &spookytypesfacts.FactCollection{
 		MachineID:   machine.Hostname,
 		CollectedAt: time.Now(),
 		Facts: &spookytypesfacts.Facts{

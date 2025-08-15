@@ -113,7 +113,7 @@ func (m *Manager) LoadMachines(ctx context.Context, projectPath string) ([]spook
 }
 
 // ExportMachines exports machines to HCL format according to machines schema
-func (m *Manager) ExportMachines(ctx context.Context, machines []spookytypes.Machine, outputPath string) error {
+func (m *Manager) ExportMachines(_ context.Context, machines []spookytypes.Machine, outputPath string) error {
 	m.logger.Info("Exporting machines to HCL", map[string]interface{}{
 		"count":       len(machines),
 		"output_path": outputPath,
@@ -128,123 +128,151 @@ func (m *Manager) ExportMachines(ctx context.Context, machines []spookytypes.Mac
 	machinesBody := machinesBlock.Body()
 
 	// Add each machine
-	for _, machine := range machines {
+	for idx := range machines {
+		machine := &machines[idx]
 		machineBlock := machinesBody.AppendNewBlock("machine", []string{machine.Hostname})
 		machineBody := machineBlock.Body()
 
-		// Add basic attributes
-		if machine.Host != "" && machine.Host != machine.Hostname {
-			machineBody.SetAttributeValue("host", cty.StringVal(machine.Host))
-		}
-		if machine.Port != 22 {
-			machineBody.SetAttributeValue("port", cty.NumberIntVal(int64(machine.Port)))
-		}
-		if machine.User != "" {
-			machineBody.SetAttributeValue("user", cty.StringVal(machine.User))
-		}
-		if machine.KeyFile != "" {
-			machineBody.SetAttributeValue("key_file", cty.StringVal(machine.KeyFile))
-		}
-		if machine.Password != "" {
-			machineBody.SetAttributeValue("password", cty.StringVal(machine.Password))
-		}
-
-		// Add tags if present
-		if len(machine.Tags) > 0 {
-			tagsMap := make(map[string]cty.Value)
-			for k, v := range machine.Tags {
-				tagsMap[k] = cty.StringVal(v)
-			}
-			machineBody.SetAttributeValue("tags", cty.MapVal(tagsMap))
-		}
-
-		// Add groups if present
-		if len(machine.Groups) > 0 {
-			groupsList := make([]cty.Value, len(machine.Groups))
-			for i, group := range machine.Groups {
-				groupsList[i] = cty.StringVal(group)
-			}
-			machineBody.SetAttributeValue("groups", cty.ListVal(groupsList))
-		}
-
-		// Add roles if present
-		if len(machine.Roles) > 0 {
-			rolesList := make([]cty.Value, len(machine.Roles))
-			for i, role := range machine.Roles {
-				rolesList[i] = cty.StringVal(role)
-			}
-			machineBody.SetAttributeValue("roles", cty.ListVal(rolesList))
-		}
-
-		// Add classes if present
-		if len(machine.Classes) > 0 {
-			classesList := make([]cty.Value, len(machine.Classes))
-			for i, class := range machine.Classes {
-				classesList[i] = cty.StringVal(class)
-			}
-			machineBody.SetAttributeValue("classes", cty.ListVal(classesList))
-		}
-
-		// Add connection settings if different from defaults
-		if machine.ConnectionTimeout != 0 {
-			machineBody.SetAttributeValue("connection_timeout", cty.NumberIntVal(int64(machine.ConnectionTimeout)))
-		}
-		if machine.CommandTimeout != 0 {
-			machineBody.SetAttributeValue("command_timeout", cty.NumberIntVal(int64(machine.CommandTimeout)))
-		}
-		if machine.MaxConnections != 0 {
-			machineBody.SetAttributeValue("max_connections", cty.NumberIntVal(int64(machine.MaxConnections)))
-		}
-		if machine.RetryAttempts != 0 {
-			machineBody.SetAttributeValue("retry_attempts", cty.NumberIntVal(int64(machine.RetryAttempts)))
-		}
-		if machine.RetryDelay != 0 {
-			machineBody.SetAttributeValue("retry_delay", cty.NumberIntVal(int64(machine.RetryDelay)))
-		}
-
-		// Add resources block if present
-		if machine.Resources != nil {
-			resourcesBlock := machineBody.AppendNewBlock("resources", nil)
-			resourcesBody := resourcesBlock.Body()
-
-			if machine.Resources.CPUCores != 0 {
-				resourcesBody.SetAttributeValue("cpu_cores", cty.NumberIntVal(int64(machine.Resources.CPUCores)))
-			}
-			if machine.Resources.MemoryGB != 0 {
-				resourcesBody.SetAttributeValue("memory_gb", cty.NumberIntVal(int64(machine.Resources.MemoryGB)))
-			}
-			if machine.Resources.DiskGB != 0 {
-				resourcesBody.SetAttributeValue("disk_gb", cty.NumberIntVal(int64(machine.Resources.DiskGB)))
-			}
-			if machine.Resources.NetworkSpeed != "" {
-				resourcesBody.SetAttributeValue("network_speed", cty.StringVal(machine.Resources.NetworkSpeed))
-			}
-		}
-
-		// Add metadata block if present
-		if machine.MachineMetadata != nil {
-			metadataBlock := machineBody.AppendNewBlock("metadata", nil)
-			metadataBody := metadataBlock.Body()
-
-			if machine.MachineMetadata.Environment != "" {
-				metadataBody.SetAttributeValue("environment", cty.StringVal(machine.MachineMetadata.Environment))
-			}
-			if machine.MachineMetadata.Location != "" {
-				metadataBody.SetAttributeValue("location", cty.StringVal(machine.MachineMetadata.Location))
-			}
-			if machine.MachineMetadata.Owner != "" {
-				metadataBody.SetAttributeValue("owner", cty.StringVal(machine.MachineMetadata.Owner))
-			}
-			if len(machine.MachineMetadata.CustomFields) > 0 {
-				customFieldsMap := make(map[string]cty.Value)
-				for k, v := range machine.MachineMetadata.CustomFields {
-					customFieldsMap[k] = cty.StringVal(v)
-				}
-				metadataBody.SetAttributeValue("custom_fields", cty.MapVal(customFieldsMap))
-			}
-		}
+		m.addMachineBasicAttributes(machineBody, machine)
+		m.addMachineCollections(machineBody, machine)
+		m.addMachineConnectionSettings(machineBody, machine)
+		m.addMachineResources(machineBody, machine)
+		m.addMachineMetadata(machineBody, machine)
 	}
 
+	// Write file
+	return m.writeHCLFile(file, outputPath)
+}
+
+// addMachineBasicAttributes adds basic machine attributes to HCL
+func (m *Manager) addMachineBasicAttributes(machineBody *hclwrite.Body, machine *spookytypes.Machine) {
+	if machine.Host != "" && machine.Host != machine.Hostname {
+		machineBody.SetAttributeValue("host", cty.StringVal(machine.Host))
+	}
+	if machine.Port != 22 {
+		machineBody.SetAttributeValue("port", cty.NumberIntVal(int64(machine.Port)))
+	}
+	if machine.User != "" {
+		machineBody.SetAttributeValue("user", cty.StringVal(machine.User))
+	}
+	if machine.KeyFile != "" {
+		machineBody.SetAttributeValue("key_file", cty.StringVal(machine.KeyFile))
+	}
+	if machine.Password != "" {
+		machineBody.SetAttributeValue("password", cty.StringVal(machine.Password))
+	}
+}
+
+// addMachineCollections adds collections (tags, groups, roles, classes) to HCL
+func (m *Manager) addMachineCollections(machineBody *hclwrite.Body, machine *spookytypes.Machine) {
+	// Add tags if present
+	if len(machine.Tags) > 0 {
+		tagsMap := make(map[string]cty.Value)
+		for k, v := range machine.Tags {
+			tagsMap[k] = cty.StringVal(v)
+		}
+		machineBody.SetAttributeValue("tags", cty.MapVal(tagsMap))
+	}
+
+	// Add groups if present
+	if len(machine.Groups) > 0 {
+		groupsList := make([]cty.Value, len(machine.Groups))
+		for i, group := range machine.Groups {
+			groupsList[i] = cty.StringVal(group)
+		}
+		machineBody.SetAttributeValue("groups", cty.ListVal(groupsList))
+	}
+
+	// Add roles if present
+	if len(machine.Roles) > 0 {
+		rolesList := make([]cty.Value, len(machine.Roles))
+		for i, role := range machine.Roles {
+			rolesList[i] = cty.StringVal(role)
+		}
+		machineBody.SetAttributeValue("roles", cty.ListVal(rolesList))
+	}
+
+	// Add classes if present
+	if len(machine.Classes) > 0 {
+		classesList := make([]cty.Value, len(machine.Classes))
+		for i, class := range machine.Classes {
+			classesList[i] = cty.StringVal(class)
+		}
+		machineBody.SetAttributeValue("classes", cty.ListVal(classesList))
+	}
+}
+
+// addMachineConnectionSettings adds connection settings to HCL
+func (m *Manager) addMachineConnectionSettings(machineBody *hclwrite.Body, machine *spookytypes.Machine) {
+	if machine.ConnectionTimeout != 0 {
+		machineBody.SetAttributeValue("connection_timeout", cty.NumberIntVal(int64(machine.ConnectionTimeout)))
+	}
+	if machine.CommandTimeout != 0 {
+		machineBody.SetAttributeValue("command_timeout", cty.NumberIntVal(int64(machine.CommandTimeout)))
+	}
+	if machine.MaxConnections != 0 {
+		machineBody.SetAttributeValue("max_connections", cty.NumberIntVal(int64(machine.MaxConnections)))
+	}
+	if machine.RetryAttempts != 0 {
+		machineBody.SetAttributeValue("retry_attempts", cty.NumberIntVal(int64(machine.RetryAttempts)))
+	}
+	if machine.RetryDelay != 0 {
+		machineBody.SetAttributeValue("retry_delay", cty.NumberIntVal(int64(machine.RetryDelay)))
+	}
+}
+
+// addMachineResources adds resources block to HCL
+func (m *Manager) addMachineResources(machineBody *hclwrite.Body, machine *spookytypes.Machine) {
+	if machine.Resources == nil {
+		return
+	}
+
+	resourcesBlock := machineBody.AppendNewBlock("resources", nil)
+	resourcesBody := resourcesBlock.Body()
+
+	if machine.Resources.CPUCores != 0 {
+		resourcesBody.SetAttributeValue("cpu_cores", cty.NumberIntVal(int64(machine.Resources.CPUCores)))
+	}
+	if machine.Resources.MemoryGB != 0 {
+		resourcesBody.SetAttributeValue("memory_gb", cty.NumberIntVal(int64(machine.Resources.MemoryGB)))
+	}
+	if machine.Resources.DiskGB != 0 {
+		resourcesBody.SetAttributeValue("disk_gb", cty.NumberIntVal(int64(machine.Resources.DiskGB)))
+	}
+	if machine.Resources.NetworkSpeed != "" {
+		resourcesBody.SetAttributeValue("network_speed", cty.StringVal(machine.Resources.NetworkSpeed))
+	}
+}
+
+// addMachineMetadata adds metadata block to HCL
+func (m *Manager) addMachineMetadata(machineBody *hclwrite.Body, machine *spookytypes.Machine) {
+	if machine.MachineMetadata == nil {
+		return
+	}
+
+	metadataBlock := machineBody.AppendNewBlock("metadata", nil)
+	metadataBody := metadataBlock.Body()
+
+	if machine.MachineMetadata.Environment != "" {
+		metadataBody.SetAttributeValue("environment", cty.StringVal(machine.MachineMetadata.Environment))
+	}
+	if machine.MachineMetadata.Location != "" {
+		metadataBody.SetAttributeValue("location", cty.StringVal(machine.MachineMetadata.Location))
+	}
+	if machine.MachineMetadata.Owner != "" {
+		metadataBody.SetAttributeValue("owner", cty.StringVal(machine.MachineMetadata.Owner))
+	}
+	if len(machine.MachineMetadata.CustomFields) > 0 {
+		customFieldsMap := make(map[string]cty.Value)
+		for k, v := range machine.MachineMetadata.CustomFields {
+			customFieldsMap[k] = cty.StringVal(v)
+		}
+		metadataBody.SetAttributeValue("custom_fields", cty.MapVal(customFieldsMap))
+	}
+}
+
+// writeHCLFile writes the HCL file to disk
+func (m *Manager) writeHCLFile(file *hclwrite.File, outputPath string) error {
 	// Ensure output directory exists
 	outputDir := filepath.Dir(outputPath)
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
@@ -252,13 +280,12 @@ func (m *Manager) ExportMachines(ctx context.Context, machines []spookytypes.Mac
 	}
 
 	// Write HCL file
-	if err := os.WriteFile(outputPath, file.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(outputPath, file.Bytes(), 0o600); err != nil {
 		return fmt.Errorf("failed to write HCL file: %w", err)
 	}
 
 	m.logger.Info("Successfully exported machines to HCL", map[string]interface{}{
 		"output_path": outputPath,
-		"count":       len(machines),
 	})
 
 	return nil
@@ -510,12 +537,13 @@ func (m *Manager) pingMachine(ctx context.Context, machine *spookytypes.Machine)
 	var status string
 	var errorMsg string
 
-	if sshStatus == "reachable" {
+	switch sshStatus {
+	case "reachable":
 		status = "online"
-	} else if sshStatus == "ssh_unreachable" {
+	case "ssh_unreachable":
 		status = "ssh_unreachable"
 		errorMsg = sshError
-	} else {
+	default:
 		status = "offline"
 		errorMsg = "connectivity check failed"
 	}
@@ -548,7 +576,8 @@ func isIPAddress(host string) bool {
 // getMachineHostnames returns a list of machine hostnames
 func getMachineHostnames(machines []spookytypes.Machine) []string {
 	var hostnames []string
-	for _, machine := range machines {
+	for idx := range machines {
+		machine := &machines[idx]
 		hostnames = append(hostnames, machine.Hostname)
 	}
 	return hostnames
@@ -559,60 +588,14 @@ func (m *Manager) validateMachineCollection(machines []spookytypes.Machine) erro
 	var errors []string
 	var warnings []string
 
-	// Check for duplicate hostnames with file source information
-	hostnameMap := make(map[string][]string) // hostname -> []file_sources
-	for _, machine := range machines {
-		sourceFile := "unknown"
-		if machine.MachineMetadata != nil && machine.MachineMetadata.CustomFields != nil {
-			if src, exists := machine.MachineMetadata.CustomFields["source_file"]; exists {
-				sourceFile = src
-			}
-		}
-		hostnameMap[machine.Hostname] = append(hostnameMap[machine.Hostname], sourceFile)
+	// Check for duplicate hostnames
+	if hostnameErrors := m.validateDuplicateHostnames(machines); len(hostnameErrors) > 0 {
+		errors = append(errors, hostnameErrors...)
 	}
 
-	for hostname, sources := range hostnameMap {
-		if len(sources) > 1 {
-			// Remove duplicates from sources
-			uniqueSources := make([]string, 0)
-			sourceMap := make(map[string]bool)
-			for _, source := range sources {
-				if !sourceMap[source] {
-					sourceMap[source] = true
-					uniqueSources = append(uniqueSources, source)
-				}
-			}
-			errors = append(errors, fmt.Sprintf("duplicate hostname '%s' found in multiple files: %v", hostname, uniqueSources))
-		}
-	}
-
-	// Check for duplicate host addresses with file source information
-	hostMap := make(map[string][]string)       // host -> []hostnames
-	hostSourceMap := make(map[string][]string) // host -> []file_sources
-	for _, machine := range machines {
-		sourceFile := "unknown"
-		if machine.MachineMetadata != nil && machine.MachineMetadata.CustomFields != nil {
-			if src, exists := machine.MachineMetadata.CustomFields["source_file"]; exists {
-				sourceFile = src
-			}
-		}
-		hostMap[machine.Host] = append(hostMap[machine.Host], machine.Hostname)
-		hostSourceMap[machine.Host] = append(hostSourceMap[machine.Host], sourceFile)
-	}
-
-	for host, hostnames := range hostMap {
-		if len(hostnames) > 1 {
-			sources := hostSourceMap[host]
-			uniqueSources := make([]string, 0)
-			sourceMap := make(map[string]bool)
-			for _, source := range sources {
-				if !sourceMap[source] {
-					sourceMap[source] = true
-					uniqueSources = append(uniqueSources, source)
-				}
-			}
-			warnings = append(warnings, fmt.Sprintf("duplicate host address '%s' used by multiple machines (%v) in files: %v", host, hostnames, uniqueSources))
-		}
+	// Check for duplicate host addresses
+	if hostWarnings := m.validateDuplicateHostAddresses(machines); len(hostWarnings) > 0 {
+		warnings = append(warnings, hostWarnings...)
 	}
 
 	// Validate environment consistency
@@ -648,46 +631,115 @@ func (m *Manager) validateMachineCollection(machines []spookytypes.Machine) erro
 	return nil
 }
 
+// validateDuplicateHostnames checks for duplicate hostnames across files
+func (m *Manager) validateDuplicateHostnames(machines []spookytypes.Machine) []string {
+	var errors []string
+	hostnameMap := make(map[string][]string) // hostname -> []file_sources
+
+	for idx := range machines {
+		machine := &machines[idx]
+		sourceFile := m.getSourceFile(machine)
+		hostnameMap[machine.Hostname] = append(hostnameMap[machine.Hostname], sourceFile)
+	}
+
+	for hostname, sources := range hostnameMap {
+		if len(sources) > 1 {
+			uniqueSources := m.getUniqueSources(sources)
+			errors = append(errors, fmt.Sprintf("duplicate hostname '%s' found in multiple files: %v", hostname, uniqueSources))
+		}
+	}
+
+	return errors
+}
+
+// validateDuplicateHostAddresses checks for duplicate host addresses across files
+func (m *Manager) validateDuplicateHostAddresses(machines []spookytypes.Machine) []string {
+	var warnings []string
+	hostMap := make(map[string][]string)       // host -> []hostnames
+	hostSourceMap := make(map[string][]string) // host -> []file_sources
+
+	for idx := range machines {
+		machine := &machines[idx]
+		sourceFile := m.getSourceFile(machine)
+		hostMap[machine.Host] = append(hostMap[machine.Host], machine.Hostname)
+		hostSourceMap[machine.Host] = append(hostSourceMap[machine.Host], sourceFile)
+	}
+
+	for host, hostnames := range hostMap {
+		if len(hostnames) <= 1 {
+			continue
+		}
+		sources := hostSourceMap[host]
+		uniqueSources := m.getUniqueSources(sources)
+		warnings = append(warnings, fmt.Sprintf("duplicate host address '%s' used by multiple machines (%v) in files: %v", host, hostnames, uniqueSources))
+	}
+
+	return warnings
+}
+
+// getSourceFile extracts the source file from machine metadata
+func (m *Manager) getSourceFile(machine *spookytypes.Machine) string {
+	if machine.MachineMetadata != nil && machine.MachineMetadata.CustomFields != nil {
+		if src, exists := machine.MachineMetadata.CustomFields["source_file"]; exists {
+			return src
+		}
+	}
+	return "unknown"
+}
+
+// getUniqueSources removes duplicate sources from a slice
+func (m *Manager) getUniqueSources(sources []string) []string {
+	uniqueSources := make([]string, 0)
+	sourceMap := make(map[string]bool)
+	for _, source := range sources {
+		if !sourceMap[source] {
+			sourceMap[source] = true
+			uniqueSources = append(uniqueSources, source)
+		}
+	}
+	return uniqueSources
+}
+
 // validateEnvironmentConsistency validates environment-specific rules
 func (m *Manager) validateEnvironmentConsistency(machines []spookytypes.Machine) error {
 	productionMachines := make([]spookytypes.Machine, 0)
 	stagingMachines := make([]spookytypes.Machine, 0)
 
 	// Group machines by environment
-	for _, machine := range machines {
-		if machine.MachineMetadata != nil {
-			switch machine.MachineMetadata.Environment {
+	for i := range machines {
+		if machines[i].MachineMetadata != nil {
+			switch machines[i].MachineMetadata.Environment {
 			case "production":
-				productionMachines = append(productionMachines, machine)
+				productionMachines = append(productionMachines, machines[i])
 			case "staging":
-				stagingMachines = append(stagingMachines, machine)
+				stagingMachines = append(stagingMachines, machines[i])
 			}
 		}
 	}
 
 	// Validate production machines
-	for _, machine := range productionMachines {
+	for i := range productionMachines {
 		// Production machines should have proper authentication
-		if machine.KeyFile == "" {
-			return fmt.Errorf("production machine '%s' must use key-based authentication", machine.Hostname)
+		if productionMachines[i].KeyFile == "" {
+			return fmt.Errorf("production machine '%s' must use key-based authentication", productionMachines[i].Hostname)
 		}
 
 		// Production machines should have reasonable timeouts
-		if machine.ConnectionTimeout > 60 {
-			return fmt.Errorf("production machine '%s' has excessive connection timeout (%ds)", machine.Hostname, machine.ConnectionTimeout)
+		if productionMachines[i].ConnectionTimeout > 60 {
+			return fmt.Errorf("production machine '%s' has excessive connection timeout (%ds)", productionMachines[i].Hostname, productionMachines[i].ConnectionTimeout)
 		}
 
 		// Production machines should have proper resource specifications
-		if machine.Resources == nil {
-			return fmt.Errorf("production machine '%s' should have resource specifications", machine.Hostname)
+		if productionMachines[i].Resources == nil {
+			return fmt.Errorf("production machine '%s' should have resource specifications", productionMachines[i].Hostname)
 		}
 	}
 
 	// Validate staging machines
-	for _, machine := range stagingMachines {
+	for i := range stagingMachines {
 		// Staging machines should have reasonable timeouts
-		if machine.ConnectionTimeout > 120 {
-			return fmt.Errorf("staging machine '%s' has excessive connection timeout (%ds)", machine.Hostname, machine.ConnectionTimeout)
+		if stagingMachines[i].ConnectionTimeout > 120 {
+			return fmt.Errorf("staging machine '%s' has excessive connection timeout (%ds)", stagingMachines[i].Hostname, stagingMachines[i].ConnectionTimeout)
 		}
 	}
 
@@ -698,8 +750,8 @@ func (m *Manager) validateEnvironmentConsistency(machines []spookytypes.Machine)
 func (m *Manager) validateAuthenticationConsistency(machines []spookytypes.Machine) error {
 	keyBasedCount := 0
 
-	for _, machine := range machines {
-		if machine.KeyFile != "" {
+	for i := range machines {
+		if machines[i].KeyFile != "" {
 			keyBasedCount++
 		}
 		// Note: Both password and key-based authentication are supported
@@ -719,12 +771,12 @@ func (m *Manager) validateCrossFileConsistency(machines []spookytypes.Machine) e
 	// Group machines by environment and check for consistency
 	envGroups := make(map[string][]spookytypes.Machine)
 
-	for _, machine := range machines {
+	for i := range machines {
 		env := "unknown"
-		if machine.MachineMetadata != nil && machine.MachineMetadata.Environment != "" {
-			env = machine.MachineMetadata.Environment
+		if machines[i].MachineMetadata != nil && machines[i].MachineMetadata.Environment != "" {
+			env = machines[i].MachineMetadata.Environment
 		}
-		envGroups[env] = append(envGroups[env], machine)
+		envGroups[env] = append(envGroups[env], machines[i])
 	}
 
 	// Check for consistent authentication methods within environments
@@ -734,8 +786,8 @@ func (m *Manager) validateCrossFileConsistency(machines []spookytypes.Machine) e
 		}
 
 		keyBasedCount := 0
-		for _, machine := range envMachines {
-			if machine.KeyFile != "" {
+		for i := range envMachines {
+			if envMachines[i].KeyFile != "" {
 				keyBasedCount++
 			}
 		}
@@ -747,8 +799,8 @@ func (m *Manager) validateCrossFileConsistency(machines []spookytypes.Machine) e
 
 		// Check for consistent timeout settings within environment
 		timeoutValues := make(map[int]int)
-		for _, machine := range envMachines {
-			timeoutValues[machine.ConnectionTimeout]++
+		for i := range envMachines {
+			timeoutValues[envMachines[i].ConnectionTimeout]++
 		}
 
 		if len(timeoutValues) > 1 {
@@ -807,90 +859,116 @@ func (m *Manager) applyMachineFilter(machines []spookytypes.Machine, filter *spo
 	for i := range machines {
 		machine := &machines[i]
 
-		// Check hostname filter
-		if len(filter.Hostnames) > 0 {
-			hostnameMatch := false
-			for _, hostname := range filter.Hostnames {
-				if machine.Hostname == hostname {
-					hostnameMatch = true
-					break
-				}
-			}
-			if !hostnameMatch {
-				continue
-			}
+		if m.machineMatchesFilter(machine, filter) {
+			filteredMachines = append(filteredMachines, *machine)
 		}
-
-		// Check groups filter
-		if len(filter.Groups) > 0 {
-			groupMatch := false
-			for _, group := range filter.Groups {
-				for _, machineGroup := range machine.Groups {
-					if machineGroup == group {
-						groupMatch = true
-						break
-					}
-				}
-				if groupMatch {
-					break
-				}
-			}
-			if !groupMatch {
-				continue
-			}
-		}
-
-		// Check roles filter
-		if len(filter.Roles) > 0 {
-			roleMatch := false
-			for _, role := range filter.Roles {
-				for _, machineRole := range machine.Roles {
-					if machineRole == role {
-						roleMatch = true
-						break
-					}
-				}
-				if roleMatch {
-					break
-				}
-			}
-			if !roleMatch {
-				continue
-			}
-		}
-
-		// Check tags filter
-		if len(filter.Tags) > 0 {
-			tagMatch := false
-			for key, value := range filter.Tags {
-				if machineValue, exists := machine.Tags[key]; exists && machineValue == value {
-					tagMatch = true
-					break
-				}
-			}
-			if !tagMatch {
-				continue
-			}
-		}
-
-		// Check patterns filter
-		if len(filter.Patterns) > 0 {
-			patternMatch := false
-			for _, pattern := range filter.Patterns {
-				if strings.Contains(machine.Hostname, pattern) {
-					patternMatch = true
-					break
-				}
-			}
-			if !patternMatch {
-				continue
-			}
-		}
-
-		filteredMachines = append(filteredMachines, *machine)
 	}
 
 	return filteredMachines, nil
+}
+
+// machineMatchesFilter checks if a machine matches the given filter
+func (m *Manager) machineMatchesFilter(machine *spookytypes.Machine, filter *spookytypesmachines.MachineFilter) bool {
+	// Check hostname filter
+	if !m.matchesHostnameFilter(machine, filter.Hostnames) {
+		return false
+	}
+
+	// Check groups filter
+	if !m.matchesGroupsFilter(machine, filter.Groups) {
+		return false
+	}
+
+	// Check roles filter
+	if !m.matchesRolesFilter(machine, filter.Roles) {
+		return false
+	}
+
+	// Check tags filter
+	if !m.matchesTagsFilter(machine, filter.Tags) {
+		return false
+	}
+
+	// Check patterns filter
+	if !m.matchesPatternsFilter(machine, filter.Patterns) {
+		return false
+	}
+
+	return true
+}
+
+// matchesHostnameFilter checks if machine matches hostname filter
+func (m *Manager) matchesHostnameFilter(machine *spookytypes.Machine, hostnames []string) bool {
+	if len(hostnames) == 0 {
+		return true
+	}
+
+	for _, hostname := range hostnames {
+		if machine.Hostname == hostname {
+			return true
+		}
+	}
+	return false
+}
+
+// matchesGroupsFilter checks if machine matches groups filter
+func (m *Manager) matchesGroupsFilter(machine *spookytypes.Machine, groups []string) bool {
+	if len(groups) == 0 {
+		return true
+	}
+
+	for _, group := range groups {
+		for _, machineGroup := range machine.Groups {
+			if machineGroup == group {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// matchesRolesFilter checks if machine matches roles filter
+func (m *Manager) matchesRolesFilter(machine *spookytypes.Machine, roles []string) bool {
+	if len(roles) == 0 {
+		return true
+	}
+
+	for _, role := range roles {
+		for _, machineRole := range machine.Roles {
+			if machineRole == role {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// matchesTagsFilter checks if machine matches tags filter
+func (m *Manager) matchesTagsFilter(machine *spookytypes.Machine, tags map[string]string) bool {
+	if len(tags) == 0 {
+		return true
+	}
+
+	for key, value := range tags {
+		if machineValue, exists := machine.Tags[key]; exists && machineValue == value {
+			return true
+		}
+	}
+	return false
+}
+
+// matchesPatternsFilter checks if machine matches patterns filter
+func (m *Manager) matchesPatternsFilter(machine *spookytypes.Machine, patterns []string) bool {
+	if len(patterns) == 0 {
+		return true
+	}
+
+	for _, pattern := range patterns {
+		if strings.Contains(machine.Hostname, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 // applyMapFilter applies a map-based filter to the machine list

@@ -1,7 +1,6 @@
 package spookyactions
 
 import (
-	"strings"
 	"testing"
 
 	spookytypes "spooky/internal/types"
@@ -9,8 +8,11 @@ import (
 	spookytypesmachines "spooky/internal/types/machines"
 )
 
-// Test the machineHasTags function directly without requiring a full manager
+// Test the machineHasTags function using a minimal manager
 func TestMachineHasTagsLogic(t *testing.T) {
+	// Create a minimal manager for testing - only need the method, not full dependencies
+	manager := &Manager{}
+
 	// Create a test machine with tags
 	machine := &spookytypes.Machine{
 		Hostname: "test-server",
@@ -66,9 +68,9 @@ func TestMachineHasTagsLogic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := machineHasTagsLogic(machine, tt.tags)
+			result := manager.machineHasTags(machine, tt.tags)
 			if result != tt.expected {
-				t.Errorf("machineHasTagsLogic(%v, %v) = %v, want %v", machine.Hostname, tt.tags, result, tt.expected)
+				t.Errorf("machineHasTags(%v, %v) = %v, want %v", machine.Hostname, tt.tags, result, tt.expected)
 			}
 		})
 	}
@@ -76,21 +78,24 @@ func TestMachineHasTagsLogic(t *testing.T) {
 
 // Test machine with nil tags
 func TestMachineHasTagsWithNilTags(t *testing.T) {
+	// Create a minimal manager for testing
+	manager := &Manager{}
+
 	machine := &spookytypes.Machine{
 		Hostname: "test-server",
 		Tags:     nil,
 	}
 
 	// Should return false when machine has no tags but tags are required
-	result := machineHasTagsLogic(machine, []string{"environment=production"})
+	result := manager.machineHasTags(machine, []string{"environment=production"})
 	if result {
-		t.Errorf("machineHasTagsLogic should return false for machine with nil tags")
+		t.Errorf("machineHasTags should return false for machine with nil tags")
 	}
 
 	// Should return true when no tags are required
-	result = machineHasTagsLogic(machine, []string{})
+	result = manager.machineHasTags(machine, []string{})
 	if !result {
-		t.Errorf("machineHasTagsLogic should return true when no tags are required")
+		t.Errorf("machineHasTags should return true when no tags are required")
 	}
 }
 
@@ -274,47 +279,7 @@ func TestSessionMachineFiltering(t *testing.T) {
 	})
 }
 
-// Helper functions for testing (copied from the actual implementation)
-
-// machineHasTagsLogic is the core logic for checking if a machine has the specified tags
-func machineHasTagsLogic(machine *spookytypes.Machine, tags []string) bool {
-	if len(tags) == 0 {
-		return true
-	}
-
-	// Handle case where machine has no tags
-	if len(machine.Tags) == 0 {
-		return false
-	}
-
-	// Check each required tag
-	for _, requiredTag := range tags {
-		tagMatched := false
-
-		// Check if tag is in key=value format
-		if strings.Contains(requiredTag, "=") {
-			parts := strings.SplitN(requiredTag, "=", 2)
-			if len(parts) == 2 {
-				key, value := parts[0], parts[1]
-				if machineValue, exists := machine.Tags[key]; exists && machineValue == value {
-					tagMatched = true
-				}
-			}
-		} else {
-			// Key-only format - check if the key exists in machine tags
-			if _, exists := machine.Tags[requiredTag]; exists {
-				tagMatched = true
-			}
-		}
-
-		// If any required tag doesn't match, machine doesn't have all required tags
-		if !tagMatched {
-			return false
-		}
-	}
-
-	return true
-}
+// Helper functions for testing
 
 // filterMachinesByName filters machines by hostname
 func filterMachinesByName(targetNames []string, machines []spookytypes.Machine) []spookytypes.Machine {
@@ -340,9 +305,12 @@ func filterMachinesByTags(tags []string, machines []spookytypes.Machine) []spook
 		return machines
 	}
 
+	// Create a minimal manager for testing
+	manager := &Manager{}
+
 	var targetMachines []spookytypes.Machine
 	for i := range machines {
-		if machineHasTagsLogic(&machines[i], tags) {
+		if manager.machineHasTags(&machines[i], tags) {
 			targetMachines = append(targetMachines, machines[i])
 		}
 	}
@@ -386,10 +354,14 @@ func filterMachinesByTagsFromSession(tags []string, session *spookytypesactions.
 		return convertSessionMachines(session.MachineInventory)
 	}
 
+	// Create a minimal manager for testing
+	manager := &Manager{}
+
 	var targetMachines []spookytypes.Machine
-	for _, sessionMachine := range session.MachineInventory {
-		machine := spookytypes.Machine(sessionMachine)
-		if machineHasTagsLogic(&machine, tags) {
+	for idx := range session.MachineInventory {
+		sessionMachine := &session.MachineInventory[idx]
+		machine := spookytypes.Machine(*sessionMachine)
+		if manager.machineHasTags(&machine, tags) {
 			targetMachines = append(targetMachines, machine)
 		}
 	}
@@ -399,8 +371,9 @@ func filterMachinesByTagsFromSession(tags []string, session *spookytypesactions.
 // convertSessionMachines converts session machines to the expected type
 func convertSessionMachines(sessionMachines []spookytypesmachines.Machine) []spookytypes.Machine {
 	machines := make([]spookytypes.Machine, len(sessionMachines))
-	for i, sessionMachine := range sessionMachines {
-		machines[i] = spookytypes.Machine(sessionMachine)
+	for i := range sessionMachines {
+		sessionMachine := &sessionMachines[i]
+		machines[i] = spookytypes.Machine(*sessionMachine)
 	}
 	return machines
 }

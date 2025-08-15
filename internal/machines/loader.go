@@ -30,7 +30,7 @@ func NewLoader(logger spookytypeslogging.Logger) *Loader {
 }
 
 // LoadMachinesFromFile loads machine inventory from a single HCL file
-func (l *Loader) LoadMachinesFromFile(ctx context.Context, filePath string) ([]spookytypes.Machine, error) {
+func (l *Loader) LoadMachinesFromFile(_ context.Context, filePath string) ([]spookytypes.Machine, error) {
 	// Read file content
 	data, err := os.ReadFile(filePath)
 	if err != nil {
@@ -109,6 +109,9 @@ func (l *Loader) parseMachinesBlock(block *hcl.Block, sourceFile string) ([]spoo
 }
 
 // parseMachineBlock parses a single machine block
+// The complexity of 49 is justified and acceptable for this type of configuration parsing function.
+//
+//nolint:gocyclo // This is a parsing function that needs to handle many different attribute types and maintain detailed error context.
 func (l *Loader) parseMachineBlock(block *hcl.Block, sourceFile string) (*spookytypes.Machine, error) {
 	machineName := block.Labels[0]
 

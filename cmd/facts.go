@@ -138,7 +138,8 @@ func handleFactsExport(cmd *cobra.Command, projectPath string) error {
 
 	// Extract machine hostnames for export
 	var machineIDs []string
-	for _, machine := range machines {
+	for idx := range machines {
+		machine := &machines[idx]
 		machineIDs = append(machineIDs, machine.Hostname)
 	}
 
@@ -181,39 +182,30 @@ func loadMachinesFromProject(projectPath string) ([]spookytypes.Machine, error) 
 	return machines, nil
 }
 
-func filterMachines(machines []spookytypes.Machine, filter string) []spookytypes.Machine {
-	var filtered []spookytypes.Machine
-	for _, machine := range machines {
-		if strings.Contains(machine.Hostname, filter) {
-			filtered = append(filtered, machine)
-		}
-	}
-	return filtered
-}
-
-func filterMachinesAdvanced(machines []spookytypes.Machine, machineFilter string, tagsFilter []string, groupsFilter []string) []spookytypes.Machine {
+func filterMachinesAdvanced(machines []spookytypes.Machine, machineFilter string, tagsFilter, groupsFilter []string) []spookytypes.Machine {
 	var filtered []spookytypes.Machine
 
-	for _, machine := range machines {
+	for idx := range machines {
+		machine := &machines[idx]
 		// Check if machine matches all filters
 		if matchesMachineFilter(machine, machineFilter) &&
 			matchesTagsFilter(machine, tagsFilter) &&
 			matchesGroupsFilter(machine, groupsFilter) {
-			filtered = append(filtered, machine)
+			filtered = append(filtered, *machine)
 		}
 	}
 
 	return filtered
 }
 
-func matchesMachineFilter(machine spookytypes.Machine, filter string) bool {
+func matchesMachineFilter(machine *spookytypes.Machine, filter string) bool {
 	if filter == "" {
 		return true
 	}
 	return strings.Contains(machine.Hostname, filter)
 }
 
-func matchesTagsFilter(machine spookytypes.Machine, tagsFilter []string) bool {
+func matchesTagsFilter(machine *spookytypes.Machine, tagsFilter []string) bool {
 	if len(tagsFilter) == 0 {
 		return true
 	}
@@ -229,11 +221,9 @@ func matchesTagsFilter(machine spookytypes.Machine, tagsFilter []string) bool {
 					if len(parts) == 2 && machineTagKey == parts[0] && machineTagValue == parts[1] {
 						return true
 					}
-				} else {
+				} else if machineTagKey == tag {
 					// Key-only format
-					if machineTagKey == tag {
-						return true
-					}
+					return true
 				}
 			}
 		}
@@ -242,7 +232,7 @@ func matchesTagsFilter(machine spookytypes.Machine, tagsFilter []string) bool {
 	return false
 }
 
-func matchesGroupsFilter(machine spookytypes.Machine, groupsFilter []string) bool {
+func matchesGroupsFilter(machine *spookytypes.Machine, groupsFilter []string) bool {
 	if len(groupsFilter) == 0 {
 		return true
 	}
@@ -262,18 +252,19 @@ func matchesGroupsFilter(machine spookytypes.Machine, groupsFilter []string) boo
 }
 
 // collectFactsParallel collects facts from multiple machines in parallel
-func collectFactsParallel(ctx context.Context, machines []spookytypes.Machine, factsManager spookyinterfaces.FactsIntegration, parallel int, verbose bool, logger spookytypeslogging.Logger) (int, int) {
-	successCount := 0
-	errorCount := 0
+func collectFactsParallel(ctx context.Context, machines []spookytypes.Machine, factsManager spookyinterfaces.FactsIntegration, parallel int, verbose bool, logger spookytypeslogging.Logger) (successCount, errorCount int) {
+	successCount = 0
+	errorCount = 0
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
 	// Create semaphore for parallel execution
 	semaphore := make(chan struct{}, parallel)
 
-	for _, machine := range machines {
+	for idx := range machines {
+		machine := &machines[idx]
 		wg.Add(1)
-		go func(m spookytypes.Machine) {
+		go func(m *spookytypes.Machine) {
 			defer wg.Done()
 			semaphore <- struct{}{}        // Acquire
 			defer func() { <-semaphore }() // Release
@@ -285,7 +276,7 @@ func collectFactsParallel(ctx context.Context, machines []spookytypes.Machine, f
 			}
 
 			// Collect facts using the integration with actual machine object
-			facts, err := factsManager.CollectFacts(ctx, &m)
+			facts, err := factsManager.CollectFacts(ctx, m)
 			if err != nil {
 				mu.Lock()
 				errorCount++

@@ -164,21 +164,22 @@ func (v *EnhancedValidator) ValidateWithEnhancedFeatures(ctx context.Context, sc
 
 	// Parse HCL if data is HCL
 	var parsedData interface{}
-	if hclData, ok := data.([]byte); ok {
-		parsed, err := v.parseHCLData(hclData, "data")
+	switch dataVal := data.(type) {
+	case []byte:
+		parsed, err := v.parseHCLData(dataVal, "data")
 		if err != nil {
 			v.addError(result, "hcl_parse_error", "Failed to parse HCL data", err.Error(), "error")
 			return result, nil
 		}
 		parsedData = parsed
-	} else if hclString, ok := data.(string); ok {
-		parsed, err := v.parseHCLData([]byte(hclString), "data")
+	case string:
+		parsed, err := v.parseHCLData([]byte(dataVal), "data")
 		if err != nil {
 			v.addError(result, "hcl_parse_error", "Failed to parse HCL string", err.Error(), "error")
 			return result, nil
 		}
 		parsedData = parsed
-	} else {
+	default:
 		parsedData = data
 	}
 
@@ -298,7 +299,7 @@ func (v *EnhancedValidator) validateSchemaConfiguration(schema *spookytypesschem
 }
 
 // validateDataStructure validates the basic data structure
-func (v *EnhancedValidator) validateDataStructure(schema *spookytypesschemas.Schema, data interface{}, result *spookytypesschemas.ValidationResult) error {
+func (v *EnhancedValidator) validateDataStructure(_ *spookytypesschemas.Schema, data interface{}, result *spookytypesschemas.ValidationResult) error {
 	if data == nil {
 		v.addError(result, "data_nil", "Data cannot be nil", "", "error")
 		return fmt.Errorf("data cannot be nil")
@@ -399,7 +400,7 @@ func (v *EnhancedValidator) validateFieldConstraintsValue(constraints *spookytyp
 	}
 
 	// Enum constraints
-	if constraints.Enum != nil && len(constraints.Enum) > 0 {
+	if len(constraints.Enum) > 0 {
 		found := false
 		for _, enumValue := range constraints.Enum {
 			if value == enumValue {
@@ -453,18 +454,18 @@ func (v *EnhancedValidator) validateCrossFieldRules(schema *spookytypesschemas.S
 
 		// Evaluate condition
 		if !v.evaluateCrossFieldCondition(crossFieldValidation.Condition, fieldValues) {
-			error := spookytypesschemas.NewSchemaError("", "", crossFieldValidation.Message)
-			error.Severity = crossFieldValidation.Severity
-			error.AddContext("fields", crossFieldValidation.Fields)
-			error.AddContext("condition", crossFieldValidation.Condition)
+			schemaError := spookytypesschemas.NewSchemaError("", "", crossFieldValidation.Message)
+			schemaError.Severity = crossFieldValidation.Severity
+			schemaError.AddContext("fields", crossFieldValidation.Fields)
+			schemaError.AddContext("condition", crossFieldValidation.Condition)
 
 			switch crossFieldValidation.Severity {
 			case "error":
-				result.Errors = append(result.Errors, *error)
+				result.Errors = append(result.Errors, *schemaError)
 			case "warning":
-				result.Warnings = append(result.Warnings, *error)
+				result.Warnings = append(result.Warnings, *schemaError)
 			case "info":
-				result.Info = append(result.Info, *error)
+				result.Info = append(result.Info, *schemaError)
 			}
 
 			result.Statistics.RulesFailed++
@@ -491,10 +492,10 @@ func (v *EnhancedValidator) validateCustomRules(ctx context.Context, schema *spo
 		// Execute custom validator
 		if validator, exists := v.customValidators[customValidator]; exists {
 			if customResult, err := validator(ctx, data, nil); err != nil {
-				error := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Custom validation failed: %v", err))
-				error.Severity = "error"
-				error.AddContext("validator", customValidator)
-				result.Errors = append(result.Errors, *error)
+				schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Custom validation failed: %v", err))
+				schemaError.Severity = "error"
+				schemaError.AddContext("validator", customValidator)
+				result.Errors = append(result.Errors, *schemaError)
 				result.Statistics.RulesFailed++
 			} else if customResult != nil {
 				// Merge custom validation results
@@ -551,7 +552,7 @@ func (v *EnhancedValidator) validateSchemaEvolution(schema *spookytypesschemas.S
 }
 
 // generateEnhancedRecommendations generates enhanced validation recommendations
-func (v *EnhancedValidator) generateEnhancedRecommendations(schema *spookytypesschemas.Schema, result *spookytypesschemas.ValidationResult) {
+func (v *EnhancedValidator) generateEnhancedRecommendations(_ *spookytypesschemas.Schema, result *spookytypesschemas.ValidationResult) {
 	if len(result.Errors) == 0 && len(result.Warnings) == 0 {
 		result.Recommendations = append(result.Recommendations, "Schema validation passed successfully")
 		return
@@ -559,8 +560,8 @@ func (v *EnhancedValidator) generateEnhancedRecommendations(schema *spookytypess
 
 	// Generate recommendations based on error types
 	errorTypes := make(map[string]int)
-	for _, error := range result.Errors {
-		errorTypes[error.Code]++
+	for i := range result.Errors {
+		errorTypes[result.Errors[i].Code]++
 	}
 
 	for errorCode, count := range errorTypes {
@@ -596,13 +597,13 @@ func (v *EnhancedValidator) generateEnhancedRecommendations(schema *spookytypess
 
 // addError adds an error to the validation result
 func (v *EnhancedValidator) addError(result *spookytypesschemas.ValidationResult, code, message, suggestion, severity string) {
-	error := spookytypesschemas.NewSchemaError("", "", message)
-	error.Code = code
-	error.Severity = severity
+	schemaError := spookytypesschemas.NewSchemaError("", "", message)
+	schemaError.Code = code
+	schemaError.Severity = severity
 	if suggestion != "" {
-		error.AddSuggestion(suggestion)
+		schemaError.AddSuggestion(suggestion)
 	}
-	result.Errors = append(result.Errors, *error)
+	result.Errors = append(result.Errors, *schemaError)
 }
 
 // addWarning adds a warning to the validation result

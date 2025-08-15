@@ -219,63 +219,105 @@ func (v *Validator) validateVariableDependencies(variable *spookytypesvariables.
 
 // validateVariableConstraints validates variable constraints
 func (v *Validator) validateVariableConstraints(variable *spookytypesvariables.Variable) error {
+	if err := v.validateStringConstraints(variable); err != nil {
+		return err
+	}
+	if err := v.validateNumericConstraints(variable); err != nil {
+		return err
+	}
+	if err := v.validateListConstraints(variable); err != nil {
+		return err
+	}
+	if err := v.validateFileConstraints(variable); err != nil {
+		return err
+	}
+	return nil
+}
+
+// validateStringConstraints validates string-specific constraints
+func (v *Validator) validateStringConstraints(variable *spookytypesvariables.Variable) error {
+	if variable.Type != spookytypesvariables.VariableTypeString {
+		return nil
+	}
+
 	constraints := variable.Constraints
 
-	// Validate string constraints
-	if variable.Type == spookytypesvariables.VariableTypeString {
-		if constraints.MinLength != nil && constraints.MaxLength != nil {
-			if *constraints.MinLength > *constraints.MaxLength {
-				return fmt.Errorf("min_length cannot be greater than max_length")
-			}
-		}
-
-		if constraints.MinLength != nil && *constraints.MinLength < 0 {
-			return fmt.Errorf("min_length cannot be negative")
-		}
-
-		if constraints.MaxLength != nil && *constraints.MaxLength < 1 {
-			return fmt.Errorf("max_length must be at least 1")
-		}
-
-		if constraints.Pattern != nil {
-			if _, err := regexp.Compile(*constraints.Pattern); err != nil {
-				return fmt.Errorf("invalid pattern: %w", err)
-			}
+	if constraints.MinLength != nil && constraints.MaxLength != nil {
+		if *constraints.MinLength > *constraints.MaxLength {
+			return fmt.Errorf("min_length cannot be greater than max_length")
 		}
 	}
 
-	// Validate numeric constraints
-	if variable.Type == spookytypesvariables.VariableTypeNumber || variable.Type == spookytypesvariables.VariableTypeFloat {
-		if constraints.MinValue != nil && constraints.MaxValue != nil {
-			if *constraints.MinValue > *constraints.MaxValue {
-				return fmt.Errorf("min_value cannot be greater than max_value")
-			}
+	if constraints.MinLength != nil && *constraints.MinLength < 0 {
+		return fmt.Errorf("min_length cannot be negative")
+	}
+
+	if constraints.MaxLength != nil && *constraints.MaxLength < 1 {
+		return fmt.Errorf("max_length must be at least 1")
+	}
+
+	if constraints.Pattern != nil {
+		if _, err := regexp.Compile(*constraints.Pattern); err != nil {
+			return fmt.Errorf("invalid pattern: %w", err)
 		}
 	}
 
-	// Validate list constraints
-	if variable.Type == spookytypesvariables.VariableTypeList {
-		if constraints.MinItems != nil && constraints.MaxItems != nil {
-			if *constraints.MinItems > *constraints.MaxItems {
-				return fmt.Errorf("min_items cannot be greater than max_items")
-			}
-		}
+	return nil
+}
 
-		if constraints.MinItems != nil && *constraints.MinItems < 0 {
-			return fmt.Errorf("min_items cannot be negative")
-		}
+// validateNumericConstraints validates numeric-specific constraints
+func (v *Validator) validateNumericConstraints(variable *spookytypesvariables.Variable) error {
+	if variable.Type != spookytypesvariables.VariableTypeNumber && variable.Type != spookytypesvariables.VariableTypeFloat {
+		return nil
+	}
 
-		if constraints.MaxItems != nil && *constraints.MaxItems < 1 {
-			return fmt.Errorf("max_items must be at least 1")
+	constraints := variable.Constraints
+
+	if constraints.MinValue != nil && constraints.MaxValue != nil {
+		if *constraints.MinValue > *constraints.MaxValue {
+			return fmt.Errorf("min_value cannot be greater than max_value")
 		}
 	}
 
-	// Validate file constraints
-	if variable.Type == spookytypesvariables.VariableTypeFile {
-		if constraints.FileSizeMax != nil {
-			if err := v.validateFileSizeConstraint(*constraints.FileSizeMax); err != nil {
-				return fmt.Errorf("invalid file_size_max: %w", err)
-			}
+	return nil
+}
+
+// validateListConstraints validates list-specific constraints
+func (v *Validator) validateListConstraints(variable *spookytypesvariables.Variable) error {
+	if variable.Type != spookytypesvariables.VariableTypeList {
+		return nil
+	}
+
+	constraints := variable.Constraints
+
+	if constraints.MinItems != nil && constraints.MaxItems != nil {
+		if *constraints.MinItems > *constraints.MaxItems {
+			return fmt.Errorf("min_items cannot be greater than max_items")
+		}
+	}
+
+	if constraints.MinItems != nil && *constraints.MinItems < 0 {
+		return fmt.Errorf("min_items cannot be negative")
+	}
+
+	if constraints.MaxItems != nil && *constraints.MaxItems < 1 {
+		return fmt.Errorf("max_items must be at least 1")
+	}
+
+	return nil
+}
+
+// validateFileConstraints validates file-specific constraints
+func (v *Validator) validateFileConstraints(variable *spookytypesvariables.Variable) error {
+	if variable.Type != spookytypesvariables.VariableTypeFile {
+		return nil
+	}
+
+	constraints := variable.Constraints
+
+	if constraints.FileSizeMax != nil {
+		if err := v.validateFileSizeConstraint(*constraints.FileSizeMax); err != nil {
+			return fmt.Errorf("invalid file_size_max: %w", err)
 		}
 	}
 
@@ -337,20 +379,17 @@ func (v *Validator) validateSensitiveVariable(variable *spookytypesvariables.Var
 }
 
 // validateVariableCollection validates the entire variable collection
-func (v *Validator) validateVariableCollection(variables map[string]*spookytypesvariables.Variable) ([]spookytypesschemas.SchemaError, []spookytypesschemas.SchemaError) {
-	var errors []spookytypesschemas.SchemaError
-	var warnings []spookytypesschemas.SchemaError
-
+func (v *Validator) validateVariableCollection(variables map[string]*spookytypesvariables.Variable) (errors, warnings []spookytypesschemas.SchemaError) {
 	// Check for circular dependencies
 	cycles := v.detectCircularDependencies(variables)
 	if len(cycles) > 0 {
 		for _, cycle := range cycles {
-			error := spookytypesschemas.NewSchemaError(
+			schemaError := spookytypesschemas.NewSchemaError(
 				"Variable",
 				"dependencies",
 				fmt.Sprintf("circular dependency detected: %s", strings.Join(cycle, " -> ")),
 			)
-			errors = append(errors, *error)
+			errors = append(errors, *schemaError)
 		}
 	}
 

@@ -368,7 +368,7 @@ func (m *Manager) resolveFromContext(variable *spookytypesvariables.Variable, co
 }
 
 // applyEnvironmentOverrides applies environment variable overrides
-func (m *Manager) applyEnvironmentOverrides(variables map[string]*spookytypesvariables.Variable, context *spookytypesvariables.VariableContext) ([]spookytypesvariables.VariableError, []spookytypesvariables.VariableWarning) {
+func (m *Manager) applyEnvironmentOverrides(variables map[string]*spookytypesvariables.Variable, _ *spookytypesvariables.VariableContext) ([]spookytypesvariables.VariableError, []spookytypesvariables.VariableWarning) {
 	var errors []spookytypesvariables.VariableError
 	var warnings []spookytypesvariables.VariableWarning
 

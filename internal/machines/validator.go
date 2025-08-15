@@ -36,8 +36,8 @@ func (v *Validator) ValidateMachines(ctx context.Context, machines []spookytypes
 	var errors []spookytypesschemas.SchemaError
 	var warnings []spookytypesschemas.SchemaError
 
-	for i, machine := range machines {
-		result, err := v.ValidateMachine(ctx, machine)
+	for i := range machines {
+		result, err := v.ValidateMachine(ctx, &machines[i])
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate machine %d: %w", i, err)
 		}
@@ -59,7 +59,7 @@ func (v *Validator) ValidateMachines(ctx context.Context, machines []spookytypes
 }
 
 // ValidateMachine validates a single machine
-func (v *Validator) ValidateMachine(_ context.Context, machine spookytypes.Machine) (*spookytypes.ValidationResult, error) {
+func (v *Validator) ValidateMachine(_ context.Context, machine *spookytypes.Machine) (*spookytypes.ValidationResult, error) {
 	v.logger.Debug("Validating machine", map[string]interface{}{
 		"hostname": machine.Hostname,
 		"host":     machine.Host,
@@ -89,12 +89,12 @@ func (v *Validator) ValidateMachine(_ context.Context, machine spookytypes.Machi
 	}
 
 	// Validate authentication
-	if err := v.validateAuthentication(&machine); err != nil {
+	if err := v.validateAuthentication(machine); err != nil {
 		errors = append(errors, v.convertErrorToSchemaError(err, "authentication"))
 	}
 
 	// Validate SSH configuration
-	if err := v.validateSSHConfig(&machine); err != nil {
+	if err := v.validateSSHConfig(machine); err != nil {
 		errors = append(errors, v.convertErrorToSchemaError(err, "ssh_config"))
 	}
 
@@ -246,7 +246,7 @@ func (v *Validator) validateResources(resources *spookytypesmachines.MachineReso
 
 	// Validate network speed
 	if resources.NetworkSpeed != "" {
-		networkSpeedRegex := regexp.MustCompile(`^[0-9]+(Gbps|Mbps)$`)
+		networkSpeedRegex := regexp.MustCompile(`^\d+(Gbps|Mbps)$`)
 		if !networkSpeedRegex.MatchString(resources.NetworkSpeed) {
 			return spookytypesmachines.NewMachineValidationError("", "network_speed", resources.NetworkSpeed, "format", "network_speed must be in format '10Gbps' or '1Mbps'")
 		}

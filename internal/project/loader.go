@@ -122,7 +122,7 @@ func (l *Loader) LoadProjectConfig(_ context.Context, projectPath string) (*spoo
 }
 
 // parseProjectBlock parses a project block from HCL
-func (l *Loader) parseProjectBlock(block *hcl.Block, projectPath string) (*spookytypes.ProjectConfig, error) {
+func (l *Loader) parseProjectBlock(block *hcl.Block, _ string) (*spookytypes.ProjectConfig, error) {
 	content, diags := block.Body.Content(&hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{Name: "name", Required: true},
@@ -155,7 +155,7 @@ func (l *Loader) parseProjectBlock(block *hcl.Block, projectPath string) (*spook
 	}
 
 	// Parse metadata block
-	var metadata *spookytypesproject.ProjectMetadata
+	var metadata *spookytypesproject.Metadata
 	for _, block := range content.Blocks {
 		if block.Type == "metadata" {
 			var err error
@@ -168,7 +168,7 @@ func (l *Loader) parseProjectBlock(block *hcl.Block, projectPath string) (*spook
 	}
 
 	// Parse settings block
-	var settings *spookytypesproject.ProjectSettings
+	var settings *spookytypesproject.Settings
 	for _, block := range content.Blocks {
 		if block.Type == "settings" {
 			var err error
@@ -197,7 +197,7 @@ func (l *Loader) parseProjectBlock(block *hcl.Block, projectPath string) (*spook
 }
 
 // parseMetadataBlock parses a metadata block from HCL
-func (l *Loader) parseMetadataBlock(block *hcl.Block) (*spookytypesproject.ProjectMetadata, error) {
+func (l *Loader) parseMetadataBlock(block *hcl.Block) (*spookytypesproject.Metadata, error) {
 	content, diags := block.Body.Content(&hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{Name: "version", Required: false},
@@ -209,7 +209,7 @@ func (l *Loader) parseMetadataBlock(block *hcl.Block) (*spookytypesproject.Proje
 		return nil, fmt.Errorf("failed to parse metadata block: %v", diags)
 	}
 
-	metadata := &spookytypesproject.ProjectMetadata{
+	metadata := &spookytypesproject.Metadata{
 		CreatedAt:  time.Now(),
 		ModifiedAt: time.Now(),
 	}
@@ -249,7 +249,7 @@ func (l *Loader) parseMetadataBlock(block *hcl.Block) (*spookytypesproject.Proje
 }
 
 // parseSettingsBlock parses a settings block from HCL
-func (l *Loader) parseSettingsBlock(block *hcl.Block) (*spookytypesproject.ProjectSettings, error) {
+func (l *Loader) parseSettingsBlock(block *hcl.Block) (*spookytypesproject.Settings, error) {
 	content, diags := block.Body.Content(&hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{Name: "parallel_workers", Required: false},
@@ -348,8 +348,8 @@ func (l *Loader) createDefaultProjectConfig(projectName string) *spookytypes.Pro
 }
 
 // createDefaultMetadata creates default project metadata
-func (l *Loader) createDefaultMetadata() *spookytypesproject.ProjectMetadata {
-	return &spookytypesproject.ProjectMetadata{
+func (l *Loader) createDefaultMetadata() *spookytypesproject.Metadata {
+	return &spookytypesproject.Metadata{
 		Version:    "1.0.0",
 		Author:     "spooky-user",
 		CreatedAt:  time.Now(),
@@ -358,8 +358,8 @@ func (l *Loader) createDefaultMetadata() *spookytypesproject.ProjectMetadata {
 }
 
 // createDefaultSettings creates default project settings
-func (l *Loader) createDefaultSettings() *spookytypesproject.ProjectSettings {
-	return &spookytypesproject.ProjectSettings{
+func (l *Loader) createDefaultSettings() *spookytypesproject.Settings {
+	return &spookytypesproject.Settings{
 		ParallelWorkers:   10,
 		TimeoutSeconds:    300,
 		LogLevel:          "info",

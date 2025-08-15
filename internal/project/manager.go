@@ -84,14 +84,14 @@ func (m *Manager) Initialize(_ context.Context, projectPath string) (*spookytype
 	projectName := filepath.Base(absPath)
 	project := &spookytypes.Project{
 		Path: absPath,
-		Config: &spookytypesproject.ProjectConfig{
+		Config: &spookytypesproject.Config{
 			Name:        projectName,
 			Description: "A spooky project for automation and orchestration",
-			Metadata: &spookytypesproject.ProjectMetadata{
+			Metadata: &spookytypesproject.Metadata{
 				Version: "1.0.0",
 				Author:  "spooky-user",
 			},
-			Settings: &spookytypesproject.ProjectSettings{
+			Settings: &spookytypesproject.Settings{
 				ParallelWorkers:   10,
 				TimeoutSeconds:    300,
 				LogLevel:          "info",

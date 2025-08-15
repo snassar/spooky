@@ -8,14 +8,14 @@ import (
 	spookytypescommon "spooky/internal/types/common"
 )
 
-// SSHError represents a generic SSH error
-type SSHError struct {
+// Error represents a generic SSH error
+type Error struct {
 	spookytypescommon.ErrorDetails
 
 	// Error details
-	ErrorType    SSHErrorType `json:"error_type" hcl:"error_type"`
-	ErrorCode    int          `json:"error_code" hcl:"error_code"`
-	ErrorMessage string       `json:"error_message" hcl:"error_message"`
+	ErrorType    ErrorType `json:"error_type" hcl:"error_type"`
+	ErrorCode    int       `json:"error_code" hcl:"error_code"`
+	ErrorMessage string    `json:"error_message" hcl:"error_message"`
 
 	// Error context
 	Hostname  string `json:"hostname,omitempty" hcl:"hostname,optional"`
@@ -32,27 +32,27 @@ type SSHError struct {
 	Details map[string]interface{} `json:"details,omitempty" hcl:"details,optional"`
 }
 
-// SSHErrorType represents the type of SSH error
-type SSHErrorType string
+// ErrorType represents the type of SSH error
+type ErrorType string
 
 const (
-	SSHErrorTypeConnection     SSHErrorType = "connection"
-	SSHErrorTypeAuthentication SSHErrorType = "authentication"
-	SSHErrorTypeAuthorization  SSHErrorType = "authorization"
-	SSHErrorTypeTimeout        SSHErrorType = "timeout"
-	SSHErrorTypeProtocol       SSHErrorType = "protocol"
-	SSHErrorTypeHostKey        SSHErrorType = "host_key"
-	SSHErrorTypeCommand        SSHErrorType = "command"
-	SSHErrorTypeSession        SSHErrorType = "session"
-	SSHErrorTypeFileTransfer   SSHErrorType = "file_transfer"
-	SSHErrorTypeValidation     SSHErrorType = "validation"
-	SSHErrorTypeConfiguration  SSHErrorType = "configuration"
-	SSHErrorTypeUnknown        SSHErrorType = "unknown"
+	ErrorTypeConnection     ErrorType = "connection"
+	ErrorTypeAuthentication ErrorType = "authentication"
+	ErrorTypeAuthorization  ErrorType = "authorization"
+	ErrorTypeTimeout        ErrorType = "timeout"
+	ErrorTypeProtocol       ErrorType = "protocol"
+	ErrorTypeHostKey        ErrorType = "host_key"
+	ErrorTypeCommand        ErrorType = "command"
+	ErrorTypeSession        ErrorType = "session"
+	ErrorTypeFileTransfer   ErrorType = "file_transfer"
+	ErrorTypeValidation     ErrorType = "validation"
+	ErrorTypeConfiguration  ErrorType = "configuration"
+	ErrorTypeUnknown        ErrorType = "unknown"
 )
 
 // ConnectionError represents an SSH connection error
 type ConnectionError struct {
-	SSHError
+	Error
 
 	// Connection details
 	ConnectionAttempts int           `json:"connection_attempts" hcl:"connection_attempts"`
@@ -73,7 +73,7 @@ type ConnectionError struct {
 
 // AuthenticationError represents an SSH authentication error
 type AuthenticationError struct {
-	SSHError
+	Error
 
 	// Authentication details
 	AuthMethod      AuthMethod `json:"auth_method" hcl:"auth_method"`
@@ -97,7 +97,7 @@ type AuthenticationError struct {
 
 // HostKeyError represents an SSH host key error
 type HostKeyError struct {
-	SSHError
+	Error
 
 	// Host key details
 	HostKeyType         KeyType `json:"host_key_type" hcl:"host_key_type"`
@@ -118,7 +118,7 @@ type HostKeyError struct {
 
 // CommandError represents an SSH command run error
 type CommandError struct {
-	SSHError
+	Error
 
 	// Command details
 	Command    string   `json:"command" hcl:"command"`
@@ -143,7 +143,7 @@ type CommandError struct {
 
 // SessionError represents an SSH session error
 type SessionError struct {
-	SSHError
+	Error
 
 	// Session details
 	SessionID      string        `json:"session_id" hcl:"session_id"`
@@ -169,7 +169,7 @@ type SessionError struct {
 
 // FileTransferError represents an SSH file transfer error
 type FileTransferError struct {
-	SSHError
+	Error
 
 	// Transfer details
 	TransferMode      TransferMode      `json:"transfer_mode" hcl:"transfer_mode"`
@@ -198,7 +198,7 @@ type FileTransferError struct {
 
 // ValidationError represents an SSH validation error
 type ValidationError struct {
-	SSHError
+	Error
 
 	// Validation details
 	ValidationType ValidationType `json:"validation_type" hcl:"validation_type"`
@@ -242,7 +242,7 @@ const (
 
 // ConfigurationError represents an SSH configuration error
 type ConfigurationError struct {
-	SSHError
+	Error
 
 	// Configuration details
 	ConfigPath    string `json:"config_path" hcl:"config_path"`

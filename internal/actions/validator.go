@@ -39,7 +39,7 @@ func (v *Validator) ValidateActions(ctx context.Context, actions []spookytypes.A
 
 	// Validate each action
 	for i := range actions {
-		actionResult, err := v.ValidateAction(ctx, actions[i])
+		actionResult, err := v.ValidateAction(ctx, &actions[i])
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate action %s: %w", actions[i].Name, err)
 		}
@@ -73,7 +73,7 @@ func (v *Validator) ValidateActions(ctx context.Context, actions []spookytypes.A
 }
 
 // ValidateAction validates a single action
-func (v *Validator) ValidateAction(_ context.Context, action spookytypes.Action) (*spookytypes.ValidationResult, error) {
+func (v *Validator) ValidateAction(_ context.Context, action *spookytypes.Action) (*spookytypes.ValidationResult, error) {
 	v.logger.Debug("Validating action", map[string]interface{}{
 		"action": action.Name,
 		"type":   action.Type,

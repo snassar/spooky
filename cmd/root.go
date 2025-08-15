@@ -30,7 +30,7 @@ Examples:
   spooky --version
   spooky --help`,
 	Version: Version,
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 		// Skip auto-setup for version and help commands
 		if cmd.Name() == "version" || cmd.Name() == "help" {
 			return nil
@@ -63,7 +63,4 @@ func init() {
 	// Set version template - only show version string
 	RootCmd.SetVersionTemplate(fmt.Sprintf(`%s
 `, Version))
-
-	// Add completion commands
-	RootCmd.AddCommand(completionCmd)
 }

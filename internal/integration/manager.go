@@ -137,7 +137,7 @@ func (m *Manager) initializeHealthStatus() {
 }
 
 // ValidateSystemHealth validates the health of all integrations
-func (m *Manager) ValidateSystemHealth(ctx context.Context) (*spookytypesschemas.ValidationResult, error) {
+func (m *Manager) ValidateSystemHealth(_ context.Context) (*spookytypesschemas.ValidationResult, error) {
 	m.healthMu.RLock()
 	defer m.healthMu.RUnlock()
 

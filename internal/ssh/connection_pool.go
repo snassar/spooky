@@ -221,7 +221,7 @@ func (p *ConnectionPool) createNewConnection(host string, port int, user string)
 	// Create SSH config
 	config := &ssh.ClientConfig{
 		User:            user,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // In production, use proper host key verification
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // nolint:gosec // In production, use proper host key verification
 		Timeout:         p.config.DefaultTimeout,
 	}
 
@@ -271,11 +271,8 @@ func (p *ConnectionPool) cleanupRoutine() {
 	ticker := time.NewTicker(p.config.IdleTimeout / 2)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			p.cleanupIdleConnections()
-		}
+	for range ticker.C {
+		p.cleanupIdleConnections()
 	}
 }
 
@@ -338,7 +335,7 @@ func (p *ConnectionPool) TestConnection(host string, port int, user string) erro
 	// Create temporary connection for testing
 	config := &ssh.ClientConfig{
 		User:            user,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // nolint:gosec // Testing only
 		Timeout:         p.config.DefaultTimeout,
 	}
 

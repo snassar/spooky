@@ -201,13 +201,25 @@ func (l *Loader) parseVariableBlock(block *hcl.Block, sourceFile string) (*spook
 	variable.Metadata["source_file"] = sourceFile
 
 	// Parse attributes
-	attrs := content.Attributes
+	if err := l.parseVariableAttributes(content.Attributes, variable); err != nil {
+		return nil, err
+	}
 
+	// Parse blocks
+	if err := l.parseVariableBlocks(content.Blocks, variable); err != nil {
+		return nil, err
+	}
+
+	return variable, nil
+}
+
+// parseVariableAttributes parses variable attributes to reduce cyclomatic complexity
+func (l *Loader) parseVariableAttributes(attrs hcl.Attributes, variable *spookytypesvariables.Variable) error {
 	// Parse type
 	if attr, exists := attrs["type"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid type: %s", diags.Error())
+			return fmt.Errorf("invalid type: %s", diags.Error())
 		}
 		if val.Type() == cty.String {
 			variable.Type = spookytypesvariables.VariableType(val.AsString())
@@ -218,7 +230,7 @@ func (l *Loader) parseVariableBlock(block *hcl.Block, sourceFile string) (*spook
 	if attr, exists := attrs["default"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid default: %s", diags.Error())
+			return fmt.Errorf("invalid default: %s", diags.Error())
 		}
 		variable.Default = val
 	}
@@ -227,7 +239,7 @@ func (l *Loader) parseVariableBlock(block *hcl.Block, sourceFile string) (*spook
 	if attr, exists := attrs["description"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid description: %s", diags.Error())
+			return fmt.Errorf("invalid description: %s", diags.Error())
 		}
 		if val.Type() == cty.String {
 			variable.Description = val.AsString()
@@ -238,7 +250,7 @@ func (l *Loader) parseVariableBlock(block *hcl.Block, sourceFile string) (*spook
 	if attr, exists := attrs["sensitive"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid sensitive: %s", diags.Error())
+			return fmt.Errorf("invalid sensitive: %s", diags.Error())
 		}
 		if val.Type() == cty.Bool {
 			variable.Sensitive = val.True()
@@ -249,7 +261,7 @@ func (l *Loader) parseVariableBlock(block *hcl.Block, sourceFile string) (*spook
 	if attr, exists := attrs["scope"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid scope: %s", diags.Error())
+			return fmt.Errorf("invalid scope: %s", diags.Error())
 		}
 		if val.Type() == cty.String {
 			variable.Scope = spookytypesvariables.VariableScope(val.AsString())
@@ -260,30 +272,33 @@ func (l *Loader) parseVariableBlock(block *hcl.Block, sourceFile string) (*spook
 	if attr, exists := attrs["dependencies"]; exists {
 		dependencies, err := l.parseArrayAttribute(attr)
 		if err != nil {
-			return nil, fmt.Errorf("invalid dependencies: %w", err)
+			return fmt.Errorf("invalid dependencies: %w", err)
 		}
 		variable.Dependencies = dependencies
 	}
 
-	// Parse blocks
-	for _, block := range content.Blocks {
+	return nil
+}
+
+// parseVariableBlocks parses variable blocks to reduce cyclomatic complexity
+func (l *Loader) parseVariableBlocks(blocks hcl.Blocks, variable *spookytypesvariables.Variable) error {
+	for _, block := range blocks {
 		switch block.Type {
 		case "validation":
 			validation, err := l.parseValidationBlock(block)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse validation block: %w", err)
+				return fmt.Errorf("failed to parse validation block: %w", err)
 			}
 			variable.Validation = validation
 		case "constraints":
 			constraints, err := l.parseConstraintsBlock(block)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse constraints block: %w", err)
+				return fmt.Errorf("failed to parse constraints block: %w", err)
 			}
 			variable.Constraints = constraints
 		}
 	}
-
-	return variable, nil
+	return nil
 }
 
 // parseArrayAttribute parses an array attribute into a []string

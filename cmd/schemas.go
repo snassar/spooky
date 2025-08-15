@@ -31,7 +31,7 @@ var schemasValidateCmd = &cobra.Command{
 This command provides comprehensive validation with detailed error reporting,
 including field-level validation, cross-field validation, and custom validation rules.`,
 	Args: cobra.ExactArgs(2),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		schemaFile := args[0]
 		dataFile := args[1]
 
@@ -49,7 +49,7 @@ This command shows:
 - All registered schemas
 - Schema types and versions
 - Schema statistics and metadata`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		return handleSchemasList()
 	},
 }
@@ -105,18 +105,19 @@ func handleSchemasValidate(schemaFile, dataFile string) error {
 		// Report errors
 		if len(result.Errors) > 0 {
 			fmt.Printf("\n❌ Errors:\n")
-			for i, error := range result.Errors {
-				fmt.Printf("   %d. %s\n", i+1, error.Message)
-				if error.FieldPath != "" {
-					fmt.Printf("      Field: %s\n", error.FieldPath)
+			for i := range result.Errors {
+				err := &result.Errors[i]
+				fmt.Printf("   %d. %s\n", i+1, err.Message)
+				if err.FieldPath != "" {
+					fmt.Printf("      Field: %s\n", err.FieldPath)
 				}
-				if error.Location != nil {
+				if err.Location != nil {
 					fmt.Printf("      Location: %s:%d:%d\n",
-						error.Location.FilePath, error.Location.Line, error.Location.Column)
+						err.Location.FilePath, err.Location.Line, err.Location.Column)
 				}
-				if len(error.Suggestions) > 0 {
+				if len(err.Suggestions) > 0 {
 					fmt.Printf("      Suggestions:\n")
-					for _, suggestion := range error.Suggestions {
+					for _, suggestion := range err.Suggestions {
 						fmt.Printf("        - %s\n", suggestion)
 					}
 				}
@@ -127,7 +128,8 @@ func handleSchemasValidate(schemaFile, dataFile string) error {
 		// Report warnings
 		if len(result.Warnings) > 0 {
 			fmt.Printf("⚠️  Warnings:\n")
-			for i, warning := range result.Warnings {
+			for i := range result.Warnings {
+				warning := &result.Warnings[i]
 				fmt.Printf("   %d. %s\n", i+1, warning.Message)
 			}
 		}

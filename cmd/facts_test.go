@@ -142,17 +142,17 @@ func TestMatchesMachineFilter(t *testing.T) {
 	machine := spookytypes.Machine{Hostname: "web-server-001"}
 
 	// Test empty filter
-	if !matchesMachineFilter(machine, "") {
+	if !matchesMachineFilter(&machine, "") {
 		t.Error("empty filter should match all machines")
 	}
 
 	// Test matching filter
-	if !matchesMachineFilter(machine, "web") {
+	if !matchesMachineFilter(&machine, "web") {
 		t.Error("machine should match 'web' filter")
 	}
 
 	// Test non-matching filter
-	if matchesMachineFilter(machine, "db") {
+	if matchesMachineFilter(&machine, "db") {
 		t.Error("machine should not match 'db' filter")
 	}
 }
@@ -166,22 +166,22 @@ func TestMatchesTagsFilter(t *testing.T) {
 	}
 
 	// Test empty filter
-	if !matchesTagsFilter(machine, nil) {
+	if !matchesTagsFilter(&machine, nil) {
 		t.Error("empty filter should match all machines")
 	}
 
 	// Test key=value filter
-	if !matchesTagsFilter(machine, []string{"environment=production"}) {
+	if !matchesTagsFilter(&machine, []string{"environment=production"}) {
 		t.Error("machine should match environment=production")
 	}
 
 	// Test key-only filter
-	if !matchesTagsFilter(machine, []string{"role"}) {
+	if !matchesTagsFilter(&machine, []string{"role"}) {
 		t.Error("machine should match role tag")
 	}
 
 	// Test non-matching filter
-	if matchesTagsFilter(machine, []string{"environment=staging"}) {
+	if matchesTagsFilter(&machine, []string{"environment=staging"}) {
 		t.Error("machine should not match environment=staging")
 	}
 }
@@ -192,17 +192,17 @@ func TestMatchesGroupsFilter(t *testing.T) {
 	}
 
 	// Test empty filter
-	if !matchesGroupsFilter(machine, nil) {
+	if !matchesGroupsFilter(&machine, nil) {
 		t.Error("empty filter should match all machines")
 	}
 
 	// Test matching group
-	if !matchesGroupsFilter(machine, []string{"webservers"}) {
+	if !matchesGroupsFilter(&machine, []string{"webservers"}) {
 		t.Error("machine should match webservers group")
 	}
 
 	// Test non-matching group
-	if matchesGroupsFilter(machine, []string{"database"}) {
+	if matchesGroupsFilter(&machine, []string{"database"}) {
 		t.Error("machine should not match database group")
 	}
 }

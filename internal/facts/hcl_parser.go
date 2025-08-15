@@ -141,115 +141,106 @@ func (p *HCLParser) parseBlockAttributes(block *hclsyntax.Block, handlers map[st
 
 // parseHostBlock parses host facts from a host block
 func (p *HCLParser) parseHostBlock(block *hclsyntax.Block, host *spookytypesfacts.HostFacts) error {
-	for _, attr := range block.Body.Attributes {
-		switch attr.Name {
-		case "hostname":
-			if val, err := p.parseStringValue(attr.Expr); err == nil {
+	return p.parseBlockAttributes(block, map[string]func(hclsyntax.Expression) error{
+		"hostname": func(expr hclsyntax.Expression) error {
+			if val, err := p.parseStringValue(expr); err == nil {
 				host.Hostname = val
 			}
-		case "uptime":
-			if val, err := p.parseInt64Value(attr.Expr); err == nil {
+			return nil
+		},
+		"uptime": func(expr hclsyntax.Expression) error {
+			if val, err := p.parseInt64Value(expr); err == nil {
 				host.Uptime = val
 			}
-		case "boot_time":
-			if val, err := p.parseInt64Value(attr.Expr); err == nil {
+			return nil
+		},
+		"boot_time": func(expr hclsyntax.Expression) error {
+			if val, err := p.parseInt64Value(expr); err == nil {
 				host.BootTime = val
 			}
-		case "os":
-			if val, err := p.parseStringValue(attr.Expr); err == nil {
+			return nil
+		},
+		"os": func(expr hclsyntax.Expression) error {
+			if val, err := p.parseStringValue(expr); err == nil {
 				host.OS = val
 			}
-		case "platform":
-			if val, err := p.parseStringValue(attr.Expr); err == nil {
+			return nil
+		},
+		"platform": func(expr hclsyntax.Expression) error {
+			if val, err := p.parseStringValue(expr); err == nil {
 				host.Platform = val
 			}
-		case "platform_family":
-			if val, err := p.parseStringValue(attr.Expr); err == nil {
+			return nil
+		},
+		"platform_family": func(expr hclsyntax.Expression) error {
+			if val, err := p.parseStringValue(expr); err == nil {
 				host.PlatformFamily = val
 			}
-		case "platform_version":
-			if val, err := p.parseStringValue(attr.Expr); err == nil {
+			return nil
+		},
+		"platform_version": func(expr hclsyntax.Expression) error {
+			if val, err := p.parseStringValue(expr); err == nil {
 				host.PlatformVersion = val
 			}
-		case "kernel_version":
-			if val, err := p.parseStringValue(attr.Expr); err == nil {
+			return nil
+		},
+		"kernel_version": func(expr hclsyntax.Expression) error {
+			if val, err := p.parseStringValue(expr); err == nil {
 				host.KernelVersion = val
 			}
-		case "kernel_arch":
-			if val, err := p.parseStringValue(attr.Expr); err == nil {
+			return nil
+		},
+		"kernel_arch": func(expr hclsyntax.Expression) error {
+			if val, err := p.parseStringValue(expr); err == nil {
 				host.KernelArch = val
 			}
-		case "virtualization_system":
-			if val, err := p.parseStringValue(attr.Expr); err == nil {
+			return nil
+		},
+		"virtualization_system": func(expr hclsyntax.Expression) error {
+			if val, err := p.parseStringValue(expr); err == nil {
 				host.VirtualizationSystem = val
 			}
-		case "virtualization_role":
-			if val, err := p.parseStringValue(attr.Expr); err == nil {
+			return nil
+		},
+		"virtualization_role": func(expr hclsyntax.Expression) error {
+			if val, err := p.parseStringValue(expr); err == nil {
 				host.VirtualizationRole = val
 			}
+			return nil
+		},
+	})
+}
+
+// createParser creates a parser function for a specific field and type
+func createParser[T any](field *T, parser func(hclsyntax.Expression) (T, error)) func(hclsyntax.Expression) error {
+	return func(expr hclsyntax.Expression) error {
+		if val, err := parser(expr); err == nil {
+			*field = val
 		}
+		return nil
 	}
-	return nil
 }
 
 // parseCPUBlock parses CPU facts from a cpu block
 func (p *HCLParser) parseCPUBlock(block *hclsyntax.Block, cpu *spookytypesfacts.CPUFacts) error {
-	return p.parseBlockAttributes(block, map[string]func(hclsyntax.Expression) error{
-		"cores": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseIntValue(expr); err == nil {
-				cpu.Cores = val
-			}
-			return nil
-		},
-		"model": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseStringValue(expr); err == nil {
-				cpu.Model = val
-			}
-			return nil
-		},
-		"vendor": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseStringValue(expr); err == nil {
-				cpu.Vendor = val
-			}
-			return nil
-		},
-		"frequency": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseFloat64Value(expr); err == nil {
-				cpu.Frequency = val
-			}
-			return nil
-		},
-	})
+	parsers := map[string]func(hclsyntax.Expression) error{
+		"cores":     createParser(&cpu.Cores, p.parseIntValue),
+		"model":     createParser(&cpu.Model, p.parseStringValue),
+		"vendor":    createParser(&cpu.Vendor, p.parseStringValue),
+		"frequency": createParser(&cpu.Frequency, p.parseFloat64Value),
+	}
+	return p.parseBlockAttributes(block, parsers)
 }
 
 // parseMemoryBlock parses memory facts from a memory block
 func (p *HCLParser) parseMemoryBlock(block *hclsyntax.Block, memory *spookytypesfacts.MemoryFacts) error {
-	return p.parseBlockAttributes(block, map[string]func(hclsyntax.Expression) error{
-		"total": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseInt64Value(expr); err == nil {
-				memory.Total = val
-			}
-			return nil
-		},
-		"available": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseInt64Value(expr); err == nil {
-				memory.Available = val
-			}
-			return nil
-		},
-		"used": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseInt64Value(expr); err == nil {
-				memory.Used = val
-			}
-			return nil
-		},
-		"free": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseInt64Value(expr); err == nil {
-				memory.Free = val
-			}
-			return nil
-		},
-	})
+	parsers := map[string]func(hclsyntax.Expression) error{
+		"total":     createParser(&memory.Total, p.parseInt64Value),
+		"available": createParser(&memory.Available, p.parseInt64Value),
+		"used":      createParser(&memory.Used, p.parseInt64Value),
+		"free":      createParser(&memory.Free, p.parseInt64Value),
+	}
+	return p.parseBlockAttributes(block, parsers)
 }
 
 // parseDiskBlock parses disk facts from a disk block

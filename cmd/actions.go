@@ -27,7 +27,7 @@ all actions in the project will be run.`,
 		Use:   "list",
 		Short: "List available actions",
 		Long:  `List all available actions in the project.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return fmt.Errorf("project directory is required")
 			}
@@ -191,7 +191,7 @@ Use --dry-run to simulate running without making changes.`,
 		Use:   "validate",
 		Short: "Validate action configurations",
 		Long:  `Validate action configurations for syntax and dependencies.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return fmt.Errorf("project directory is required")
 			}
@@ -274,7 +274,7 @@ func validateProjectPath(projectPath string) error {
 // Helper function to get integration manager
 func getIntegrationManager() spookyinterfaces.IntegrationManager {
 	// Return the global integration manager from cmd package
-	return integrationManager
+	return GetIntegrationManager()
 }
 
 func init() {

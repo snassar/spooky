@@ -27,7 +27,7 @@ type SimpleSchemaValidator struct {
 }
 
 // Validate validates data against a schema
-func (s *SimpleSchemaValidator) Validate(schema *spookytypesschemas.Schema, data interface{}) (*spookytypesschemas.ValidationResult, error) {
+func (s *SimpleSchemaValidator) Validate(_ *spookytypesschemas.Schema, _ interface{}) (*spookytypesschemas.ValidationResult, error) {
 	return &spookytypesschemas.ValidationResult{
 		Valid:       true,
 		ValidatedAt: time.Now(),
@@ -37,8 +37,8 @@ func (s *SimpleSchemaValidator) Validate(schema *spookytypesschemas.Schema, data
 }
 
 // ValidateFile validates a file against a schema
-func (s *SimpleSchemaValidator) ValidateFile(schema *spookytypesschemas.Schema, filePath string) (*spookytypesschemas.ValidationResult, error) {
-	return s.Validate(schema, nil)
+func (s *SimpleSchemaValidator) ValidateFile(_ *spookytypesschemas.Schema, _ string) (*spookytypesschemas.ValidationResult, error) {
+	return s.Validate(nil, nil)
 }
 
 // ValidateString validates a string against a schema
@@ -52,12 +52,12 @@ func (s *SimpleSchemaValidator) ValidateBytes(schema *spookytypesschemas.Schema,
 }
 
 // ValidateWithContext validates data with additional context
-func (s *SimpleSchemaValidator) ValidateWithContext(schema *spookytypesschemas.Schema, data interface{}, context map[string]interface{}) (*spookytypesschemas.ValidationResult, error) {
-	return s.Validate(schema, data)
+func (s *SimpleSchemaValidator) ValidateWithContext(_ *spookytypesschemas.Schema, _ interface{}, _ map[string]interface{}) (*spookytypesschemas.ValidationResult, error) {
+	return s.Validate(nil, nil)
 }
 
 // ValidateField validates a specific field
-func (s *SimpleSchemaValidator) ValidateField(schema *spookytypesschemas.Schema, fieldPath string, value interface{}) (*spookytypesschemas.ValidationResult, error) {
+func (s *SimpleSchemaValidator) ValidateField(_ *spookytypesschemas.Schema, _ string, _ interface{}) (*spookytypesschemas.ValidationResult, error) {
 	return &spookytypesschemas.ValidationResult{
 		Valid:       true,
 		ValidatedAt: time.Now(),
@@ -68,21 +68,21 @@ func (s *SimpleSchemaValidator) ValidateField(schema *spookytypesschemas.Schema,
 
 // SimpleSchemaManager implements SchemaManager interface for integration
 type SimpleSchemaManager struct {
-	logger spookytypeslogging.Logger
+	_ spookytypeslogging.Logger // nolint:unused // Interface compliance
 }
 
 // LoadSchema loads a schema from the given path
-func (s *SimpleSchemaManager) LoadSchema(ctx context.Context, schemaPath string) (*spookytypes.Schema, error) {
+func (s *SimpleSchemaManager) LoadSchema(_ context.Context, _ string) (*spookytypes.Schema, error) {
 	return &spookytypes.Schema{}, nil
 }
 
 // LoadEmbeddedSchema loads an embedded schema
-func (s *SimpleSchemaManager) LoadEmbeddedSchema(ctx context.Context, schemaName string) (*spookytypes.Schema, error) {
+func (s *SimpleSchemaManager) LoadEmbeddedSchema(_ context.Context, _ string) (*spookytypes.Schema, error) {
 	return &spookytypes.Schema{}, nil
 }
 
 // Validate validates data against a schema
-func (s *SimpleSchemaManager) Validate(ctx context.Context, schema *spookytypes.Schema, data interface{}) (*spookytypes.ValidationResult, error) {
+func (s *SimpleSchemaManager) Validate(_ context.Context, _ *spookytypes.Schema, _ interface{}) (*spookytypes.ValidationResult, error) {
 	return &spookytypes.ValidationResult{
 		Valid:    true,
 		Errors:   []spookytypes.SchemaError{},
@@ -91,7 +91,7 @@ func (s *SimpleSchemaManager) Validate(ctx context.Context, schema *spookytypes.
 }
 
 // Register registers a new schema
-func (s *SimpleSchemaManager) Register(ctx context.Context, schema *spookytypes.Schema) error {
+func (s *SimpleSchemaManager) Register(_ context.Context, _ *spookytypes.Schema) error {
 	return nil
 }
 

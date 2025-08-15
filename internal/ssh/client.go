@@ -153,21 +153,23 @@ func (p *AdvancedConnectionPool) cleanupIdleConnections() {
 	idleThreshold := p.config.IdleTimeout
 
 	for key, conn := range p.connections {
-		if conn.IsIdle && now.Sub(conn.LastUsed) > idleThreshold {
-			// Close the connection
-			if err := conn.Client.Close(); err != nil {
-				p.logger.Warn("Failed to close idle connection", map[string]interface{}{
-					"host":  conn.Host,
-					"port":  conn.Port,
-					"error": err.Error(),
-				})
-			}
-
-			delete(p.connections, key)
-			removedCount++
-			p.metrics.TotalConnections--
-			p.metrics.IdleConnections--
+		if !conn.IsIdle || now.Sub(conn.LastUsed) <= idleThreshold {
+			continue
 		}
+
+		// Close the connection
+		if err := conn.Client.Close(); err != nil {
+			p.logger.Warn("Failed to close idle connection", map[string]interface{}{
+				"host":  conn.Host,
+				"port":  conn.Port,
+				"error": err.Error(),
+			})
+		}
+
+		delete(p.connections, key)
+		removedCount++
+		p.metrics.TotalConnections--
+		p.metrics.IdleConnections--
 	}
 
 	if removedCount > 0 {
@@ -611,7 +613,7 @@ func (h *HostKeyManager) SaveKnownHosts() error {
 
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(h.knownHostsPath)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("failed to create known hosts directory: %w", err)
 	}
 
@@ -826,7 +828,7 @@ func NewClient(config *spookytypes.ClientConfig, logger spookytypeslogging.Logge
 }
 
 // Connect establishes an SSH connection with proper authentication
-func (c *Client) Connect(ctx context.Context, request *spookytypes.ConnectionRequest) (*spookytypes.ConnectionResult, error) {
+func (c *Client) Connect(_ context.Context, request *spookytypes.ConnectionRequest) (*spookytypes.ConnectionResult, error) {
 	if c.closed {
 		return nil, fmt.Errorf("client is closed")
 	}
@@ -1006,7 +1008,7 @@ func (c *Client) validateRSAKey(pubKey ssh.PublicKey) error {
 }
 
 // RunCommand runs a command via SSH
-func (c *Client) RunCommand(ctx context.Context, connection *spookytypes.Connection, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error) {
+func (c *Client) RunCommand(_ context.Context, connection *spookytypes.Connection, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error) {
 	if c.closed {
 		return nil, fmt.Errorf("client is closed")
 	}
@@ -1107,7 +1109,7 @@ func (c *Client) RunCommand(ctx context.Context, connection *spookytypes.Connect
 }
 
 // Close closes all SSH connections
-func (c *Client) Close(ctx context.Context) error {
+func (c *Client) Close(_ context.Context) error {
 	if c.closed {
 		return nil
 	}
@@ -1166,7 +1168,7 @@ func (m *mockPublicKey) Marshal() []byte {
 	return []byte("mock-key-data")
 }
 
-func (m *mockPublicKey) Verify(data []byte, sig *ssh.Signature) error {
+func (m *mockPublicKey) Verify(_ []byte, _ *ssh.Signature) error {
 	return fmt.Errorf("mock key verification not implemented")
 }
 

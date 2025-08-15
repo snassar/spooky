@@ -49,7 +49,7 @@ func NewManager(logger spookytypeslogging.Logger) spookyinterfaces.SSHManager {
 }
 
 // CreateClient creates a new SSH client with the given configuration
-func (m *Manager) CreateClient(ctx context.Context, config *spookytypes.ClientConfig) (*spookytypes.Client, error) {
+func (m *Manager) CreateClient(_ context.Context, config *spookytypes.ClientConfig) (*spookytypes.Client, error) {
 	// For now, we'll use the existing Client
 	// In a more sophisticated implementation, we might create different client types
 	// based on the configuration
@@ -66,7 +66,7 @@ func (m *Manager) CreateClient(ctx context.Context, config *spookytypes.ClientCo
 }
 
 // Connect establishes an SSH connection to the given host
-func (m *Manager) Connect(ctx context.Context, request *spookytypes.ConnectionRequest) (*spookytypes.ConnectionResult, error) {
+func (m *Manager) Connect(_ context.Context, request *spookytypes.ConnectionRequest) (*spookytypes.ConnectionResult, error) {
 	m.logger.Debug("Establishing SSH connection", map[string]interface{}{
 		"host": request.Host,
 		"port": request.Port,
@@ -74,7 +74,7 @@ func (m *Manager) Connect(ctx context.Context, request *spookytypes.ConnectionRe
 	})
 
 	// Use the Client to establish the connection
-	connectionResult, err := m.client.Connect(ctx, request)
+	connectionResult, err := m.client.Connect(context.Background(), request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to establish SSH connection: %w", err)
 	}
@@ -83,7 +83,7 @@ func (m *Manager) Connect(ctx context.Context, request *spookytypes.ConnectionRe
 }
 
 // Authenticate authenticates with the given credentials
-func (m *Manager) Authenticate(ctx context.Context, connection *spookytypes.Connection, auth *spookytypes.Authentication) (*spookytypes.AuthenticationResult, error) {
+func (m *Manager) Authenticate(_ context.Context, _ *spookytypes.Connection, _ *spookytypes.Authentication) (*spookytypes.AuthenticationResult, error) {
 	// For now, authentication is handled during connection establishment
 	// In a more sophisticated implementation, we might support re-authentication
 	return &spookytypes.AuthenticationResult{
@@ -92,7 +92,7 @@ func (m *Manager) Authenticate(ctx context.Context, connection *spookytypes.Conn
 }
 
 // CreateSession creates a new SSH session
-func (m *Manager) CreateSession(ctx context.Context, connection *spookytypes.Connection) (*spookytypes.Session, error) {
+func (m *Manager) CreateSession(_ context.Context, connection *spookytypes.Connection) (*spookytypes.Session, error) {
 	m.logger.Debug("Creating SSH session", map[string]interface{}{
 		"host": connection.Host,
 		"port": connection.Port,
@@ -111,7 +111,7 @@ func (m *Manager) CreateSession(ctx context.Context, connection *spookytypes.Con
 }
 
 // RunCommand runs a command via SSH
-func (m *Manager) RunCommand(ctx context.Context, session *spookytypes.Session, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error) {
+func (m *Manager) RunCommand(_ context.Context, session *spookytypes.Session, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error) {
 	m.logger.Debug("Running SSH command", map[string]interface{}{
 		"session_id": session.SessionID,
 		"command":    command.Command,
@@ -119,7 +119,7 @@ func (m *Manager) RunCommand(ctx context.Context, session *spookytypes.Session, 
 	})
 
 	// Use the Client to run the command
-	commandResult, err := m.client.RunCommand(ctx, session.Connection, command)
+	commandResult, err := m.client.RunCommand(context.Background(), session.Connection, command)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run SSH command: %w", err)
 	}
@@ -128,7 +128,7 @@ func (m *Manager) RunCommand(ctx context.Context, session *spookytypes.Session, 
 }
 
 // CreateActingSession creates a new SSH acting session
-func (m *Manager) CreateActingSession(ctx context.Context, connection *spookytypes.Connection) (*spookytypesactions.ActingSession, error) {
+func (m *Manager) CreateActingSession(_ context.Context, connection *spookytypes.Connection) (*spookytypesactions.ActingSession, error) {
 	m.logger.Debug("Creating SSH acting session", map[string]interface{}{
 		"host": connection.Host,
 		"port": connection.Port,
@@ -258,7 +258,7 @@ func (m *Manager) RunAction(ctx context.Context, session *spookytypesactions.Act
 }
 
 // CollectResults collects results from multiple acting sessions
-func (m *Manager) CollectResults(ctx context.Context, sessions []*spookytypesactions.ActingSession) ([]*spookytypesactions.ActingResult, error) {
+func (m *Manager) CollectResults(_ context.Context, sessions []*spookytypesactions.ActingSession) ([]*spookytypesactions.ActingResult, error) {
 	var results []*spookytypesactions.ActingResult
 
 	for _, session := range sessions {
@@ -410,7 +410,7 @@ func (m *Manager) TransferFile(ctx context.Context, session *spookytypes.Session
 }
 
 // ValidateConnection validates SSH connection parameters
-func (m *Manager) ValidateConnection(ctx context.Context, request *spookytypes.ConnectionRequest) (*spookytypes.ValidationResult, error) {
+func (m *Manager) ValidateConnection(_ context.Context, request *spookytypes.ConnectionRequest) (*spookytypes.ValidationResult, error) {
 	// Basic validation of connection parameters
 	if request.Host == "" {
 		return &spookytypes.ValidationResult{
@@ -455,7 +455,7 @@ func (m *Manager) ValidateConnection(ctx context.Context, request *spookytypes.C
 }
 
 // ValidateAuthentication validates SSH authentication parameters
-func (m *Manager) ValidateAuthentication(ctx context.Context, auth *spookytypes.Authentication) (*spookytypes.ValidationResult, error) {
+func (m *Manager) ValidateAuthentication(_ context.Context, auth *spookytypes.Authentication) (*spookytypes.ValidationResult, error) {
 	// Basic validation of authentication parameters
 	if auth == nil {
 		return &spookytypes.ValidationResult{

@@ -56,7 +56,7 @@ var variablesListCmd = &cobra.Command{
 This command reads variables.hcl files and variables/*.hcl files and displays information
 about all configured variables including name, type, description, and scope.`,
 	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		return handleVariablesList(args[0])
 	},
 }
@@ -70,7 +70,7 @@ var variablesValidateCmd = &cobra.Command{
 This command validates that all variables in the project have proper configuration
 including required fields, valid types, and dependency relationships.`,
 	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		return handleVariablesValidate(args[0])
 	},
 }
@@ -191,7 +191,8 @@ func handleVariablesValidate(projectPath string) error {
 	// Display errors
 	if len(result.Errors) > 0 {
 		fmt.Println("\nErrors:")
-		for i, err := range result.Errors {
+		for i := range result.Errors {
+			err := &result.Errors[i]
 			fmt.Printf("  %d. %s\n", i+1, err.Message)
 		}
 	}
@@ -199,7 +200,8 @@ func handleVariablesValidate(projectPath string) error {
 	// Display warnings
 	if len(result.Warnings) > 0 {
 		fmt.Println("\nWarnings:")
-		for i, warning := range result.Warnings {
+		for i := range result.Warnings {
+			warning := &result.Warnings[i]
 			fmt.Printf("  %d. %s\n", i+1, warning.Message)
 		}
 	}
@@ -213,7 +215,7 @@ func handleVariablesValidate(projectPath string) error {
 }
 
 // handleVariablesResolve handles resolving variables using the VariablesIntegration interface
-func handleVariablesResolve(cmd *cobra.Command, projectPath string) error {
+func handleVariablesResolve(_ *cobra.Command, projectPath string) error {
 	ctx := context.Background()
 
 	// Initialize dependencies if not already done
@@ -254,7 +256,8 @@ func handleVariablesResolve(cmd *cobra.Command, projectPath string) error {
 	// Display errors
 	if len(resolutionResult.Errors) > 0 {
 		fmt.Printf("\n❌ Resolution errors (%d):\n", len(resolutionResult.Errors))
-		for i, err := range resolutionResult.Errors {
+		for i := range resolutionResult.Errors {
+			err := &resolutionResult.Errors[i]
 			fmt.Printf("  %d. %s: %s\n", i+1, err.VariableName, err.ErrorDetails.Message)
 		}
 	}
@@ -262,7 +265,8 @@ func handleVariablesResolve(cmd *cobra.Command, projectPath string) error {
 	// Display warnings
 	if len(resolutionResult.Warnings) > 0 {
 		fmt.Printf("\n⚠️  Resolution warnings (%d):\n", len(resolutionResult.Warnings))
-		for i, warning := range resolutionResult.Warnings {
+		for i := range resolutionResult.Warnings {
+			warning := &resolutionResult.Warnings[i]
 			fmt.Printf("  %d. %s: %s\n", i+1, warning.VariableName, warning.ErrorDetails.Message)
 		}
 	}

@@ -27,7 +27,7 @@ type FactCollection struct {
 // FactCollector collects facts from a machine
 type FactCollector interface {
 	// Collect collects facts from the given machine
-	Collect(ctx context.Context, machine *spookytypes.Machine) (*FactCollection, error)
+	Collect(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error)
 
 	// GetName returns the collector name
 	GetName() string
@@ -36,13 +36,13 @@ type FactCollector interface {
 // FactManager manages fact collection and export
 type FactManager interface {
 	// CollectFacts collects facts from the given machine
-	CollectFacts(ctx context.Context, machine *spookytypes.Machine) (*FactCollection, error)
+	CollectFacts(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error)
 
 	// GetFacts retrieves facts for a specific machine (collects on demand)
-	GetFacts(ctx context.Context, machineID string) (*FactCollection, error)
+	GetFacts(ctx context.Context, machineID string) (*spookytypesfacts.FactCollection, error)
 
 	// ValidateFacts validates facts against schema
-	ValidateFacts(ctx context.Context, facts *FactCollection) (*spookytypes.ValidationResult, error)
+	ValidateFacts(ctx context.Context, facts *spookytypesfacts.FactCollection) (*spookytypes.ValidationResult, error)
 
 	// ExportFacts exports facts to the given format
 	ExportFacts(ctx context.Context, machineIDs []string, format string, outputPath string) error

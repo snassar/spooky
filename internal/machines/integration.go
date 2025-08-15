@@ -104,9 +104,10 @@ func (i *Integration) PingMachines(ctx context.Context, machines []spookytypes.M
 
 	var statuses []spookytypes.MachineStatus
 
-	for _, machine := range machines {
+	for idx := range machines {
+		machine := &machines[idx]
 		status := spookytypes.MachineStatus{
-			Machine:   &machine,
+			Machine:   machine,
 			Status:    "unknown",
 			LastCheck: time.Now(),
 		}
@@ -189,7 +190,7 @@ func (i *Integration) ExportMachines(ctx context.Context, machines []spookytypes
 	}
 
 	// Write to file
-	if err := os.WriteFile(outputPath, []byte(hclContent), 0644); err != nil {
+	if err := os.WriteFile(outputPath, []byte(hclContent), 0o600); err != nil {
 		return fmt.Errorf("failed to write machines to file %s: %w", outputPath, err)
 	}
 
@@ -215,13 +216,14 @@ func (i *Integration) GetMachineByName(ctx context.Context, name string) (*spook
 	}
 
 	// Find machine by name
-	for _, machine := range machines {
+	for idx := range machines {
+		machine := &machines[idx]
 		if machine.Hostname == name {
 			i.logger.Debug("Found machine by name", map[string]interface{}{
 				"name":     name,
 				"hostname": machine.Hostname,
 			})
-			return &machine, nil
+			return machine, nil
 		}
 	}
 
@@ -337,7 +339,8 @@ func (i *Integration) generateHCLContent(machines []spookytypes.Machine) (string
 
 	content.WriteString("machines {\n")
 
-	for _, machine := range machines {
+	for idx := range machines {
+		machine := &machines[idx]
 		content.WriteString(fmt.Sprintf("  machine %q {\n", machine.Host))
 		content.WriteString(fmt.Sprintf("    host = %q\n", machine.Host))
 		content.WriteString(fmt.Sprintf("    port = %d\n", machine.Port))
@@ -351,14 +354,14 @@ func (i *Integration) generateHCLContent(machines []spookytypes.Machine) (string
 			content.WriteString(fmt.Sprintf("    password = %q\n", machine.Password))
 		}
 		if machine.Passphrase != "" {
-			content.WriteString(fmt.Sprintf("    passphrase = \"%s\"\n", machine.Passphrase))
+			content.WriteString(fmt.Sprintf("    passphrase = %q\n", machine.Passphrase))
 		}
 
 		// Add tags if present
 		if len(machine.Tags) > 0 {
 			content.WriteString("    tags = [\n")
 			for _, tag := range machine.Tags {
-				content.WriteString(fmt.Sprintf("      \"%s\",\n", tag))
+				content.WriteString(fmt.Sprintf("      %q,\n", tag))
 			}
 			content.WriteString("    ]\n")
 		}

@@ -83,7 +83,7 @@ func TestLogManagerWithFileOutput(t *testing.T) {
 	}
 }
 
-func TestLoggerWithFields(t *testing.T) {
+func TestLoggerWithFields(_ *testing.T) {
 	manager := NewLogManager()
 	defer manager.Close()
 
@@ -98,7 +98,7 @@ func TestLoggerWithFields(t *testing.T) {
 	fieldLogger.Info("Message with fields", map[string]interface{}{"additional": "data"})
 }
 
-func TestLoggerWithComponent(t *testing.T) {
+func TestLoggerWithComponent(_ *testing.T) {
 	manager := NewLogManager()
 	defer manager.Close()
 
@@ -109,7 +109,7 @@ func TestLoggerWithComponent(t *testing.T) {
 	componentLogger.Info("Message from new component")
 }
 
-func TestLoggerWithOperation(t *testing.T) {
+func TestLoggerWithOperation(_ *testing.T) {
 	manager := NewLogManager()
 	defer manager.Close()
 

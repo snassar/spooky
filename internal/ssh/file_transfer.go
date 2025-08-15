@@ -220,7 +220,7 @@ func (ft *FileTransferManager) downloadViaSFTP(ctx context.Context, sftpClient *
 
 	// Create local directory if needed
 	localDir := filepath.Dir(transfer.LocalPath)
-	if err := os.MkdirAll(localDir, 0755); err != nil {
+	if err := os.MkdirAll(localDir, 0o755); err != nil {
 		return ft.createFailedResult(transfer, fmt.Errorf("failed to create local directory: %w", err), startTime), nil
 	}
 
@@ -306,7 +306,7 @@ func (ft *FileTransferManager) transferViaSCP(ctx context.Context, pooledConn *P
 }
 
 // uploadViaSCP uploads a file using SCP
-func (ft *FileTransferManager) uploadViaSCP(ctx context.Context, session *ssh.Session, transfer *spookytypesssh.FileTransfer, startTime time.Time) (*spookytypesssh.FileTransferResult, error) {
+func (ft *FileTransferManager) uploadViaSCP(_ context.Context, session *ssh.Session, transfer *spookytypesssh.FileTransfer, startTime time.Time) (*spookytypesssh.FileTransferResult, error) {
 	// Open local file
 	localFile, err := os.Open(transfer.LocalPath)
 	if err != nil {
@@ -381,7 +381,7 @@ func (ft *FileTransferManager) uploadViaSCP(ctx context.Context, session *ssh.Se
 }
 
 // downloadViaSCP downloads a file using SCP
-func (ft *FileTransferManager) downloadViaSCP(ctx context.Context, session *ssh.Session, transfer *spookytypesssh.FileTransfer, startTime time.Time) (*spookytypesssh.FileTransferResult, error) {
+func (ft *FileTransferManager) downloadViaSCP(_ context.Context, session *ssh.Session, transfer *spookytypesssh.FileTransfer, startTime time.Time) (*spookytypesssh.FileTransferResult, error) {
 	// Create local file
 	localFile, err := os.Create(transfer.LocalPath)
 	if err != nil {
@@ -501,7 +501,7 @@ type ProgressTracker struct {
 }
 
 // createProgressTracker creates a new progress tracker
-func (ft *FileTransferManager) createProgressTracker(transfer *spookytypesssh.FileTransfer) *ProgressTracker {
+func (ft *FileTransferManager) createProgressTracker(_ *spookytypesssh.FileTransfer) *ProgressTracker {
 	return &ProgressTracker{
 		startTime: time.Now(),
 		logger:    ft.logger,

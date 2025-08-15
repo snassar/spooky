@@ -97,7 +97,7 @@ func (v *SchemaDrivenValidator) SetRegistry(registry spookytypesschemas.SchemaRe
 }
 
 // ValidateConfiguration validates configuration using schema-driven approach
-func (v *SchemaDrivenValidator) ValidateConfiguration(ctx context.Context, configPath string, configType string) (*spookytypesschemas.ValidationResult, error) {
+func (v *SchemaDrivenValidator) ValidateConfiguration(_ context.Context, configPath, configType string) (*spookytypesschemas.ValidationResult, error) {
 	start := time.Now()
 
 	v.logger.Debug("Validating configuration with schema-driven approach", map[string]interface{}{
@@ -171,7 +171,7 @@ func (v *SchemaDrivenValidator) ValidateConfiguration(ctx context.Context, confi
 }
 
 // ValidateProjectStructure validates project structure using schema-driven approach
-func (v *SchemaDrivenValidator) ValidateProjectStructure(ctx context.Context, projectPath string) (*spookytypesschemas.ValidationResult, error) {
+func (v *SchemaDrivenValidator) ValidateProjectStructure(_ context.Context, projectPath string) (*spookytypesschemas.ValidationResult, error) {
 	start := time.Now()
 
 	v.logger.Debug("Validating project structure with schema-driven approach", map[string]interface{}{
@@ -315,7 +315,7 @@ func (v *SchemaDrivenValidator) getSchemaForConfigType(configType string, result
 }
 
 // validateAgainstSchema validates data against the schema
-func (v *SchemaDrivenValidator) validateAgainstSchema(schema *spookytypesschemas.Schema, data interface{}, configPath string, result *spookytypesschemas.ValidationResult) error {
+func (v *SchemaDrivenValidator) validateAgainstSchema(schema *spookytypesschemas.Schema, data interface{}, _ string, result *spookytypesschemas.ValidationResult) error {
 	// Basic schema validation
 	if schema == nil {
 		v.addError(result, "invalid_schema", "Schema is nil", "Check schema configuration", "error")
@@ -406,7 +406,7 @@ func (v *SchemaDrivenValidator) validateFilePermissions(projectPath string, resu
 	// Check project directory permissions
 	if info, err := os.Stat(projectPath); err == nil {
 		mode := info.Mode()
-		if mode&0077 != 0 {
+		if mode&0o077 != 0 {
 			v.addWarning(result, "directory_permissions", fmt.Sprintf("Project directory has loose permissions: %s", projectPath), "Consider restricting permissions to 750", "warning")
 		}
 	}
@@ -417,7 +417,7 @@ func (v *SchemaDrivenValidator) validateFilePermissions(projectPath string, resu
 		filePath := filepath.Join(projectPath, file)
 		if info, err := os.Stat(filePath); err == nil {
 			mode := info.Mode()
-			if mode&0077 != 0 {
+			if mode&0o077 != 0 {
 				v.addWarning(result, "file_permissions", fmt.Sprintf("Sensitive file has loose permissions: %s", file), "Consider restricting permissions to 600", "warning")
 			}
 		}
@@ -427,7 +427,7 @@ func (v *SchemaDrivenValidator) validateFilePermissions(projectPath string, resu
 }
 
 // validateFileContent validates file content
-func (v *SchemaDrivenValidator) validateFileContent(filePath, fileName string, result *spookytypesschemas.ValidationResult) error {
+func (v *SchemaDrivenValidator) validateFileContent(filePath, _ string, _ *spookytypesschemas.ValidationResult) error {
 	// Read file content
 	data, err := os.ReadFile(filePath)
 	if err != nil {
@@ -444,62 +444,62 @@ func (v *SchemaDrivenValidator) validateFileContent(filePath, fileName string, r
 
 // Schema-specific validation methods
 
-func (v *SchemaDrivenValidator) validateProjectDirectorySchema(data interface{}, result *spookytypesschemas.ValidationResult) error {
+func (v *SchemaDrivenValidator) validateProjectDirectorySchema(_ interface{}, _ *spookytypesschemas.ValidationResult) error {
 	// Validate project directory structure
 	// This would contain specific validation rules for project directory structure
 	return nil
 }
 
-func (v *SchemaDrivenValidator) validateProjectSchema(data interface{}, result *spookytypesschemas.ValidationResult) error {
+func (v *SchemaDrivenValidator) validateProjectSchema(_ interface{}, _ *spookytypesschemas.ValidationResult) error {
 	// Validate project configuration
 	// This would contain specific validation rules for project configuration
 	return nil
 }
 
-func (v *SchemaDrivenValidator) validateMachinesSchema(data interface{}, result *spookytypesschemas.ValidationResult) error {
+func (v *SchemaDrivenValidator) validateMachinesSchema(_ interface{}, _ *spookytypesschemas.ValidationResult) error {
 	// Validate machines configuration
 	// This would contain specific validation rules for machines configuration
 	return nil
 }
 
-func (v *SchemaDrivenValidator) validateActionsSchema(data interface{}, result *spookytypesschemas.ValidationResult) error {
+func (v *SchemaDrivenValidator) validateActionsSchema(_ interface{}, _ *spookytypesschemas.ValidationResult) error {
 	// Validate actions configuration
 	// This would contain specific validation rules for actions configuration
 	return nil
 }
 
-func (v *SchemaDrivenValidator) validateVariablesSchema(data interface{}, result *spookytypesschemas.ValidationResult) error {
+func (v *SchemaDrivenValidator) validateVariablesSchema(_ interface{}, _ *spookytypesschemas.ValidationResult) error {
 	// Validate variables configuration
 	// This would contain specific validation rules for variables configuration
 	return nil
 }
 
-func (v *SchemaDrivenValidator) validateTemplatesSchema(data interface{}, result *spookytypesschemas.ValidationResult) error {
+func (v *SchemaDrivenValidator) validateTemplatesSchema(_ interface{}, _ *spookytypesschemas.ValidationResult) error {
 	// Validate templates configuration
 	// This would contain specific validation rules for templates configuration
 	return nil
 }
 
-func (v *SchemaDrivenValidator) validateLoggingSchema(data interface{}, result *spookytypesschemas.ValidationResult) error {
+func (v *SchemaDrivenValidator) validateLoggingSchema(_ interface{}, _ *spookytypesschemas.ValidationResult) error {
 	// Validate logging configuration
 	// This would contain specific validation rules for logging configuration
 	return nil
 }
 
-func (v *SchemaDrivenValidator) validateSSHSchema(data interface{}, result *spookytypesschemas.ValidationResult) error {
+func (v *SchemaDrivenValidator) validateSSHSchema(_ interface{}, _ *spookytypesschemas.ValidationResult) error {
 	// Validate SSH configuration
 	// This would contain specific validation rules for SSH configuration
 	return nil
 }
 
-func (v *SchemaDrivenValidator) validateBasicSchema(data interface{}, result *spookytypesschemas.ValidationResult) error {
+func (v *SchemaDrivenValidator) validateBasicSchema(_ interface{}, _ *spookytypesschemas.ValidationResult) error {
 	// Basic validation for any HCL content
 	// This would contain basic validation rules
 	return nil
 }
 
 // applyCustomValidationRules applies custom validation rules
-func (v *SchemaDrivenValidator) applyCustomValidationRules(configType string, data interface{}, result *spookytypesschemas.ValidationResult) error {
+func (v *SchemaDrivenValidator) applyCustomValidationRules(_ string, data interface{}, result *spookytypesschemas.ValidationResult) error {
 	// Apply custom validation rules for the configuration type
 	for ruleName, rule := range v.config.CustomRules {
 		if err := v.applyCustomRule(ruleName, rule, data, result); err != nil {
@@ -511,14 +511,14 @@ func (v *SchemaDrivenValidator) applyCustomValidationRules(configType string, da
 }
 
 // validateCrossFieldRules validates cross-field rules
-func (v *SchemaDrivenValidator) validateCrossFieldRules(configType string, data interface{}, result *spookytypesschemas.ValidationResult) error {
+func (v *SchemaDrivenValidator) validateCrossFieldRules(_ string, _ interface{}, _ *spookytypesschemas.ValidationResult) error {
 	// Apply cross-field validation rules
 	// This would contain cross-field validation logic
 	return nil
 }
 
 // applyCustomRule applies a custom validation rule
-func (v *SchemaDrivenValidator) applyCustomRule(ruleName string, rule CustomValidationRule, data interface{}, result *spookytypesschemas.ValidationResult) error {
+func (v *SchemaDrivenValidator) applyCustomRule(_ string, _ CustomValidationRule, _ interface{}, _ *spookytypesschemas.ValidationResult) error {
 	// Apply custom validation rule
 	// This would contain custom rule application logic
 	return nil
@@ -581,13 +581,13 @@ func (v *SchemaDrivenValidator) getEmbeddedSchema(schemaName string) (*spookytyp
 
 // addError adds an error to the validation result
 func (v *SchemaDrivenValidator) addError(result *spookytypesschemas.ValidationResult, code, message, suggestion, severity string) {
-	error := spookytypesschemas.NewSchemaError("", "", message)
-	error.Code = code
-	error.Severity = severity
+	schemaError := spookytypesschemas.NewSchemaError("", "", message)
+	schemaError.Code = code
+	schemaError.Severity = severity
 	if suggestion != "" {
-		error.AddSuggestion(suggestion)
+		schemaError.AddSuggestion(suggestion)
 	}
-	result.Errors = append(result.Errors, *error)
+	result.Errors = append(result.Errors, *schemaError)
 	result.Statistics.InvalidFields++
 	result.Statistics.RulesFailed++
 }

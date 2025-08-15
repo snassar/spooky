@@ -18,21 +18,21 @@ type Project struct {
 	Path string `json:"path" hcl:"path"`
 
 	// Project configuration
-	Config *ProjectConfig `json:"config" hcl:"config"`
+	Config *Config `json:"config" hcl:"config"`
 
 	// Project metadata
-	Metadata *ProjectMetadata `json:"metadata" hcl:"metadata"`
+	Metadata *Metadata `json:"metadata" hcl:"metadata"`
 
 	// Project settings
-	Settings *ProjectSettings `json:"settings" hcl:"settings"`
+	Settings *Settings `json:"settings" hcl:"settings"`
 
 	// Project validation state
 	Validated   bool      `json:"validated" hcl:"validated"`
 	ValidatedAt time.Time `json:"validated_at,omitempty" hcl:"validated_at,optional"`
 }
 
-// ProjectConfig represents the project.hcl configuration
-type ProjectConfig struct {
+// Config represents the project.hcl configuration
+type Config struct {
 	// Project name
 	Name string `json:"name" hcl:"name"`
 
@@ -40,14 +40,14 @@ type ProjectConfig struct {
 	Description string `json:"description,omitempty" hcl:"description,optional"`
 
 	// Project metadata
-	Metadata *ProjectMetadata `json:"metadata,omitempty" hcl:"metadata,optional"`
+	Metadata *Metadata `json:"metadata,omitempty" hcl:"metadata,optional"`
 
 	// Project settings
-	Settings *ProjectSettings `json:"settings,omitempty" hcl:"settings,optional"`
+	Settings *Settings `json:"settings,omitempty" hcl:"settings,optional"`
 }
 
-// ProjectMetadata provides metadata for the project
-type ProjectMetadata struct {
+// Metadata provides metadata for the project
+type Metadata struct {
 	// Project version
 	Version string `json:"version,omitempty" hcl:"version,optional"`
 
@@ -70,8 +70,8 @@ type ProjectMetadata struct {
 	ModifiedAt time.Time `json:"modified_at,omitempty" hcl:"modified_at,optional"`
 }
 
-// ProjectSettings provides configuration settings for the project
-type ProjectSettings struct {
+// Settings provides configuration settings for the project
+type Settings struct {
 	// Parallel workers for operations
 	ParallelWorkers int `json:"parallel_workers,omitempty" hcl:"parallel_workers,optional"`
 
@@ -103,8 +103,8 @@ type ProjectSettings struct {
 	RetryDelaySeconds int `json:"retry_delay_seconds,omitempty" hcl:"retry_delay_seconds,optional"`
 }
 
-// ProjectDirectory represents the project directory structure
-type ProjectDirectory struct {
+// Directory represents the project directory structure
+type Directory struct {
 	// Project root path
 	Root string `json:"root" hcl:"root"`
 
@@ -121,8 +121,8 @@ type ProjectDirectory struct {
 	OptionalFiles []string `json:"optional_files,omitempty" hcl:"optional_files,optional"`
 }
 
-// ProjectValidation represents project validation results
-type ProjectValidation struct {
+// Validation represents project validation results
+type Validation struct {
 	// Whether the project is valid
 	Valid bool `json:"valid" hcl:"valid"`
 
@@ -130,17 +130,17 @@ type ProjectValidation struct {
 	ValidatedAt time.Time `json:"validated_at" hcl:"validated_at"`
 
 	// Validation errors
-	Errors []ProjectError `json:"errors,omitempty" hcl:"errors,optional"`
+	Errors []Error `json:"errors,omitempty" hcl:"errors,optional"`
 
 	// Validation warnings
-	Warnings []ProjectError `json:"warnings,omitempty" hcl:"warnings,optional"`
+	Warnings []Error `json:"warnings,omitempty" hcl:"warnings,optional"`
 
 	// Validation details
 	Details map[string]interface{} `json:"details,omitempty" hcl:"details,optional"`
 }
 
-// ProjectError represents a project-related error
-type ProjectError struct {
+// Error represents a project-related error
+type Error struct {
 	// Error details
 	Code        string                 `json:"code" hcl:"code"`
 	Message     string                 `json:"message" hcl:"message"`
@@ -164,9 +164,9 @@ type ProjectError struct {
 	Severity string `json:"severity" hcl:"severity"` // "error", "warning", "info"
 }
 
-// NewProjectError creates a new project error
-func NewProjectError(projectPath, message string, severity string) *ProjectError {
-	return &ProjectError{
+// NewError creates a new project error
+func NewError(projectPath, message, severity string) *Error {
+	return &Error{
 		Code:        "project_error",
 		Message:     message,
 		Recoverable: severity != "error",
@@ -176,17 +176,17 @@ func NewProjectError(projectPath, message string, severity string) *ProjectError
 }
 
 // Error implements the error interface
-func (e *ProjectError) Error() string {
+func (e *Error) Error() string {
 	return e.Message
 }
 
 // Unwrap returns the underlying error
-func (e *ProjectError) Unwrap() error {
+func (e *Error) Unwrap() error {
 	return nil
 }
 
 // ProjectInfo provides information about a project
-type ProjectInfo struct {
+type Info struct {
 	// Project name
 	Name string `json:"name" hcl:"name"`
 
@@ -216,11 +216,11 @@ type ProjectInfo struct {
 	ValidatedAt time.Time `json:"validated_at,omitempty" hcl:"validated_at,optional"`
 
 	// Project statistics
-	Statistics *ProjectStatistics `json:"statistics,omitempty" hcl:"statistics,optional"`
+	Statistics *Statistics `json:"statistics,omitempty" hcl:"statistics,optional"`
 }
 
-// ProjectStatistics provides statistics about the project
-type ProjectStatistics struct {
+// Statistics provides statistics about the project
+type Statistics struct {
 	// Number of machines in the project
 	MachineCount int `json:"machine_count" hcl:"machine_count"`
 

@@ -35,7 +35,7 @@ func (c *SystemFactCollector) GetName() string {
 }
 
 // Collect collects facts from the given machine
-func (c *SystemFactCollector) Collect(ctx context.Context, machine *spookytypes.Machine) (*FactCollection, error) {
+func (c *SystemFactCollector) Collect(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error) {
 	// Get machine ID
 	machineID, err := c.getMachineID(machine)
 	if err != nil {
@@ -73,7 +73,7 @@ func (c *SystemFactCollector) Collect(ctx context.Context, machine *spookytypes.
 	}
 
 	// Create fact collection
-	collection := &FactCollection{
+	collection := &spookytypesfacts.FactCollection{
 		MachineID:   machineID,
 		CollectedAt: time.Now(),
 		Facts:       facts,
@@ -105,7 +105,7 @@ func (c *SystemFactCollector) getMachineID(machine *spookytypes.Machine) (string
 }
 
 // collectSystemFacts collects operating system facts via SSH commands
-func (c *SystemFactCollector) collectSystemFacts(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.SystemFacts, error) {
+func (c *SystemFactCollector) collectSystemFacts(_ context.Context, machine *spookytypes.Machine) (*spookytypesfacts.SystemFacts, error) {
 	facts := &spookytypesfacts.SystemFacts{}
 
 	// Collect OS information
@@ -224,7 +224,10 @@ func (c *SystemFactCollector) collectCPUFacts(machine *spookytypes.Machine) (*sp
 	}
 
 	cores := 0
-	fmt.Sscanf(strings.TrimSpace(cpuCount), "%d", &cores)
+	if _, err := fmt.Sscanf(strings.TrimSpace(cpuCount), "%d", &cores); err != nil {
+		// If parsing fails, default to 0 cores
+		cores = 0
+	}
 
 	frequency, _ := strconv.ParseFloat(cpuDetails["cpu MHz"], 64)
 
@@ -333,9 +336,15 @@ func (c *SystemFactCollector) collectLoadAverageFacts(machine *spookytypes.Machi
 	}
 
 	var load1, load5, load15 float64
-	fmt.Sscanf(loadParts[0], "%f", &load1)
-	fmt.Sscanf(loadParts[1], "%f", &load5)
-	fmt.Sscanf(loadParts[2], "%f", &load15)
+	if _, err := fmt.Sscanf(loadParts[0], "%f", &load1); err != nil {
+		load1 = 0.0
+	}
+	if _, err := fmt.Sscanf(loadParts[1], "%f", &load5); err != nil {
+		load5 = 0.0
+	}
+	if _, err := fmt.Sscanf(loadParts[2], "%f", &load15); err != nil {
+		load15 = 0.0
+	}
 
 	return &spookytypesfacts.LoadAverageFacts{
 		Load1:  load1,
@@ -353,7 +362,10 @@ func (c *SystemFactCollector) collectProcessFacts(machine *spookytypes.Machine) 
 	}
 
 	count := 0
-	fmt.Sscanf(strings.TrimSpace(processCount), "%d", &count)
+	if _, err := fmt.Sscanf(strings.TrimSpace(processCount), "%d", &count); err != nil {
+		// If parsing fails, default to 0
+		count = 0
+	}
 
 	return &spookytypesfacts.ProcessFacts{
 		Count: count,
@@ -361,7 +373,7 @@ func (c *SystemFactCollector) collectProcessFacts(machine *spookytypes.Machine) 
 }
 
 // collectCollectorFacts collects facts from spooky-collector binary
-func (c *SystemFactCollector) collectCollectorFacts(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.CollectorFacts, error) {
+func (c *SystemFactCollector) collectCollectorFacts(_ context.Context, machine *spookytypes.Machine) (*spookytypesfacts.CollectorFacts, error) {
 	// Check if collector facts file exists
 	checkCmd := "test -f /etc/spooky/facts.hcl && echo 'exists' || echo 'not_found'"
 	result, err := c.runSSHCommand(machine, checkCmd)
@@ -390,7 +402,7 @@ func (c *SystemFactCollector) collectCollectorFacts(ctx context.Context, machine
 }
 
 // collectCustomFacts collects custom facts from HCL files
-func (c *SystemFactCollector) collectCustomFacts(ctx context.Context, machine *spookytypes.Machine) (map[string]interface{}, error) {
+func (c *SystemFactCollector) collectCustomFacts(_ context.Context, machine *spookytypes.Machine) (map[string]interface{}, error) {
 	// Check if custom facts file exists (optional)
 	checkCmd := "test -f /etc/spooky/custom.hcl && echo 'exists' || echo 'not_found'"
 	result, err := c.runSSHCommand(machine, checkCmd)
@@ -479,41 +491,6 @@ func (e *FactCollectionError) Error() string {
 	return fmt.Sprintf("fact collection error on %s (%s): %s", e.Machine, e.ErrorType, e.Message)
 }
 
-// classifyError classifies fact collection errors
-func classifyError(machine string, err error) *FactCollectionError {
-	if err == nil {
-		return nil
-	}
-
-	errorType := "unknown"
-	recoverable := false
-
-	switch {
-	case strings.Contains(err.Error(), "connection refused"):
-		errorType = "ssh_connection"
-		recoverable = false
-	case strings.Contains(err.Error(), "authentication failed"):
-		errorType = "ssh_auth"
-		recoverable = false
-	case strings.Contains(err.Error(), "permission denied"):
-		errorType = "permission"
-		recoverable = true
-	case strings.Contains(err.Error(), "file not found"):
-		errorType = "file_not_found"
-		recoverable = true
-	case strings.Contains(err.Error(), "timeout"):
-		errorType = "timeout"
-		recoverable = true
-	}
-
-	return &FactCollectionError{
-		Machine:     machine,
-		ErrorType:   errorType,
-		Message:     err.Error(),
-		Recoverable: recoverable,
-	}
-}
-
 // Helper methods for parsing command output
 
 func (c *SystemFactCollector) parseOSRelease(content string) map[string]string {
@@ -556,10 +533,18 @@ func (c *SystemFactCollector) parseMemoryInfo(content string) map[string]int64 {
 			parts := strings.Fields(line)
 			if len(parts) >= 7 {
 				var total, used, free, available int64
-				fmt.Sscanf(parts[1], "%d", &total)
-				fmt.Sscanf(parts[2], "%d", &used)
-				fmt.Sscanf(parts[3], "%d", &free)
-				fmt.Sscanf(parts[6], "%d", &available)
+				if _, err := fmt.Sscanf(parts[1], "%d", &total); err != nil {
+					total = 0
+				}
+				if _, err := fmt.Sscanf(parts[2], "%d", &used); err != nil {
+					used = 0
+				}
+				if _, err := fmt.Sscanf(parts[3], "%d", &free); err != nil {
+					free = 0
+				}
+				if _, err := fmt.Sscanf(parts[6], "%d", &available); err != nil {
+					available = 0
+				}
 				result["total"] = total
 				result["used"] = used
 				result["free"] = free
@@ -592,7 +577,7 @@ func (c *SystemFactCollector) parseDiskInfo(content string) []map[string]interfa
 	return result
 }
 
-func (c *SystemFactCollector) parseNetworkInfo(content string) map[string]interface{} {
+func (c *SystemFactCollector) parseNetworkInfo(_ string) map[string]interface{} {
 	result := make(map[string]interface{})
 	// Simplified parsing - would need more sophisticated parsing
 	result["interfaces"] = []string{}

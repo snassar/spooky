@@ -56,7 +56,7 @@ var machinesListCmd = &cobra.Command{
 This command reads machines.hcl files and displays information about all configured
 machines including hostname, host, user, and connection status.`,
 	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		return handleMachinesList(args[0])
 	},
 }
@@ -70,7 +70,7 @@ var machinesValidateCmd = &cobra.Command{
 This command validates that all machines in the inventory have proper configuration
 including required fields, valid authentication methods, and SSH settings.`,
 	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		return handleMachinesValidate(args[0])
 	},
 }
@@ -140,14 +140,15 @@ func handleMachinesList(projectPath string) error {
 
 	// Group machines by source file for better display
 	machinesBySource := make(map[string][]spookytypes.Machine)
-	for _, machine := range machines {
+	for idx := range machines {
+		machine := &machines[idx]
 		sourceFile := "unknown"
 		if machine.MachineMetadata != nil && machine.MachineMetadata.CustomFields != nil {
 			if src, exists := machine.MachineMetadata.CustomFields["source_file"]; exists {
 				sourceFile = src
 			}
 		}
-		machinesBySource[sourceFile] = append(machinesBySource[sourceFile], machine)
+		machinesBySource[sourceFile] = append(machinesBySource[sourceFile], *machine)
 	}
 
 	// Display machines grouped by source
@@ -155,7 +156,8 @@ func handleMachinesList(projectPath string) error {
 		fmt.Printf("📁 Source: %s (%d machines)\n", sourceFile, len(sourceMachines))
 		fmt.Printf("%s\n", strings.Repeat("─", 50))
 
-		for i, machine := range sourceMachines {
+		for i := range sourceMachines {
+			machine := &sourceMachines[i]
 			fmt.Printf("%d. %s (%s)\n", i+1, machine.Hostname, machine.Host)
 			fmt.Printf("   User: %s\n", machine.User)
 			fmt.Printf("   Port: %d\n", machine.Port)
@@ -228,7 +230,8 @@ func handleMachinesValidate(projectPath string) error {
 	// Display errors
 	if len(result.Errors) > 0 {
 		fmt.Printf("❌ Errors (%d):\n", len(result.Errors))
-		for i, err := range result.Errors {
+		for i := range result.Errors {
+			err := &result.Errors[i]
 			fmt.Printf("  %d. %s\n", i+1, err.Message)
 			if err.Context != nil {
 				fmt.Printf("     Context: %v\n", err.Context)
@@ -240,7 +243,8 @@ func handleMachinesValidate(projectPath string) error {
 	// Display warnings
 	if len(result.Warnings) > 0 {
 		fmt.Printf("⚠️  Warnings (%d):\n", len(result.Warnings))
-		for i, warning := range result.Warnings {
+		for i := range result.Warnings {
+			warning := &result.Warnings[i]
 			fmt.Printf("  %d. %s\n", i+1, warning.Message)
 			if warning.Context != nil {
 				fmt.Printf("     Context: %v\n", warning.Context)
@@ -253,9 +257,8 @@ func handleMachinesValidate(projectPath string) error {
 	if len(result.Errors) > 0 {
 		fmt.Printf("❌ Validation failed with %d errors and %d warnings\n", len(result.Errors), len(result.Warnings))
 		return fmt.Errorf("validation failed")
-	} else {
-		fmt.Printf("✅ Validation passed with %d warnings\n", len(result.Warnings))
 	}
+	fmt.Printf("✅ Validation passed with %d warnings\n", len(result.Warnings))
 
 	return nil
 }
@@ -305,7 +308,7 @@ func handleMachinesPing(cmd *cobra.Command, projectPath string) error {
 		for i := range statuses {
 			if statuses[i].Status == "online" {
 				// Test authentication for this machine
-				err := testMachineAuthentication(ctx, machines[i])
+				err := testMachineAuthentication(ctx, &machines[i])
 				if err != nil {
 					statuses[i].Status = "auth_failed"
 					statuses[i].Error = fmt.Sprintf("Authentication failed: %v", err)
@@ -362,9 +365,10 @@ func handleMachinesExport(cmd *cobra.Command, projectPath string) error {
 	// Filter by machine name if specified
 	if machineName, _ := cmd.Flags().GetString("machine"); machineName != "" {
 		var filtered []spookytypes.Machine
-		for _, machine := range machines {
+		for idx := range machines {
+			machine := &machines[idx]
 			if machine.Hostname == machineName {
-				filtered = append(filtered, machine)
+				filtered = append(filtered, *machine)
 				break
 			}
 		}
@@ -382,10 +386,12 @@ func handleMachinesExport(cmd *cobra.Command, projectPath string) error {
 		}
 		// Intersect with already filtered machines
 		var intersection []spookytypes.Machine
-		for _, tagged := range taggedMachines {
-			for _, filtered := range filteredMachines {
+		for idx := range taggedMachines {
+			tagged := &taggedMachines[idx]
+			for idx := range filteredMachines {
+				filtered := &filteredMachines[idx]
 				if tagged.Hostname == filtered.Hostname {
-					intersection = append(intersection, tagged)
+					intersection = append(intersection, *tagged)
 					break
 				}
 			}
@@ -428,7 +434,7 @@ func outputPingResultsText(statuses []spookytypes.MachineStatus, verbose bool) e
 			if verbose {
 				fmt.Printf("%s: %s (latency: %dms; Error: %s)\n",
 					status.Machine.Hostname, status.Status, status.Latency,
-					getErrorMessage(status))
+					getErrorMessage(&status))
 			} else {
 				fmt.Printf("%s: %s\n", status.Machine.Hostname, status.Status)
 			}
@@ -437,7 +443,7 @@ func outputPingResultsText(statuses []spookytypes.MachineStatus, verbose bool) e
 			if verbose {
 				fmt.Printf("%s: %s (latency: %dms; Error: %s)\n",
 					status.Machine.Hostname, status.Status, status.Latency,
-					getErrorMessage(status))
+					getErrorMessage(&status))
 			} else {
 				fmt.Printf("%s: %s\n", status.Machine.Hostname, status.Status)
 			}
@@ -467,7 +473,7 @@ func outputPingResultsJSON(statuses []spookytypes.MachineStatus, verbose bool) e
 		if status.Status != "online" || verbose {
 			machineJSON["latency_ms"] = status.Latency
 			if status.Status != "online" {
-				machineJSON["error"] = getErrorMessage(status)
+				machineJSON["error"] = getErrorMessage(&status)
 			}
 		}
 
@@ -482,7 +488,7 @@ func outputPingResultsJSON(statuses []spookytypes.MachineStatus, verbose bool) e
 }
 
 // testMachineAuthentication tests authentication for a single machine
-func testMachineAuthentication(ctx context.Context, machine spookytypes.Machine) error {
+func testMachineAuthentication(ctx context.Context, machine *spookytypes.Machine) error {
 	// Get actions integration to access SSH manager
 	actionsIntegration := getIntegrationManager().GetActionsIntegration()
 	if actionsIntegration == nil {
@@ -506,12 +512,13 @@ func testMachineAuthentication(ctx context.Context, machine spookytypes.Machine)
 	}
 
 	// Set authentication method based on available credentials
-	if machine.KeyFile != "" {
+	switch {
+	case machine.KeyFile != "":
 		clientConfig.DefaultKeyPath = machine.KeyFile
 		clientConfig.DefaultAuthMethod = "public_key"
-	} else if machine.Password != "" {
+	case machine.Password != "":
 		clientConfig.DefaultAuthMethod = "password"
-	} else {
+	default:
 		return fmt.Errorf("no authentication credentials provided for %s", machine.Hostname)
 	}
 
@@ -550,7 +557,7 @@ func testMachineAuthentication(ctx context.Context, machine spookytypes.Machine)
 }
 
 // getErrorMessage extracts error message from machine status
-func getErrorMessage(status spookytypes.MachineStatus) string {
+func getErrorMessage(status *spookytypes.MachineStatus) string {
 	if status.Error != "" {
 		return status.Error
 	}

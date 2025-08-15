@@ -76,8 +76,9 @@ func (c *IntegrationsCommand) Validate(ctx context.Context, _ []string) error {
 	}
 
 	fmt.Println("❌ Integration validation failed:")
-	for _, error := range result.Errors {
-		fmt.Printf("  - %s\n", error.Message)
+	for idx := range result.Errors {
+		validationError := &result.Errors[idx]
+		fmt.Printf("  - %s\n", validationError.Message)
 	}
 
 	// Exit with error code if validation fails

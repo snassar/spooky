@@ -78,13 +78,13 @@ var projectValidateCmd = &cobra.Command{
 This command validates that the project follows the project-directory.schema.hcl
 schema and that all configuration files are properly formatted.`,
 	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		return handleProjectValidate(args[0])
 	},
 }
 
 // handleProjectInit handles project initialization using the ProjectManager interface
-func handleProjectInit(projectPath, name, description, version, author, email, url string) error {
+func handleProjectInit(projectPath, name, description, version, author, _, url string) error {
 	ctx := context.Background()
 
 	// Initialize dependencies if not already done
@@ -169,13 +169,15 @@ func handleProjectValidate(projectPath string) error {
 	} else {
 		if len(result.Errors) > 0 {
 			fmt.Printf("❌ Validation issues found:\n")
-			for _, error := range result.Errors {
-				fmt.Printf("   - %s\n", error.Message)
+			for i := range result.Errors {
+				err := &result.Errors[i]
+				fmt.Printf("   - %s\n", err.Message)
 			}
 		}
 		if len(result.Warnings) > 0 {
 			fmt.Printf("⚠️  Warnings:\n")
-			for _, warning := range result.Warnings {
+			for i := range result.Warnings {
+				warning := &result.Warnings[i]
 				fmt.Printf("   - %s\n", warning.Message)
 			}
 		}

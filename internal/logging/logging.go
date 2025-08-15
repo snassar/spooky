@@ -165,7 +165,7 @@ func (lm *LogManager) configureOutput(config *spookytypeslogging.LogConfig) erro
 
 		// Ensure directory exists
 		dir := filepath.Dir(config.File.Path)
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return fmt.Errorf("failed to create log directory: %w", err)
 		}
 
@@ -178,7 +178,7 @@ func (lm *LogManager) configureOutput(config *spookytypeslogging.LogConfig) erro
 		}
 
 		// Parse permissions
-		perm := os.FileMode(0644)
+		perm := os.FileMode(0o644)
 		if config.File.Permissions != "" {
 			if parsed, err := parseOctalPermissions(config.File.Permissions); err == nil {
 				perm = parsed
@@ -460,7 +460,7 @@ func (l *Logger) log(level slog.Level, msg string, fields ...map[string]interfac
 }
 
 // shouldFilter determines if this log should be filtered
-func (l *Logger) shouldFilter(msg string, fields ...map[string]interface{}) bool {
+func (l *Logger) shouldFilter(msg string, _ ...map[string]interface{}) bool {
 	if l.manager.config.Filtering == nil {
 		return false
 	}
@@ -480,7 +480,7 @@ func (l *Logger) shouldFilter(msg string, fields ...map[string]interface{}) bool
 		if len(l.manager.config.Filtering.Patterns.Include) > 0 {
 			matched := false
 			for _, pattern := range l.manager.config.Filtering.Patterns.Include {
-				if matched, _ := regexp.MatchString(pattern, msg); matched {
+				if isMatch, _ := regexp.MatchString(pattern, msg); isMatch {
 					matched = true
 					break
 				}
@@ -544,14 +544,16 @@ type StructuredHandler struct {
 }
 
 // Enabled reports whether the handler handles records at the given level
-func (h *StructuredHandler) Enabled(ctx context.Context, level slog.Level) bool {
+func (h *StructuredHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= h.level
 }
 
 // Handle handles the Record
-func (h *StructuredHandler) Handle(ctx context.Context, r slog.Record) error {
+//
+//nolint:gocritic // slog.Handler interface requires slog.Record by value
+func (h *StructuredHandler) Handle(_ context.Context, r slog.Record) error {
 	// Build structured log entry
-	entry := h.buildLogEntry(r)
+	entry := h.buildLogEntry(&r)
 
 	// Format and write
 	formatted := h.formatEntry(entry)
@@ -560,21 +562,21 @@ func (h *StructuredHandler) Handle(ctx context.Context, r slog.Record) error {
 }
 
 // WithAttrs returns a new handler with the given attributes
-func (h *StructuredHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+func (h *StructuredHandler) WithAttrs(_ []slog.Attr) slog.Handler {
 	// For simplicity, return the same handler
 	// In a full implementation, you'd want to store the attributes
 	return h
 }
 
 // WithGroup returns a new handler with the given group
-func (h *StructuredHandler) WithGroup(name string) slog.Handler {
+func (h *StructuredHandler) WithGroup(_ string) slog.Handler {
 	// For simplicity, return the same handler
 	// In a full implementation, you'd want to handle groups
 	return h
 }
 
 // buildLogEntry builds a log entry from a slog record
-func (h *StructuredHandler) buildLogEntry(r slog.Record) *spookytypeslogging.LogEntry {
+func (h *StructuredHandler) buildLogEntry(r *slog.Record) *spookytypeslogging.LogEntry {
 	entry := &spookytypeslogging.LogEntry{
 		Timestamp: r.Time,
 		Level:     spookytypeslogging.FromSlogLevel(r.Level),
@@ -617,12 +619,12 @@ func (h *StructuredHandler) formatJSON(entry *spookytypeslogging.LogEntry) strin
 		// Convert fields to JSON string (simplified)
 		var pairs []string
 		for k, v := range entry.Fields {
-			pairs = append(pairs, fmt.Sprintf(`"%s":"%v"`, k, v))
+			pairs = append(pairs, fmt.Sprintf(`%q:%v`, k, v))
 		}
 		fieldsJSON = "{" + strings.Join(pairs, ",") + "}"
 	}
 
-	return fmt.Sprintf(`{"timestamp":"%s","level":"%s","message":"%s","fields":%s}`,
+	return fmt.Sprintf(`{"timestamp":%q,"level":%q,"message":%q,"fields":%s}`,
 		entry.Timestamp.Format(time.RFC3339),
 		entry.Level,
 		entry.Message,
@@ -651,14 +653,12 @@ func (h *StructuredHandler) formatText(entry *spookytypeslogging.LogEntry) strin
 func (h *StructuredHandler) formatLogfmt(entry *spookytypeslogging.LogEntry) string {
 	var pairs []string
 
-	// Add timestamp
-	pairs = append(pairs, fmt.Sprintf("time=%s", entry.Timestamp.Format(time.RFC3339)))
-
-	// Add level
-	pairs = append(pairs, fmt.Sprintf("level=%s", strings.ToLower(string(entry.Level))))
-
-	// Add message
-	pairs = append(pairs, fmt.Sprintf("msg=%q", entry.Message))
+	// Add timestamp, level, and message
+	pairs = append(pairs,
+		fmt.Sprintf("time=%s", entry.Timestamp.Format(time.RFC3339)),
+		fmt.Sprintf("level=%s", strings.ToLower(string(entry.Level))),
+		fmt.Sprintf("msg=%q", entry.Message),
+	)
 
 	// Add fields
 	for k, v := range entry.Fields {

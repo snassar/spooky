@@ -7,6 +7,7 @@ import (
 
 	spookyinterfaces "spooky/internal/interfaces"
 	spookytypes "spooky/internal/types"
+	spookytypesfacts "spooky/internal/types/facts"
 	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesschemas "spooky/internal/types/schemas"
 )
@@ -45,7 +46,7 @@ func (i *Integration) CollectFacts(ctx context.Context, machine *spookytypes.Mac
 }
 
 // StoreFacts stores facts in memory
-func (i *Integration) StoreFacts(ctx context.Context, facts interface{}) error {
+func (i *Integration) StoreFacts(_ context.Context, facts interface{}) error {
 	if facts == nil {
 		return fmt.Errorf("facts cannot be nil")
 	}
@@ -55,9 +56,9 @@ func (i *Integration) StoreFacts(ctx context.Context, facts interface{}) error {
 	})
 
 	// Convert interface{} to FactCollection
-	factCollection, ok := facts.(*FactCollection)
+	factCollection, ok := facts.(*spookytypesfacts.FactCollection)
 	if !ok {
-		return fmt.Errorf("invalid facts type: expected *FactCollection, got %T", facts)
+		return fmt.Errorf("invalid facts type: expected *spookytypesfacts.FactCollection, got %T", facts)
 	}
 
 	// Store facts using the manager (collect and store)
@@ -70,7 +71,7 @@ func (i *Integration) StoreFacts(ctx context.Context, facts interface{}) error {
 }
 
 // LoadFacts loads facts from memory
-func (i *Integration) LoadFacts(ctx context.Context) (interface{}, error) {
+func (i *Integration) LoadFacts(_ context.Context) (interface{}, error) {
 	i.logger.Info("Loading facts via integration")
 
 	// Facts are only stored in memory during operations
@@ -93,11 +94,11 @@ func (i *Integration) ValidateFacts(ctx context.Context, facts interface{}) (*sp
 	})
 
 	// Convert interface{} to FactCollection
-	factCollection, ok := facts.(*FactCollection)
+	factCollection, ok := facts.(*spookytypesfacts.FactCollection)
 	if !ok {
 		return &spookytypes.ValidationResult{
 			Valid:    false,
-			Errors:   []spookytypesschemas.SchemaError{{Message: fmt.Sprintf("invalid facts type: expected *FactCollection, got %T", facts)}},
+			Errors:   []spookytypesschemas.SchemaError{{Message: fmt.Sprintf("invalid facts type: expected *spookytypesfacts.FactCollection, got %T", facts)}},
 			Warnings: []spookytypesschemas.SchemaError{},
 		}, nil
 	}

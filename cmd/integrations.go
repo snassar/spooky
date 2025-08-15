@@ -19,6 +19,11 @@ var (
 	integrationsLogger spookytypeslogging.Logger
 )
 
+// GetIntegrationManager returns the global integration manager instance
+func GetIntegrationManager() spookyinterfaces.IntegrationManager {
+	return integrationManager
+}
+
 // InitializeIntegrationsDependencies initializes integration-related dependencies
 func InitializeIntegrationsDependencies() error {
 	// Create log manager for integrations component
@@ -49,7 +54,7 @@ var integrationsListCmd = &cobra.Command{
 	Long: `List all available integrations and their current status.
 
 This command shows which integrations are available and working correctly.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		// Initialize dependencies if not already done
 		if integrationManager == nil {
 			if err := InitializeIntegrationsDependencies(); err != nil {
@@ -74,7 +79,7 @@ var integrationsValidateCmd = &cobra.Command{
 
 This command performs comprehensive validation of all system integrations
 and reports any issues found.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		// Initialize dependencies if not already done
 		if integrationManager == nil {
 			if err := InitializeIntegrationsDependencies(); err != nil {

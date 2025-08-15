@@ -9,12 +9,10 @@ import (
 	"time"
 
 	spookyinterfaces "spooky/internal/interfaces"
-	spookymachines "spooky/internal/machines"
 	spookyschemas "spooky/internal/schemas"
 	spookytypes "spooky/internal/types"
 	spookytypesactions "spooky/internal/types/actions"
 	spookytypeslogging "spooky/internal/types/logging"
-	spookytypesmachines "spooky/internal/types/machines"
 
 	"github.com/hashicorp/hcl/v2/hclsimple"
 )
@@ -196,7 +194,8 @@ func (m *Manager) createActionPlan(_ context.Context, actions []spookytypes.Acti
 
 	// Convert actions to internal format
 	var internalActions []*spookytypesactions.Action
-	for _, action := range actions {
+	for idx := range actions {
+		action := &actions[idx]
 		// Convert spookytypes.Action to spookytypesactions.Action
 		internalAction := &spookytypesactions.Action{
 			Name:         action.Name,
@@ -278,7 +277,7 @@ func (m *Manager) runActionPlan(ctx context.Context, session *spookytypesactions
 }
 
 // runActionStep runs a single step of actions
-func (m *Manager) runActionStep(ctx context.Context, session *spookytypesactions.ActingSession, actionNames []string, allActions []*spookytypesactions.Action, plan *spookytypesactions.ActionPlan) ([]spookytypes.ActingResult, error) {
+func (m *Manager) runActionStep(ctx context.Context, session *spookytypesactions.ActingSession, actionNames []string, allActions []*spookytypesactions.Action, _ *spookytypesactions.ActionPlan) ([]spookytypes.ActingResult, error) {
 	var results []spookytypes.ActingResult
 
 	// Find actions by name
@@ -768,8 +767,9 @@ func (m *Manager) getTargetMachines(action *spookytypesactions.Action, session *
 func (m *Manager) getTargetMachinesFromSession(action *spookytypesactions.Action, session *spookytypesactions.ActingSession) []spookytypes.Machine {
 	// Convert session machine inventory to the expected type
 	availableMachines := make([]spookytypes.Machine, len(session.MachineInventory))
-	for i, machine := range session.MachineInventory {
-		availableMachines[i] = spookytypes.Machine(machine)
+	for i := range session.MachineInventory {
+		machine := &session.MachineInventory[i]
+		availableMachines[i] = spookytypes.Machine(*machine)
 	}
 
 	// Use the same logic as getTargetMachines but with session inventory
@@ -826,74 +826,6 @@ func (m *Manager) getTargetMachinesFromSession(action *spookytypesactions.Action
 	return availableMachines
 }
 
-// populateSessionWithMachineInventory loads and populates the session with machine inventory
-func (m *Manager) populateSessionWithMachineInventory(ctx context.Context, session *spookytypesactions.ActingSession) error {
-	if session == nil {
-		return fmt.Errorf("session cannot be nil")
-	}
-
-	if session.ProjectPath == "" {
-		return fmt.Errorf("session project path is required for machine inventory loading")
-	}
-
-	// Load machines from the project
-	machines, err := m.loadMachinesFromProject(ctx, session.ProjectPath)
-	if err != nil {
-		return fmt.Errorf("failed to load machine inventory: %w", err)
-	}
-
-	// Convert to session machine type and populate inventory
-	session.MachineInventory = make([]spookytypesmachines.Machine, len(machines))
-	session.MachineCache = make(map[string]*spookytypesmachines.Machine)
-
-	for i, machine := range machines {
-		// Convert spookytypes.Machine to spookytypesmachines.Machine
-		sessionMachine := spookytypesmachines.Machine(machine)
-		session.MachineInventory[i] = sessionMachine
-		session.MachineCache[machine.Hostname] = &session.MachineInventory[i]
-	}
-
-	m.logger.Debug("Populated session with machine inventory", map[string]interface{}{
-		"session_id":    session.SessionID,
-		"project_path":  session.ProjectPath,
-		"machine_count": len(session.MachineInventory),
-		"cache_entries": len(session.MachineCache),
-	})
-
-	return nil
-}
-
-// loadMachinesFromProject loads machines from a project path
-// This is a helper method that loads machines from the project's machines.hcl file
-func (m *Manager) loadMachinesFromProject(ctx context.Context, projectPath string) ([]spookytypes.Machine, error) {
-	// Look for machines.hcl file in the project directory
-	machinesHCLPath := filepath.Join(projectPath, "machines.hcl")
-
-	// Check if machines.hcl exists
-	if _, err := os.Stat(machinesHCLPath); os.IsNotExist(err) {
-		m.logger.Debug("No machines.hcl found in project", map[string]interface{}{
-			"project_path": projectPath,
-		})
-		return []spookytypes.Machine{}, nil
-	}
-
-	// Create a machines loader to parse the machines.hcl file
-	loader := spookymachines.NewLoader(m.logger)
-
-	// Load machines from the machines.hcl file
-	machines, err := loader.LoadMachinesFromFile(ctx, machinesHCLPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load machines from %s: %w", machinesHCLPath, err)
-	}
-
-	m.logger.Debug("Loaded machines from project", map[string]interface{}{
-		"project_path":  projectPath,
-		"machine_count": len(machines),
-	})
-
-	return machines, nil
-}
-
 // machineHasTags checks if a machine has the specified tags
 // Supports both key=value and key-only tag matching
 func (m *Manager) machineHasTags(machine *spookytypes.Machine, tags []string) bool {
@@ -944,7 +876,8 @@ func (m *Manager) GetSSHManager() spookyinterfaces.SSHManager {
 func (m *Manager) resolveDependencies(actions []*spookytypesactions.Action) (runningOrder [][]string, dependencies map[string][]string, err error) {
 	// Build dependency graph
 	dependencies = make(map[string][]string)
-	for _, action := range actions {
+	for idx := range actions {
+		action := actions[idx]
 		dependencies[action.Name] = action.Dependencies
 	}
 
@@ -1037,250 +970,4 @@ func (m *Manager) topologicalSort(dependencies map[string][]string) [][]string {
 	}
 
 	return runningOrder
-}
-
-// mergeActionFiles merges multiple action files into a single collection
-func (m *Manager) mergeActionFiles(ctx context.Context, filePaths []string) ([]*spookytypesactions.Action, error) {
-	m.logger.Debug("Merging action files", map[string]interface{}{
-		"files": len(filePaths),
-	})
-
-	var allActions []*spookytypesactions.Action
-	actionNames := make(map[string]string) // name -> file path for conflict detection
-
-	for _, filePath := range filePaths {
-		actions, err := m.loadActionsFromFile(ctx, filePath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load actions from %s: %w", filePath, err)
-		}
-
-		// Convert to internal format and check for conflicts
-		for _, action := range actions {
-			internalAction := &spookytypesactions.Action{
-				Name:           action.Name,
-				Description:    action.Description,
-				Type:           action.Type,
-				Machines:       action.Machines,
-				Tags:           action.Tags,
-				Dependencies:   action.Dependencies,
-				Parallel:       action.Parallel,
-				MaxConcurrent:  action.MaxConcurrent,
-				Timeout:        action.Timeout,
-				Retries:        action.Retries,
-				RetryDelay:     action.RetryDelay,
-				AllowFailure:   action.AllowFailure,
-				StopOnFailure:  action.StopOnFailure,
-				CommandString:  action.CommandString,
-				Command:        action.Command,
-				Script:         action.Script,
-				Template:       action.Template,
-				FileCopy:       action.FileCopy,
-				ServiceControl: action.ServiceControl,
-				ResourceLimits: action.ResourceLimits,
-				Environment:    action.Environment,
-				Variables:      action.Variables,
-				WorkingDir:     action.WorkingDir,
-				Sudo:           action.Sudo,
-				User:           action.User,
-				Group:          action.Group,
-				ValidateBefore: action.ValidateBefore,
-				DryRun:         action.DryRun,
-				Metadata:       action.Metadata,
-			}
-
-			// Check for name conflicts
-			if existingFile, exists := actionNames[internalAction.Name]; exists {
-				return nil, fmt.Errorf("action name conflict: '%s' defined in both %s and %s",
-					internalAction.Name, existingFile, filePath)
-			}
-
-			actionNames[internalAction.Name] = filePath
-			allActions = append(allActions, internalAction)
-		}
-	}
-
-	m.logger.Info("Action files merged successfully", map[string]interface{}{
-		"files":   len(filePaths),
-		"actions": len(allActions),
-	})
-
-	return allActions, nil
-}
-
-// trackDependencies tracks dependencies across actions and detects circular references
-func (m *Manager) trackDependencies(actions []*spookytypesactions.Action) (map[string][]string, error) {
-	m.logger.Debug("Tracking dependencies across actions", map[string]interface{}{
-		"actions": len(actions),
-	})
-
-	// Build dependency graph
-	dependencies := make(map[string][]string)
-	actionMap := make(map[string]*spookytypesactions.Action)
-
-	// Create action map for quick lookup
-	for _, action := range actions {
-		actionMap[action.Name] = action
-		dependencies[action.Name] = action.Dependencies
-	}
-
-	// Validate that all dependencies exist
-	for actionName, deps := range dependencies {
-		for _, dep := range deps {
-			if _, exists := actionMap[dep]; !exists {
-				return nil, fmt.Errorf("action '%s' depends on undefined action '%s'", actionName, dep)
-			}
-		}
-	}
-
-	// Detect circular dependencies
-	if err := m.detectCircularDependencies(dependencies); err != nil {
-		return nil, fmt.Errorf("circular dependency detected: %w", err)
-	}
-
-	m.logger.Info("Dependencies tracked successfully", map[string]interface{}{
-		"actions":      len(actions),
-		"dependencies": len(dependencies),
-	})
-
-	return dependencies, nil
-}
-
-// detectCircularDependencies detects circular dependencies in the action graph
-func (m *Manager) detectCircularDependencies(dependencies map[string][]string) error {
-	visited := make(map[string]bool)
-	recStack := make(map[string]bool)
-
-	for action := range dependencies {
-		if !visited[action] {
-			if m.hasCircularDependency(action, dependencies, visited, recStack) {
-				return fmt.Errorf("circular dependency detected in action graph")
-			}
-		}
-	}
-
-	return nil
-}
-
-// hasCircularDependency checks if there's a circular dependency starting from the given action
-func (m *Manager) hasCircularDependency(action string, dependencies map[string][]string, visited, recStack map[string]bool) bool {
-	visited[action] = true
-	recStack[action] = true
-
-	for _, dep := range dependencies[action] {
-		if !visited[dep] {
-			if m.hasCircularDependency(dep, dependencies, visited, recStack) {
-				return true
-			}
-		} else if recStack[dep] {
-			// Found a back edge - circular dependency
-			return true
-		}
-	}
-
-	recStack[action] = false
-	return false
-}
-
-// resolveDependenciesWithTopologicalSort resolves dependencies using topological sorting
-func (m *Manager) resolveDependenciesWithTopologicalSort(dependencies map[string][]string) ([][]string, error) {
-	m.logger.Debug("Resolving dependencies with topological sort", map[string]interface{}{
-		"dependencies": len(dependencies),
-	})
-
-	// Calculate in-degrees for each action
-	inDegree := make(map[string]int)
-	for action := range dependencies {
-		inDegree[action] = 0
-	}
-
-	for _, deps := range dependencies {
-		for _, dep := range deps {
-			inDegree[dep]++
-		}
-	}
-
-	// Find actions with no dependencies (in-degree = 0)
-	var queue []string
-	for action, degree := range inDegree {
-		if degree == 0 {
-			queue = append(queue, action)
-		}
-	}
-
-	var executionOrder [][]string
-	var processedCount int
-
-	// Process actions in topological order
-	for len(queue) > 0 {
-		var currentLevel []string
-		var nextQueue []string
-
-		for _, action := range queue {
-			currentLevel = append(currentLevel, action)
-			processedCount++
-
-			// Reduce in-degree for dependent actions
-			for _, dep := range dependencies[action] {
-				inDegree[dep]--
-				if inDegree[dep] == 0 {
-					nextQueue = append(nextQueue, dep)
-				}
-			}
-		}
-
-		executionOrder = append(executionOrder, currentLevel)
-		queue = nextQueue
-	}
-
-	// Check if all actions were processed
-	if processedCount != len(dependencies) {
-		return nil, fmt.Errorf("circular dependency detected - not all actions can be ordered")
-	}
-
-	m.logger.Info("Dependencies resolved with topological sort", map[string]interface{}{
-		"actions":          len(dependencies),
-		"execution_levels": len(executionOrder),
-	})
-
-	return executionOrder, nil
-}
-
-// manageCrossFileDependencies manages dependencies across multiple action files
-func (m *Manager) manageCrossFileDependencies(ctx context.Context, filePaths []string) (map[string][]string, error) {
-	m.logger.Debug("Managing cross-file dependencies", map[string]interface{}{
-		"files": len(filePaths),
-	})
-
-	// Load and merge all action files
-	allActions, err := m.mergeActionFiles(ctx, filePaths)
-	if err != nil {
-		return nil, fmt.Errorf("failed to merge action files: %w", err)
-	}
-
-	// Track dependencies across all actions
-	dependencies, err := m.trackDependencies(allActions)
-	if err != nil {
-		return nil, fmt.Errorf("failed to track dependencies: %w", err)
-	}
-
-	// Resolve dependencies with topological sort
-	executionOrder, err := m.resolveDependenciesWithTopologicalSort(dependencies)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve dependencies: %w", err)
-	}
-
-	// Store execution order in dependencies map for later use
-	dependencies["__execution_order__"] = make([]string, 0)
-	for _, level := range executionOrder {
-		dependencies["__execution_order__"] = append(dependencies["__execution_order__"], level...)
-	}
-
-	m.logger.Info("Cross-file dependencies managed successfully", map[string]interface{}{
-		"files":            len(filePaths),
-		"actions":          len(allActions),
-		"dependencies":     len(dependencies),
-		"execution_levels": len(executionOrder),
-	})
-
-	return dependencies, nil
 }

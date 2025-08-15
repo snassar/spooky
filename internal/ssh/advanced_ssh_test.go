@@ -18,29 +18,29 @@ import (
 // MockLogger implements a simple mock logger for testing
 type MockLogger struct{}
 
-func (m *MockLogger) Debug(msg string, fields ...map[string]interface{})            {}
-func (m *MockLogger) Info(msg string, fields ...map[string]interface{})             {}
-func (m *MockLogger) Warn(msg string, fields ...map[string]interface{})             {}
-func (m *MockLogger) Error(msg string, err error, fields ...map[string]interface{}) {}
-func (m *MockLogger) Fatal(msg string, err error, fields ...map[string]interface{}) {}
+func (m *MockLogger) Debug(_ string, _ ...map[string]interface{})          {}
+func (m *MockLogger) Info(_ string, _ ...map[string]interface{})           {}
+func (m *MockLogger) Warn(_ string, _ ...map[string]interface{})           {}
+func (m *MockLogger) Error(_ string, _ error, _ ...map[string]interface{}) {}
+func (m *MockLogger) Fatal(_ string, _ error, _ ...map[string]interface{}) {}
 
 // WithFields returns a logger with additional fields
-func (m *MockLogger) WithFields(fields map[string]interface{}) spookytypeslogging.Logger {
+func (m *MockLogger) WithFields(_ map[string]interface{}) spookytypeslogging.Logger {
 	return m
 }
 
 // WithComponent returns a logger with a component name
-func (m *MockLogger) WithComponent(component string) spookytypeslogging.Logger {
+func (m *MockLogger) WithComponent(_ string) spookytypeslogging.Logger {
 	return m
 }
 
 // WithOperation returns a logger with an operation name
-func (m *MockLogger) WithOperation(operation string) spookytypeslogging.Logger {
+func (m *MockLogger) WithOperation(_ string) spookytypeslogging.Logger {
 	return m
 }
 
 // SetLevel sets the log level
-func (m *MockLogger) SetLevel(level spookytypeslogging.LogLevel) {}
+func (m *MockLogger) SetLevel(_ spookytypeslogging.LogLevel) {}
 
 // GetLevel returns the current log level
 func (m *MockLogger) GetLevel() spookytypeslogging.LogLevel {
@@ -76,7 +76,7 @@ func TestFileTransfer(t *testing.T) {
 	// Create test file
 	testContent := "Hello, this is a test file for SFTP transfer!"
 	testFile := filepath.Join(t.TempDir(), "test_file.txt")
-	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil { // nolint:gosec // Test file permissions
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
@@ -88,7 +88,7 @@ func TestFileTransfer(t *testing.T) {
 			Direction:   spookytypesssh.TransferDirectionUpload,
 			Mode:        spookytypesssh.TransferModeSFTP,
 			Verify:      true,
-			Permissions: 0644,
+			Permissions: 0o644,
 		}
 
 		result, err := ftm.TransferFile(context.Background(), connection, transfer)
@@ -274,7 +274,7 @@ func BenchmarkFileTransfer(b *testing.B) {
 	// Create test file
 	testContent := "Benchmark test content"
 	testFile := filepath.Join(b.TempDir(), "benchmark_test.txt")
-	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil {
+	if err := os.WriteFile(testFile, []byte(testContent), 0o644); err != nil { // nolint:gosec // Test file permissions
 		b.Fatalf("Failed to create test file: %v", err)
 	}
 

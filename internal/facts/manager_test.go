@@ -3,10 +3,8 @@ package facts
 import (
 	"context"
 	"testing"
-	"time"
 
 	spookytypes "spooky/internal/types"
-	spookytypesfacts "spooky/internal/types/facts"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -22,19 +20,19 @@ func NewMockFactStorage() *MockFactStorage {
 	}
 }
 
-func (m *MockFactStorage) Store(ctx context.Context, machineID string, facts *FactCollection) error {
+func (m *MockFactStorage) Store(_ context.Context, machineID string, facts *FactCollection) error {
 	m.facts[machineID] = facts
 	return nil
 }
 
-func (m *MockFactStorage) Get(ctx context.Context, machineID string) (*FactCollection, error) {
+func (m *MockFactStorage) Get(_ context.Context, machineID string) (*FactCollection, error) {
 	if facts, exists := m.facts[machineID]; exists {
 		return facts, nil
 	}
 	return nil, nil
 }
 
-func (m *MockFactStorage) List(ctx context.Context) ([]string, error) {
+func (m *MockFactStorage) List(_ context.Context) ([]string, error) {
 	var machineIDs []string
 	for machineID := range m.facts {
 		machineIDs = append(machineIDs, machineID)
@@ -42,7 +40,7 @@ func (m *MockFactStorage) List(ctx context.Context) ([]string, error) {
 	return machineIDs, nil
 }
 
-func (m *MockFactStorage) Clear(ctx context.Context) error {
+func (m *MockFactStorage) Clear(_ context.Context) error {
 	m.facts = make(map[string]*FactCollection)
 	return nil
 }
@@ -53,37 +51,6 @@ func (m *MockFactStorage) GetStats() (map[string]interface{}, error) {
 		"total_size":    0,
 		"storage_type":  "memory",
 	}, nil
-}
-
-// createValidTestFacts creates a valid FactCollection for testing
-func createValidTestFacts(machineID string) *FactCollection {
-	return &FactCollection{
-		MachineID:   machineID,
-		CollectedAt: time.Now(),
-		Facts: &spookytypesfacts.Facts{
-			System: &spookytypesfacts.SystemFacts{
-				OS: &spookytypesfacts.OSFacts{
-					Name:    "TestOS",
-					Version: "1.0.0",
-				},
-				Hardware: &spookytypesfacts.HardwareFacts{
-					CPU: &spookytypesfacts.CPUFacts{
-						Cores: 4,
-						Model: "Test CPU",
-					},
-					Memory: &spookytypesfacts.MemoryFacts{
-						Total: 8589934592, // 8GB
-					},
-				},
-				Network: &spookytypesfacts.NetworkFacts{
-					Hostname:    "test-host",
-					IPAddresses: []string{"192.168.1.100"},
-					PrimaryIP:   "192.168.1.100",
-				},
-			},
-		},
-		Metadata: make(map[string]interface{}),
-	}
 }
 
 func createTestManager(t *testing.T) *Manager {

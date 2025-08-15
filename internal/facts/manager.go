@@ -9,6 +9,7 @@ import (
 	"time"
 
 	spookytypes "spooky/internal/types"
+	spookytypesfacts "spooky/internal/types/facts"
 	spookytypesschemas "spooky/internal/types/schemas"
 
 	"github.com/hashicorp/hcl/v2/hclwrite"
@@ -36,7 +37,7 @@ func NewManager(
 }
 
 // CollectFacts collects facts from the given machine
-func (m *Manager) CollectFacts(ctx context.Context, machine *spookytypes.Machine) (*FactCollection, error) {
+func (m *Manager) CollectFacts(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error) {
 	if machine == nil {
 		return nil, fmt.Errorf("machine cannot be nil")
 	}
@@ -56,7 +57,7 @@ func (m *Manager) CollectFacts(ctx context.Context, machine *spookytypes.Machine
 }
 
 // ValidateFacts validates facts against schema
-func (m *Manager) ValidateFacts(ctx context.Context, facts *FactCollection) (*spookytypes.ValidationResult, error) {
+func (m *Manager) ValidateFacts(_ context.Context, facts *spookytypesfacts.FactCollection) (*spookytypes.ValidationResult, error) {
 	if facts == nil {
 		return &spookytypes.ValidationResult{
 			Valid:    false,
@@ -114,7 +115,7 @@ func (m *Manager) ValidateFacts(ctx context.Context, facts *FactCollection) (*sp
 }
 
 // ExportFacts exports facts to the given format
-func (m *Manager) ExportFacts(ctx context.Context, machineIDs []string, format string, outputPath string) error {
+func (m *Manager) ExportFacts(ctx context.Context, machineIDs []string, format, outputPath string) error {
 	m.logger.Info("Exporting facts", map[string]interface{}{
 		"machines": len(machineIDs),
 		"format":   format,
@@ -122,7 +123,7 @@ func (m *Manager) ExportFacts(ctx context.Context, machineIDs []string, format s
 	})
 
 	// Collect facts for the specified machines
-	var allFacts []*FactCollection
+	var allFacts []*spookytypesfacts.FactCollection
 	for _, machineID := range machineIDs {
 		facts, err := m.CollectFacts(ctx, &spookytypes.Machine{Hostname: machineID})
 		if err != nil {
@@ -146,7 +147,7 @@ func (m *Manager) ExportFacts(ctx context.Context, machineIDs []string, format s
 }
 
 // exportToJSON exports facts to JSON format following facts-structure.schema.hcl
-func (m *Manager) exportToJSON(facts []*FactCollection, outputPath string) error {
+func (m *Manager) exportToJSON(facts []*spookytypesfacts.FactCollection, outputPath string) error {
 	// Export each fact collection individually following the schema structure
 	var exportData []map[string]interface{}
 
@@ -170,7 +171,7 @@ func (m *Manager) exportToJSON(facts []*FactCollection, outputPath string) error
 		return fmt.Errorf("failed to marshal facts to JSON: %w", err)
 	}
 
-	if err := os.WriteFile(outputPath, data, 0644); err != nil {
+	if err := os.WriteFile(outputPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write JSON export file: %w", err)
 	}
 
@@ -179,157 +180,198 @@ func (m *Manager) exportToJSON(facts []*FactCollection, outputPath string) error
 }
 
 // exportToHCL exports facts to HCL format following facts-structure.schema.hcl
-func (m *Manager) exportToHCL(facts []*FactCollection, outputPath string) error {
+func (m *Manager) exportToHCL(facts []*spookytypesfacts.FactCollection, outputPath string) error {
 	file := hclwrite.NewEmptyFile()
 	rootBody := file.Body()
 
 	// Export each fact collection following the facts_structure schema
-	for _, fact := range facts {
+	for idx := range facts {
+		fact := facts[idx]
 		if fact == nil {
 			continue
 		}
 
-		// Create facts_structure block
-		factsStructureBlock := rootBody.AppendNewBlock("facts_structure", nil)
-		factsStructureBody := factsStructureBlock.Body()
-
-		// Add machine_id
-		factsStructureBody.SetAttributeValue("machine_id", cty.StringVal(fact.MachineID))
-
-		// Add collected_at
-		factsStructureBody.SetAttributeValue("collected_at", cty.StringVal(fact.CollectedAt.Format(time.RFC3339)))
-
-		// Add facts object
-		if fact.Facts != nil {
-			factsBlock := factsStructureBody.AppendNewBlock("facts", nil)
-			factsBody := factsBlock.Body()
-
-			// Add system facts if available
-			if fact.Facts.System != nil {
-				systemBlock := factsBody.AppendNewBlock("system", nil)
-				systemBody := systemBlock.Body()
-
-				// OS facts
-				if fact.Facts.System.OS != nil {
-					osBlock := systemBody.AppendNewBlock("os", nil)
-					osBody := osBlock.Body()
-					osBody.SetAttributeValue("name", cty.StringVal(fact.Facts.System.OS.Name))
-					osBody.SetAttributeValue("version", cty.StringVal(fact.Facts.System.OS.Version))
-					osBody.SetAttributeValue("arch", cty.StringVal(fact.Facts.System.OS.Arch))
-					if fact.Facts.System.OS.Kernel != "" {
-						osBody.SetAttributeValue("kernel", cty.StringVal(fact.Facts.System.OS.Kernel))
-					}
-					if fact.Facts.System.OS.Platform != "" {
-						osBody.SetAttributeValue("platform", cty.StringVal(fact.Facts.System.OS.Platform))
-					}
-					if fact.Facts.System.OS.Family != "" {
-						osBody.SetAttributeValue("family", cty.StringVal(fact.Facts.System.OS.Family))
-					}
-				}
-
-				// Hardware facts
-				if fact.Facts.System.Hardware != nil {
-					hardwareBlock := systemBody.AppendNewBlock("hardware", nil)
-					hardwareBody := hardwareBlock.Body()
-
-					// CPU facts
-					if fact.Facts.System.Hardware.CPU != nil {
-						cpuBlock := hardwareBody.AppendNewBlock("cpu", nil)
-						cpuBody := cpuBlock.Body()
-						cpuBody.SetAttributeValue("cores", cty.NumberIntVal(int64(fact.Facts.System.Hardware.CPU.Cores)))
-						cpuBody.SetAttributeValue("model", cty.StringVal(fact.Facts.System.Hardware.CPU.Model))
-						if fact.Facts.System.Hardware.CPU.Frequency > 0 {
-							cpuBody.SetAttributeValue("frequency", cty.NumberFloatVal(fact.Facts.System.Hardware.CPU.Frequency))
-						}
-						if fact.Facts.System.Hardware.CPU.Architecture != "" {
-							cpuBody.SetAttributeValue("architecture", cty.StringVal(fact.Facts.System.Hardware.CPU.Architecture))
-						}
-						if fact.Facts.System.Hardware.CPU.Vendor != "" {
-							cpuBody.SetAttributeValue("vendor", cty.StringVal(fact.Facts.System.Hardware.CPU.Vendor))
-						}
-					}
-
-					// Memory facts
-					if fact.Facts.System.Hardware.Memory != nil {
-						memoryBlock := hardwareBody.AppendNewBlock("memory", nil)
-						memoryBody := memoryBlock.Body()
-						memoryBody.SetAttributeValue("total", cty.NumberIntVal(fact.Facts.System.Hardware.Memory.Total))
-						if fact.Facts.System.Hardware.Memory.Available > 0 {
-							memoryBody.SetAttributeValue("available", cty.NumberIntVal(fact.Facts.System.Hardware.Memory.Available))
-						}
-						if fact.Facts.System.Hardware.Memory.Used > 0 {
-							memoryBody.SetAttributeValue("used", cty.NumberIntVal(fact.Facts.System.Hardware.Memory.Used))
-						}
-						if fact.Facts.System.Hardware.Memory.Free > 0 {
-							memoryBody.SetAttributeValue("free", cty.NumberIntVal(fact.Facts.System.Hardware.Memory.Free))
-						}
-						if fact.Facts.System.Hardware.Memory.Buffers > 0 {
-							memoryBody.SetAttributeValue("buffers", cty.NumberIntVal(fact.Facts.System.Hardware.Memory.Buffers))
-						}
-						if fact.Facts.System.Hardware.Memory.Cached > 0 {
-							memoryBody.SetAttributeValue("cached", cty.NumberIntVal(fact.Facts.System.Hardware.Memory.Cached))
-						}
-					}
-				}
-
-				// Network facts
-				if fact.Facts.System.Network != nil {
-					networkBlock := systemBody.AppendNewBlock("network", nil)
-					networkBody := networkBlock.Body()
-
-					if fact.Facts.System.Network.Hostname != "" {
-						networkBody.SetAttributeValue("hostname", cty.StringVal(fact.Facts.System.Network.Hostname))
-					}
-
-					if len(fact.Facts.System.Network.Interfaces) > 0 {
-						interfacesBlock := networkBody.AppendNewBlock("interfaces", nil)
-						interfacesBody := interfacesBlock.Body()
-
-						for _, iface := range fact.Facts.System.Network.Interfaces {
-							ifaceBlock := interfacesBody.AppendNewBlock("interface", []string{iface.Name})
-							ifaceBody := ifaceBlock.Body()
-							ifaceBody.SetAttributeValue("name", cty.StringVal(iface.Name))
-							if iface.MACAddress != "" {
-								ifaceBody.SetAttributeValue("mac_address", cty.StringVal(iface.MACAddress))
-							}
-							if len(iface.IPAddresses) > 0 {
-								// Convert IP addresses to HCL list
-								ipList := make([]cty.Value, len(iface.IPAddresses))
-								for i, ip := range iface.IPAddresses {
-									ipList[i] = cty.StringVal(ip)
-								}
-								ifaceBody.SetAttributeValue("ip_addresses", cty.ListVal(ipList))
-							}
-							if iface.MTU > 0 {
-								ifaceBody.SetAttributeValue("mtu", cty.NumberIntVal(int64(iface.MTU)))
-							}
-						}
-					}
-
-					if len(fact.Facts.System.Network.IPAddresses) > 0 {
-						// Convert IP addresses to HCL list
-						ipList := make([]cty.Value, len(fact.Facts.System.Network.IPAddresses))
-						for i, ip := range fact.Facts.System.Network.IPAddresses {
-							ipList[i] = cty.StringVal(ip)
-						}
-						networkBody.SetAttributeValue("ip_addresses", cty.ListVal(ipList))
-					}
-
-					if fact.Facts.System.Network.PrimaryIP != "" {
-						networkBody.SetAttributeValue("primary_ip", cty.StringVal(fact.Facts.System.Network.PrimaryIP))
-					}
-				}
-			}
-		}
+		m.addFactStructureToHCL(rootBody, fact)
 	}
 
 	// Write to file
-	if err := os.WriteFile(outputPath, file.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(outputPath, file.Bytes(), 0o600); err != nil {
 		return fmt.Errorf("failed to write HCL export file: %w", err)
 	}
 
 	m.logger.Info("Successfully exported facts to HCL", map[string]interface{}{"output": outputPath, "machines": len(facts)})
 	return nil
+}
+
+// addFactStructureToHCL adds a fact structure block to the HCL body
+func (m *Manager) addFactStructureToHCL(rootBody *hclwrite.Body, fact *spookytypesfacts.FactCollection) {
+	// Create facts_structure block
+	factsStructureBlock := rootBody.AppendNewBlock("facts_structure", nil)
+	factsStructureBody := factsStructureBlock.Body()
+
+	// Add machine_id
+	factsStructureBody.SetAttributeValue("machine_id", cty.StringVal(fact.MachineID))
+
+	// Add collected_at
+	factsStructureBody.SetAttributeValue("collected_at", cty.StringVal(fact.CollectedAt.Format(time.RFC3339)))
+
+	// Add facts object
+	if fact.Facts != nil {
+		factsBlock := factsStructureBody.AppendNewBlock("facts", nil)
+		factsBody := factsBlock.Body()
+
+		// Add system facts if available
+		if fact.Facts.System != nil {
+			m.addSystemFactsToHCL(factsBody, fact.Facts.System)
+		}
+	}
+}
+
+// addSystemFactsToHCL adds system facts to the HCL body
+func (m *Manager) addSystemFactsToHCL(factsBody *hclwrite.Body, system *spookytypesfacts.SystemFacts) {
+	systemBlock := factsBody.AppendNewBlock("system", nil)
+	systemBody := systemBlock.Body()
+
+	// OS facts
+	if system.OS != nil {
+		m.addOSFactsToHCL(systemBody, system.OS)
+	}
+
+	// Hardware facts
+	if system.Hardware != nil {
+		m.addHardwareFactsToHCL(systemBody, system.Hardware)
+	}
+
+	// Network facts
+	if system.Network != nil {
+		m.addNetworkFactsToHCL(systemBody, system.Network)
+	}
+}
+
+// addOSFactsToHCL adds OS facts to the HCL body
+func (m *Manager) addOSFactsToHCL(systemBody *hclwrite.Body, os *spookytypesfacts.OSFacts) {
+	osBlock := systemBody.AppendNewBlock("os", nil)
+	osBody := osBlock.Body()
+	osBody.SetAttributeValue("name", cty.StringVal(os.Name))
+	osBody.SetAttributeValue("version", cty.StringVal(os.Version))
+	osBody.SetAttributeValue("arch", cty.StringVal(os.Arch))
+	if os.Kernel != "" {
+		osBody.SetAttributeValue("kernel", cty.StringVal(os.Kernel))
+	}
+	if os.Platform != "" {
+		osBody.SetAttributeValue("platform", cty.StringVal(os.Platform))
+	}
+	if os.Family != "" {
+		osBody.SetAttributeValue("family", cty.StringVal(os.Family))
+	}
+}
+
+// addHardwareFactsToHCL adds hardware facts to the HCL body
+func (m *Manager) addHardwareFactsToHCL(systemBody *hclwrite.Body, hardware *spookytypesfacts.HardwareFacts) {
+	hardwareBlock := systemBody.AppendNewBlock("hardware", nil)
+	hardwareBody := hardwareBlock.Body()
+
+	// CPU facts
+	if hardware.CPU != nil {
+		m.addCPUFactsToHCL(hardwareBody, hardware.CPU)
+	}
+
+	// Memory facts
+	if hardware.Memory != nil {
+		m.addMemoryFactsToHCL(hardwareBody, hardware.Memory)
+	}
+}
+
+// addCPUFactsToHCL adds CPU facts to the HCL body
+func (m *Manager) addCPUFactsToHCL(hardwareBody *hclwrite.Body, cpu *spookytypesfacts.CPUFacts) {
+	cpuBlock := hardwareBody.AppendNewBlock("cpu", nil)
+	cpuBody := cpuBlock.Body()
+	cpuBody.SetAttributeValue("cores", cty.NumberIntVal(int64(cpu.Cores)))
+	cpuBody.SetAttributeValue("model", cty.StringVal(cpu.Model))
+	if cpu.Frequency > 0 {
+		cpuBody.SetAttributeValue("frequency", cty.NumberFloatVal(cpu.Frequency))
+	}
+	if cpu.Architecture != "" {
+		cpuBody.SetAttributeValue("architecture", cty.StringVal(cpu.Architecture))
+	}
+	if cpu.Vendor != "" {
+		cpuBody.SetAttributeValue("vendor", cty.StringVal(cpu.Vendor))
+	}
+}
+
+// addMemoryFactsToHCL adds memory facts to the HCL body
+func (m *Manager) addMemoryFactsToHCL(hardwareBody *hclwrite.Body, memory *spookytypesfacts.MemoryFacts) {
+	memoryBlock := hardwareBody.AppendNewBlock("memory", nil)
+	memoryBody := memoryBlock.Body()
+	memoryBody.SetAttributeValue("total", cty.NumberIntVal(memory.Total))
+	if memory.Available > 0 {
+		memoryBody.SetAttributeValue("available", cty.NumberIntVal(memory.Available))
+	}
+	if memory.Used > 0 {
+		memoryBody.SetAttributeValue("used", cty.NumberIntVal(memory.Used))
+	}
+	if memory.Free > 0 {
+		memoryBody.SetAttributeValue("free", cty.NumberIntVal(memory.Free))
+	}
+	if memory.Buffers > 0 {
+		memoryBody.SetAttributeValue("buffers", cty.NumberIntVal(memory.Buffers))
+	}
+	if memory.Cached > 0 {
+		memoryBody.SetAttributeValue("cached", cty.NumberIntVal(memory.Cached))
+	}
+}
+
+// addNetworkFactsToHCL adds network facts to the HCL body
+func (m *Manager) addNetworkFactsToHCL(systemBody *hclwrite.Body, network *spookytypesfacts.NetworkFacts) {
+	networkBlock := systemBody.AppendNewBlock("network", nil)
+	networkBody := networkBlock.Body()
+
+	if network.Hostname != "" {
+		networkBody.SetAttributeValue("hostname", cty.StringVal(network.Hostname))
+	}
+
+	if len(network.Interfaces) > 0 {
+		m.addNetworkInterfacesToHCL(networkBody, network.Interfaces)
+	}
+
+	if len(network.IPAddresses) > 0 {
+		// Convert IP addresses to HCL list
+		ipList := make([]cty.Value, len(network.IPAddresses))
+		for i, ip := range network.IPAddresses {
+			ipList[i] = cty.StringVal(ip)
+		}
+		networkBody.SetAttributeValue("ip_addresses", cty.ListVal(ipList))
+	}
+
+	if network.PrimaryIP != "" {
+		networkBody.SetAttributeValue("primary_ip", cty.StringVal(network.PrimaryIP))
+	}
+}
+
+// addNetworkInterfacesToHCL adds network interfaces to the HCL body
+func (m *Manager) addNetworkInterfacesToHCL(networkBody *hclwrite.Body, interfaces []*spookytypesfacts.NetworkInterface) {
+	interfacesBlock := networkBody.AppendNewBlock("interfaces", nil)
+	interfacesBody := interfacesBlock.Body()
+
+	for _, iface := range interfaces {
+		ifaceBlock := interfacesBody.AppendNewBlock("interface", []string{iface.Name})
+		ifaceBody := ifaceBlock.Body()
+		ifaceBody.SetAttributeValue("name", cty.StringVal(iface.Name))
+		if iface.MACAddress != "" {
+			ifaceBody.SetAttributeValue("mac_address", cty.StringVal(iface.MACAddress))
+		}
+		if len(iface.IPAddresses) > 0 {
+			// Convert IP addresses to HCL list
+			ipList := make([]cty.Value, len(iface.IPAddresses))
+			for i, ip := range iface.IPAddresses {
+				ipList[i] = cty.StringVal(ip)
+			}
+			ifaceBody.SetAttributeValue("ip_addresses", cty.ListVal(ipList))
+		}
+		if iface.MTU > 0 {
+			ifaceBody.SetAttributeValue("mtu", cty.NumberIntVal(int64(iface.MTU)))
+		}
+	}
 }
 
 // CollectAndStoreFacts collects facts for a machine (in-memory only)
@@ -415,7 +457,7 @@ func (m *Manager) GetStorageStats() (map[string]interface{}, error) {
 }
 
 // GetFacts retrieves facts for a specific machine (collects on demand)
-func (m *Manager) GetFacts(ctx context.Context, machineID string) (*FactCollection, error) {
+func (m *Manager) GetFacts(ctx context.Context, machineID string) (*spookytypesfacts.FactCollection, error) {
 	m.logger.Info("Getting facts for machine", map[string]interface{}{
 		"machine": machineID,
 	})
@@ -426,14 +468,14 @@ func (m *Manager) GetFacts(ctx context.Context, machineID string) (*FactCollecti
 
 // FactExport represents exported facts data
 type FactExport struct {
-	ExportedAt   time.Time                  `json:"exported_at"`
-	Format       string                     `json:"format"`
-	MachineCount int                        `json:"machine_count"`
-	Facts        map[string]*FactCollection `json:"facts"`
+	ExportedAt   time.Time                                   `json:"exported_at"`
+	Format       string                                      `json:"format"`
+	MachineCount int                                         `json:"machine_count"`
+	Facts        map[string]*spookytypesfacts.FactCollection `json:"facts"`
 }
 
 // ClearFacts removes all facts from memory
-func (m *Manager) ClearFacts(ctx context.Context) error {
+func (m *Manager) ClearFacts(_ context.Context) error {
 	m.logger.Info("Clearing all facts from memory")
 
 	// In-memory storage - no cleanup needed as facts are temporary
