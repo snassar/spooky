@@ -2,264 +2,337 @@
 
 ## Overview
 
-The Integrations system provides centralized coordination for all spooky system components. It includes a comprehensive IntegrationManager that coordinates facts, actions, variables, templates, machines, secrets, and configuration integrations.
+This document provides a comprehensive overview of the spooky integrations system documentation. It serves as a guide to help you find the right documentation for your needs and understand how all the pieces fit together.
+
+**Status: Mixed Implementation** - Different systems have varying levels of implementation completeness, from fully functional to partially implemented with known issues.
 
 ## Documentation Structure
 
-### 📚 **API Reference** (`INTEGRATIONS_API_REFERENCE.md`)
-- Complete interface definitions
-- Implementation details
-- Usage examples
+### 📚 Core Documentation
+
+#### 1. [User Guide](INTEGRATIONS_USER_GUIDE.md)
+**Audience:** End users, system administrators, DevOps engineers
+**Purpose:** Complete guide to using the integrations system
+
+**What it covers:**
+- Getting started with system integrations
+- Integration patterns and best practices
+- System coordination and management
+- Current implementation status and limitations
+- Real-world examples and use cases
+
+**When to use:** Start here if you're new to spooky integrations or need to understand how to use the system effectively.
+
+#### 2. [API Reference](INTEGRATIONS_API_REFERENCE.md)
+**Audience:** Developers, system integrators, contributors
+**Purpose:** Technical reference for the integrations system APIs and implementation
+
+**What it covers:**
+- Core interfaces and type definitions
+- Implementation details and algorithms
 - Error handling patterns
-- Thread safety information
+- Configuration rules and schemas
+- CLI integration details
+- Code examples and patterns
 
-### 👥 **User Guide** (`INTEGRATIONS_USER_GUIDE.md`)
-- CLI command usage
-- Common use cases
-- Integration status explanation
-- Best practices
-- Performance considerations
+**When to use:** Use this when developing with the integrations system, extending functionality, or debugging implementation issues.
 
-### 🔧 **Troubleshooting Guide** (`INTEGRATIONS_TROUBLESHOOTING.md`)
-- Diagnostic commands
-- Common error patterns
-- Integration-specific issues
-- Recovery procedures
-- Prevention strategies
+#### 3. [Troubleshooting Guide](INTEGRATIONS_TROUBLESHOOTING.md)
+**Audience:** System administrators, support engineers, users experiencing issues
+**Purpose:** Solutions for common problems and debugging techniques
 
-## Key Components
+**What it covers:**
+- Common error messages and solutions
+- Integration issues and workarounds
+- Performance issues and optimization
+- Configuration problems and debugging
+- Best practices for troubleshooting
 
-### IntegrationManager
-- **Purpose**: Central coordinator for all system integrations
-- **Features**: Health monitoring, coordinated operations, status tracking
-- **Interfaces**: Provides access to all individual integrations
+**When to use:** Use this when encountering problems or need to debug issues with the integrations system.
 
-### Individual Integrations
-- **FactsIntegration**: Collect and manage system facts
-- **ActionsIntegration**: Load and run actions
-- **VariablesIntegration**: Manage and resolve variables
-- **TemplatesIntegration**: Load and render templates
-- **MachinesIntegration**: Manage machine inventory and connectivity
-- **SecretsIntegration**: Handle encryption and key management
-- **ConfigIntegration**: Load and validate configuration
+### 📁 Examples Directory
 
-### CLI Commands
-```bash
-spooky integrations list      # List available integrations and status
-spooky integrations validate  # Validate all integrations are working
-```
+#### [Examples Overview](examples/README.md)
+**Audience:** All users
+**Purpose:** Quick reference for available examples and use cases
+
+**What it covers:**
+- Available integration examples
+- Example configurations and scripts
+- Common use case patterns
+- Integration examples with other systems
+
+**When to use:** Use this to quickly find relevant examples for your use case.
+
+## System Integration Status
+
+### ✅ **Production Ready Systems**
+
+#### SSH System
+**Status:** ✅ **Fully Implemented**
+- Complete SSH infrastructure with enhanced key support
+- SSH certificate support with validation
+- Connection pooling and efficient management
+- Comprehensive error handling and troubleshooting
+- **Documentation:** Current and accurate
+
+#### Actions System
+**Status:** ✅ **Fully Implemented**
+- Complete acting infrastructure with SSH-based execution
+- All action types (command, script, template_deploy, file_copy, service_control)
+- Machine targeting and dependency resolution
+- Parallel execution with proper resource management
+- **Documentation:** Current and accurate
+
+#### Logging System
+**Status:** ✅ **Fully Implemented**
+- Comprehensive logging framework with schema-driven configuration
+- Multiple output formats (JSON, text, structured)
+- Component-based logging and filtering
+- Performance optimization and caching
+- **Documentation:** Current and accurate
+
+#### Machines System
+**Status:** ✅ **Fully Implemented**
+- Complete machine inventory management
+- SSH connectivity testing and validation
+- Enterprise-scale indexing and filtering
+- Import/export capabilities
+- **Documentation:** Current and accurate
+
+### ⚠️ **Partially Implemented Systems**
+
+#### Facts System
+**Status:** ⚠️ **Partially Implemented**
+- Basic fact collection and export functionality
+- Machine inventory integration
+- **Known Issues:** SSH-based collection has implementation problems
+- **Workarounds:** Use local collection and manual export
+- **Documentation:** Updated to reflect current limitations
+
+#### Templates System
+**Status:** 🔄 **Partially Implemented**
+- Basic template rendering with Go templates
+- Template context management
+- **Needs Enhancement:** CLI commands, advanced features, security
+- **Documentation:** Needs updates to reflect current state
+
+#### Variables System
+**Status:** 🔄 **Partially Implemented**
+- Basic variable management functionality
+- **Needs Enhancement:** File merging, dependency management, CLI commands
+- **Documentation:** Needs updates to reflect current state
+
+### 📋 **Foundation Systems**
+
+#### Project System
+**Status:** ✅ **Fully Implemented**
+- Project initialization and structure
+- Configuration management and validation
+- **Documentation:** Current and accurate
+
+#### Configuration System
+**Status:** ✅ **Fully Implemented**
+- Global and project-specific configuration
+- Schema-driven validation
+- **Documentation:** Current and accurate
+
+#### Schema System
+**Status:** 🔄 **Partially Implemented**
+- Basic schema validation and management
+- **Needs Enhancement:** Advanced validation, evolution management
+- **Documentation:** Needs updates to reflect current state
+
+## Key Concepts
+
+### Core Features
+
+1. **Interface-Based Design** - All systems use well-defined interfaces for integration
+2. **Dependency Injection** - Loose coupling through interface-based dependencies
+3. **Schema-Driven Validation** - Configuration validation using embedded schemas
+4. **Comprehensive Error Handling** - Structured error types and detailed reporting
+5. **Performance Optimization** - Efficient resource management and caching
+6. **Extensible Architecture** - Easy to add new features and integrations
+
+### Architecture Principles
+
+1. **Interface-First Design** - All functionality through well-defined interfaces
+2. **Dependency Injection** - Loose coupling through interface-based dependencies
+3. **Schema-Driven Validation** - Configuration validation using embedded schemas
+4. **Comprehensive Error Handling** - Structured error types and detailed reporting
+5. **Performance Optimization** - Efficient resource management and caching
+6. **Extensible Architecture** - Easy to add new features and integrations
+
+### Best Practices
+
+1. **Use Production-Ready Systems** - Leverage fully implemented systems (SSH, Actions, Logging, Machines)
+2. **Handle Partial Implementations** - Be aware of limitations in partially implemented systems
+3. **Follow Interface Patterns** - Use established interface patterns for consistency
+4. **Validate Configuration** - Always validate configuration before use
+5. **Monitor Performance** - Use appropriate resource management and monitoring
+6. **Report Issues** - Report issues with partially implemented systems
 
 ## Implementation Status
 
-### ✅ **Completed**
-- IntegrationManager interface and implementation
-- Health monitoring system
-- CLI integration commands
-- Comprehensive test coverage
-- Factory pattern for creation
-- Thread-safe health status tracking
+### ✅ Completed Features
 
-### 🔄 **In Progress**
-- Individual integration implementations (templates, secrets, config)
-- Integration factory implementation
-- Health validation improvements
+- **Core Integration Infrastructure**
+  - Integration manager with dependency injection
+  - Interface-based system coordination
+  - Comprehensive error handling and validation
+  - Performance optimization and resource management
 
-### 📋 **Planned**
-- Full integration implementations
-- Advanced health monitoring
-- Performance optimizations
-- Integration dependency management
+- **Production-Ready Systems**
+  - SSH system with complete infrastructure
+  - Actions system with full acting capabilities
+  - Logging system with comprehensive framework
+  - Machines system with complete inventory management
 
-## Architecture Patterns
+- **Foundation Systems**
+  - Project system with initialization and validation
+  - Configuration system with schema-driven validation
+  - Basic schema system with validation capabilities
 
-### Factory Pattern
+### ⚠️ Known Issues and Limitations
+
+- **Facts System SSH Collection**
+  - SSH-based fact collection has implementation issues
+  - Remote facts file reading is not fully functional
+  - Parallel collection across multiple machines has limitations
+
+- **Templates System Enhancement**
+  - CLI commands need implementation
+  - Advanced features need development
+  - Security and sandboxing need implementation
+
+- **Variables System Enhancement**
+  - File merging needs implementation
+  - Dependency management needs development
+  - CLI commands need implementation
+
+### 🔄 Planned Improvements
+
+- **Facts System Enhancement**
+  - Fix SSH-based fact collection implementation
+  - Improve remote facts file reading capabilities
+  - Enhance parallel collection across multiple machines
+
+- **Templates System Completion**
+  - Implement CLI commands for template management
+  - Add advanced template features and security
+  - Complete template integration with other systems
+
+- **Variables System Completion**
+  - Implement file merging and dependency management
+  - Add CLI commands for variable management
+  - Complete variable integration with other systems
+
+## Common Patterns
+
+### System Integration
+
 ```go
-factory := integration.NewFactory(logger)
-manager := factory.CreateIntegrationManager()
+// Get integration manager
+manager := getIntegrationManager()
+
+// Use production-ready systems
+sshIntegration := manager.GetSSHIntegration()
+actionsIntegration := manager.GetActionsIntegration()
+loggingIntegration := manager.GetLoggingIntegration()
+machinesIntegration := manager.GetMachinesIntegration()
+
+// Handle partially implemented systems
+factsIntegration := manager.GetFactsIntegration()
+if factsIntegration != nil {
+    // Use with awareness of limitations
+}
 ```
 
-### Health Monitoring
+### Error Handling
+
 ```go
-status := manager.GetHealthStatus()
-result, err := manager.ValidateSystemHealth(ctx)
+// Handle integration errors
+result, err := integration.Operation(ctx, request)
+if err != nil {
+    // Check for specific error types
+    if validationErr, ok := err.(*ValidationError); ok {
+        // Handle validation errors
+    } else if sshErr, ok := err.(*SSHError); ok {
+        // Handle SSH errors
+    }
+    return err
+}
 ```
 
-### Coordinated Operations
-```go
-err := manager.CoordinatedOperation(ctx, func() error {
-    // Multi-integration operations
-    return nil
-})
+### Configuration Management
+
+```hcl
+# Global configuration
+logging {
+  level = "info"
+  format = "json"
+  output = "stderr"
+}
+
+# Project-specific configuration
+project {
+  name = "my-project"
+  description = "Example project"
+  
+  settings {
+    parallel_workers = 4
+    timeout_seconds = 300
+  }
+}
 ```
 
-## Integration Status Tracking
+## Integration with Other Systems
 
-### Available Status
-- ✅ **Available**: Integration is properly initialized and functional
-- ❌ **Unavailable**: Integration is not configured or not working
+### CLI Integration
+- [User Guide - System Management](INTEGRATIONS_USER_GUIDE.md#system-management)
+- [API Reference - CLI Integration](INTEGRATIONS_API_REFERENCE.md#cli-integration)
+- [Examples - System Coordination](examples/README.md#system-coordination)
 
-### Health Validation
-- Real-time status tracking
-- Thread-safe status updates
-- Comprehensive error reporting
-- Validation result aggregation
+### Configuration Integration
+- [User Guide - Configuration Management](INTEGRATIONS_USER_GUIDE.md#configuration-management)
+- [API Reference - Configuration Integration](INTEGRATIONS_API_REFERENCE.md#configuration-integration)
+- [Examples - Configuration Patterns](examples/README.md#configuration-patterns)
 
-## CLI Output Examples
+## Recent Updates
 
-### List Command
-```
-Available Integrations:
-=======================
-facts        ✅ available
-actions      ✅ available
-variables    ❌ unavailable
-templates    ✅ available
-machines     ✅ available
-secrets      ✅ available
-config       ✅ available
-```
+### System Implementation Status (Latest)
 
-### Validate Command (Success)
-```
-✅ All integrations are working correctly
-```
+The integrations system has varying levels of implementation completeness:
 
-### Validate Command (Failure)
-```
-❌ Integration validation failed:
-  - integration facts is not available
-  - integration actions is not available
-  - integration variables is not available
-  - integration machines is not available
-```
+#### ✅ **Production Ready**
+- **SSH System**: Complete SSH infrastructure with enhanced key support
+- **Actions System**: Complete acting infrastructure with SSH-based execution
+- **Logging System**: Comprehensive logging framework with schema-driven configuration
+- **Machines System**: Complete machine inventory management with SSH connectivity testing
 
-## Error Handling
+#### ⚠️ **Partially Implemented**
+- **Facts System**: Basic functionality with SSH-based collection issues
+- **Templates System**: Basic rendering with CLI commands and advanced features needed
+- **Variables System**: Basic functionality with file merging and CLI commands needed
 
-### Validation Errors
-- Structured error types with context
-- Field-level error information
-- Error aggregation for comprehensive reporting
-- Actionable error messages
+#### 🔄 **Foundation Systems**
+- **Project System**: Complete project initialization and structure
+- **Configuration System**: Complete configuration management and validation
+- **Schema System**: Basic validation with advanced features needed
 
-### Health Status Errors
-- Integration availability tracking
-- Health check failures
-- Status update errors
-- Thread safety violations
+#### 📚 **Updated Documentation**
+- **User Guide**: Updated to reflect current implementation status
+- **API Reference**: Added implementation status indicators for all systems
+- **Troubleshooting Guide**: Added system-specific issues sections
+- **Integration Guides**: Updated to reflect current system capabilities
 
-## Testing Strategy
+## Remember
 
-### Unit Tests
-- IntegrationManager creation and initialization
-- Health status tracking and updates
-- Validation result handling
-- CLI command functionality
+**Good integrations system usage enables:**
+- Coordinated system operations
+- Interface-based system design
+- Comprehensive error handling
+- Performance optimization
+- Extensible architecture
 
-### Integration Tests
-- Factory pattern usage
-- Multi-integration coordination
-- Health monitoring workflows
-- Error handling scenarios
-
-### Test Coverage
-- Interface compliance validation
-- Error path testing
-- Thread safety verification
-- CLI command validation
-
-## Performance Characteristics
-
-### Health Checks
-- Lightweight and fast
-- Cached status information
-- Minimal performance impact
-- Real-time status updates
-
-### Validation Operations
-- Comprehensive system validation
-- Error aggregation and reporting
-- Configurable validation depth
-- Performance-optimized checks
-
-## Security Considerations
-
-### Status Information
-- Integration status may reveal configuration details
-- Health check results should be logged appropriately
-- Sensitive information should not be exposed in status
-
-### Validation Operations
-- May access sensitive configuration data
-- Should be performed in secure environments
-- Error messages should not expose sensitive information
-
-## Best Practices
-
-### Development
-1. Always validate health before critical operations
-2. Use coordinated operations for multi-integration workflows
-3. Handle validation errors with proper context
-4. Monitor integration status in production environments
-
-### Operations
-1. Regular health checks using CLI commands
-2. Pre-operation validation for critical workflows
-3. Monitoring integration status changes
-4. Proper error handling and recovery
-
-### Configuration
-1. Keep integration configurations in version control
-2. Use consistent configuration patterns
-3. Validate configurations before deployment
-4. Monitor configuration changes
-
-## Future Enhancements
-
-### Planned Features
-- Advanced health monitoring with metrics
-- Integration dependency management
-- Performance optimization and caching
-- Enhanced error reporting and diagnostics
-
-### Potential Improvements
-- Integration lifecycle management
-- Dynamic integration loading
-- Health check scheduling
-- Integration performance profiling
-
-## Related Documentation
-
-### System Documentation
-- [Interface Architecture](../interface-architecture.mdc)
-- [Interface Definitions](../interface-definitions.mdc)
-- [Types System](../types.mdc)
-- [Error Handling Standards](../error-handling-standards.mdc)
-
-### Component Documentation
-- [Facts Documentation](./FACTS_DOCUMENTATION_SUMMARY.md)
-- [Actions Documentation](./ACTIONS_DOCUMENTATION_SUMMARY.md)
-- [Variables Documentation](./VARIABLES_DOCUMENTATION_SUMMARY.md)
-- [Templates Documentation](./TEMPLATES_DOCUMENTATION_SUMMARY.md)
-- [Machines Documentation](./MACHINES_DOCUMENTATION_SUMMARY.md)
-- [Secrets Documentation](./SECRETS_DOCUMENTATION_SUMMARY.md)
-- [Config Documentation](./CONFIG_DOCUMENTATION_SUMMARY.md)
-
-## Maintenance
-
-### Documentation Updates
-- Keep API reference current with code changes
-- Update user guide for new features
-- Maintain troubleshooting guide with common issues
-- Review and update examples regularly
-
-### Code Maintenance
-- Ensure interface compliance
-- Maintain test coverage
-- Update health monitoring as needed
-- Review performance characteristics
-
-### Integration Maintenance
-- Monitor integration health regularly
-- Update integration implementations
-- Maintain integration dependencies
-- Review integration patterns and best practices
+**Always be aware of the implementation status of each system and use appropriate workarounds for partially implemented features.**

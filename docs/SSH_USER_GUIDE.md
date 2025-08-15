@@ -2,983 +2,426 @@
 
 ## Overview
 
-The spooky SSH system provides secure, efficient, and validated SSH connectivity for remote machine management. This guide covers everything from basic SSH connections to advanced features like key type validation, certificate authentication, and connection pooling.
-
-## Table of Contents
-
-1. [Getting Started](#getting-started)
-2. [Key Types and Authentication](#key-types-and-authentication)
-3. [SSH Certificates](#ssh-certificates)
-4. [Connection Management](#connection-management)
-5. [Command Running](#command-running)
-6. [Advanced Features](#advanced-features)
-7. [Advanced SSH Capabilities](#advanced-ssh-capabilities)
-8. [Best Practices](#best-practices)
-9. [Examples](#examples)
+The spooky SSH system provides comprehensive SSH connectivity and management capabilities with enhanced key support, SSH certificate support, and robust connection management. This guide covers everything from basic SSH configuration to advanced features like certificate authentication and connection pooling.
 
 ## Getting Started
 
-### Basic SSH Connection
+### Prerequisites
 
-The SSH system in spooky is designed to work seamlessly with the machines inventory system. SSH connections are automatically established when needed for machine operations.
+- spooky CLI installed and configured
+- SSH keys (ED25519, ED25519-SK, or RSA 4096-bit minimum)
+- SSH access to target machines
+- Basic understanding of SSH authentication
 
-**Basic Machine Configuration with SSH:**
-```hcl
-machines {
-  machine "web-server-01" {
-    host = "192.168.1.10"
-    user = "admin"
-    port = 22
-    
-    key_file = "~/.ssh/id_ed25519"
-    passphrase = "my-secure-passphrase"
-    
-    tags = ["web", "production"]
-    groups = ["web-servers"]
-    
-    metadata {
-      environment = "production"
-      datacenter = "us-west-1"
-      owner = "web-team"
-    }
-  }
-}
-```
+### Quick Start
 
-### Testing SSH Connectivity
+1. **Check SSH System Status**
+   ```bash
+   spooky ssh --help
+   ```
 
-Use the machines ping command to test SSH connectivity:
+2. **Test SSH Connection**
+   ```bash
+   spooky ssh connect example.com --user admin --key ~/.ssh/id_ed25519
+   ```
 
-```bash
-# Test connectivity to all machines
-spooky machines ping ./my-project
+3. **Validate SSH Key**
+   ```bash
+   spooky ssh validate-key ~/.ssh/id_ed25519
+   ```
 
-# Test connectivity and authentication
-spooky machines ping ./my-project --auth
+## SSH System Concepts
 
-# Test specific machine
-spooky machines ping ./my-project --machine web-server-01
+### What is the SSH System?
 
-# Test with verbose output
-spooky machines ping ./my-project --verbose
+The SSH system provides:
 
-# Test with JSON output
-spooky machines ping ./my-project --format json
-```
-
-## Key Types and Authentication
+- **Secure Connections**: Encrypted SSH connections to remote machines
+- **Key Management**: Support for modern SSH key types (ED25519, RSA 4096-bit)
+- **Certificate Authentication**: SSH certificate support for enhanced security
+- **Connection Pooling**: Efficient connection management and reuse
+- **Command Execution**: Remote command execution via SSH
+- **File Transfer**: Secure file transfer capabilities (SFTP/SCP)
 
 ### Supported Key Types
 
-The SSH system supports three key types with strict validation:
+The SSH system supports the following key types:
 
-#### 1. ED25519 Keys
-Modern, secure elliptic curve keys with fixed 256-bit size.
+1. **ED25519 Keys** - Modern, secure elliptic curve keys
+   - Fixed 256-bit size
+   - Always valid (no size validation needed)
+   - Recommended for new deployments
 
-**Generation:**
+2. **ED25519-SK Keys** - Hardware security key support
+   - Security key-based ED25519 keys
+   - Hardware-backed security
+   - Implementation pending
+
+3. **RSA Keys** - Traditional RSA keys with enhanced security
+   - Minimum 4096-bit key size enforced
+   - Compatible with legacy systems
+   - Must meet minimum size requirements
+
+### SSH Certificate Support
+
+The system includes comprehensive SSH certificate support:
+
+- **Certificate Authentication**: Use SSH certificates for authentication
+- **Private Key Requirement**: Certificates must be accompanied by private keys
+- **Passphrase Support**: Encrypted private keys supported
+- **Certificate Validation**: Automatic certificate format validation
+
+## Configuration
+
+### SSH Key Configuration
+
+#### ED25519 Key Setup
 ```bash
-# Note: spooky does not generate SSH keys
-# Use openssh to generate keys:
-ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "spooky-ssh-key"
+# Generate ED25519 key
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "your-email@example.com"
 
-# Generate with passphrase
-ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "spooky-ssh-key" -N "my-passphrase"
+# Set proper permissions
+chmod 600 ~/.ssh/id_ed25519
+chmod 644 ~/.ssh/id_ed25519.pub
+
+# Add to SSH agent
+ssh-add ~/.ssh/id_ed25519
 ```
 
-**Configuration:**
+#### RSA 4096-bit Key Setup
+```bash
+# Generate RSA 4096-bit key
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_4096 -C "your-email@example.com"
+
+# Set proper permissions
+chmod 600 ~/.ssh/id_rsa_4096
+chmod 644 ~/.ssh/id_rsa_4096.pub
+
+# Add to SSH agent
+ssh-add ~/.ssh/id_rsa_4096
+```
+
+#### SSH Certificate Setup
+```bash
+# Generate certificate (requires CA)
+ssh-keygen -s /path/to/ca_key -I "user-cert" -n "user" -V +1d ~/.ssh/id_ed25519.pub
+
+# Certificate will be saved as ~/.ssh/id_ed25519-cert.pub
+# Use with private key for authentication
+```
+
+### Machine Configuration
+
+SSH settings are configured in machine inventory files:
+
 ```hcl
+# machines.hcl
 machines {
-  machine "modern-server" {
-    host = "192.168.1.20"
-    user = "admin"
+  machine "web-server" {
+    hostname = "web.example.com"
+    host     = "192.168.1.100"
+    port     = 22
+    user     = "admin"
+    
+    # SSH key authentication
     key_file = "~/.ssh/id_ed25519"
-    passphrase = "my-passphrase"  # Optional
-  }
-}
-```
-
-#### 2. ED25519-SK Keys
-Hardware security key-based ED25519 keys (planned feature).
-
-**Note:** This key type is marked as supported but implementation is pending.
-
-#### 3. RSA Keys (4096-bit minimum)
-Traditional RSA keys with enhanced security requirements.
-
-**Generation:**
-```bash
-# Note: spooky does not generate SSH keys
-# Use openssh to generate keys:
-ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_4096 -C "spooky-rsa-key"
-
-# Generate with passphrase
-ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_4096 -C "spooky-rsa-key" -N "my-passphrase"
-```
-
-**Configuration:**
-```hcl
-machines {
-  machine "legacy-server" {
-    host = "192.168.1.30"
-    user = "admin"
-    key_file = "~/.ssh/id_rsa_4096"
-    passphrase = "my-passphrase"  # Optional
-  }
-}
-```
-
-### Key Validation
-
-The SSH system automatically validates all keys:
-
-- **Type Validation**: Only supported key types are accepted
-- **Size Validation**: RSA keys must be 4096-bit minimum
-- **Format Validation**: Keys must be in valid SSH format
-- **Access Validation**: Key files must be readable
-
-**Validation Errors:**
-```bash
-# Example: RSA key too small
-Error: key validation failed for rsa: RSA key size 2048 bits is less than minimum required 4096 bits
-
-# Example: Unsupported key type
-Error: key validation failed for dsa: unsupported key type: ssh-dss. Supported types: ed25519, ed25519-sk, rsa-4096
-```
-
-### Authentication Methods
-
-#### Public Key Authentication
-Standard SSH key-based authentication (recommended).
-
-```hcl
-machines {
-  machine "key-auth-server" {
-    host = "192.168.1.40"
-    user = "admin"
-    key_file = "~/.ssh/id_ed25519"
-    # No passphrase = unencrypted key
-  }
-}
-```
-
-#### Password Authentication
-Traditional password-based authentication (less secure).
-
-```hcl
-machines {
-  machine "password-auth-server" {
-    host = "192.168.1.50"
-    user = "admin"
-    password = "my-secure-password"  # Not recommended for production
-  }
-}
-```
-
-## SSH Certificates
-
-### Certificate Authentication
-
-SSH certificates provide enhanced security and key management capabilities.
-
-#### Certificate Setup
-
-1. **Generate Certificate Authority (CA):**
-```bash
-# Generate CA key
-ssh-keygen -t ed25519 -f ~/.ssh/ca_key -C "spooky-ca"
-
-# Generate CA certificate
-ssh-keygen -s ~/.ssh/ca_key -I "spooky-ca" -n "admin" -V +52w ~/.ssh/id_ed25519.pub
-```
-
-2. **Configure Certificate Authentication:**
-```hcl
-machines {
-  machine "cert-server" {
-    host = "192.168.1.60"
-    user = "admin"
-    key_file = "~/.ssh/id_ed25519"           # Private key
-    certificate_file = "~/.ssh/id_ed25519-cert.pub"  # Certificate
-    passphrase = "my-passphrase"             # Optional
-  }
-}
-```
-
-#### Certificate Benefits
-
-- **Enhanced Security**: Certificates include identity and authorization information
-- **Key Management**: Centralized key management through CA
-- **Access Control**: Fine-grained access control through certificate principals
-- **Audit Trail**: Certificate usage can be tracked and audited
-
-### Certificate Validation
-
-The SSH system validates certificates:
-
-- **Format Validation**: Certificate must be in valid SSH format
-- **Private Key Requirement**: Certificate must be accompanied by private key
-- **Expiration Checking**: Certificate expiration is validated (planned)
-- **Principal Validation**: Certificate principals are checked (planned)
-
-## Connection Management
-
-### Connection Pooling
-
-The SSH system uses connection pooling for efficiency:
-
-```hcl
-# Connection pooling is automatic
-# Multiple operations reuse connections when possible
-```
-
-**Pool Configuration:**
-- **Max Connections**: Default 10 concurrent connections
-- **Idle Timeout**: Default 300 seconds
-- **Connection Timeout**: Default 30 seconds
-- **Retry Attempts**: Default 3 attempts
-
-### Connection Health
-
-Monitor connection health through the machines ping command:
-
-```bash
-# Check connection health
-spooky machines ping ./my-project
-
-# Output shows connection status:
-# ✓ web-server-01: Connected (latency: 15ms)
-# ✗ db-server-01: Connection failed (timeout)
-```
-
-### Connection Retry Logic
-
-The SSH system implements robust retry logic:
-
-1. **Initial Connection**: Attempt to establish connection
-2. **Retry on Failure**: Retry up to 3 times with exponential backoff
-3. **Timeout Handling**: Configurable timeouts for different operations
-4. **Error Reporting**: Detailed error messages for troubleshooting
-
-## Command Running
-
-### Basic Command Running
-
-Commands are run through the actions system:
-
-```hcl
-actions {
-  action "check-system-info" {
-    description = "Check system information on remote machines"
     
-    machines = ["web-server-01", "db-server-01"]
-    parallel = true
+    # SSH certificate authentication (optional)
+    certificate_path = "~/.ssh/id_ed25519-cert.pub"
+    passphrase       = "your-passphrase"  # Optional
     
-    command = "uname -a && df -h && free -h"
+    # Connection settings
+    connection_timeout = 30
+    command_timeout    = 300
+    max_connections    = 10
+    retry_attempts     = 3
+    retry_delay        = 5
+    
+    tags = ["web", "production"]
   }
 }
 ```
 
-### Command Configuration
+## CLI Commands
 
-Commands support various configuration options:
+### SSH Connection Commands
 
-```hcl
-actions {
-  action "complex-command" {
-    description = "Complex command with environment and working directory"
-    
-    machines = ["web-server-01"]
-    
-    command = "python3 /opt/scripts/health_check.py"
-    working_dir = "/opt/scripts"
-    environment = {
-      "PYTHONPATH" = "/opt/lib"
-      "LOG_LEVEL" = "DEBUG"
-    }
-    timeout = "60s"
-  }
-}
+#### Test SSH Connection
+```bash
+# Basic connection test
+spooky ssh connect example.com --user admin --key ~/.ssh/id_ed25519
+
+# Connection with certificate
+spooky ssh connect example.com \
+  --user admin \
+  --key ~/.ssh/id_ed25519 \
+  --certificate ~/.ssh/id_ed25519-cert.pub
+
+# Connection with custom timeout
+spooky ssh connect example.com \
+  --user admin \
+  --key ~/.ssh/id_ed25519 \
+  --timeout 60
 ```
 
-### Command Output Handling
+#### Run SSH Command
+```bash
+# Run single command
+spooky ssh run example.com \
+  --user admin \
+  --key ~/.ssh/id_ed25519 \
+  --command "uname -a"
 
-Command output is automatically captured and processed:
+# Run command with arguments
+spooky ssh run example.com \
+  --user admin \
+  --key ~/.ssh/id_ed25519 \
+  --command "ls" \
+  --args "-la" \
+  --args "/etc"
 
-- **Standard Output**: Captured and available for processing
-- **Standard Error**: Captured and reported separately
-- **Exit Codes**: Available for error handling
-- **Run Time**: Tracked for performance monitoring
+# Run command with environment variables
+spooky ssh run example.com \
+  --user admin \
+  --key ~/.ssh/id_ed25519 \
+  --command "echo \$ENV_VAR" \
+  --env "ENV_VAR=value"
+```
+
+### SSH Key Management Commands
+
+#### Validate SSH Key
+```bash
+# Validate key type and format
+spooky ssh validate-key ~/.ssh/id_ed25519
+
+# Validate RSA key size
+spooky ssh validate-key ~/.ssh/id_rsa_4096
+
+# Validate with verbose output
+spooky ssh validate-key ~/.ssh/id_ed25519 --verbose
+```
+
+#### Generate Key Fingerprint
+```bash
+# Generate SHA256 fingerprint
+spooky ssh fingerprint ~/.ssh/id_ed25519
+
+# Generate fingerprint for certificate
+spooky ssh fingerprint ~/.ssh/id_ed25519-cert.pub
+```
+
+### SSH Configuration Commands
+
+#### List SSH Configuration
+```bash
+# List SSH configuration
+spooky ssh config list
+
+# Show specific configuration
+spooky ssh config show --key-path ~/.ssh/id_ed25519
+```
+
+#### Test SSH Configuration
+```bash
+# Test SSH configuration
+spooky ssh config test
+
+# Test with specific machine
+spooky ssh config test --machine web-server
+```
 
 ## Advanced Features
 
-### Environment Variables
+### Connection Pooling
 
-Set environment variables for command running:
+The SSH system implements efficient connection pooling:
 
-```hcl
-actions {
-  action "environment-test" {
-    machines = ["web-server-01"]
-    command = "echo $CUSTOM_VAR && env | grep CUSTOM"
-    
-    environment = {
-      "CUSTOM_VAR" = "custom-value"
-      "DEBUG" = "true"
-      "PATH" = "/usr/local/bin:/usr/bin:/bin"
-    }
-  }
-}
+- **Connection Reuse**: Existing connections are reused when possible
+- **Health Checks**: Connections are tested before reuse
+- **Automatic Cleanup**: Dead connections are automatically removed
+- **Thread Safety**: Pool operations are thread-safe
+
+### Certificate Authentication
+
+SSH certificates provide enhanced security:
+
+```bash
+# Connect using certificate authentication
+spooky ssh connect example.com \
+  --user admin \
+  --key ~/.ssh/id_ed25519 \
+  --certificate ~/.ssh/id_ed25519-cert.pub \
+  --passphrase "your-passphrase"
 ```
 
-### Working Directory
+### Multi-Machine Operations
 
-Set working directory for command running:
+Execute commands across multiple machines:
 
-```hcl
-actions {
-  action "working-dir-test" {
-    machines = ["web-server-01"]
-    command = "pwd && ls -la"
-    working_dir = "/opt/app"
-  }
-}
+```bash
+# Run command on multiple machines
+spooky ssh run-multiple \
+  --machines "web-server,app-server,db-server" \
+  --user admin \
+  --key ~/.ssh/id_ed25519 \
+  --command "uptime"
+
+# Run with parallel execution
+spooky ssh run-multiple \
+  --machines "web-server,app-server,db-server" \
+  --user admin \
+  --key ~/.ssh/id_ed25519 \
+  --command "systemctl status nginx" \
+  --parallel
 ```
 
-### Timeout Configuration
+## Integration with Other Systems
 
-Configure timeouts for different operations:
+### Facts System Integration
 
-```hcl
-machines {
-  machine "slow-server" {
-    host = "192.168.1.70"
-    user = "admin"
-    key_file = "~/.ssh/id_ed25519"
-    
-    # Connection timeout
-    timeout = "60s"
-    
-    # Keepalive settings
-    keepalive_interval = "30s"
-    keepalive_count = 3
-  }
-}
+The SSH system integrates with the facts system for remote data collection:
+
+```bash
+# Collect facts using SSH
+spooky facts export ./my-project \
+  --machines "web-server,app-server" \
+  --format json \
+  --output facts.json
 ```
 
-### Compression
+### Actions System Integration
 
-Enable compression for slow connections:
+The SSH system powers the actions system for remote command execution:
 
-```hcl
-machines {
-  machine "slow-connection" {
-    host = "remote.example.com"
-    user = "admin"
-    key_file = "~/.ssh/id_ed25519"
-    
-    # Enable compression
-    compression = true
-  }
-}
+```bash
+# Run actions using SSH
+spooky actions run ./my-project \
+  --machines "web-server" \
+  --action "deploy-application"
 ```
 
-## Advanced SSH Capabilities
+### Machines System Integration
 
-The spooky SSH system now includes advanced capabilities for file transfer, session management, and multi-factor authentication.
+The SSH system validates machine connectivity:
 
-### File Transfer
-
-#### SFTP File Transfer
-
-Transfer files securely using SFTP with progress tracking and verification.
-
-```hcl
-actions {
-  action "deploy-config" {
-    description = "Deploy configuration files via SFTP"
-    
-    machines = ["web-server-01"]
-    
-    # File transfer configuration
-    file_transfer {
-      local_path = "./config/app.conf"
-      remote_path = "/etc/app/app.conf"
-      mode = "sftp"
-      verify = true
-      permissions = "0644"
-    }
-    
-    command = "systemctl reload app"
-  }
-}
+```bash
+# Test machine connectivity
+spooky machines ping ./my-project \
+  --machines "web-server,app-server"
 ```
 
-#### SCP File Transfer
+## Troubleshooting
 
-Use SCP for efficient file transfer:
+### Common Issues
 
-```hcl
-actions {
-  action "backup-data" {
-    description = "Backup data using SCP"
-    
-    machines = ["db-server-01"]
-    
-    file_transfer {
-      local_path = "/tmp/backup.sql"
-      remote_path = "/backups/db-backup.sql"
-      mode = "scp"
-      direction = "download"
-      verify = true
-    }
-  }
-}
+#### Key Validation Errors
+```bash
+# Error: Unsupported key type
+# Solution: Use ED25519, ED25519-SK, or RSA 4096-bit keys
+
+# Error: RSA key size too small
+# Solution: Generate new RSA key with 4096-bit minimum
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_4096
 ```
 
-#### Batch File Transfer
+#### Connection Errors
+```bash
+# Error: Connection timeout
+# Solution: Check network connectivity and firewall settings
 
-Transfer multiple files concurrently:
-
-```hcl
-actions {
-  action "deploy-application" {
-    description = "Deploy application files"
-    
-    machines = ["app-server-01"]
-    
-    file_transfer {
-      local_path = "./app/"
-      remote_path = "/opt/app/"
-      mode = "sftp"
-      batch = true
-      verify = true
-    }
-    
-    command = "systemctl restart app"
-  }
-}
+# Error: Authentication failed
+# Solution: Verify key permissions and server configuration
+chmod 600 ~/.ssh/id_ed25519
 ```
 
-### Session Management
+#### Certificate Errors
+```bash
+# Error: Certificate requires private key
+# Solution: Ensure private key is provided with certificate
 
-#### Persistent Sessions
-
-Create and manage long-lived SSH sessions:
-
-```hcl
-actions {
-  action "monitor-system" {
-    description = "Monitor system with persistent session"
-    
-    machines = ["monitor-server-01"]
-    
-    session {
-      persistent = true
-      keepalive = true
-      timeout = "300s"
-    }
-    
-    command = "tail -f /var/log/system.log"
-  }
-}
+# Error: Invalid certificate format
+# Solution: Verify certificate is in valid SSH format
 ```
 
-#### Session Recovery
+### Debugging Commands
 
-Sessions can be paused and resumed:
-
-```hcl
-actions {
-  action "long-running-task" {
-    description = "Long-running task with session recovery"
-    
-    machines = ["task-server-01"]
-    
-    session {
-      persistent = true
-      recoverable = true
-      max_retries = 3
-    }
-    
-    command = "long-running-script.sh"
-  }
-}
+#### Verbose SSH Output
+```bash
+# Enable verbose output
+spooky ssh connect example.com \
+  --user admin \
+  --key ~/.ssh/id_ed25519 \
+  --verbose
 ```
 
-### Multi-Factor Authentication
+#### SSH Configuration Test
+```bash
+# Test SSH configuration
+spooky ssh config test --verbose
 
-#### TOTP Authentication
-
-Configure Time-based One-Time Password authentication:
-
-```hcl
-machines {
-  machine "secure-server" {
-    host = "secure.example.com"
-    user = "admin"
-    key_file = "~/.ssh/id_ed25519"
-    
-    authentication {
-      primary_method = "public_key"
-      secondary_method = "totp"
-      totp_secret = "your_totp_secret"
-      totp_algorithm = "sha1"
-      totp_digits = 6
-      totp_period = 30
-    }
-  }
-}
+# Test specific connection
+spooky ssh config test \
+  --host example.com \
+  --user admin \
+  --key ~/.ssh/id_ed25519 \
+  --verbose
 ```
 
-#### Certificate-Based Authentication
-
-Use SSH certificates for enhanced security:
-
-```hcl
-machines {
-  machine "cert-server" {
-    host = "cert.example.com"
-    user = "admin"
-    
-    authentication {
-      primary_method = "certificate"
-      certificate_path = "~/.ssh/user-cert.pub"
-      key_path = "~/.ssh/user-key"
-      ca_path = "~/.ssh/ca.pub"
-    }
-  }
-}
-```
-
-#### SSH Agent Integration
-
-Integrate with the local SSH agent:
-
-```hcl
-machines {
-  machine "agent-server" {
-    host = "agent.example.com"
-    user = "admin"
-    
-    authentication {
-      primary_method = "agent"
-      agent_socket = "~/.ssh/agent.sock"
-    }
-  }
-}
-```
-
-### Advanced Configuration Examples
-
-#### Complete Advanced Setup
-
-```hcl
-machines {
-  machine "advanced-server" {
-    host = "advanced.example.com"
-    user = "admin"
-    port = 2222
-    
-    key_file = "~/.ssh/advanced_key"
-    passphrase = "secure-passphrase"
-    
-    authentication {
-      primary_method = "public_key"
-      secondary_method = "totp"
-      totp_secret = "your_totp_secret"
-      auth_order = ["primary", "secondary"]
-      max_retries = 3
-      retry_delay = "5s"
-    }
-    
-    session {
-      persistent = true
-      keepalive = true
-      timeout = "600s"
-      recoverable = true
-    }
-    
-    file_transfer {
-      default_mode = "sftp"
-      verify_transfers = true
-      progress_tracking = true
-    }
-    
-    tags = ["advanced", "production"]
-  }
-}
-
-actions {
-  action "advanced-deployment" {
-    description = "Advanced deployment with file transfer and session management"
-    
-    machines = ["advanced-server"]
-    
-    file_transfer {
-      local_path = "./app/"
-      remote_path = "/opt/app/"
-      mode = "sftp"
-      verify = true
-      permissions = "0755"
-    }
-    
-    session {
-      persistent = true
-      working_dir = "/opt/app"
-      environment = {
-        "APP_ENV" = "production"
-        "DEBUG" = "false"
-      }
-    }
-    
-    command = """
-    echo "Starting deployment..."
-    npm install --production
-    npm run build
-    systemctl restart app
-    echo "Deployment completed"
-    """
-    
-    timeout = "300s"
-  }
-}
-```
-
-## Best Practices
+## Security Best Practices
 
 ### Key Management
 
-1. **Use ED25519 keys** for new deployments:
-   - Modern, secure, and efficient
-   - Fixed size (256 bits)
-   - Resistant to timing attacks
+1. **Use Strong Keys**: Prefer ED25519 keys over RSA
+2. **Enforce Key Size**: Use 4096-bit minimum for RSA keys
+3. **Secure Permissions**: Set 600 permissions on private keys
+4. **Key Rotation**: Regularly rotate SSH keys
+5. **Key Storage**: Store keys securely, not in version control
 
-2. **Use 4096-bit RSA keys** if RSA is required:
-   - Minimum security requirement
-   - Compatible with legacy systems
-   - Larger key size for enhanced security
+### Certificate Management
 
-3. **Secure key storage**:
-   ```bash
-   # Set proper permissions
-   chmod 600 ~/.ssh/id_ed25519
-   chmod 644 ~/.ssh/id_ed25519.pub
-   
-   # Store keys in secure location
-   # Use passphrases for additional security
-   ```
+1. **Certificate Expiration**: Monitor certificate expiration dates
+2. **Private Key Security**: Keep private keys secure and separate
+3. **Certificate Validation**: Validate certificates before use
+4. **CA Management**: Secure certificate authority keys
 
-4. **Key rotation**:
-   - Rotate keys regularly (every 90-180 days)
-   - Use certificates for easier key management
-   - Monitor key usage and access
+### Connection Security
 
-### Connection Management
+1. **Host Key Verification**: Verify host keys (TODO: implement)
+2. **Connection Timeouts**: Use appropriate timeouts
+3. **Retry Limits**: Limit retry attempts to prevent brute force
+4. **Logging**: Monitor SSH connection logs
 
-1. **Use connection pooling**:
-   - Multiple operations reuse connections
-   - Reduces connection overhead
-   - Improves performance
+## Performance Optimization
 
-2. **Set appropriate timeouts**:
-   - Connection timeout: 30-60 seconds
-   - Command timeout: Based on command complexity
-   - Idle timeout: 300-600 seconds
+### Connection Pooling
 
-3. **Implement retry logic**:
-   - Handle transient network issues
-   - Exponential backoff for retries
-   - Maximum retry attempts (3-5)
+- **Pool Size**: Configure appropriate pool size for your workload
+- **Idle Timeout**: Set idle timeout to free unused connections
+- **Health Checks**: Enable health checks for connection validation
 
-4. **Monitor connection health**:
-   - Regular connectivity testing
-   - Performance monitoring
-   - Error tracking and alerting
+### Parallel Operations
 
-### Security Considerations
+- **Concurrent Connections**: Use parallel execution for multiple machines
+- **Connection Limits**: Respect server connection limits
+- **Resource Management**: Monitor connection resource usage
 
-1. **Key validation**:
-   - Always validate keys before use
-   - Use only supported key types
-   - Verify key permissions and ownership
+## Future Enhancements
 
-2. **Certificate usage**:
-   - Use certificates for enhanced security
-   - Implement proper CA management
-   - Monitor certificate expiration
+### Planned Features
 
-3. **Access control**:
-   - Follow least privilege principles
-   - Use dedicated service accounts
-   - Implement proper user management
+1. **ED25519-SK Support**: Hardware security key integration
+2. **Enhanced Certificate Support**: Certificate chain validation
+3. **Host Key Verification**: Known hosts file integration
+4. **Performance Optimizations**: Connection pooling improvements
 
-4. **Audit and monitoring**:
-   - Log all SSH connections
-   - Monitor for suspicious activity
-   - Track key and certificate usage
+### Roadmap
 
-### Performance Optimization
+- **Q1 2024**: ED25519-SK hardware key support
+- **Q2 2024**: Enhanced certificate validation
+- **Q3 2024**: Host key verification implementation
+- **Q4 2024**: Performance optimization and caching
 
-1. **Connection pooling**:
-   - Reuse connections when possible
-   - Configure appropriate pool sizes
-   - Monitor pool utilization
+## Conclusion
 
-2. **Parallel running**:
-   - Use parallel running for multiple machines
-   - Configure appropriate concurrency limits
-   - Monitor resource usage
-
-3. **Compression**:
-   - Enable compression for slow connections
-   - Monitor compression effectiveness
-   - Balance compression vs. CPU usage
-
-4. **Caching**:
-   - Cache connection information
-   - Cache key validation results
-   - Implement appropriate cache invalidation
-
-## Examples
-
-### Basic SSH Setup
-
-**Project Structure:**
-```
-my-ssh-project/
-├── project.hcl
-├── machines.hcl
-└── actions.hcl
-```
-
-**Project Configuration (`project.hcl`):**
-```hcl
-project {
-  name = "ssh-example-project"
-  description = "Example SSH project with different key types"
-  
-  metadata {
-    version = "1.0.0"
-    author = "admin"
-    tags = ["ssh", "example"]
-  }
-}
-```
-
-**Machine Inventory (`machines.hcl`):**
-```hcl
-machines {
-  # ED25519 key example
-  machine "modern-server" {
-    host = "192.168.1.10"
-    user = "admin"
-    key_file = "~/.ssh/id_ed25519"
-    passphrase = "my-passphrase"
-    
-    tags = ["modern", "production"]
-    groups = ["web-servers"]
-    
-    metadata {
-      environment = "production"
-      key_type = "ed25519"
-    }
-  }
-  
-  # RSA 4096-bit key example
-  machine "legacy-server" {
-    host = "192.168.1.20"
-    user = "admin"
-    key_file = "~/.ssh/id_rsa_4096"
-    
-    tags = ["legacy", "production"]
-    groups = ["database-servers"]
-    
-    metadata {
-      environment = "production"
-      key_type = "rsa-4096"
-    }
-  }
-  
-  # Certificate authentication example
-  machine "cert-server" {
-    host = "192.168.1.30"
-    user = "admin"
-    key_file = "~/.ssh/id_ed25519"
-    certificate_file = "~/.ssh/id_ed25519-cert.pub"
-    passphrase = "my-passphrase"
-    
-    tags = ["certificate", "production"]
-    groups = ["app-servers"]
-    
-    metadata {
-      environment = "production"
-      auth_method = "certificate"
-    }
-  }
-}
-```
-
-**Actions Configuration (`actions.hcl`):**
-```hcl
-actions {
-  # Basic system information
-  action "system-info" {
-    description = "Get system information from all machines"
-    
-    machines = ["modern-server", "legacy-server", "cert-server"]
-    parallel = true
-    
-    command = "uname -a && hostname && date"
-  }
-  
-  # Disk usage check
-  action "disk-usage" {
-    description = "Check disk usage on all machines"
-    
-    machines = ["modern-server", "legacy-server", "cert-server"]
-    parallel = true
-    
-    command = "df -h"
-  }
-  
-  # Process monitoring
-  action "process-check" {
-    description = "Check running processes"
-    
-    machines = ["modern-server", "legacy-server", "cert-server"]
-    parallel = true
-    
-    command = "ps aux | head -20"
-  }
-}
-```
-
-### Testing the Setup
-
-```bash
-# Validate the project
-spooky validate --project ./my-ssh-project
-
-# Test SSH connectivity
-spooky machines ping ./my-ssh-project
-
-# Run actions
-spooky actions run ./my-ssh-project --action system-info
-spooky actions run ./my-ssh-project --action disk-usage
-spooky actions run ./my-ssh-project --action process-check
-```
-
-### Advanced Configuration
-
-**Complex Machine Configuration:**
-```hcl
-machines {
-  machine "production-web" {
-    host = "web.prod.example.com"
-    user = "webadmin"
-    port = 2222  # Custom SSH port
-    
-    key_file = "~/.ssh/prod_web_key"
-    passphrase = "production-passphrase"
-    
-    # Connection settings
-    timeout = "60s"
-    keepalive_interval = "30s"
-    keepalive_count = 3
-    compression = true
-    
-    # Security settings
-    strict_host_key_check = true
-    known_hosts_path = "~/.ssh/known_hosts"
-    
-    tags = ["web", "production", "load-balanced"]
-    groups = ["web-servers", "production-servers"]
-    
-    metadata {
-      environment = "production"
-      datacenter = "us-west-1"
-      availability_zone = "us-west-1a"
-      instance_type = "t3.large"
-      cost_center = "IT-001"
-      owner = "web-team"
-      key_type = "ed25519"
-      last_updated = "2024-01-15"
-    }
-  }
-}
-```
-
-**Complex Action Configuration:**
-```hcl
-actions {
-  action "deploy-web-application" {
-    description = "Deploy web application to production servers"
-    
-    machines = ["production-web"]
-    parallel = false  # Sequential deployment
-    
-    # Environment setup
-    environment = {
-      "DEPLOY_ENV" = "production"
-      "APP_VERSION" = "1.2.3"
-      "LOG_LEVEL" = "INFO"
-      "NODE_ENV" = "production"
-    }
-    
-    working_dir = "/opt/webapp"
-    
-    # Multi-step deployment
-    command = """
-    echo "Starting deployment of version $APP_VERSION"
-    git pull origin main
-    npm install --production
-    npm run build
-    sudo systemctl restart webapp
-    echo "Deployment completed successfully"
-    """
-    
-    timeout = "300s"  # 5 minutes
-    
-    tags = ["deployment", "web", "production"]
-  }
-}
-```
-
-## Advanced SSH Capabilities CLI Commands
-
-The spooky CLI provides comprehensive commands for advanced SSH capabilities including authentication testing.
-
-**Note**: File transfer capabilities are available through the actions system. Actions can include file transfer operations that use the underlying SSH file transfer functionality.
-
-### Authentication Testing
-
-**Test connectivity and authentication:**
-```bash
-# Test basic connectivity
-spooky machines ping ./my-project
-
-# Test connectivity and authentication
-spooky machines ping ./my-project --auth
-
-# Test with verbose output
-spooky machines ping ./my-project --auth --verbose
-
-# Test with JSON output
-spooky machines ping ./my-project --auth --format json
-```
-
-### Command Examples
-
-**Complete workflow example:**
-```bash
-# 1. Test connectivity
-spooky machines ping ./my-project
-
-# 2. Test connectivity and authentication
-spooky machines ping ./my-project --auth
-
-# 3. Run actions with file transfer (actions system is fully implemented)
-spooky actions run ./my-project --action deploy-web
-```
-
-This comprehensive user guide provides everything needed to effectively use the SSH system in spooky, from basic setup to advanced configurations and best practices.
+The SSH system provides robust, secure connectivity with support for modern key types and SSH certificates. The system is production-ready and integrates seamlessly with other spooky systems. Follow security best practices and monitor system performance for optimal operation.

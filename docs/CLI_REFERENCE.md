@@ -97,7 +97,7 @@ spooky project validate ./my-automation-project
 
 ### 2. Machine Inventory Commands
 
-Commands for managing machine inventory, including listing, validation, and connectivity testing.
+Commands for managing machine inventory, including listing, validation, connectivity testing, and export.
 
 #### `spooky machines list`
 
@@ -188,6 +188,43 @@ spooky machines ping ./my-automation-project --format json
 - Checks SSH accessibility
 - Reports response times and connection status
 - Optionally tests authentication
+
+**Related Documentation:**
+- [Machines User Guide](MACHINES_USER_GUIDE.md)
+- [Machines API Reference](MACHINES_API_REFERENCE.md)
+- [Machines System Design](../design/systems/machines-system.md)
+
+#### `spooky machines export`
+
+Export machine inventory to HCL format.
+
+**Syntax:**
+```bash
+spooky machines export [project-path]
+```
+
+**Flags:**
+- `--output string` - Output file path (required)
+- `--machine string` - Export specific machine by hostname
+- `--tags stringArray` - Filter machines by tags (key=value or key-only)
+
+**Examples:**
+```bash
+# Export all machines
+spooky machines export ./my-automation-project --output machines.hcl
+
+# Export specific machine
+spooky machines export ./my-automation-project --machine web-server --output web-server.hcl
+
+# Export with tag filtering
+spooky machines export ./my-automation-project --tags environment=production --output prod-machines.hcl
+```
+
+**What it does:**
+- Exports machine inventory to HCL format
+- Supports filtering by machine name and tags
+- Creates backup of machine configurations
+- Enables machine inventory sharing
 
 **Related Documentation:**
 - [Machines User Guide](MACHINES_USER_GUIDE.md)
@@ -365,6 +402,230 @@ spooky facts export ./my-automation-project --verbose --output facts.hcl
 - [Facts API Reference](FACTS_API_REFERENCE.md)
 - [Facts System Design](../plans/facts-system-design.md)
 
+### 5. Actions Management Commands
+
+Commands for managing and running actions on machines.
+
+#### `spooky actions list`
+
+List all available actions in the project.
+
+**Syntax:**
+```bash
+spooky actions list [project-path]
+```
+
+**Examples:**
+```bash
+# List actions in current directory project
+spooky actions list .
+
+# List actions in specific project
+spooky actions list ./my-automation-project
+```
+
+**What it does:**
+- Reads actions.hcl files from the project
+- Displays all available actions with descriptions
+- Shows action metadata and dependencies
+- Groups actions by source file
+
+**Related Documentation:**
+- [Actions User Guide](ACTIONS_USER_GUIDE.md)
+- [Actions API Reference](ACTIONS_API_REFERENCE.md)
+- [Actions System Design](../plans/actions-system-design.md)
+
+#### `spooky actions run`
+
+Run actions on target machines.
+
+**Syntax:**
+```bash
+spooky actions run [project-path]
+```
+
+**Flags:**
+- `--plan` - Show running plan without running
+- `--dry-run` - Simulate running without making changes
+- `--machine stringSlice` - Target specific machines
+- `--tags stringSlice` - Target machines with specific tags
+- `--filter string` - Complex filter expression
+- `--parallel int` - Number of parallel workers (minimum 2) (default: 1)
+
+**Examples:**
+```bash
+# Run all actions
+spooky actions run ./my-automation-project
+
+# Plan actions without running
+spooky actions run ./my-automation-project --plan
+
+# Dry run to simulate execution
+spooky actions run ./my-automation-project --dry-run
+
+# Run on specific machines
+spooky actions run ./my-automation-project --machine web-server --machine db-server
+
+# Run on machines with specific tags
+spooky actions run ./my-automation-project --tags environment=production
+
+# Run with parallel execution
+spooky actions run ./my-automation-project --parallel 4
+
+# Complex filtering
+spooky actions run ./my-automation-project --filter "environment=prod AND role=web"
+```
+
+**What it does:**
+- Loads actions from project configuration
+- Runs actions in dependency order
+- Supports targeting specific machines or groups
+- Provides planning and dry-run capabilities
+- Enables parallel execution for performance
+
+**Related Documentation:**
+- [Actions User Guide](ACTIONS_USER_GUIDE.md)
+- [Actions API Reference](ACTIONS_API_REFERENCE.md)
+- [Actions System Design](../plans/actions-system-design.md)
+
+#### `spooky actions validate`
+
+Validate action configurations.
+
+**Syntax:**
+```bash
+spooky actions validate [project-path]
+```
+
+**Examples:**
+```bash
+# Validate actions in current directory project
+spooky actions validate .
+
+# Validate actions in specific project
+spooky actions validate ./my-automation-project
+```
+
+**What it does:**
+- Validates action configuration
+- Checks required fields and dependencies
+- Validates machine targeting
+- Reports configuration errors
+
+**Related Documentation:**
+- [Actions User Guide](ACTIONS_USER_GUIDE.md)
+- [Actions API Reference](ACTIONS_API_REFERENCE.md)
+- [Actions System Design](../plans/actions-system-design.md)
+
+### 6. Schema Management Commands
+
+Commands for managing and validating HCL schemas.
+
+#### `spooky schemas list`
+
+List all available schemas in the system.
+
+**Syntax:**
+```bash
+spooky schemas list
+```
+
+**Examples:**
+```bash
+# List all schemas
+spooky schemas list
+```
+
+**What it does:**
+- Shows all registered schemas
+- Displays schema types and versions
+- Provides schema statistics and metadata
+- Lists embedded and external schemas
+
+**Related Documentation:**
+- [Schema System Design](../design/systems/schema-system.md)
+
+#### `spooky schemas validate`
+
+Validate data against a schema.
+
+**Syntax:**
+```bash
+spooky schemas validate [schema-file] [data-file]
+```
+
+**Examples:**
+```bash
+# Validate project configuration
+spooky schemas validate project.schema.hcl project.hcl
+
+# Validate machine inventory
+spooky schemas validate machines.schema.hcl machines.hcl
+```
+
+**What it does:**
+- Validates HCL data files against schemas
+- Provides comprehensive validation with detailed error reporting
+- Includes field-level validation and cross-field validation
+- Supports custom validation rules
+
+**Related Documentation:**
+- [Schema System Design](../design/systems/schema-system.md)
+
+### 7. Integration Management Commands
+
+Commands for managing and validating system integrations.
+
+#### `spooky integrations list`
+
+List all available integrations and their current status.
+
+**Syntax:**
+```bash
+spooky integrations list
+```
+
+**Examples:**
+```bash
+# List all integrations
+spooky integrations list
+```
+
+**What it does:**
+- Shows which integrations are available
+- Reports integration status and health
+- Displays integration capabilities
+- Lists facts, actions, variables, templates, machines, secrets, and configuration integrations
+
+**Related Documentation:**
+- [Integrations User Guide](INTEGRATIONS_USER_GUIDE.md)
+- [Integrations API Reference](INTEGRATIONS_API_REFERENCE.md)
+
+#### `spooky integrations validate`
+
+Validate that all integrations are working correctly.
+
+**Syntax:**
+```bash
+spooky integrations validate
+```
+
+**Examples:**
+```bash
+# Validate all integrations
+spooky integrations validate
+```
+
+**What it does:**
+- Performs comprehensive validation of all system integrations
+- Reports any issues found
+- Tests integration connectivity and functionality
+- Provides detailed diagnostic information
+
+**Related Documentation:**
+- [Integrations User Guide](INTEGRATIONS_USER_GUIDE.md)
+- [Integrations API Reference](INTEGRATIONS_API_REFERENCE.md)
+
 ## Common Usage Patterns
 
 ### Project Workflow
@@ -396,8 +657,17 @@ spooky variables validate my-automation-project
 # 8. Resolve variables
 spooky variables resolve my-automation-project
 
-# 9. Export facts
+# 9. Add actions
+# (Edit actions.hcl file)
+
+# 10. Validate actions
+spooky actions validate my-automation-project
+
+# 11. Export facts
 spooky facts export my-automation-project --output facts.hcl
+
+# 12. Run actions
+spooky actions run my-automation-project
 ```
 
 ### Filtering and Selection
@@ -413,6 +683,11 @@ spooky facts export ./project \
   --machine web-server \
   --tags role=web \
   --output web-facts.hcl
+
+# Filter actions by machines and tags
+spooky actions run ./project \
+  --machine web-server \
+  --tags environment=production
 
 # Filter variables resolution with external data
 spooky variables resolve ./project \
@@ -501,12 +776,16 @@ spooky project --help
 spooky machines --help
 spooky variables --help
 spooky facts --help
+spooky actions --help
+spooky schemas --help
+spooky integrations --help
 
 # Subcommand help
 spooky project init --help
 spooky machines ping --help
 spooky variables resolve --help
 spooky facts export --help
+spooky actions run --help
 ```
 
 ## Related Documentation

@@ -4,6 +4,8 @@
 
 This document provides a comprehensive overview of the spooky facts system documentation. It serves as a guide to help you find the right documentation for your needs and understand how all the pieces fit together.
 
+**Status: Partially Implemented** - The facts system has basic functionality but SSH-based fact collection has known issues that need to be addressed.
+
 ## Documentation Structure
 
 ### 📚 Core Documentation
@@ -14,10 +16,10 @@ This document provides a comprehensive overview of the spooky facts system docum
 
 **What it covers:**
 - Getting started with fact collection
-- Basic and advanced usage patterns
-- Project and machine configuration
-- Integration with other spooky components
-- Monitoring and maintenance
+- Fact collection and export functionality
+- Machine inventory integration
+- Export formats and options
+- Current limitations and known issues
 - Real-world examples and use cases
 
 **When to use:** Start here if you're new to spooky facts or need to understand how to use the system effectively.
@@ -42,11 +44,11 @@ This document provides a comprehensive overview of the spooky facts system docum
 
 **What it covers:**
 - Common error messages and solutions
-- Configuration problems and fixes
+- SSH-based collection issues and workarounds
 - Performance issues and optimization
-- Network and connectivity issues
-- Storage and database problems
-- Recovery procedures and prevention strategies
+- Export format issues
+- Configuration problems and debugging
+- Best practices for troubleshooting
 
 **When to use:** Use this when encountering problems or need to debug issues with the facts system.
 
@@ -54,155 +56,174 @@ This document provides a comprehensive overview of the spooky facts system docum
 
 #### [Examples Overview](examples/README.md)
 **Audience:** All users
-**Purpose:** Practical examples and configuration patterns
+**Purpose:** Quick reference for available examples and use cases
 
 **What it covers:**
-- Basic fact collection setup
-- Project configuration examples
-- Machine-specific configurations
-- Integration examples with other components
-- Best practices and patterns
+- Available fact collection examples
+- Example configurations and scripts
+- Common use case patterns
+- Integration examples with other systems
 
-**Example Files:**
-- [`basic-facts-project.hcl`](examples/basic-facts-project.hcl) - Basic fact collection project
-- [`advanced-facts-config.hcl`](examples/advanced-facts-config.hcl) - Advanced configuration
-- [`facts-integration.hcl`](examples/facts-integration.hcl) - Integration with other components
-
-**When to use:** Use these as starting points for your own configurations or to learn best practices.
-
-## Quick Start Guide
-
-### For New Users
-
-1. **Read the User Guide** - Start with [FACTS_USER_GUIDE.md](FACTS_USER_GUIDE.md) to understand the basics
-2. **Try the Examples** - Copy and customize examples from the [examples/](examples/) directory
-3. **Test Your Setup** - Use `spooky facts gather` and `spooky facts validate` to test
-4. **Check Troubleshooting** - If you encounter issues, refer to [FACTS_TROUBLESHOOTING.md](FACTS_TROUBLESHOOTING.md)
-
-### For Developers
-
-1. **Review the API Reference** - Understand the interfaces and implementation in [FACTS_API_REFERENCE.md](FACTS_API_REFERENCE.md)
-2. **Study the Examples** - See how the APIs are used in practice
-3. **Check the Code** - Review the actual implementation in `internal/facts/`
-4. **Test Your Changes** - Use the examples to test your modifications
-
-### For System Administrators
-
-1. **Start with User Guide** - Understand the system capabilities
-2. **Review Examples** - See real-world configuration patterns
-3. **Plan Your Fact Collection** - Design your fact collection strategy
-4. **Implement Gradually** - Start with basic collection and expand
-5. **Monitor and Validate** - Use validation and testing regularly
-
-## Documentation Navigation
-
-### By Use Case
-
-#### Getting Started
-- **New to spooky facts?** → [User Guide](FACTS_USER_GUIDE.md) - Getting Started section
-- **Setting up your first project?** → [User Guide](FACTS_USER_GUIDE.md) - Basic Usage section
-- **Need examples?** → [Examples Directory](examples/) - Basic examples
-
-#### Configuration
-- **Project configuration?** → [User Guide](FACTS_USER_GUIDE.md) - Project Configuration section
-- **Machine-specific settings?** → [User Guide](FACTS_USER_GUIDE.md) - Machine-Specific Configuration section
-- **Advanced configuration?** → [User Guide](FACTS_USER_GUIDE.md) - Advanced Usage section
-
-#### Integration
-- **Using facts in variables?** → [User Guide](FACTS_USER_GUIDE.md) - Variables Integration section
-- **Using facts in templates?** → [User Guide](FACTS_USER_GUIDE.md) - Templates Integration section
-- **Using facts in actions?** → [User Guide](FACTS_USER_GUIDE.md) - Actions Integration section
-
-#### Troubleshooting
-- **Collection failures?** → [Troubleshooting Guide](FACTS_TROUBLESHOOTING.md) - Collection Errors section
-- **Storage issues?** → [Troubleshooting Guide](FACTS_TROUBLESHOOTING.md) - Memory Errors section
-- **Performance problems?** → [Troubleshooting Guide](FACTS_TROUBLESHOOTING.md) - Performance Issues section
-
-#### Development
-- **Extending the system?** → [API Reference](FACTS_API_REFERENCE.md) - Core Interfaces section
-- **Adding new collectors?** → [API Reference](FACTS_API_REFERENCE.md) - FactCollector Interface section
-- **Custom storage backends?** → [API Reference](FACTS_API_REFERENCE.md) - FactStorage Interface section
-
-### By Component
-
-#### Fact Collection
-- **Overview** → [User Guide](FACTS_USER_GUIDE.md) - Facts System Concepts
-- **Configuration** → [User Guide](FACTS_USER_GUIDE.md) - Gathering Facts
-- **Troubleshooting** → [Troubleshooting Guide](FACTS_TROUBLESHOOTING.md) - Collection Errors
-- **API** → [API Reference](FACTS_API_REFERENCE.md) - FactCollector Interface
-
-#### Fact Storage
-- **Overview** → [User Guide](FACTS_USER_GUIDE.md) - Fact Storage
-- **Configuration** → [User Guide](FACTS_USER_GUIDE.md) - Storage Management
-- **Troubleshooting** → [Troubleshooting Guide](FACTS_TROUBLESHOOTING.md) - Memory Issues
-- **API** → [API Reference](FACTS_API_REFERENCE.md) - FactStorage Interface
-
-#### Fact Validation
-- **Overview** → [User Guide](FACTS_USER_GUIDE.md) - Validating Facts
-- **Configuration** → [User Guide](FACTS_USER_GUIDE.md) - Validation Settings
-- **Troubleshooting** → [Troubleshooting Guide](FACTS_TROUBLESHOOTING.md) - Validation Errors
-- **API** → [API Reference](FACTS_API_REFERENCE.md) - Validation Rules
-
-#### CLI Commands
-- **Overview** → [User Guide](FACTS_USER_GUIDE.md) - Basic Usage
-- **Commands** → [User Guide](FACTS_USER_GUIDE.md) - Command Options
-- **Troubleshooting** → [Troubleshooting Guide](FACTS_TROUBLESHOOTING.md) - CLI Issues
-- **API** → [API Reference](FACTS_API_REFERENCE.md) - CLI Integration
+**When to use:** Use this to quickly find relevant examples for your use case.
 
 ## Key Concepts
 
-### Facts System Architecture
+### Core Features
 
-The facts system consists of several key components:
+1. **Direct Export** - Facts are collected and exported immediately without intermediate storage
+2. **Machine Integration** - Uses project machine inventory for target identification
+3. **Multiple Export Formats** - JSON and HCL export formats
+4. **Filtering Support** - Filter by machine, tags, and groups
+5. **SSH-Based Collection** - Collect facts from remote machines via SSH (with known limitations)
+6. **Local Collection** - Collect facts from local machine using system commands
 
-1. **FactCollector** - Collects system information from machines
-2. **FactStorage** - Provides minimal storage for debugging and statistics during export operations
-3. **FactManager** - Orchestrates collection, validation, and export
-4. **FactsIntegration** - Provides integration with other spooky components
-5. **CLI Commands** - User interface for fact management
+### Architecture Principles
 
-### Data Flow
+1. **Interface-First Design** - All functionality through well-defined interfaces
+2. **Dependency Injection** - Loose coupling through interface-based dependencies
+3. **Direct Export** - No intermediate storage, direct gather → export
+4. **Extensible Design** - Easy to add new collection methods and export formats
+5. **Performance Optimized** - Efficient collection and export with minimal overhead
 
-1. **Machine Discovery** - Read machine inventory from project configuration
-2. **SSH Connection** - Establish secure connection to target machine
-3. **Fact Collection** - Use gopsutil to gather system information
-4. **Data Processing** - Convert and validate collected data
-5. **In-Memory Storage** - Provides minimal storage for debugging and statistics during export operations
-6. **Integration** - Make facts available to other spooky components
+### Best Practices
 
-### Fact Types
+1. **Use Project Machine Inventory** - Leverage existing machine inventory for fact collection
+2. **Filter Appropriately** - Use machine and tag filtering to limit collection scope
+3. **Choose Export Format** - Use JSON for machine processing, HCL for human readability
+4. **Handle SSH Issues** - Be aware of current SSH-based collection limitations
+5. **Validate Before Export** - Ensure machine inventory is valid before collection
+6. **Monitor Performance** - Use appropriate filtering to avoid overwhelming systems
 
-The system collects various types of facts:
+## Implementation Status
 
-- **System Facts** - OS, hardware, network information
-- **Enhanced Facts** - Additional system details
-- **Application Facts** - Application-specific information
-- **Custom Facts** - User-defined facts and metadata
+### ✅ Completed Features
+
+- **Core Fact Collection**
+  - Local fact collection using system commands
+  - Machine inventory integration for target identification
+  - Direct export to JSON and HCL formats
+  - Machine and tag-based filtering
+  - Basic validation and error handling
+
+- **CLI Integration**
+  - `spooky facts export` command with full functionality
+  - Project path validation and machine inventory loading
+  - Export format selection and output file specification
+  - Comprehensive error reporting and validation
+
+- **Machine Integration**
+  - Uses project machine inventory for target identification
+  - Supports machine filtering by names and tags
+  - Integrates with existing SSH infrastructure
+  - Provides machine-specific collection context
+
+### ⚠️ Known Issues and Limitations
+
+- **SSH-Based Collection Issues**
+  - SSH-based fact collection has known implementation issues
+  - Remote `/etc/spooky/facts.*` reading is not fully functional
+  - Parallel collection across multiple machines has limitations
+  - SSH integration with machine inventory needs improvement
+
+- **Current Workarounds**
+  - Use local fact collection for immediate needs
+  - Export facts manually from remote machines if needed
+  - Monitor for updates to SSH-based collection functionality
+
+### 🔄 Planned Improvements
+
+- **SSH Collection Enhancement**
+  - Fix SSH-based fact collection implementation
+  - Improve remote facts file reading capabilities
+  - Enhance parallel collection across multiple machines
+  - Better integration with machine inventory authentication
+
+- **Advanced Features**
+  - Enhanced fact validation and processing
+  - Custom fact collection scripts
+  - Fact caching and performance optimization
+  - Advanced filtering and querying capabilities
 
 ## Common Patterns
 
 ### Basic Fact Collection
 
 ```bash
-# Collect facts from all machines
-spooky facts gather ./my-project
+# Export facts from a project
+spooky facts export ./my-project --format json --output facts.json
 
-# Export facts directly from machines
-spooky facts list ./my-project
+# Export with machine filtering
+spooky facts export ./my-project --machine web-server --format hcl --output web-facts.hcl
 
-# Validate facts
-spooky facts validate ./my-project
+# Export with tag filtering
+spooky facts export ./my-project --tags environment=production --format json --output prod-facts.json
 ```
 
 ### Advanced Configuration
 
 ```hcl
+# Project configuration with facts integration
 project {
-  facts {
-    parallel_workers = 8
-    timeout_seconds = 120
-    storage_path = "memory"
-    compression_enabled = true
+  name = "my-project"
+  description = "Project with fact collection"
+  
+  machines {
+    machine "web-server" {
+      hostname = "web.example.com"
+      user = "admin"
+      tags = {
+        environment = "production"
+        role = "web"
+      }
+    }
   }
 }
 ```
+
+## Integration with Other Systems
+
+### CLI Integration
+- [User Guide - Fact Collection](FACTS_USER_GUIDE.md#fact-collection)
+- [API Reference - CLI Integration](FACTS_API_REFERENCE.md#cli-integration)
+- [Examples - Export and Filtering](examples/README.md#export-and-filtering)
+
+### Machine Integration
+- [User Guide - Machine Integration](FACTS_USER_GUIDE.md#machine-integration)
+- [API Reference - Machine Integration](FACTS_API_REFERENCE.md#machine-integration)
+- [Examples - Machine Filtering](examples/README.md#machine-filtering)
+
+## Recent Updates
+
+### SSH Collection Issues (Latest)
+
+The facts system has identified issues with SSH-based fact collection:
+
+#### ⚠️ **Known Issues**
+- **SSH-Based Collection**: SSH-based fact collection has implementation issues
+- **Remote Facts Reading**: Cannot reliably read `/etc/spooky/facts.*` files from remote machines
+- **Parallel Processing**: Sequential collection only, no multi-machine parallel processing
+- **SSH Integration**: Cannot fully leverage existing SSH infrastructure and machine inventory
+- **Authentication**: Limited support for machine inventory authentication methods
+
+#### 🔧 **Current Workarounds**
+- **Local Collection**: Use local fact collection for immediate needs
+- **Manual Export**: Export facts manually from remote machines if needed
+- **Filtered Collection**: Use machine filtering to limit collection scope
+- **Monitor Updates**: Watch for improvements to SSH-based collection
+
+#### 📚 **Updated Documentation**
+- **User Guide**: Updated to reflect current SSH collection limitations
+- **API Reference**: Added implementation status indicators for SSH-based features
+- **Troubleshooting Guide**: Added SSH collection issues section
+- **Integration Guides**: Updated to reflect current SSH integration status
+
+## Remember
+
+**Good facts system usage enables:**
+- Efficient system information collection
+- Machine inventory integration
+- Flexible export and filtering
+- Integration with other spooky systems
+- Performance-optimized data gathering
+
+**Always be aware of current SSH-based collection limitations and use appropriate workarounds until these issues are resolved.**
