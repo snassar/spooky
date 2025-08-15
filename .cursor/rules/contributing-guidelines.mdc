@@ -1,0 +1,446 @@
+---
+description: Contribution workflow and code review standards for the spooky codebase
+globs: ["**/*.go", "**/*.md", "**/*.hcl", ".github/**/*"]
+alwaysApply: true
+---
+
+# Contributing Guidelines
+
+## Quick Reference for AI Assistants
+
+### Decision Tree: Which Contribution Pattern to Apply?
+
+1. **Are you reviewing code changes?**
+   - **Yes** → Use comprehensive review checklist
+   - **No** → Continue to step 2
+
+2. **Are you setting up development workflow?**
+   - **Yes** → Use feature branch patterns
+   - **No** → Continue to step 3
+
+3. **Are you reporting issues?**
+   - **Yes** → Use structured issue reporting
+   - **No** → Continue to step 4
+
+4. **Are you creating pull requests?**
+   - **Yes** → Use PR template patterns
+   - **No** → Use general contribution patterns
+
+### AI Action Items
+
+**ALWAYS DO:**
+- Follow feature branch workflow
+- Write descriptive commit messages
+- Include comprehensive PR descriptions
+- Provide reproduction steps for issues
+- Update documentation for new features
+
+**NEVER DO:**
+- Commit directly to main branch
+- Use vague commit messages
+- Skip code review process
+- Ignore automated test failures
+- Leave documentation outdated
+
+## Core Principles
+
+### 1. Development Workflow
+- **Feature branches**: Create branches from main for all changes
+- **Descriptive commits**: Use clear, descriptive commit messages
+- **Pull requests**: All changes require PR review
+- **Squash commits**: Squash commits before merging
+- **CHANGELOG updates**: Update for user-facing changes
+
+### 2. Code Review Process
+- **Automated checks**: All tests must pass
+- **Coverage requirements**: Meet minimum coverage thresholds
+- **Documentation updates**: Update docs for new features
+- **Breaking changes**: Require migration plan and documentation
+- **Security review**: Security-sensitive code requires security review
+
+### 3. Issue Reporting
+- **Reproduction steps**: Include clear reproduction steps
+- **System information**: Provide relevant system details
+- **Error logs**: Include complete error logs
+- **Expected behavior**: Describe expected vs actual behavior
+- **Tag appropriately**: Use appropriate issue labels
+
+## Implementation Guidelines
+
+### Feature Branch Workflow
+```bash
+# 1. Create feature branch from main
+git checkout main
+git pull origin main
+git checkout -b feature/new-feature
+
+# 2. Make changes and commit
+git add .
+git commit -m "feat: implement new feature
+
+- Add new functionality for X
+- Update documentation
+- Add tests for new feature
+
+Closes #123"
+
+# 3. Push and create PR
+git push origin feature/new-feature
+# Create PR via GitHub web interface
+```
+
+### Commit Message Standards
+```bash
+# Good commit messages
+feat: add SSH connection pooling for better performance
+fix: resolve HCL parsing error with nested blocks
+docs: update installation instructions for new platforms
+test: add integration tests for machine inventory
+refactor: extract common validation logic into shared package
+style: format code according to gofmt standards
+
+# Bad commit messages
+fix stuff
+update
+wip
+```
+
+### Pull Request Template
+```markdown
+## Description
+Brief description of the changes made.
+
+## Type of Change
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+
+## Testing
+- [ ] Unit tests pass
+- [ ] Integration tests pass
+- [ ] Manual testing completed
+- [ ] Coverage thresholds met
+
+## Checklist
+- [ ] Code follows project style guidelines
+- [ ] Self-review completed
+- [ ] Documentation updated
+- [ ] CHANGELOG.md updated (if applicable)
+- [ ] Breaking changes documented
+
+## Related Issues
+Closes #123
+Related to #456
+```
+
+### Issue Template
+```markdown
+## Bug Report
+
+### Description
+Clear and concise description of the bug.
+
+### Steps to Reproduce
+1. Go to '...'
+2. Click on '...'
+3. Scroll down to '...'
+4. See error
+
+### Expected Behavior
+What you expected to happen.
+
+### Actual Behavior
+What actually happened.
+
+### Environment
+- OS: [e.g. Ubuntu 22.04]
+- Go version: [e.g. 1.24.0]
+- Spooky version: [e.g. 1.0.0]
+- Configuration: [relevant config files]
+
+### Additional Context
+Add any other context about the problem here.
+
+### Logs
+```
+[Include relevant log output]
+```
+```
+
+## Code Review Standards
+
+### Review Checklist
+```markdown
+## Code Review Checklist
+
+### Functionality
+- [ ] Code implements the intended feature/fix
+- [ ] Edge cases are handled appropriately
+- [ ] Error handling is comprehensive
+- [ ] Performance implications are considered
+
+### Code Quality
+- [ ] Code follows project style guidelines
+- [ ] Functions are appropriately sized (<50 lines)
+- [ ] Cyclomatic complexity is reasonable (<10)
+- [ ] Variable and function names are descriptive
+- [ ] Comments explain complex logic
+
+### Testing
+- [ ] Unit tests are included
+- [ ] Integration tests are included (if applicable)
+- [ ] Test coverage meets thresholds
+- [ ] Tests are meaningful and not just for coverage
+
+### Documentation
+- [ ] Public APIs are documented
+- [ ] README is updated (if applicable)
+- [ ] Configuration examples are provided
+- [ ] Breaking changes are documented
+
+### Security
+- [ ] No hardcoded credentials
+- [ ] Input validation is implemented
+- [ ] Sensitive data is handled appropriately
+- [ ] Security implications are considered
+
+### Interface Compliance
+- [ ] All interface methods are implemented
+- [ ] Interface contracts are satisfied
+- [ ] Error types are used appropriately
+- [ ] Context patterns are followed
+```
+
+### Automated Review Gates
+```yaml
+# .github/workflows/pr-check.yml
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+      
+      - name: Run tests
+        run: go test -v -coverprofile=coverage.out ./...
+      
+      - name: Check coverage
+        run: |
+          go tool cover -func=coverage.out | grep total | awk '{if ($3 < 75) exit 1}'
+      
+      - name: Run linter
+        run: golangci-lint run
+      
+      - name: Check formatting
+        run: |
+          if [ "$(gofmt -l . | wc -l)" -gt 0 ]; then
+            echo "Code is not formatted. Run 'gofmt -w .'"
+            exit 1
+          fi
+```
+
+## Development Workflow
+
+### Feature Development Process
+```go
+// Feature development workflow
+type FeatureWorkflow struct {
+    BranchName    string
+    IssueNumber   int
+    Description   string
+    TestsRequired bool
+    DocsRequired  bool
+}
+
+func (w *FeatureWorkflow) Validate() error {
+    if w.BranchName == "" {
+        return fmt.Errorf("branch name is required")
+    }
+    
+    if !strings.HasPrefix(w.BranchName, "feature/") && 
+       !strings.HasPrefix(w.BranchName, "fix/") &&
+       !strings.HasPrefix(w.BranchName, "docs/") {
+        return fmt.Errorf("branch name must start with feature/, fix/, or docs/")
+    }
+    
+    if w.IssueNumber <= 0 {
+        return fmt.Errorf("issue number is required")
+    }
+    
+    return nil
+}
+
+func (w *FeatureWorkflow) CreateBranch() error {
+    // Create feature branch
+    cmd := exec.Command("git", "checkout", "-b", w.BranchName)
+    return cmd.Run()
+}
+```
+
+### Code Review Process
+```go
+// Code review automation
+type CodeReview struct {
+    PRNumber      int
+    Author        string
+    Reviewers     []string
+    Status        ReviewStatus
+    Comments      []ReviewComment
+}
+
+type ReviewStatus string
+
+const (
+    ReviewStatusPending   ReviewStatus = "pending"
+    ReviewStatusApproved  ReviewStatus = "approved"
+    ReviewStatusChanges   ReviewStatus = "changes_requested"
+    ReviewStatusDismissed ReviewStatus = "dismissed"
+)
+
+type ReviewComment struct {
+    File     string
+    Line     int
+    Message  string
+    Severity CommentSeverity
+}
+
+type CommentSeverity string
+
+const (
+    SeverityInfo    CommentSeverity = "info"
+    SeverityWarning CommentSeverity = "warning"
+    SeverityError   CommentSeverity = "error"
+)
+
+func (r *CodeReview) AddComment(file, message string, line int, severity CommentSeverity) {
+    r.Comments = append(r.Comments, ReviewComment{
+        File:     file,
+        Line:     line,
+        Message:  message,
+        Severity: severity,
+    })
+}
+```
+
+## Issue Management
+
+### Issue Templates
+```markdown
+## Feature Request
+
+### Description
+Clear and concise description of the feature you'd like to see.
+
+### Use Case
+Describe the use case for this feature.
+
+### Proposed Solution
+Describe the solution you'd like to see.
+
+### Alternatives Considered
+Describe any alternative solutions you've considered.
+
+### Additional Context
+Add any other context or screenshots about the feature request.
+
+---
+
+## Documentation Request
+
+### Description
+Clear and concise description of what documentation is missing or unclear.
+
+### Location
+Where should this documentation be added?
+
+### Content
+What specific information should be included?
+
+### Priority
+How important is this documentation?
+```
+
+### Issue Labeling
+```yaml
+# .github/labels.yml
+labels:
+  - name: bug
+    color: d73a4a
+    description: Something isn't working
+  - name: enhancement
+    color: a2eeef
+    description: New feature or request
+  - name: documentation
+    color: 0075ca
+    description: Improvements or additions to documentation
+  - name: good first issue
+    color: 7057ff
+    description: Good for newcomers
+  - name: help wanted
+    color: 008672
+    description: Extra attention is needed
+  - name: priority: high
+    color: ff0000
+    description: High priority issue
+  - name: priority: medium
+    color: ffaa00
+    description: Medium priority issue
+  - name: priority: low
+    color: 00ff00
+    description: Low priority issue
+```
+
+## AI Assistant Checklist
+
+When working with contribution guidelines, ensure:
+
+- [ ] Feature branch workflow is followed
+- [ ] Commit messages are descriptive and follow conventions
+- [ ] Pull requests include comprehensive descriptions
+- [ ] Code review checklist is completed
+- [ ] Automated checks pass before merging
+- [ ] Documentation is updated for new features
+- [ ] CHANGELOG is updated for user-facing changes
+- [ ] Issue templates are used appropriately
+- [ ] Breaking changes are properly documented
+- [ ] Security implications are reviewed
+
+## Integration with Other Rules
+
+This rule works in conjunction with:
+- **Code Quality Standards**: Ensures quality in contributions
+- **Build Development**: Maintains development workflow standards
+- **Documentation Examples**: Ensures documentation quality
+- **Testing Standards**: Enforces testing requirements
+
+### Cross-References
+- **See [Code Quality Standards](mdc:code-quality-standards)**: For quality requirements
+- **See [Build Development](mdc:build-development)**: For development workflow
+- **See [Documentation Examples](mdc:documentation-examples)**: For documentation standards
+- **See [Testing Standards](mdc:testing)**: For testing requirements
+
+## Remember
+
+**Good contribution guidelines enable:**
+- Consistent development practices
+- High-quality code contributions
+- Efficient code review processes
+- Clear communication and collaboration
+- Maintainable and extensible codebase
+
+**Always follow established contribution patterns and maintain high standards for all contributions.**
+description:
+globs:
+alwaysApply: false
+---
