@@ -26,7 +26,7 @@ func NewIntegration(logger spookytypeslogging.Logger) spookyinterfaces.SecretsIn
 }
 
 // Encrypt encrypts data with the given key
-func (i *Integration) Encrypt(ctx context.Context, data []byte, key []byte) ([]byte, error) {
+func (i *Integration) Encrypt(_ context.Context, data []byte, key []byte) ([]byte, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("data cannot be empty")
 	}
@@ -65,7 +65,7 @@ func (i *Integration) Encrypt(ctx context.Context, data []byte, key []byte) ([]b
 }
 
 // Decrypt decrypts data with the given key
-func (i *Integration) Decrypt(ctx context.Context, data []byte, key []byte) ([]byte, error) {
+func (i *Integration) Decrypt(_ context.Context, data []byte, key []byte) ([]byte, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("data cannot be empty")
 	}
@@ -109,7 +109,7 @@ func (i *Integration) Decrypt(ctx context.Context, data []byte, key []byte) ([]b
 }
 
 // ValidateKey validates an encryption key
-func (i *Integration) ValidateKey(ctx context.Context, key []byte) error {
+func (i *Integration) ValidateKey(_ context.Context, key []byte) error {
 	if len(key) == 0 {
 		return fmt.Errorf("key cannot be empty")
 	}

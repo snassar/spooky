@@ -132,7 +132,7 @@ func (m *Manager) ValidateVariables(ctx context.Context, variables map[string]*s
 }
 
 // ResolveVariables resolves variables with the given context
-func (m *Manager) ResolveVariables(ctx context.Context, variables map[string]*spookytypesvariables.Variable, context *spookytypesvariables.VariableContext) (*spookytypesvariables.VariableResolutionResult, error) {
+func (m *Manager) ResolveVariables(_ context.Context, variables map[string]*spookytypesvariables.Variable, context *spookytypesvariables.VariableContext) (*spookytypesvariables.VariableResolutionResult, error) {
 	m.logger.Info("Resolving variables", map[string]interface{}{
 		"count": len(variables),
 	})

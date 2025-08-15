@@ -29,7 +29,7 @@ func NewLoader(logger spookytypeslogging.Logger) *Loader {
 }
 
 // LoadVariablesFromFile loads variables from a single HCL file
-func (l *Loader) LoadVariablesFromFile(ctx context.Context, filePath string) (map[string]*spookytypesvariables.Variable, error) {
+func (l *Loader) LoadVariablesFromFile(_ context.Context, filePath string) (map[string]*spookytypesvariables.Variable, error) {
 	l.logger.Debug("Loading variables from file", map[string]interface{}{
 		"file_path": filePath,
 	})

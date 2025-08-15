@@ -247,7 +247,7 @@ func (m *Manager) ExportMachines(ctx context.Context, machines []spookytypes.Mac
 
 	// Ensure output directory exists
 	outputDir := filepath.Dir(outputPath)
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
@@ -388,16 +388,16 @@ func (m *Manager) PingMachines(ctx context.Context, machines []spookytypes.Machi
 
 	var statuses []spookytypes.MachineStatus
 
-	for _, machine := range machines {
-		status, err := m.pingMachine(ctx, machine)
+	for i := range machines {
+		status, err := m.pingMachine(ctx, &machines[i])
 		if err != nil {
 			m.logger.Warn("Failed to ping machine", map[string]interface{}{
-				"hostname": machine.Hostname,
+				"hostname": machines[i].Hostname,
 				"error":    err.Error(),
 			})
 			// Create error status
 			status = &spookytypes.MachineStatus{
-				Machine:   &machine,
+				Machine:   &machines[i],
 				Status:    "error",
 				LastCheck: time.Now(),
 				Error:     err.Error(),
@@ -433,7 +433,7 @@ func (m *Manager) PingMachines(ctx context.Context, machines []spookytypes.Machi
 }
 
 // pingMachine pings a single machine to check connectivity
-func (m *Manager) pingMachine(ctx context.Context, machine spookytypes.Machine) (*spookytypes.MachineStatus, error) {
+func (m *Manager) pingMachine(ctx context.Context, machine *spookytypes.Machine) (*spookytypes.MachineStatus, error) {
 	startTime := time.Now()
 
 	// Step 1: DNS Resolution (if hostname is not an IP)
@@ -442,7 +442,7 @@ func (m *Manager) pingMachine(ctx context.Context, machine spookytypes.Machine) 
 		ips, err := net.LookupHost(host)
 		if err != nil {
 			return &spookytypes.MachineStatus{
-				Machine:   &machine,
+				Machine:   machine,
 				Status:    "offline",
 				LastCheck: time.Now(),
 				Error:     fmt.Sprintf("DNS resolution failed: %v", err),
@@ -451,7 +451,7 @@ func (m *Manager) pingMachine(ctx context.Context, machine spookytypes.Machine) 
 		}
 		if len(ips) == 0 {
 			return &spookytypes.MachineStatus{
-				Machine:   &machine,
+				Machine:   machine,
 				Status:    "offline",
 				LastCheck: time.Now(),
 				Error:     "DNS resolution returned no IP addresses",
@@ -467,7 +467,7 @@ func (m *Manager) pingMachine(ctx context.Context, machine spookytypes.Machine) 
 	conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, sshPort), 5*time.Second)
 	if err != nil {
 		return &spookytypes.MachineStatus{
-			Machine:   &machine,
+			Machine:   machine,
 			Status:    "offline",
 			LastCheck: time.Now(),
 			Error:     fmt.Sprintf("SSH port %s not reachable: %v", sshPort, err),
@@ -521,7 +521,7 @@ func (m *Manager) pingMachine(ctx context.Context, machine spookytypes.Machine) 
 	}
 
 	return &spookytypes.MachineStatus{
-		Machine:   &machine,
+		Machine:   machine,
 		Status:    status,
 		LastCheck: time.Now(),
 		Error:     errorMsg,
@@ -767,7 +767,7 @@ func (m *Manager) machineHasTags(machine *spookytypes.Machine, tags []string) bo
 	}
 
 	// Handle case where machine has no tags
-	if machine.Tags == nil || len(machine.Tags) == 0 {
+	if len(machine.Tags) == 0 {
 		return false
 	}
 

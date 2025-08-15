@@ -59,7 +59,7 @@ func (v *Validator) ValidateMachines(ctx context.Context, machines []spookytypes
 }
 
 // ValidateMachine validates a single machine
-func (v *Validator) ValidateMachine(ctx context.Context, machine spookytypes.Machine) (*spookytypes.ValidationResult, error) {
+func (v *Validator) ValidateMachine(_ context.Context, machine spookytypes.Machine) (*spookytypes.ValidationResult, error) {
 	v.logger.Debug("Validating machine", map[string]interface{}{
 		"hostname": machine.Hostname,
 		"host":     machine.Host,
@@ -89,12 +89,12 @@ func (v *Validator) ValidateMachine(ctx context.Context, machine spookytypes.Mac
 	}
 
 	// Validate authentication
-	if err := v.validateAuthentication(machine); err != nil {
+	if err := v.validateAuthentication(&machine); err != nil {
 		errors = append(errors, v.convertErrorToSchemaError(err, "authentication"))
 	}
 
 	// Validate SSH configuration
-	if err := v.validateSSHConfig(machine); err != nil {
+	if err := v.validateSSHConfig(&machine); err != nil {
 		errors = append(errors, v.convertErrorToSchemaError(err, "ssh_config"))
 	}
 
@@ -172,7 +172,7 @@ func (v *Validator) validateUser(user string) error {
 }
 
 // validateAuthentication validates the machine authentication
-func (v *Validator) validateAuthentication(machine spookytypes.Machine) error {
+func (v *Validator) validateAuthentication(machine *spookytypes.Machine) error {
 	// Check that either password or key_file is provided
 	if machine.Password == "" && machine.KeyFile == "" {
 		return spookytypesmachines.NewMachineValidationError(machine.Hostname, "authentication", nil, "required", "either password or key_file must be provided")
@@ -194,7 +194,7 @@ func (v *Validator) validateAuthentication(machine spookytypes.Machine) error {
 }
 
 // validateSSHConfig validates the SSH configuration
-func (v *Validator) validateSSHConfig(machine spookytypes.Machine) error {
+func (v *Validator) validateSSHConfig(machine *spookytypes.Machine) error {
 	// Validate connection timeout
 	if machine.ConnectionTimeout < 1 || machine.ConnectionTimeout > 300 {
 		return spookytypesmachines.NewMachineValidationError(machine.Hostname, "connection_timeout", machine.ConnectionTimeout, "range", "connection_timeout must be between 1 and 300 seconds")

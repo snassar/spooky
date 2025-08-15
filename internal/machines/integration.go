@@ -247,9 +247,9 @@ func (i *Integration) GetMachinesByTags(ctx context.Context, tags []string) ([]s
 
 	var filteredMachines []spookytypes.Machine
 
-	for _, machine := range machines {
-		if i.machineMatchesTags(machine, tags) {
-			filteredMachines = append(filteredMachines, machine)
+	for idx := range machines {
+		if i.machineMatchesTags(&machines[idx], tags) {
+			filteredMachines = append(filteredMachines, machines[idx])
 		}
 	}
 
@@ -338,17 +338,17 @@ func (i *Integration) generateHCLContent(machines []spookytypes.Machine) (string
 	content.WriteString("machines {\n")
 
 	for _, machine := range machines {
-		content.WriteString(fmt.Sprintf("  machine \"%s\" {\n", machine.Host))
-		content.WriteString(fmt.Sprintf("    host = \"%s\"\n", machine.Host))
+		content.WriteString(fmt.Sprintf("  machine %q {\n", machine.Host))
+		content.WriteString(fmt.Sprintf("    host = %q\n", machine.Host))
 		content.WriteString(fmt.Sprintf("    port = %d\n", machine.Port))
-		content.WriteString(fmt.Sprintf("    user = \"%s\"\n", machine.User))
+		content.WriteString(fmt.Sprintf("    user = %q\n", machine.User))
 
 		// Add authentication fields if present
 		if machine.KeyFile != "" {
-			content.WriteString(fmt.Sprintf("    key_file = \"%s\"\n", machine.KeyFile))
+			content.WriteString(fmt.Sprintf("    key_file = %q\n", machine.KeyFile))
 		}
 		if machine.Password != "" {
-			content.WriteString(fmt.Sprintf("    password = \"%s\"\n", machine.Password))
+			content.WriteString(fmt.Sprintf("    password = %q\n", machine.Password))
 		}
 		if machine.Passphrase != "" {
 			content.WriteString(fmt.Sprintf("    passphrase = \"%s\"\n", machine.Passphrase))
@@ -379,7 +379,7 @@ func (i *Integration) getCurrentProjectPath() string {
 }
 
 // machineMatchesTags checks if a machine matches the given tags
-func (i *Integration) machineMatchesTags(machine spookytypes.Machine, tags []string) bool {
+func (i *Integration) machineMatchesTags(machine *spookytypes.Machine, tags []string) bool {
 	machineTags := make(map[string]string)
 	for _, tag := range machine.Tags {
 		if strings.Contains(tag, "=") {
@@ -413,7 +413,7 @@ func (i *Integration) machineMatchesTags(machine spookytypes.Machine, tags []str
 }
 
 // applyComplexFilter applies complex filtering criteria to machines
-func (i *Integration) applyComplexFilter(machines []spookytypes.Machine, filter interface{}) ([]spookytypes.Machine, error) {
+func (i *Integration) applyComplexFilter(machines []spookytypes.Machine, _ interface{}) ([]spookytypes.Machine, error) {
 	// This would implement complex filtering logic based on the filter interface
 	// For now, return all machines
 	return machines, nil

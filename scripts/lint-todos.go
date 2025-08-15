@@ -91,9 +91,8 @@ func lintSingleFile(config *Config) {
 			fmt.Printf("  %s\n", issue.Message)
 		}
 		os.Exit(1)
-	} else {
-		fmt.Printf("✓ No issues found in %s\n", config.SingleFile)
 	}
+	fmt.Printf("✓ No issues found in %s\n", config.SingleFile)
 }
 
 func lintAllFiles(config *Config) {
@@ -284,7 +283,7 @@ func parseLintOutput(output, _ string) []LintIssue {
 	return issues
 }
 
-func categorizeSeverity(errorType, message string) string {
+func categorizeSeverity(errorType, _ string) string {
 	// High priority - ONLY truly build-breaking errors
 	if errorType == "typecheck" {
 		return "High"
@@ -713,8 +712,7 @@ func printSummary(results []LintResult) {
 		fmt.Printf("You can also run: golangci-lint run --fix\n")
 		// Exit with success (0) since finding issues is the expected outcome
 		os.Exit(0)
-	} else {
-		fmt.Printf("\nNo linting issues found!\n")
-		os.Exit(0)
 	}
+	fmt.Printf("\nNo linting issues found!\n")
+	os.Exit(0)
 }

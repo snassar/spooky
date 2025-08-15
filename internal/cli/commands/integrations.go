@@ -22,7 +22,7 @@ func NewIntegrationsCommand(manager spookyinterfaces.IntegrationManager) *Integr
 }
 
 // List lists all available integrations and their status
-func (c *IntegrationsCommand) List(ctx context.Context, args []string) error {
+func (c *IntegrationsCommand) List(_ context.Context, _ []string) error {
 	// Get health status from the integration manager
 	managerImpl, ok := c.integrationManager.(interface {
 		GetHealthStatus() map[string]bool
@@ -54,7 +54,7 @@ func (c *IntegrationsCommand) List(ctx context.Context, args []string) error {
 }
 
 // Validate validates all integrations are working
-func (c *IntegrationsCommand) Validate(ctx context.Context, args []string) error {
+func (c *IntegrationsCommand) Validate(ctx context.Context, _ []string) error {
 	// Get health status from the integration manager
 	managerImpl, ok := c.integrationManager.(interface {
 		GetHealthStatus() map[string]bool

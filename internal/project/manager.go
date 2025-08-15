@@ -36,7 +36,7 @@ func NewManager(
 }
 
 // Initialize initializes a new project
-func (m *Manager) Initialize(ctx context.Context, projectPath string) (*spookytypes.Project, error) {
+func (m *Manager) Initialize(_ context.Context, projectPath string) (*spookytypes.Project, error) {
 	m.logger.Info("Initializing new project", map[string]interface{}{
 		"project_path": projectPath,
 	})
@@ -53,7 +53,7 @@ func (m *Manager) Initialize(ctx context.Context, projectPath string) (*spookyty
 	}
 
 	// Create project directory
-	if err := os.MkdirAll(absPath, 0755); err != nil {
+	if err := os.MkdirAll(absPath, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create project directory: %w", err)
 	}
 
@@ -63,7 +63,7 @@ func (m *Manager) Initialize(ctx context.Context, projectPath string) (*spookyty
 	}
 	for _, dir := range requiredDirs {
 		dirPath := filepath.Join(absPath, dir)
-		if err := os.MkdirAll(dirPath, 0755); err != nil {
+		if err := os.MkdirAll(dirPath, 0o755); err != nil {
 			return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 	}
@@ -75,7 +75,7 @@ func (m *Manager) Initialize(ctx context.Context, projectPath string) (*spookyty
 	}
 	for _, dir := range optionalDirs {
 		dirPath := filepath.Join(absPath, dir)
-		if err := os.MkdirAll(dirPath, 0755); err != nil {
+		if err := os.MkdirAll(dirPath, 0o755); err != nil {
 			return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 	}
@@ -170,7 +170,7 @@ func (m *Manager) Validate(ctx context.Context, project *spookytypes.Project) (*
 }
 
 // Save saves a project to disk
-func (m *Manager) Save(ctx context.Context, project *spookytypes.Project) error {
+func (m *Manager) Save(_ context.Context, project *spookytypes.Project) error {
 	m.logger.Info("Saving project", map[string]interface{}{
 		"project_path": project.Path,
 		"project_name": project.Config.Name,
@@ -189,7 +189,7 @@ func (m *Manager) Save(ctx context.Context, project *spookytypes.Project) error 
 }
 
 // Delete deletes a project
-func (m *Manager) Delete(ctx context.Context, projectPath string) error {
+func (m *Manager) Delete(_ context.Context, projectPath string) error {
 	m.logger.Info("Deleting project", map[string]interface{}{
 		"project_path": projectPath,
 	})

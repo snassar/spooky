@@ -63,7 +63,7 @@ func (v *Validator) ValidateVariables(ctx context.Context, variables map[string]
 }
 
 // ValidateVariable validates a single variable
-func (v *Validator) ValidateVariable(ctx context.Context, variable *spookytypesvariables.Variable) (*spookytypes.ValidationResult, error) {
+func (v *Validator) ValidateVariable(_ context.Context, variable *spookytypesvariables.Variable) (*spookytypes.ValidationResult, error) {
 	v.logger.Debug("Validating variable", map[string]interface{}{
 		"name": variable.Name,
 		"type": variable.Type,

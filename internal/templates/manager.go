@@ -62,7 +62,7 @@ func (m *Manager) LoadTemplate(ctx context.Context, templatePath string) (*spook
 }
 
 // RenderTemplate renders a template with the given data using Go's text/template engine
-func (m *Manager) RenderTemplate(ctx context.Context, tmplData *spookytypes.Template, data map[string]interface{}) (string, error) {
+func (m *Manager) RenderTemplate(_ context.Context, tmplData *spookytypes.Template, data map[string]interface{}) (string, error) {
 	m.logger.Info("Rendering template", map[string]interface{}{
 		"template":  tmplData.ID,
 		"data_keys": len(data),
@@ -99,7 +99,7 @@ func (m *Manager) RenderTemplate(ctx context.Context, tmplData *spookytypes.Temp
 }
 
 // ValidateTemplate validates a template
-func (m *Manager) ValidateTemplate(ctx context.Context, tmplData *spookytypes.Template) (*spookytypesschemas.ValidationResult, error) {
+func (m *Manager) ValidateTemplate(_ context.Context, tmplData *spookytypes.Template) (*spookytypesschemas.ValidationResult, error) {
 	m.logger.Info("Validating template", map[string]interface{}{
 		"template": tmplData.ID,
 	})

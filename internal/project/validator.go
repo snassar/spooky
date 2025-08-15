@@ -80,7 +80,7 @@ func (v *Validator) ValidateProject(ctx context.Context, project *spookytypes.Pr
 }
 
 // ValidateProjectDirectory validates project directory structure
-func (v *Validator) ValidateProjectDirectory(ctx context.Context, projectPath string) (*spookytypesschemas.ValidationResult, error) {
+func (v *Validator) ValidateProjectDirectory(_ context.Context, projectPath string) (*spookytypesschemas.ValidationResult, error) {
 	v.logger.Info("Validating project directory structure", map[string]interface{}{
 		"project_path": projectPath,
 	})
@@ -182,7 +182,7 @@ func (v *Validator) ValidateProjectDirectory(ctx context.Context, projectPath st
 }
 
 // ValidateProjectConfig validates project configuration
-func (v *Validator) ValidateProjectConfig(ctx context.Context, config *spookytypes.ProjectConfig) (*spookytypesschemas.ValidationResult, error) {
+func (v *Validator) ValidateProjectConfig(_ context.Context, config *spookytypes.ProjectConfig) (*spookytypesschemas.ValidationResult, error) {
 	v.logger.Info("Validating project configuration", map[string]interface{}{
 		"project_name": config.Name,
 	})

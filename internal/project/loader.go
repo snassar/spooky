@@ -76,7 +76,7 @@ func (l *Loader) LoadProject(ctx context.Context, projectPath string) (*spookyty
 }
 
 // LoadProjectConfig loads project configuration from project.hcl
-func (l *Loader) LoadProjectConfig(ctx context.Context, projectPath string) (*spookytypes.ProjectConfig, error) {
+func (l *Loader) LoadProjectConfig(_ context.Context, projectPath string) (*spookytypes.ProjectConfig, error) {
 	l.logger.Info("Loading project configuration", map[string]interface{}{
 		"project_path": projectPath,
 	})
@@ -371,7 +371,7 @@ func (l *Loader) createDefaultSettings() *spookytypesproject.ProjectSettings {
 }
 
 // LoadProjectMetadata loads project metadata from project.hcl and other sources
-func (l *Loader) LoadProjectMetadata(ctx context.Context, projectPath string) (*spookytypes.ProjectMetadata, error) {
+func (l *Loader) LoadProjectMetadata(_ context.Context, projectPath string) (*spookytypes.ProjectMetadata, error) {
 	l.logger.Info("Loading project metadata", map[string]interface{}{
 		"project_path": projectPath,
 	})
