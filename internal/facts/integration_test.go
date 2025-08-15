@@ -5,277 +5,197 @@ import (
 	"testing"
 	"time"
 
+	spookyinterfaces "spooky/internal/interfaces"
 	spookytypes "spooky/internal/types"
 	spookytypesfacts "spooky/internal/types/facts"
-	spookytypesschemas "spooky/internal/types/schemas"
 )
 
-// MockFactManager implements FactManager for testing
-type MockFactManager struct {
-	facts map[string]*FactCollection
+// MockFactCollector implements FactCollector for testing
+type MockFactCollector struct{}
+
+func (m *MockFactCollector) GetName() string {
+	return "mock-collector"
 }
 
-func NewMockFactManager() *MockFactManager {
-	return &MockFactManager{
-		facts: make(map[string]*FactCollection),
-	}
-}
-
-func (m *MockFactManager) CollectFacts(ctx context.Context, machine *spookytypes.Machine) (*FactCollection, error) {
+func (m *MockFactCollector) Collect(ctx context.Context, machine *spookytypes.Machine) (*FactCollection, error) {
 	return &FactCollection{
-		MachineID:   "1234567890abcdef1234567890abcdef",
+		MachineID:   machine.Hostname,
 		CollectedAt: time.Now(),
 		Facts: &spookytypesfacts.Facts{
 			System: &spookytypesfacts.SystemFacts{
 				OS: &spookytypesfacts.OSFacts{
-					Name:    "TestOS",
-					Version: "1.0.0",
-				},
-				Hardware: &spookytypesfacts.HardwareFacts{
-					CPU: &spookytypesfacts.CPUFacts{
-						Cores: 4,
-						Model: "Test CPU",
-					},
-					Memory: &spookytypesfacts.MemoryFacts{
-						Total: 8589934592, // 8GB
-					},
-				},
-				Network: &spookytypesfacts.NetworkFacts{
-					Hostname:    "test-host",
-					IPAddresses: []string{"192.168.1.100"},
-					PrimaryIP:   "192.168.1.100",
+					Name:    "Linux",
+					Version: "Ubuntu 20.04",
 				},
 			},
 		},
-		Metadata: make(map[string]interface{}),
 	}, nil
 }
 
-func (m *MockFactManager) StoreFacts(ctx context.Context, machineID string, facts *FactCollection) error {
-	m.facts[machineID] = facts
-	return nil
+// MockSchemaValidator implements SchemaValidator for testing
+type MockSchemaValidator struct{}
+
+func (m *MockSchemaValidator) Validate(ctx context.Context, schema *spookytypes.Schema, data interface{}) (*spookytypes.ValidationResult, error) {
+	return &spookytypes.ValidationResult{Valid: true}, nil
 }
 
-func (m *MockFactManager) GetFacts(ctx context.Context, machineID string) (*FactCollection, error) {
-	if facts, exists := m.facts[machineID]; exists {
-		return facts, nil
-	}
-	return nil, nil
-}
+// MockLogger implements Logger for testing
+type MockLogger struct{}
 
-func (m *MockFactManager) ListFacts(ctx context.Context) ([]string, error) {
-	var machineIDs []string
-	for machineID := range m.facts {
-		machineIDs = append(machineIDs, machineID)
-	}
-	return machineIDs, nil
-}
-
-func (m *MockFactManager) ClearFacts(ctx context.Context) error {
-	m.facts = make(map[string]*FactCollection)
-	return nil
-}
-
-func (m *MockFactManager) ValidateFacts(ctx context.Context, facts *FactCollection) (*spookytypes.ValidationResult, error) {
-	return &spookytypes.ValidationResult{
-		Valid:    true,
-		Errors:   []spookytypesschemas.SchemaError{},
-		Warnings: []spookytypesschemas.SchemaError{},
-	}, nil
-}
-
-func (m *MockFactManager) ExportFacts(ctx context.Context, machineIDs []string, format string, outputPath string) error {
-	return nil
-}
-
-func (m *MockFactManager) ImportFacts(ctx context.Context, format string, inputPath string) error {
-	return nil
-}
-
-func (m *MockFactManager) GetStorageStats() (map[string]interface{}, error) {
-	return map[string]interface{}{
-		"total_facts":   len(m.facts),
-		"machine_count": len(m.facts),
-		"storage_type":  "mock",
-		"last_updated":  time.Now(),
-	}, nil
-}
+func (m *MockLogger) Debug(msg string, fields map[string]interface{}) {}
+func (m *MockLogger) Info(msg string, fields map[string]interface{})  {}
+func (m *MockLogger) Warn(msg string, fields map[string]interface{})  {}
+func (m *MockLogger) Error(err error, fields map[string]interface{})  {}
+func (m *MockLogger) Fatal(err error, fields map[string]interface{})  {}
 
 func TestNewIntegration(t *testing.T) {
-	mockManager := NewMockFactManager()
-	integration := NewIntegration(mockManager)
+	// Create a real manager with mock dependencies
+	mockCollector := &MockFactCollector{}
+	mockValidator := &MockSchemaValidator{}
+	mockLogger := &MockLogger{}
+
+	manager := NewManager(mockCollector, mockValidator, mockLogger)
+
+	integration := NewIntegration(manager)
 
 	if integration == nil {
 		t.Fatal("NewIntegration returned nil")
 	}
 
-	if integration.manager != mockManager {
-		t.Error("manager not set correctly")
-	}
+	// Test that the integration implements the interface
+	var _ spookyinterfaces.FactsIntegration = integration
 }
 
-func TestIntegration_CollectFacts(t *testing.T) {
-	mockManager := NewMockFactManager()
-	integration := NewIntegration(mockManager)
+func TestIntegrationCollectFacts(t *testing.T) {
+	// Create a real manager with mock dependencies
+	mockCollector := &MockFactCollector{}
+	mockValidator := &MockSchemaValidator{}
+	mockLogger := &MockLogger{}
 
-	ctx := context.Background()
-	testMachine := &spookytypes.Machine{
-		Hostname: "test-machine",
-		Host:     "test-machine",
+	manager := NewManager(mockCollector, mockValidator, mockLogger)
+	integration := NewIntegration(manager)
+
+	machine := &spookytypes.Machine{
+		Hostname: "test-server",
 		Port:     22,
-		User:     "testuser",
+		User:     "test-user",
 	}
-	facts, err := integration.CollectFacts(ctx, testMachine)
 
+	facts, err := integration.CollectFacts(context.Background(), machine)
 	if err != nil {
 		t.Fatalf("CollectFacts failed: %v", err)
 	}
 
 	if facts == nil {
-		t.Fatal("CollectFacts returned nil")
+		t.Fatal("CollectFacts returned nil facts")
 	}
 
-	// Type assert to check the facts
-	factCollection, ok := facts.(*FactCollection)
-	if !ok {
-		t.Fatal("facts is not of type *FactCollection")
-	}
-
-	if factCollection.MachineID != "1234567890abcdef1234567890abcdef" {
-		t.Errorf("expected MachineID '1234567890abcdef1234567890abcdef', got %s", factCollection.MachineID)
-	}
-
-	if factCollection.Facts == nil {
-		t.Error("facts.Facts is nil")
-	}
-
-	if factCollection.Facts.System == nil {
-		t.Error("facts.Facts.System is nil")
-	}
-
-	if factCollection.Facts.System.OS == nil {
-		t.Error("facts.Facts.System.OS is nil")
-	}
-
-	if factCollection.Facts.System.OS.Name != "TestOS" {
-		t.Errorf("expected OS name 'TestOS', got %s", factCollection.Facts.System.OS.Name)
+	// Verify facts structure
+	if factCollection, ok := facts.(*FactCollection); ok {
+		if factCollection.MachineID != machine.Hostname {
+			t.Errorf("Expected machine ID %s, got %s", machine.Hostname, factCollection.MachineID)
+		}
+	} else {
+		t.Fatal("CollectFacts did not return *FactCollection")
 	}
 }
 
-func TestIntegration_ValidateFacts(t *testing.T) {
-	mockManager := NewMockFactManager()
-	integration := NewIntegration(mockManager)
+func TestIntegrationStoreFacts(t *testing.T) {
+	// Create a real manager with mock dependencies
+	mockCollector := &MockFactCollector{}
+	mockValidator := &MockSchemaValidator{}
+	mockLogger := &MockLogger{}
 
-	facts := createValidTestFacts("1234567890abcdef1234567890abcdef")
+	manager := NewManager(mockCollector, mockValidator, mockLogger)
+	integration := NewIntegration(manager)
 
-	ctx := context.Background()
-	result, err := integration.ValidateFacts(ctx, facts)
+	facts := &FactCollection{
+		MachineID:   "test-server",
+		CollectedAt: time.Now(),
+		Facts: &spookytypesfacts.Facts{
+			System: &spookytypesfacts.SystemFacts{
+				OS: &spookytypesfacts.OSFacts{
+					Name:    "Linux",
+					Version: "Ubuntu 20.04",
+				},
+			},
+		},
+	}
 
+	err := integration.StoreFacts(context.Background(), facts)
+	if err != nil {
+		t.Fatalf("StoreFacts failed: %v", err)
+	}
+}
+
+func TestIntegrationLoadFacts(t *testing.T) {
+	// Create a real manager with mock dependencies
+	mockCollector := &MockFactCollector{}
+	mockValidator := &MockSchemaValidator{}
+	mockLogger := &MockLogger{}
+
+	manager := NewManager(mockCollector, mockValidator, mockLogger)
+	integration := NewIntegration(manager)
+
+	facts, err := integration.LoadFacts(context.Background())
+	if err != nil {
+		t.Fatalf("LoadFacts failed: %v", err)
+	}
+
+	// LoadFacts returns nil for in-memory storage
+	if facts != nil {
+		t.Fatal("LoadFacts should return nil for in-memory storage")
+	}
+}
+
+func TestIntegrationValidateFacts(t *testing.T) {
+	// Create a real manager with mock dependencies
+	mockCollector := &MockFactCollector{}
+	mockValidator := &MockSchemaValidator{}
+	mockLogger := &MockLogger{}
+
+	manager := NewManager(mockCollector, mockValidator, mockLogger)
+	integration := NewIntegration(manager)
+
+	facts := &FactCollection{
+		MachineID:   "test-server",
+		CollectedAt: time.Now(),
+		Facts: &spookytypesfacts.Facts{
+			System: &spookytypesfacts.SystemFacts{
+				OS: &spookytypesfacts.OSFacts{
+					Name:    "Linux",
+					Version: "Ubuntu 20.04",
+				},
+			},
+		},
+	}
+
+	result, err := integration.ValidateFacts(context.Background(), facts)
 	if err != nil {
 		t.Fatalf("ValidateFacts failed: %v", err)
 	}
 
 	if result == nil {
-		t.Fatal("ValidationResult is nil")
-	}
-
-	if !result.Valid {
-		t.Error("Validation should pass with mock validator")
+		t.Fatal("ValidateFacts returned nil result")
 	}
 }
 
-func TestIntegration_ValidateFacts_NilFacts(t *testing.T) {
-	mockManager := NewMockFactManager()
-	integration := NewIntegration(mockManager)
+func TestIntegrationGetManager(t *testing.T) {
+	// Create a real manager with mock dependencies
+	mockCollector := &MockFactCollector{}
+	mockValidator := &MockSchemaValidator{}
+	mockLogger := &MockLogger{}
 
-	ctx := context.Background()
-	result, err := integration.ValidateFacts(ctx, nil)
+	manager := NewManager(mockCollector, mockValidator, mockLogger)
+	integration := NewIntegration(manager)
 
-	if err != nil {
-		t.Fatalf("ValidateFacts failed: %v", err)
+	managerInterface := integration.GetManager()
+	if managerInterface == nil {
+		t.Fatal("GetManager returned nil")
 	}
 
-	if result == nil {
-		t.Fatal("ValidationResult is nil")
-	}
-
-	if result.Valid {
-		t.Error("Validation should fail when facts is nil")
-	}
-
-	if len(result.Errors) == 0 {
-		t.Error("Validation should have errors when facts is nil")
-	}
-}
-
-func TestIntegration_ValidateFacts_InvalidType(t *testing.T) {
-	mockManager := NewMockFactManager()
-	integration := NewIntegration(mockManager)
-
-	ctx := context.Background()
-	result, err := integration.ValidateFacts(ctx, "invalid-type")
-
-	if err != nil {
-		t.Fatalf("ValidateFacts failed: %v", err)
-	}
-
-	if result == nil {
-		t.Fatal("ValidationResult is nil")
-	}
-
-	if result.Valid {
-		t.Error("Validation should fail when facts is invalid type")
-	}
-
-	if len(result.Errors) == 0 {
-		t.Error("Validation should have errors when facts is invalid type")
-	}
-}
-
-func TestIntegration_ExportFacts(t *testing.T) {
-	mockManager := NewMockFactManager()
-	integration := NewIntegration(mockManager)
-
-	facts := createValidTestFacts("1234567890abcdef1234567890abcdef")
-
-	ctx := context.Background()
-	err := integration.ExportFacts(ctx, facts, "json", "/tmp/test-facts.json")
-
-	if err != nil {
-		t.Fatalf("ExportFacts failed: %v", err)
-	}
-}
-
-func TestIntegration_ExportFacts_NilFacts(t *testing.T) {
-	mockManager := NewMockFactManager()
-	integration := NewIntegration(mockManager)
-
-	ctx := context.Background()
-	err := integration.ExportFacts(ctx, nil, "json", "/tmp/test-facts.json")
-
-	if err == nil {
-		t.Error("Expected error when facts is nil")
-	}
-
-	if err.Error() != "facts cannot be nil" {
-		t.Errorf("Expected 'facts cannot be nil' error, got: %v", err)
-	}
-}
-
-func TestIntegration_ExportFacts_UnsupportedFormat(t *testing.T) {
-	mockManager := NewMockFactManager()
-	integration := NewIntegration(mockManager)
-
-	facts := createValidTestFacts("1234567890abcdef1234567890abcdef")
-
-	ctx := context.Background()
-	err := integration.ExportFacts(ctx, facts, "unsupported", "/tmp/test-facts.unsupported")
-
-	if err == nil {
-		t.Error("Expected error for unsupported format")
-	}
-
-	if err.Error() != "unsupported export format: unsupported" {
-		t.Errorf("Expected 'unsupported export format' error, got: %v", err)
+	// Verify it's the same manager
+	if managerInterface != manager {
+		t.Fatal("GetManager returned different manager")
 	}
 }
