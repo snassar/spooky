@@ -50,9 +50,13 @@ type IssueCategory struct {
 }
 
 func main() {
+	// Generate filename with timestamp
+	timestamp := time.Now().Format("2006-01-02-15-04-05")
+	outputFile := fmt.Sprintf("linting-todos-%s.md", timestamp)
+
 	config := Config{
 		LintConfig:       getEnv("LINT_CONFIG", ".golangci.yml"),
-		OutputFile:       getEnv("OUTPUT_FILE", "lint-todos.md"),
+		OutputFile:       getEnv("OUTPUT_FILE", outputFile),
 		MaxFilesPerBatch: 10,
 		ShowProgress:     false, // No progress output
 		SingleFile:       getEnv("LINT_FILE", ""),
@@ -78,6 +82,7 @@ func lintSingleFile(config *Config) {
 
 	fmt.Printf("Processing: %s\n", config.SingleFile)
 
+	// For single file, we still use file-based linting since the user specifically requested it
 	result := lintFile(config.SingleFile, config.LintConfig, config.UseFastMode)
 
 	if result.HasIssues {
@@ -96,23 +101,23 @@ func lintSingleFile(config *Config) {
 }
 
 func lintAllFiles(config *Config) {
-	fmt.Printf("Starting concurrent file-by-file linting analysis...\n")
+	fmt.Printf("Starting concurrent package-by-package linting analysis...\n")
 	fmt.Printf("Output will be saved to: %s\n", config.OutputFile)
 	fmt.Printf("Lint config: %s\n", config.LintConfig)
 	fmt.Printf("Workers: %d\n\n", config.NumWorkers)
 
-	// Find all Go files
-	fmt.Printf("Finding Go files...\n")
-	files, err := findGoFiles(".")
+	// Find all Go packages
+	fmt.Printf("Finding Go packages...\n")
+	packages, err := findGoPackages(".")
 	if err != nil {
-		fmt.Printf("Error finding Go files: %v\n", err)
+		fmt.Printf("Error finding Go packages: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Found %d Go files\n\n", len(files))
+	fmt.Printf("Found %d Go packages\n\n", len(packages))
 
-	// Process files concurrently
-	results := processFilesConcurrent(files, config)
+	// Process packages concurrently
+	results := processPackagesConcurrent(packages, config)
 
 	// Generate report
 	generateReport(results, config)
@@ -143,43 +148,69 @@ func getEnvAsBool(key string, defaultValue bool) bool {
 	return defaultValue
 }
 
-func findGoFiles(root string) ([]string, error) {
-	var files []string
+// findGoPackages finds all Go packages in the given root directory
+func findGoPackages(root string) ([]string, error) {
+	var packages []string
+	seenPackages := make(map[string]bool)
+
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
+
+		// Skip vendor directory
+		if info.IsDir() && info.Name() == "vendor" {
+			return filepath.SkipDir
+		}
+
+		// Check if this is a Go file
 		if !info.IsDir() && strings.HasSuffix(path, ".go") {
-			// Skip vendor directory
-			if !strings.Contains(path, "/vendor/") {
-				files = append(files, path)
+			// Get the package directory
+			packageDir := filepath.Dir(path)
+			packagePath, err := filepath.Rel(root, packageDir)
+			if err != nil {
+				return err
+			}
+
+			// Use "." for the root package
+			if packagePath == "." {
+				packagePath = "."
+			}
+
+			// Only add each package once
+			if !seenPackages[packagePath] {
+				packages = append(packages, packagePath)
+				seenPackages[packagePath] = true
 			}
 		}
 		return nil
 	})
-	return files, err
+
+	// Sort packages for consistent output
+	sort.Strings(packages)
+	return packages, err
 }
 
-func processFilesConcurrent(files []string, config *Config) []LintResult {
+func processPackagesConcurrent(packages []string, config *Config) []LintResult {
 	numWorkers := config.NumWorkers
-	if numWorkers > len(files) {
-		numWorkers = len(files)
+	if numWorkers > len(packages) {
+		numWorkers = len(packages)
 	}
 
-	jobs := make(chan string, len(files))
-	results := make(chan LintResult, len(files))
+	jobs := make(chan string, len(packages))
+	results := make(chan LintResult, len(packages))
 
 	var wg sync.WaitGroup
 
 	// Start workers
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
-		go worker(jobs, results, config.LintConfig, config.UseFastMode, &wg)
+		go packageWorker(jobs, results, config.LintConfig, config.UseFastMode, &wg)
 	}
 
 	// Send jobs
-	for _, file := range files {
-		jobs <- file
+	for _, pkg := range packages {
+		jobs <- pkg
 	}
 	close(jobs)
 
@@ -195,7 +226,7 @@ func processFilesConcurrent(files []string, config *Config) []LintResult {
 		allResults = append(allResults, result)
 	}
 
-	// Sort results by file name
+	// Sort results by package name
 	sort.Slice(allResults, func(i, j int) bool {
 		return allResults[i].File < allResults[j].File
 	})
@@ -203,10 +234,10 @@ func processFilesConcurrent(files []string, config *Config) []LintResult {
 	return allResults
 }
 
-func worker(jobs <-chan string, results chan<- LintResult, lintConfig string, useFastMode bool, wg *sync.WaitGroup) {
+func packageWorker(jobs <-chan string, results chan<- LintResult, lintConfig string, useFastMode bool, wg *sync.WaitGroup) {
 	defer wg.Done()
-	for file := range jobs {
-		result := lintFile(file, lintConfig, useFastMode)
+	for pkg := range jobs {
+		result := lintPackage(pkg, lintConfig, useFastMode)
 		results <- result
 	}
 }
@@ -230,6 +261,33 @@ func lintFile(file, lintConfig string, useFastMode bool) LintResult {
 	if err != nil {
 		// Parse the output to extract issues
 		issues := parseLintOutput(string(output), file)
+		result.HasIssues = len(issues) > 0
+		result.Issues = issues
+		result.IssueCount = len(issues)
+	}
+
+	return result
+}
+
+func lintPackage(pkg, lintConfig string, useFastMode bool) LintResult {
+	result := LintResult{
+		File:      pkg,
+		HasIssues: false,
+		Issues:    []LintIssue{},
+	}
+
+	args := []string{"run", "--config=" + lintConfig}
+	if useFastMode {
+		args = append(args, "--fast")
+	}
+	args = append(args, "./"+pkg)
+
+	cmd := exec.Command("golangci-lint", args...)
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		// Parse the output to extract issues
+		issues := parseLintOutput(string(output), pkg)
 		result.HasIssues = len(issues) > 0
 		result.Issues = issues
 		result.IssueCount = len(issues)
@@ -425,8 +483,8 @@ func getFixPatterns(errorType string) []string {
 }
 
 func calculateStats(results []LintResult, categories map[string]*IssueCategory) map[string]interface{} {
-	totalFiles := len(results)
-	filesWithIssues := 0
+	totalPackages := len(results)
+	packagesWithIssues := 0
 	totalIssues := 0
 	highPriority := 0
 	mediumPriority := 0
@@ -434,7 +492,7 @@ func calculateStats(results []LintResult, categories map[string]*IssueCategory) 
 
 	for _, result := range results {
 		if result.HasIssues {
-			filesWithIssues++
+			packagesWithIssues++
 			totalIssues += result.IssueCount
 		}
 	}
@@ -453,8 +511,8 @@ func calculateStats(results []LintResult, categories map[string]*IssueCategory) 
 	}
 
 	return map[string]interface{}{
-		"totalFiles":      totalFiles,
-		"filesWithIssues": filesWithIssues,
+		"totalFiles":      totalPackages,      // Keep key name for compatibility
+		"filesWithIssues": packagesWithIssues, // Keep key name for compatibility
 		"totalIssues":     totalIssues,
 		"highPriority":    highPriority,
 		"mediumPriority":  mediumPriority,
@@ -465,7 +523,7 @@ func calculateStats(results []LintResult, categories map[string]*IssueCategory) 
 
 func writeEnhancedHeader(writer *bufio.Writer, stats map[string]interface{}, config *Config) {
 	fmt.Fprintf(writer, "# Linting TODOs - AI-Optimized Report\n\n")
-	fmt.Fprintf(writer, "This file contains linting issues captured by running `golangci-lint` on each Go file individually.\n")
+	fmt.Fprintf(writer, "This file contains linting issues captured by running `golangci-lint` on each Go package.\n")
 	fmt.Fprintf(writer, "**Optimized for AI consumption** with categorization, fix suggestions, and progress tracking.\n\n")
 
 	fmt.Fprintf(writer, "**Generated:** %s\n", time.Now().Format("2006-01-02 15:04:05"))
@@ -473,8 +531,8 @@ func writeEnhancedHeader(writer *bufio.Writer, stats map[string]interface{}, con
 	fmt.Fprintf(writer, "**Fast Mode:** %t\n\n", config.UseFastMode)
 
 	fmt.Fprintf(writer, "## 📊 Summary Statistics\n\n")
-	fmt.Fprintf(writer, "- **Total files processed:** %d\n", stats["totalFiles"])
-	fmt.Fprintf(writer, "- **Files with issues:** %d\n", stats["filesWithIssues"])
+	fmt.Fprintf(writer, "- **Total packages processed:** %d\n", stats["totalFiles"])
+	fmt.Fprintf(writer, "- **Packages with issues:** %d\n", stats["filesWithIssues"])
 	fmt.Fprintf(writer, "- **Total issues:** %d\n\n", stats["totalIssues"])
 
 	fmt.Fprintf(writer, "### Priority Breakdown\n\n")
@@ -523,7 +581,7 @@ func writeIssueCategories(writer *bufio.Writer, categories map[string]*IssueCate
 }
 
 func writeFileBreakdown(writer *bufio.Writer, results []LintResult, config *Config) {
-	fmt.Fprintf(writer, "## 📁 File-by-File Breakdown\n\n")
+	fmt.Fprintf(writer, "## 📁 Package-by-Package Breakdown\n\n")
 
 	for _, result := range results {
 		if !result.HasIssues {
@@ -575,7 +633,11 @@ func writeFileBreakdown(writer *bufio.Writer, results []LintResult, config *Conf
 
 		fmt.Fprintf(writer, "```bash\n")
 		fmt.Fprintf(writer, "# TODO: Fix linting issues in %s\n", result.File)
-		fmt.Fprintf(writer, "# Run: golangci-lint run --config=%s %s\n", config.LintConfig, result.File)
+		if result.File == "." {
+			fmt.Fprintf(writer, "# Run: golangci-lint run --config=%s .\n", config.LintConfig)
+		} else {
+			fmt.Fprintf(writer, "# Run: golangci-lint run --config=%s ./%s\n", config.LintConfig, result.File)
+		}
 		fmt.Fprintf(writer, "```\n\n")
 	}
 }
@@ -590,7 +652,7 @@ func writeBatchFixes(writer *bufio.Writer, allIssues []LintIssue) {
 		issueGroups[key] = append(issueGroups[key], issue)
 	}
 
-	// Find issues that appear in multiple files
+	// Find issues that appear in multiple packages
 	var batchFixes []struct {
 		pattern string
 		issues  []LintIssue
@@ -613,21 +675,23 @@ func writeBatchFixes(writer *bufio.Writer, allIssues []LintIssue) {
 	})
 
 	if len(batchFixes) > 0 {
-		fmt.Fprintf(writer, "### Issues Found in Multiple Files\n\n")
+		fmt.Fprintf(writer, "### Issues Found in Multiple Packages\n\n")
 		for _, fix := range batchFixes {
-			if fix.count >= 3 { // Only show if 3+ files affected
-				fmt.Fprintf(writer, "#### %s (%d files)\n\n", fix.issues[0].ErrorType, fix.count)
-				fmt.Fprintf(writer, "**Pattern:** %s\n\n", fix.issues[0].Message)
-				fmt.Fprintf(writer, "**Affected files:**\n")
-				for _, issue := range fix.issues {
-					fmt.Fprintf(writer, "- %s:%d\n", issue.File, issue.LineNumber)
-				}
-				fmt.Fprintf(writer, "\n**Suggested batch fix:**\n")
-				fmt.Fprintf(writer, "```bash\n")
-				fmt.Fprintf(writer, "# Run this command to fix all instances:\n")
-				fmt.Fprintf(writer, "# find . -name \"*.go\" -exec sed -i 's/pattern/replacement/g' {} \\;\n")
-				fmt.Fprintf(writer, "```\n\n")
+			if fix.count < 3 {
+				continue
 			}
+			// Only show if 3+ packages affected
+			fmt.Fprintf(writer, "#### %s (%d packages)\n\n", fix.issues[0].ErrorType, fix.count)
+			fmt.Fprintf(writer, "**Pattern:** %s\n\n", fix.issues[0].Message)
+			fmt.Fprintf(writer, "**Affected packages:**\n")
+			for _, issue := range fix.issues {
+				fmt.Fprintf(writer, "- %s:%d\n", issue.File, issue.LineNumber)
+			}
+			fmt.Fprintf(writer, "\n**Suggested batch fix:**\n")
+			fmt.Fprintf(writer, "```bash\n")
+			fmt.Fprintf(writer, "# Run this command to fix all instances:\n")
+			fmt.Fprintf(writer, "# find . -name \"*.go\" -exec sed -i 's/pattern/replacement/g' {} \\;\n")
+			fmt.Fprintf(writer, "```\n\n")
 		}
 	} else {
 		fmt.Fprintf(writer, "No batch fix opportunities found.\n\n")
@@ -691,23 +755,23 @@ func writeFixPatterns(writer *bufio.Writer) {
 }
 
 func printSummary(results []LintResult) {
-	totalFiles := len(results)
-	filesWithIssues := 0
+	totalPackages := len(results)
+	packagesWithIssues := 0
 	totalIssues := 0
 
 	for _, result := range results {
 		if result.HasIssues {
-			filesWithIssues++
+			packagesWithIssues++
 			totalIssues += result.IssueCount
 		}
 	}
 
 	fmt.Printf("\n=== Linting Analysis Complete ===\n")
-	fmt.Printf("Total files processed: %d\n", totalFiles)
-	fmt.Printf("Files with issues: %d\n", filesWithIssues)
+	fmt.Printf("Total packages processed: %d\n", totalPackages)
+	fmt.Printf("Packages with issues: %d\n", packagesWithIssues)
 	fmt.Printf("Total issues: %d\n", totalIssues)
 
-	if filesWithIssues > 0 {
+	if packagesWithIssues > 0 {
 		fmt.Printf("\nTo fix issues, review the generated report and address them systematically.\n")
 		fmt.Printf("You can also run: golangci-lint run --fix\n")
 		// Exit with success (0) since finding issues is the expected outcome

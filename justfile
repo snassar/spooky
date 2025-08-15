@@ -64,12 +64,14 @@ lint:
 # Run linter on each file individually and capture TODOs (AI-optimized)
 lint-todos:
     @echo "Running AI-optimized file-by-file linting analysis..."
-    @go run scripts/lint-todos.go
+    @mkdir -p docs/plans
+    @OUTPUT_FILE=docs/plans/linting-todos-$(date +%Y-%m-%d-%H-%M-%S).md go run scripts/lint-todos.go
 
 # Run AI-optimized linter on a specific file
 lint-file file:
     @echo "Running AI-optimized linter on {{file}}..."
-    @LINT_FILE={{file}} go run scripts/lint-todos.go
+    @mkdir -p docs/plans
+    @OUTPUT_FILE=docs/plans/linting-todos-$(date +%Y-%m-%d-%H-%M-%S).md LINT_FILE={{file}} go run scripts/lint-todos.go
 
 
 
