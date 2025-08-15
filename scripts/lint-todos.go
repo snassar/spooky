@@ -62,14 +62,14 @@ func main() {
 
 	if config.SingleFile != "" {
 		// Lint a single file
-		lintSingleFile(config)
+		lintSingleFile(&config)
 	} else {
 		// Lint all files
-		lintAllFiles(config)
+		lintAllFiles(&config)
 	}
 }
 
-func lintSingleFile(config Config) {
+func lintSingleFile(config *Config) {
 	// Check if file exists
 	if _, err := os.Stat(config.SingleFile); os.IsNotExist(err) {
 		fmt.Printf("Error: File %s does not exist\n", config.SingleFile)
@@ -96,7 +96,7 @@ func lintSingleFile(config Config) {
 	}
 }
 
-func lintAllFiles(config Config) {
+func lintAllFiles(config *Config) {
 	fmt.Printf("Starting concurrent file-by-file linting analysis...\n")
 	fmt.Printf("Output will be saved to: %s\n", config.OutputFile)
 	fmt.Printf("Lint config: %s\n", config.LintConfig)
@@ -139,7 +139,7 @@ func getEnvAsInt(key string, defaultValue int) int {
 
 func getEnvAsBool(key string, defaultValue bool) bool {
 	if value := os.Getenv(key); value != "" {
-		return strings.ToLower(value) == "true"
+		return strings.EqualFold(value, "true")
 	}
 	return defaultValue
 }
@@ -161,7 +161,7 @@ func findGoFiles(root string) ([]string, error) {
 	return files, err
 }
 
-func processFilesConcurrent(files []string, config Config) []LintResult {
+func processFilesConcurrent(files []string, config *Config) []LintResult {
 	numWorkers := config.NumWorkers
 	if numWorkers > len(files) {
 		numWorkers = len(files)
@@ -239,7 +239,7 @@ func lintFile(file, lintConfig string, useFastMode bool) LintResult {
 	return result
 }
 
-func parseLintOutput(output, file string) []LintIssue {
+func parseLintOutput(output, _ string) []LintIssue {
 	var issues []LintIssue
 
 	// Skip if it's a parallel execution error
@@ -262,8 +262,12 @@ func parseLintOutput(output, file string) []LintIssue {
 		if len(matches) == 6 {
 			lineNum := 0
 			column := 0
-			fmt.Sscanf(matches[2], "%d", &lineNum)
-			fmt.Sscanf(matches[3], "%d", &column)
+			if _, err := fmt.Sscanf(matches[2], "%d", &lineNum); err != nil {
+				continue // Skip this line if we can't parse the line number
+			}
+			if _, err := fmt.Sscanf(matches[3], "%d", &column); err != nil {
+				continue // Skip this line if we can't parse the column number
+			}
 
 			issue := LintIssue{
 				File:       matches[1],
@@ -281,25 +285,28 @@ func parseLintOutput(output, file string) []LintIssue {
 }
 
 func categorizeSeverity(errorType, message string) string {
-	// High priority - build breaking
-	if errorType == "typecheck" || strings.Contains(message, "undefined") || strings.Contains(message, "unused") {
+	// High priority - ONLY truly build-breaking errors
+	if errorType == "typecheck" {
 		return "High"
 	}
 
-	// Medium priority - code quality
-	if errorType == "gocritic" || errorType == "govet" || strings.Contains(message, "unused") {
+	// Medium priority - code quality and potential issues
+	if errorType == "gocritic" || errorType == "govet" || errorType == "errcheck" ||
+		errorType == "gosec" || errorType == "ineffassign" || errorType == "deadcode" {
 		return "Medium"
 	}
 
-	// Low priority - style
-	if errorType == "gofmt" || errorType == "goimports" || errorType == "misspell" {
+	// Low priority - style and formatting
+	if errorType == "gofmt" || errorType == "goimports" || errorType == "misspell" ||
+		errorType == "gosimple" || errorType == "revive" || errorType == "unused" ||
+		errorType == "gocyclo" || errorType == "dupl" {
 		return "Low"
 	}
 
 	return "Medium"
 }
 
-func generateReport(results []LintResult, config Config) {
+func generateReport(results []LintResult, config *Config) {
 	file, err := os.Create(config.OutputFile)
 	if err != nil {
 		fmt.Printf("Error creating output file: %v\n", err)
@@ -457,7 +464,7 @@ func calculateStats(results []LintResult, categories map[string]*IssueCategory) 
 	}
 }
 
-func writeEnhancedHeader(writer *bufio.Writer, stats map[string]interface{}, config Config) {
+func writeEnhancedHeader(writer *bufio.Writer, stats map[string]interface{}, config *Config) {
 	fmt.Fprintf(writer, "# Linting TODOs - AI-Optimized Report\n\n")
 	fmt.Fprintf(writer, "This file contains linting issues captured by running `golangci-lint` on each Go file individually.\n")
 	fmt.Fprintf(writer, "**Optimized for AI consumption** with categorization, fix suggestions, and progress tracking.\n\n")
@@ -516,7 +523,7 @@ func writeIssueCategories(writer *bufio.Writer, categories map[string]*IssueCate
 	}
 }
 
-func writeFileBreakdown(writer *bufio.Writer, results []LintResult, config Config) {
+func writeFileBreakdown(writer *bufio.Writer, results []LintResult, config *Config) {
 	fmt.Fprintf(writer, "## 📁 File-by-File Breakdown\n\n")
 
 	for _, result := range results {

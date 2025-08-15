@@ -7,8 +7,6 @@ import (
 
 	spookytypes "spooky/internal/types"
 	spookytypesfacts "spooky/internal/types/facts"
-	spookytypeslogging "spooky/internal/types/logging"
-	spookytypesschemas "spooky/internal/types/schemas"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -56,104 +54,6 @@ func (m *MockFactStorage) GetStats() (map[string]interface{}, error) {
 		"storage_type":  "memory",
 	}, nil
 }
-
-// MockFactCollector implements FactCollector for testing
-type MockFactCollector struct {
-	name string
-}
-
-func NewMockFactCollector() *MockFactCollector {
-	return &MockFactCollector{
-		name: "mock-collector",
-	}
-}
-
-func (m *MockFactCollector) Collect(ctx context.Context, machine *spookytypes.Machine) (*FactCollection, error) {
-	return &FactCollection{
-		MachineID:   "1234567890abcdef1234567890abcdef",
-		CollectedAt: time.Now(),
-		Facts: &spookytypesfacts.Facts{
-			System: &spookytypesfacts.SystemFacts{
-				OS: &spookytypesfacts.OSFacts{
-					Name:    "TestOS",
-					Version: "1.0.0",
-					Arch:    "x86_64",
-					Kernel:  "5.0.0",
-				},
-				Hardware: &spookytypesfacts.HardwareFacts{
-					CPU: &spookytypesfacts.CPUFacts{
-						Cores: 4,
-						Model: "Test CPU",
-					},
-					Memory: &spookytypesfacts.MemoryFacts{
-						Total: 8589934592, // 8GB
-					},
-				},
-				Network: &spookytypesfacts.NetworkFacts{
-					Hostname:    "test-host",
-					IPAddresses: []string{"192.168.1.100"},
-					PrimaryIP:   "192.168.1.100",
-				},
-			},
-		},
-		Metadata: make(map[string]interface{}),
-	}, nil
-}
-
-func (m *MockFactCollector) GetName() string {
-	return m.name
-}
-
-// MockSchemaValidator implements SchemaValidator for testing
-type MockSchemaValidator struct{}
-
-func (m *MockSchemaValidator) Validate(schema *spookytypesschemas.Schema, data interface{}) (*spookytypesschemas.ValidationResult, error) {
-	return &spookytypesschemas.ValidationResult{
-		Valid:       true,
-		ValidatedAt: time.Now(),
-		Errors:      []spookytypesschemas.SchemaError{},
-		Warnings:    []spookytypesschemas.SchemaError{},
-	}, nil
-}
-
-func (m *MockSchemaValidator) ValidateFile(schema *spookytypesschemas.Schema, filePath string) (*spookytypesschemas.ValidationResult, error) {
-	return m.Validate(schema, nil)
-}
-
-func (m *MockSchemaValidator) ValidateString(schema *spookytypesschemas.Schema, content string) (*spookytypesschemas.ValidationResult, error) {
-	return m.Validate(schema, content)
-}
-
-func (m *MockSchemaValidator) ValidateBytes(schema *spookytypesschemas.Schema, data []byte) (*spookytypesschemas.ValidationResult, error) {
-	return m.Validate(schema, data)
-}
-
-func (m *MockSchemaValidator) ValidateWithContext(schema *spookytypesschemas.Schema, data interface{}, context map[string]interface{}) (*spookytypesschemas.ValidationResult, error) {
-	return m.Validate(schema, data)
-}
-
-func (m *MockSchemaValidator) ValidateField(schema *spookytypesschemas.Schema, fieldPath string, value interface{}) (*spookytypesschemas.ValidationResult, error) {
-	return &spookytypesschemas.ValidationResult{
-		Valid:       true,
-		ValidatedAt: time.Now(),
-		Errors:      []spookytypesschemas.SchemaError{},
-		Warnings:    []spookytypesschemas.SchemaError{},
-	}, nil
-}
-
-// MockLogger implements Logger for testing
-type MockLogger struct{}
-
-func (m *MockLogger) Debug(msg string, fields ...map[string]interface{})            {}
-func (m *MockLogger) Info(msg string, fields ...map[string]interface{})             {}
-func (m *MockLogger) Warn(msg string, fields ...map[string]interface{})             {}
-func (m *MockLogger) Error(msg string, err error, fields ...map[string]interface{}) {}
-func (m *MockLogger) Fatal(msg string, err error, fields ...map[string]interface{}) {}
-func (m *MockLogger) WithFields(fields map[string]interface{}) spookytypes.Logger   { return m }
-func (m *MockLogger) WithComponent(component string) spookytypes.Logger             { return m }
-func (m *MockLogger) WithOperation(operation string) spookytypes.Logger             { return m }
-func (m *MockLogger) SetLevel(level spookytypes.LogLevel)                           {}
-func (m *MockLogger) GetLevel() spookytypes.LogLevel                                { return spookytypeslogging.LogLevelInfo }
 
 // createValidTestFacts creates a valid FactCollection for testing
 func createValidTestFacts(machineID string) *FactCollection {

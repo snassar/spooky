@@ -10,44 +10,6 @@ import (
 	spookytypesfacts "spooky/internal/types/facts"
 )
 
-// MockFactCollector implements FactCollector for testing
-type MockFactCollector struct{}
-
-func (m *MockFactCollector) GetName() string {
-	return "mock-collector"
-}
-
-func (m *MockFactCollector) Collect(ctx context.Context, machine *spookytypes.Machine) (*FactCollection, error) {
-	return &FactCollection{
-		MachineID:   machine.Hostname,
-		CollectedAt: time.Now(),
-		Facts: &spookytypesfacts.Facts{
-			System: &spookytypesfacts.SystemFacts{
-				OS: &spookytypesfacts.OSFacts{
-					Name:    "Linux",
-					Version: "Ubuntu 20.04",
-				},
-			},
-		},
-	}, nil
-}
-
-// MockSchemaValidator implements SchemaValidator for testing
-type MockSchemaValidator struct{}
-
-func (m *MockSchemaValidator) Validate(ctx context.Context, schema *spookytypes.Schema, data interface{}) (*spookytypes.ValidationResult, error) {
-	return &spookytypes.ValidationResult{Valid: true}, nil
-}
-
-// MockLogger implements Logger for testing
-type MockLogger struct{}
-
-func (m *MockLogger) Debug(msg string, fields map[string]interface{}) {}
-func (m *MockLogger) Info(msg string, fields map[string]interface{})  {}
-func (m *MockLogger) Warn(msg string, fields map[string]interface{})  {}
-func (m *MockLogger) Error(err error, fields map[string]interface{})  {}
-func (m *MockLogger) Fatal(err error, fields map[string]interface{})  {}
-
 func TestNewIntegration(t *testing.T) {
 	// Create a real manager with mock dependencies
 	mockCollector := &MockFactCollector{}
