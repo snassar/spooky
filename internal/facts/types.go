@@ -26,8 +26,11 @@ type FactCollection struct {
 
 // FactCollector collects facts from a machine
 type FactCollector interface {
-	// Collect collects facts from the given machine
+	// Collect collects facts from the given machine (local or remote)
 	Collect(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error)
+
+	// CollectViaSSH collects facts from remote machine via SSH
+	CollectViaSSH(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error)
 
 	// GetName returns the collector name
 	GetName() string

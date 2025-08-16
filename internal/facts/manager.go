@@ -44,18 +44,68 @@ func (m *Manager) CollectFacts(ctx context.Context, machine *spookytypes.Machine
 		return nil, fmt.Errorf("machine cannot be nil")
 	}
 
-	m.logger.Info("Collecting facts", map[string]interface{}{"machine": machine.Hostname})
+	m.logger.Info("Collecting facts", map[string]interface{}{
+		"machine": machine.Hostname,
+		"host":    machine.Host,
+	})
 
-	// Collect facts using the collector
+	// Determine collection method based on machine configuration
+	if machine.Host != "" && machine.Host != "localhost" && machine.Host != "127.0.0.1" {
+		// Remote machine - use SSH-based collection
+		return m.collectFactsViaSSH(ctx, machine)
+	}
+
+	// Local machine - use local collection
 	facts, err := m.collector.Collect(ctx, machine)
 	if err != nil {
 		m.logger.Error("Failed to collect facts", err, map[string]interface{}{"machine": machine.Hostname})
 		return nil, fmt.Errorf("failed to collect facts for %s: %w", machine.Hostname, err)
 	}
 
-	m.logger.Info("Successfully collected facts", map[string]interface{}{"machine": machine.Hostname, "collector": m.collector.GetName()})
+	m.logger.Info("Successfully collected facts", map[string]interface{}{
+		"machine":   machine.Hostname,
+		"collector": m.collector.GetName(),
+	})
 
 	return facts, nil
+}
+
+// collectFactsViaSSH collects facts from remote machine via SSH
+func (m *Manager) collectFactsViaSSH(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error) {
+	m.logger.Info("Collecting facts via SSH", map[string]interface{}{
+		"machine": machine.Hostname,
+		"host":    machine.Host,
+	})
+
+	// Get SSH-capable collector
+	sshCollector, ok := m.collector.(interface {
+		CollectViaSSH(context.Context, *spookytypes.Machine) (*spookytypesfacts.FactCollection, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("collector does not support SSH operations")
+	}
+
+	// Collect facts using SSH
+	facts, err := sshCollector.CollectViaSSH(ctx, machine)
+	if err != nil {
+		m.logger.Error("Failed to collect facts via SSH", err, map[string]interface{}{
+			"machine": machine.Hostname,
+			"host":    machine.Host,
+		})
+		return nil, fmt.Errorf("failed to collect facts via SSH for %s: %w", machine.Hostname, err)
+	}
+
+	m.logger.Info("Successfully collected facts via SSH", map[string]interface{}{
+		"machine": machine.Hostname,
+		"host":    machine.Host,
+	})
+
+	return facts, nil
+}
+
+// GetCollector returns the underlying collector for SSH operations
+func (m *Manager) GetCollector() FactCollector {
+	return m.collector
 }
 
 // ValidateFacts validates facts against schema

@@ -54,7 +54,7 @@ func (m *MockFactStorage) GetStats() (map[string]interface{}, error) {
 }
 
 func createTestManager(t *testing.T) *Manager {
-	collector := NewMockFactCollector()
+	collector := NewMockSystemFactCollector()
 	validator := &MockSchemaValidator{}
 	logger := &MockLogger{}
 

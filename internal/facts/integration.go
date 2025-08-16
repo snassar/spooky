@@ -34,12 +34,43 @@ func (i *Integration) CollectFacts(ctx context.Context, machine *spookytypes.Mac
 
 	i.logger.Info("Collecting facts via integration", map[string]interface{}{
 		"machine": machine.Hostname,
+		"host":    machine.Host,
 	})
 
-	// Use the manager to collect facts
+	// Determine if this is a remote machine that needs SSH
+	if machine.Host != "" && machine.Host != "localhost" && machine.Host != "127.0.0.1" {
+		// Use SSH-based collection for remote machines
+		return i.collectFactsViaSSH(ctx, machine)
+	}
+
+	// Use local collection for localhost/127.0.0.1
 	facts, err := i.manager.CollectFacts(ctx, machine)
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect facts: %w", err)
+	}
+
+	return facts, nil
+}
+
+// collectFactsViaSSH collects facts from remote machine via SSH
+func (i *Integration) collectFactsViaSSH(ctx context.Context, machine *spookytypes.Machine) (interface{}, error) {
+	i.logger.Info("Collecting facts via SSH", map[string]interface{}{
+		"machine": machine.Hostname,
+		"host":    machine.Host,
+	})
+
+	// Get the underlying collector that has SSH capabilities
+	collector, ok := i.manager.GetCollector().(interface {
+		CollectViaSSH(context.Context, *spookytypes.Machine) (*spookytypesfacts.FactCollection, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("collector does not support SSH operations")
+	}
+
+	// Collect facts using SSH
+	facts, err := collector.CollectViaSSH(ctx, machine)
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect facts via SSH: %w", err)
 	}
 
 	return facts, nil

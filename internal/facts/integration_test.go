@@ -12,7 +12,7 @@ import (
 
 func TestNewIntegration(t *testing.T) {
 	// Create a real manager with mock dependencies
-	mockCollector := &MockFactCollector{}
+	mockCollector := NewMockSystemFactCollector()
 	mockValidator := &MockSchemaValidator{}
 	mockLogger := &MockLogger{}
 
@@ -30,7 +30,7 @@ func TestNewIntegration(t *testing.T) {
 
 func TestIntegrationCollectFacts(t *testing.T) {
 	// Create a real manager with mock dependencies
-	mockCollector := &MockFactCollector{}
+	mockCollector := NewMockSystemFactCollector()
 	mockValidator := &MockSchemaValidator{}
 	mockLogger := &MockLogger{}
 
@@ -53,25 +53,26 @@ func TestIntegrationCollectFacts(t *testing.T) {
 	}
 
 	// Verify facts structure
-	if factCollection, ok := facts.(*FactCollection); ok {
-		if factCollection.MachineID != machine.Hostname {
-			t.Errorf("Expected machine ID %s, got %s", machine.Hostname, factCollection.MachineID)
+	if factCollection, ok := facts.(*spookytypesfacts.FactCollection); ok {
+		expectedMachineID := "a1b2c3d4e5f678901234567890123456" // Valid 32-character hex string
+		if factCollection.MachineID != expectedMachineID {
+			t.Errorf("Expected machine ID %s, got %s", expectedMachineID, factCollection.MachineID)
 		}
 	} else {
-		t.Fatal("CollectFacts did not return *FactCollection")
+		t.Fatal("CollectFacts did not return *spookytypesfacts.FactCollection")
 	}
 }
 
 func TestIntegrationStoreFacts(t *testing.T) {
 	// Create a real manager with mock dependencies
-	mockCollector := &MockFactCollector{}
+	mockCollector := NewMockSystemFactCollector()
 	mockValidator := &MockSchemaValidator{}
 	mockLogger := &MockLogger{}
 
 	manager := NewManager(mockCollector, mockValidator, mockLogger)
 	integration := NewIntegration(manager)
 
-	facts := &FactCollection{
+	facts := &spookytypesfacts.FactCollection{
 		MachineID:   "test-server",
 		CollectedAt: time.Now(),
 		Facts: &spookytypesfacts.Facts{
@@ -92,7 +93,7 @@ func TestIntegrationStoreFacts(t *testing.T) {
 
 func TestIntegrationLoadFacts(t *testing.T) {
 	// Create a real manager with mock dependencies
-	mockCollector := &MockFactCollector{}
+	mockCollector := NewMockSystemFactCollector()
 	mockValidator := &MockSchemaValidator{}
 	mockLogger := &MockLogger{}
 
@@ -112,14 +113,14 @@ func TestIntegrationLoadFacts(t *testing.T) {
 
 func TestIntegrationValidateFacts(t *testing.T) {
 	// Create a real manager with mock dependencies
-	mockCollector := &MockFactCollector{}
+	mockCollector := NewMockSystemFactCollector()
 	mockValidator := &MockSchemaValidator{}
 	mockLogger := &MockLogger{}
 
 	manager := NewManager(mockCollector, mockValidator, mockLogger)
 	integration := NewIntegration(manager)
 
-	facts := &FactCollection{
+	facts := &spookytypesfacts.FactCollection{
 		MachineID:   "test-server",
 		CollectedAt: time.Now(),
 		Facts: &spookytypesfacts.Facts{
@@ -144,7 +145,7 @@ func TestIntegrationValidateFacts(t *testing.T) {
 
 func TestIntegrationGetManager(t *testing.T) {
 	// Create a real manager with mock dependencies
-	mockCollector := &MockFactCollector{}
+	mockCollector := NewMockSystemFactCollector()
 	mockValidator := &MockSchemaValidator{}
 	mockLogger := &MockLogger{}
 

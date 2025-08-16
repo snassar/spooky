@@ -264,3 +264,60 @@ type ConfigurationError struct {
 	ConfigColumn   int       `json:"config_column,omitempty" hcl:"config_column,optional"`
 	ConfigModified time.Time `json:"config_modified" hcl:"config_modified"`
 }
+
+// ActionExecutionError represents SSH action execution errors
+type ActionExecutionError struct {
+	BaseError Error
+
+	// Action-specific details
+	ActionName    string `json:"action_name" hcl:"action_name"`
+	MachineName   string `json:"machine_name" hcl:"machine_name"`
+	SessionID     string `json:"session_id" hcl:"session_id"`
+	CommandString string `json:"command_string" hcl:"command_string"`
+	ExitCode      int    `json:"exit_code" hcl:"exit_code"`
+	Stdout        string `json:"stdout" hcl:"stdout"`
+	Stderr        string `json:"stderr" hcl:"stderr"`
+
+	// Action execution context
+	WorkingDir    string            `json:"working_dir,omitempty" hcl:"working_dir,optional"`
+	Environment   map[string]string `json:"environment,omitempty" hcl:"environment,optional"`
+	Timeout       time.Duration     `json:"timeout" hcl:"timeout"`
+	ExecutionTime time.Duration     `json:"execution_time" hcl:"execution_time"`
+
+	// Action execution state
+	ActionStarted  time.Time  `json:"action_started" hcl:"action_started"`
+	ActionFinished *time.Time `json:"action_finished,omitempty" hcl:"action_finished,optional"`
+	Killed         bool       `json:"killed" hcl:"killed"`
+
+	// Action execution metrics
+	RetryCount    int `json:"retry_count" hcl:"retry_count"`
+	MaxRetries    int `json:"max_retries" hcl:"max_retries"`
+	RetryAttempts int `json:"retry_attempts" hcl:"retry_attempts"`
+}
+
+// NewActionExecutionError creates a new action execution error
+func NewActionExecutionError(actionName, machineName, sessionID, commandString, message string, exitCode int, stdout, stderr string) *ActionExecutionError {
+	return &ActionExecutionError{
+		BaseError: Error{
+			ErrorType:    ErrorTypeCommand,
+			ErrorCode:    exitCode,
+			ErrorMessage: message,
+			Timestamp:    time.Now(),
+			Retryable:    true,
+			Recoverable:  true,
+		},
+		ActionName:    actionName,
+		MachineName:   machineName,
+		SessionID:     sessionID,
+		CommandString: commandString,
+		ExitCode:      exitCode,
+		Stdout:        stdout,
+		Stderr:        stderr,
+		ActionStarted: time.Now(),
+	}
+}
+
+// Error implements the error interface
+func (e *ActionExecutionError) Error() string {
+	return e.BaseError.ErrorMessage
+}

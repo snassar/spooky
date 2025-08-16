@@ -34,7 +34,7 @@ func InitializeFactsDependencies() error {
 	sshManager := spookyssh.NewManager(factsLogger)
 
 	// Initialize facts components
-	collector := spookyfacts.NewSystemFactCollector(sshManager)
+	collector := spookyfacts.NewSystemFactCollector(sshManager, factsLogger)
 	manager := spookyfacts.NewManager(collector, nil, factsLogger)
 
 	// Create facts integration
@@ -272,6 +272,8 @@ func collectFactsParallel(ctx context.Context, machines []spookytypes.Machine, f
 			if verbose {
 				logger.Info("Collecting facts for export", map[string]interface{}{
 					"machine": m.Hostname,
+					"host":    m.Host,
+					"method":  getCollectionMethod(m),
 				})
 			}
 
@@ -283,6 +285,7 @@ func collectFactsParallel(ctx context.Context, machines []spookytypes.Machine, f
 				mu.Unlock()
 				logger.Error("Failed to collect facts for export", err, map[string]interface{}{
 					"machine": m.Hostname,
+					"host":    m.Host,
 				})
 				return
 			}
@@ -294,6 +297,7 @@ func collectFactsParallel(ctx context.Context, machines []spookytypes.Machine, f
 				mu.Unlock()
 				logger.Error("Failed to store facts for export", err, map[string]interface{}{
 					"machine": m.Hostname,
+					"host":    m.Host,
 				})
 				return
 			}
@@ -305,6 +309,7 @@ func collectFactsParallel(ctx context.Context, machines []spookytypes.Machine, f
 			if verbose {
 				logger.Info("Successfully collected facts for export", map[string]interface{}{
 					"machine": m.Hostname,
+					"host":    m.Host,
 				})
 			}
 		}(machine)
@@ -312,6 +317,14 @@ func collectFactsParallel(ctx context.Context, machines []spookytypes.Machine, f
 
 	wg.Wait()
 	return successCount, errorCount
+}
+
+// getCollectionMethod determines if collection will be local or SSH-based
+func getCollectionMethod(machine *spookytypes.Machine) string {
+	if machine.Host != "" && machine.Host != "localhost" && machine.Host != "127.0.0.1" {
+		return "SSH"
+	}
+	return "local"
 }
 
 func init() {

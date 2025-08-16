@@ -22,6 +22,50 @@ import (
 	spookyvariables "spooky/internal/variables"
 )
 
+// TemplateSchemaValidator implements SchemaValidator interface for template validation
+type TemplateSchemaValidator struct {
+	logger          spookytypeslogging.Logger
+	schemaValidator *spookyschemas.Validator
+}
+
+// NewTemplateSchemaValidator creates a new template schema validator
+func NewTemplateSchemaValidator(logger spookytypeslogging.Logger) *TemplateSchemaValidator {
+	return &TemplateSchemaValidator{
+		logger:          logger,
+		schemaValidator: spookyschemas.NewValidator(logger),
+	}
+}
+
+// Validate validates data against a schema
+func (t *TemplateSchemaValidator) Validate(schema *spookytypesschemas.Schema, data interface{}) (*spookytypesschemas.ValidationResult, error) {
+	return t.schemaValidator.Validate(schema, data)
+}
+
+// ValidateFile validates a file against a schema
+func (t *TemplateSchemaValidator) ValidateFile(schema *spookytypesschemas.Schema, filePath string) (*spookytypesschemas.ValidationResult, error) {
+	return t.schemaValidator.ValidateFile(filePath, schema.Name)
+}
+
+// ValidateString validates a string against a schema
+func (t *TemplateSchemaValidator) ValidateString(schema *spookytypesschemas.Schema, content string) (*spookytypesschemas.ValidationResult, error) {
+	return t.schemaValidator.Validate(schema, content)
+}
+
+// ValidateBytes validates bytes against a schema
+func (t *TemplateSchemaValidator) ValidateBytes(schema *spookytypesschemas.Schema, data []byte) (*spookytypesschemas.ValidationResult, error) {
+	return t.schemaValidator.Validate(schema, data)
+}
+
+// ValidateWithContext validates data with additional context
+func (t *TemplateSchemaValidator) ValidateWithContext(schema *spookytypesschemas.Schema, data interface{}, context map[string]interface{}) (*spookytypesschemas.ValidationResult, error) {
+	return t.schemaValidator.Validate(schema, data)
+}
+
+// ValidateField validates a specific field
+func (t *TemplateSchemaValidator) ValidateField(schema *spookytypesschemas.Schema, fieldPath string, value interface{}) (*spookytypesschemas.ValidationResult, error) {
+	return t.schemaValidator.Validate(schema, value)
+}
+
 // SimpleSchemaValidator implements SchemaValidator interface for facts validation
 type SimpleSchemaValidator struct {
 	logger spookytypeslogging.Logger
@@ -142,7 +186,7 @@ func (f *Factory) createFactsIntegration() spookyinterfaces.FactsIntegration {
 	sshManager := spookyssh.NewManager(f.logger)
 
 	// Create fact collector
-	collector := spookyfacts.NewSystemFactCollector(sshManager)
+	collector := spookyfacts.NewSystemFactCollector(sshManager, f.logger)
 
 	// Create a simple schema validator for facts validation
 	schemaValidator := &SimpleSchemaValidator{logger: f.logger}
@@ -193,8 +237,14 @@ func (f *Factory) createVariablesIntegration() spookyinterfaces.VariablesIntegra
 
 // createTemplatesIntegration creates the templates integration
 func (f *Factory) createTemplatesIntegration() spookyinterfaces.TemplatesIntegration {
+	// Create a proper schema validator for templates
+	schemaValidator := NewTemplateSchemaValidator(f.logger)
+
 	// Create templates manager
 	templatesManager := spookytemplates.NewManager(f.logger)
+
+	// Set schema validator for template validation
+	templatesManager.SetSchemaValidator(schemaValidator)
 
 	// Create templates integration
 	templatesIntegration := spookytemplates.NewIntegration(templatesManager)

@@ -6,6 +6,7 @@ import (
 
 	spookytypescommon "spooky/internal/types/common"
 	spookytypesmachines "spooky/internal/types/machines"
+	spookytypesssh "spooky/internal/types/ssh"
 )
 
 // ActionRunContext represents the context for action running
@@ -97,6 +98,18 @@ type ActingSession struct {
 	// Session metadata
 	Tags     []string          `json:"tags" hcl:"tags,optional"`
 	Metadata map[string]string `json:"metadata" hcl:"metadata,optional"`
+
+	// SSH connection for this session
+	SSHConnection *spookytypesssh.Connection `json:"ssh_connection,omitempty" hcl:"ssh_connection,optional"`
+
+	// SSH session metadata
+	SSHMetadata map[string]interface{} `json:"ssh_metadata,omitempty" hcl:"ssh_metadata,optional"`
+
+	// File transfer operations for this session
+	FileTransfers []*spookytypesssh.FileTransfer `json:"file_transfers,omitempty" hcl:"file_transfers,optional"`
+
+	// File transfer results
+	FileTransferResults []*spookytypesssh.FileTransferResult `json:"file_transfer_results,omitempty" hcl:"file_transfer_results,optional"`
 
 	// Go context
 	Context context.Context `json:"-" hcl:"-"`

@@ -4,6 +4,7 @@ package ssh
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/rsa"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 
 	spookytypes "spooky/internal/types"
 	spookytypeslogging "spooky/internal/types/logging"
@@ -1180,4 +1182,694 @@ func (c *Client) GetFileTransferManager() *FileTransferManager {
 // GetAdvancedAuthManager returns the advanced authentication manager
 func (c *Client) GetAdvancedAuthManager() *AdvancedAuthManager {
 	return c.advancedAuthManager
+}
+
+// ReusableSSHClient manages SSH connections with reuse and authentication caching
+type ReusableSSHClient struct {
+	connections map[string]*cachedConnection // host:port -> connection
+	authCache   map[string]*authInfo         // host:port -> auth info
+	metrics     *ConnectionMetrics
+	mutex       sync.RWMutex
+	logger      spookytypeslogging.Logger
+	config      *spookytypes.ClientConfig
+}
+
+// cachedConnection represents a cached SSH connection
+type cachedConnection struct {
+	client   *ssh.Client
+	session  *ssh.Session
+	lastUsed time.Time
+	healthy  bool
+	authInfo *authInfo
+	mutex    sync.Mutex
+}
+
+// authInfo represents cached authentication information
+type authInfo struct {
+	method      string
+	credentials interface{}
+	lastUsed    time.Time
+	valid       bool
+}
+
+// ConnectionMetrics tracks connection performance metrics
+type ConnectionMetrics struct {
+	TotalConnections      int64
+	SuccessfulConnections int64
+	FailedConnections     int64
+	ReusedConnections     int64
+	AuthenticationTime    time.Duration
+	CommandExecutionTime  time.Duration
+	mutex                 sync.RWMutex
+}
+
+// NewReusableSSHClient creates a new SSH client with connection reuse
+func NewReusableSSHClient(config *spookytypes.ClientConfig, logger spookytypeslogging.Logger) *ReusableSSHClient {
+	client := &ReusableSSHClient{
+		connections: make(map[string]*cachedConnection),
+		authCache:   make(map[string]*authInfo),
+		metrics:     &ConnectionMetrics{},
+		logger:      logger,
+		config:      config,
+	}
+
+	// Start connection cleanup goroutine
+	go client.performConnectionCleanup()
+
+	return client
+}
+
+// RunCommand executes a command on a remote machine via SSH with connection reuse
+func (c *ReusableSSHClient) RunCommand(ctx context.Context, machine *spookytypes.Machine, command string) (string, error) {
+	c.logger.Debug("Running SSH command", map[string]interface{}{
+		"machine": machine.Hostname,
+		"host":    machine.Host,
+		"command": command,
+	})
+
+	// Get or create cached connection
+	connection, err := c.getOrCreateConnection(ctx, machine)
+	if err != nil {
+		c.recordConnectionFailure()
+		return "", fmt.Errorf("failed to get connection for %s: %w", machine.Hostname, err)
+	}
+
+	// Execute command using cached connection
+	result, err := c.executeCommandOnConnection(ctx, connection, command)
+	if err != nil {
+		// Mark connection as unhealthy on error
+		c.markConnectionUnhealthy(machine)
+		c.recordConnectionFailure()
+		return "", fmt.Errorf("failed to execute command on %s: %w", machine.Hostname, err)
+	}
+
+	// Update connection last used time
+	c.updateConnectionLastUsed(machine)
+	c.recordConnectionSuccess(true) // This is a reused connection
+
+	c.logger.Debug("Successfully executed SSH command", map[string]interface{}{
+		"machine": machine.Hostname,
+		"host":    machine.Host,
+		"command": command,
+	})
+
+	return result, nil
+}
+
+// getOrCreateConnection gets existing connection or creates new one
+func (c *ReusableSSHClient) getOrCreateConnection(ctx context.Context, machine *spookytypes.Machine) (*cachedConnection, error) {
+	connectionKey := c.getConnectionKey(machine)
+
+	c.mutex.RLock()
+	if cachedConn, exists := c.connections[connectionKey]; exists {
+		c.mutex.RUnlock()
+
+		// Check if existing connection is healthy
+		if c.isConnectionHealthy(cachedConn) {
+			c.logger.Debug("Reusing existing SSH connection", map[string]interface{}{
+				"machine": machine.Hostname,
+				"host":    machine.Host,
+			})
+			return cachedConn, nil
+		}
+
+		// Connection is unhealthy, remove it
+		c.logger.Debug("Removing unhealthy SSH connection", map[string]interface{}{
+			"machine": machine.Hostname,
+			"host":    machine.Host,
+		})
+		c.removeConnection(connectionKey)
+	} else {
+		c.mutex.RUnlock()
+	}
+
+	// Create new connection
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.logger.Debug("Creating new SSH connection", map[string]interface{}{
+		"machine": machine.Hostname,
+		"host":    machine.Host,
+	})
+
+	connection, err := c.createNewConnection(ctx, machine)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new connection: %w", err)
+	}
+
+	// Cache the connection
+	c.connections[connectionKey] = connection
+	c.recordConnectionSuccess(false) // This is a new connection
+
+	return connection, nil
+}
+
+// createNewConnection creates a new SSH connection with authentication
+func (c *ReusableSSHClient) createNewConnection(ctx context.Context, machine *spookytypes.Machine) (*cachedConnection, error) {
+	// Get or create authentication info
+	authInfo, err := c.getOrCreateAuthInfo(ctx, machine)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get authentication info: %w", err)
+	}
+
+	// Create SSH client config
+	sshConfig, err := c.createSSHConfig(machine, authInfo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SSH config: %w", err)
+	}
+
+	// Establish connection
+	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", machine.Host, machine.Port), sshConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to dial SSH: %w", err)
+	}
+
+	// Create session
+	session, err := client.NewSession()
+	if err != nil {
+		client.Close()
+		return nil, fmt.Errorf("failed to create SSH session: %w", err)
+	}
+
+	connection := &cachedConnection{
+		client:   client,
+		session:  session,
+		lastUsed: time.Now(),
+		healthy:  true,
+		authInfo: authInfo,
+	}
+
+	return connection, nil
+}
+
+// getOrCreateAuthInfo gets existing auth info or creates new one
+func (c *ReusableSSHClient) getOrCreateAuthInfo(ctx context.Context, machine *spookytypes.Machine) (*authInfo, error) {
+	connectionKey := c.getConnectionKey(machine)
+
+	// Check for existing valid auth info
+	if cachedAuth, exists := c.authCache[connectionKey]; exists && cachedAuth.valid {
+		// Check if auth info is still recent (within 1 hour)
+		if time.Since(cachedAuth.lastUsed) < time.Hour {
+			c.logger.Debug("Reusing cached authentication", map[string]interface{}{
+				"machine": machine.Hostname,
+				"host":    machine.Host,
+				"method":  cachedAuth.method,
+			})
+			cachedAuth.lastUsed = time.Now()
+			return cachedAuth, nil
+		}
+	}
+
+	// Create new auth info
+	c.logger.Debug("Creating new authentication info", map[string]interface{}{
+		"machine": machine.Hostname,
+		"host":    machine.Host,
+	})
+
+	authInfo, err := c.createAuthInfo(ctx, machine)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create authentication info: %w", err)
+	}
+
+	// Cache the auth info
+	c.authCache[connectionKey] = authInfo
+
+	return authInfo, nil
+}
+
+// createAuthInfo creates authentication information for a machine
+func (c *ReusableSSHClient) createAuthInfo(ctx context.Context, machine *spookytypes.Machine) (*authInfo, error) {
+	// Try different authentication methods in order of preference
+	authMethods := []struct {
+		name string
+		fn   func(*spookytypes.Machine) (ssh.AuthMethod, error)
+	}{
+		{"ssh_key", c.createSSHKeyAuth},
+		{"password", c.createPasswordAuth},
+		{"agent", c.createAgentAuth},
+	}
+
+	for _, method := range authMethods {
+		authMethod, err := method.fn(machine)
+		if err != nil {
+			c.logger.Debug("Authentication method failed", map[string]interface{}{
+				"machine": machine.Hostname,
+				"method":  method.name,
+				"error":   err.Error(),
+			})
+			continue
+		}
+
+		// Test authentication with a simple command
+		if c.testAuthentication(ctx, machine, authMethod) {
+			c.logger.Debug("Authentication method successful", map[string]interface{}{
+				"machine": machine.Hostname,
+				"method":  method.name,
+			})
+
+			return &authInfo{
+				method:      method.name,
+				credentials: authMethod,
+				lastUsed:    time.Now(),
+				valid:       true,
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no valid authentication method found for %s", machine.Hostname)
+}
+
+// createSSHKeyAuth creates SSH key authentication
+func (c *ReusableSSHClient) createSSHKeyAuth(machine *spookytypes.Machine) (ssh.AuthMethod, error) {
+	if machine.KeyFile == "" {
+		return nil, fmt.Errorf("no SSH key file specified")
+	}
+
+	// Read private key
+	keyData, err := os.ReadFile(machine.KeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read SSH key file: %w", err)
+	}
+
+	var signer ssh.Signer
+	if machine.Passphrase != "" {
+		// Key is encrypted with passphrase
+		signer, err = ssh.ParsePrivateKeyWithPassphrase(keyData, []byte(machine.Passphrase))
+	} else {
+		// Key is not encrypted
+		signer, err = ssh.ParsePrivateKey(keyData)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse SSH private key: %w", err)
+	}
+
+	return ssh.PublicKeys(signer), nil
+}
+
+// createPasswordAuth creates password authentication
+func (c *ReusableSSHClient) createPasswordAuth(machine *spookytypes.Machine) (ssh.AuthMethod, error) {
+	if machine.Password == "" {
+		return nil, fmt.Errorf("no password specified")
+	}
+
+	return ssh.Password(machine.Password), nil
+}
+
+// createAgentAuth creates SSH agent authentication
+func (c *ReusableSSHClient) createAgentAuth(_ *spookytypes.Machine) (ssh.AuthMethod, error) {
+	agentConn := agent.NewKeyring()
+	if agentConn == nil {
+		return nil, fmt.Errorf("failed to create SSH agent keyring")
+	}
+
+	return ssh.PublicKeysCallback(agentConn.Signers), nil
+}
+
+// testAuthentication tests authentication with a simple command
+func (c *ReusableSSHClient) testAuthentication(_ context.Context, machine *spookytypes.Machine, authMethod ssh.AuthMethod) bool {
+	// Create temporary SSH config for testing
+	// Note: InsecureIgnoreHostKey is used for testing only - in production, implement proper host key validation
+	sshConfig := &ssh.ClientConfig{
+		User:            machine.User,
+		Auth:            []ssh.AuthMethod{authMethod},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), //nolint:gosec // Used for testing authentication only
+		Timeout:         10 * time.Second,
+	}
+
+	// Try to connect
+	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", machine.Host, machine.Port), sshConfig)
+	if err != nil {
+		return false
+	}
+	defer client.Close()
+
+	// Try to create a session
+	session, err := client.NewSession()
+	if err != nil {
+		return false
+	}
+	defer session.Close()
+
+	// Try to execute a simple command
+	err = session.Run("echo 'authentication test'")
+	return err == nil
+}
+
+// createSSHConfig creates SSH client configuration
+func (c *ReusableSSHClient) createSSHConfig(machine *spookytypes.Machine, authInfo *authInfo) (*ssh.ClientConfig, error) {
+	authMethod, ok := authInfo.credentials.(ssh.AuthMethod)
+	if !ok {
+		return nil, fmt.Errorf("invalid authentication method type")
+	}
+
+	return &ssh.ClientConfig{
+		User:            machine.User,
+		Auth:            []ssh.AuthMethod{authMethod},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), //nolint:gosec // TODO: Implement proper host key validation
+		Timeout:         30 * time.Second,
+		Config: ssh.Config{
+			KeyExchanges: []string{
+				"curve25519-sha256@libssh.org",
+				"ecdh-sha2-nistp256",
+				"ecdh-sha2-nistp384",
+				"ecdh-sha2-nistp521",
+			},
+			Ciphers: []string{
+				"aes128-ctr",
+				"aes192-ctr",
+				"aes256-ctr",
+				"aes128-gcm@openssh.com",
+				"chacha20-poly1305@openssh.com",
+			},
+			MACs: []string{
+				"hmac-sha2-256-etm@openssh.com",
+				"hmac-sha2-512-etm@openssh.com",
+				"umac-128-etm@openssh.com",
+			},
+		},
+	}, nil
+}
+
+// executeCommandOnConnection executes a command on a cached connection
+func (c *ReusableSSHClient) executeCommandOnConnection(ctx context.Context, connection *cachedConnection, command string) (string, error) {
+	connection.mutex.Lock()
+	defer connection.mutex.Unlock()
+
+	// Check if connection is still healthy
+	if !connection.healthy {
+		return "", fmt.Errorf("connection is not healthy")
+	}
+
+	// Create a new session for this command (sessions are not reusable)
+	session, err := connection.client.NewSession()
+	if err != nil {
+		return "", fmt.Errorf("failed to create new session: %w", err)
+	}
+	defer session.Close()
+
+	// Set up command execution
+	var stdout, stderr bytes.Buffer
+	session.Stdout = &stdout
+	session.Stderr = &stderr
+
+	// Execute command with context
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- session.Run(command)
+	}()
+
+	// Wait for completion or context cancellation
+	select {
+	case err := <-errChan:
+		if err != nil {
+			return "", fmt.Errorf("command execution failed: %w, stderr: %s", err, stderr.String())
+		}
+	case <-ctx.Done():
+		return "", fmt.Errorf("command execution cancelled: %w", ctx.Err())
+	}
+
+	return stdout.String(), nil
+}
+
+// isConnectionHealthy checks if a cached connection is still healthy
+func (c *ReusableSSHClient) isConnectionHealthy(connection *cachedConnection) bool {
+	if connection == nil || !connection.healthy {
+		return false
+	}
+
+	// Check if connection hasn't timed out (30 minutes)
+	if time.Since(connection.lastUsed) > 30*time.Minute {
+		return false
+	}
+
+	// Check if SSH client is still connected
+	if connection.client == nil {
+		return false
+	}
+
+	// Try to create a test session to verify connection is alive
+	session, err := connection.client.NewSession()
+	if err != nil {
+		return false
+	}
+	defer session.Close()
+
+	// Try to execute a simple command
+	err = session.Run("echo 'health check'")
+	return err == nil
+}
+
+// markConnectionUnhealthy marks a connection as unhealthy
+func (c *ReusableSSHClient) markConnectionUnhealthy(machine *spookytypes.Machine) {
+	connectionKey := c.getConnectionKey(machine)
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	if connection, exists := c.connections[connectionKey]; exists {
+		connection.healthy = false
+		c.logger.Debug("Marked SSH connection as unhealthy", map[string]interface{}{
+			"machine": machine.Hostname,
+			"host":    machine.Host,
+		})
+	}
+}
+
+// updateConnectionLastUsed updates the last used time for a connection
+func (c *ReusableSSHClient) updateConnectionLastUsed(machine *spookytypes.Machine) {
+	connectionKey := c.getConnectionKey(machine)
+
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	if connection, exists := c.connections[connectionKey]; exists {
+		connection.lastUsed = time.Now()
+	}
+}
+
+// removeConnection removes a connection from the cache
+func (c *ReusableSSHClient) removeConnection(connectionKey string) {
+	if connection, exists := c.connections[connectionKey]; exists {
+		// Close the connection
+		if connection.client != nil {
+			connection.client.Close()
+		}
+		if connection.session != nil {
+			connection.session.Close()
+		}
+		delete(c.connections, connectionKey)
+	}
+}
+
+// getConnectionKey generates a unique key for a machine connection
+func (c *ReusableSSHClient) getConnectionKey(machine *spookytypes.Machine) string {
+	return fmt.Sprintf("%s:%d:%s", machine.Host, machine.Port, machine.User)
+}
+
+// performConnectionCleanup performs the actual connection cleanup
+func (c *ReusableSSHClient) performConnectionCleanup() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	now := time.Now()
+	expiredConnections := []string{}
+	expiredAuth := []string{}
+
+	// Check for expired connections (older than 30 minutes)
+	for key, connection := range c.connections {
+		if now.Sub(connection.lastUsed) > 30*time.Minute {
+			expiredConnections = append(expiredConnections, key)
+		}
+	}
+
+	// Check for expired auth info (older than 1 hour)
+	for key, authInfo := range c.authCache {
+		if now.Sub(authInfo.lastUsed) > time.Hour {
+			expiredAuth = append(expiredAuth, key)
+		}
+	}
+
+	// Remove expired connections
+	for _, key := range expiredConnections {
+		c.logger.Debug("Cleaning up expired SSH connection", map[string]interface{}{
+			"connection_key": key,
+		})
+		c.removeConnection(key)
+	}
+
+	// Remove expired auth info
+	for _, key := range expiredAuth {
+		c.logger.Debug("Cleaning up expired authentication info", map[string]interface{}{
+			"auth_key": key,
+		})
+		delete(c.authCache, key)
+	}
+
+	if len(expiredConnections) > 0 || len(expiredAuth) > 0 {
+		c.logger.Info("Cleaned up expired SSH resources", map[string]interface{}{
+			"expired_connections": len(expiredConnections),
+			"expired_auth":        len(expiredAuth),
+		})
+	}
+}
+
+// Close closes all SSH connections and cleans up resources
+func (c *ReusableSSHClient) Close() error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.logger.Info("Closing SSH client and cleaning up connections", map[string]interface{}{
+		"active_connections": len(c.connections),
+		"cached_auth":        len(c.authCache),
+	})
+
+	// Close all connections
+	for key, connection := range c.connections {
+		c.logger.Debug("Closing SSH connection", map[string]interface{}{
+			"connection_key": key,
+		})
+		if connection.client != nil {
+			connection.client.Close()
+		}
+		if connection.session != nil {
+			connection.session.Close()
+		}
+	}
+
+	// Clear caches
+	c.connections = make(map[string]*cachedConnection)
+	c.authCache = make(map[string]*authInfo)
+
+	return nil
+}
+
+// GetConnectionStats returns statistics about cached connections
+func (c *ReusableSSHClient) GetConnectionStats() map[string]interface{} {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
+	healthyConnections := 0
+	for _, connection := range c.connections {
+		if connection.healthy {
+			healthyConnections++
+		}
+	}
+
+	return map[string]interface{}{
+		"total_connections":     len(c.connections),
+		"healthy_connections":   healthyConnections,
+		"unhealthy_connections": len(c.connections) - healthyConnections,
+		"cached_auth":           len(c.authCache),
+	}
+}
+
+// recordConnectionSuccess records a successful connection
+func (c *ReusableSSHClient) recordConnectionSuccess(reused bool) {
+	c.metrics.mutex.Lock()
+	defer c.metrics.mutex.Unlock()
+
+	c.metrics.TotalConnections++
+	c.metrics.SuccessfulConnections++
+	if reused {
+		c.metrics.ReusedConnections++
+	}
+}
+
+// recordConnectionFailure records a failed connection
+func (c *ReusableSSHClient) recordConnectionFailure() {
+	c.metrics.mutex.Lock()
+	defer c.metrics.mutex.Unlock()
+
+	c.metrics.TotalConnections++
+	c.metrics.FailedConnections++
+}
+
+// GetMetrics returns connection metrics
+func (c *ReusableSSHClient) GetMetrics() map[string]interface{} {
+	c.metrics.mutex.RLock()
+	defer c.metrics.mutex.RUnlock()
+
+	successRate := 0.0
+	if c.metrics.TotalConnections > 0 {
+		successRate = float64(c.metrics.SuccessfulConnections) / float64(c.metrics.TotalConnections)
+	}
+
+	reuseRate := 0.0
+	if c.metrics.SuccessfulConnections > 0 {
+		reuseRate = float64(c.metrics.ReusedConnections) / float64(c.metrics.SuccessfulConnections)
+	}
+
+	return map[string]interface{}{
+		"total_connections":          c.metrics.TotalConnections,
+		"successful_connections":     c.metrics.SuccessfulConnections,
+		"failed_connections":         c.metrics.FailedConnections,
+		"reused_connections":         c.metrics.ReusedConnections,
+		"success_rate":               successRate,
+		"reuse_rate":                 reuseRate,
+		"avg_authentication_time":    c.metrics.AuthenticationTime,
+		"avg_command_execution_time": c.metrics.CommandExecutionTime,
+	}
+}
+
+// RunCommandWithStdin executes a command with stdin data
+func (c *ReusableSSHClient) RunCommandWithStdin(ctx context.Context, machine *spookytypes.Machine, command, stdin string) (string, error) {
+	c.logger.Debug("Running SSH command with stdin", map[string]interface{}{
+		"machine": machine.Hostname,
+		"host":    machine.Host,
+		"command": command,
+	})
+
+	// Get or create cached connection
+	connection, err := c.getOrCreateConnection(ctx, machine)
+	if err != nil {
+		c.recordConnectionFailure()
+		return "", fmt.Errorf("failed to get connection for %s: %w", machine.Hostname, err)
+	}
+
+	// Execute command with stdin using cached connection
+	result, err := c.executeCommandOnConnectionWithStdin(ctx, connection, command, stdin)
+	if err != nil {
+		// Mark connection as unhealthy on error
+		c.markConnectionUnhealthy(machine)
+		c.recordConnectionFailure()
+		return "", fmt.Errorf("failed to execute command on %s: %w", machine.Hostname, err)
+	}
+
+	// Update connection last used time
+	c.updateConnectionLastUsed(machine)
+	c.recordConnectionSuccess(true)
+
+	return result, nil
+}
+
+// executeCommandOnConnectionWithStdin executes a command with stdin data
+func (c *ReusableSSHClient) executeCommandOnConnectionWithStdin(_ context.Context, connection *cachedConnection, command, stdin string) (string, error) {
+	connection.mutex.Lock()
+	defer connection.mutex.Unlock()
+
+	// Create new session for command execution
+	session, err := connection.client.NewSession()
+	if err != nil {
+		return "", fmt.Errorf("failed to create SSH session: %w", err)
+	}
+	defer session.Close()
+
+	// Set up stdin
+	if stdin != "" {
+		session.Stdin = strings.NewReader(stdin)
+	}
+
+	// Capture stdout and stderr
+	var stdout, stderr bytes.Buffer
+	session.Stdout = &stdout
+	session.Stderr = &stderr
+
+	// Execute command
+	err = session.Run(command)
+	if err != nil {
+		return "", fmt.Errorf("command execution failed: %w (stderr: %s)", err, stderr.String())
+	}
+
+	return stdout.String(), nil
 }

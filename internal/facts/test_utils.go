@@ -15,15 +15,27 @@ type MockFactCollector struct {
 	name string
 }
 
+// MockSystemFactCollector extends MockFactCollector to be SSH-capable
+type MockSystemFactCollector struct {
+	*MockFactCollector
+}
+
 func NewMockFactCollector() *MockFactCollector {
 	return &MockFactCollector{
 		name: "mock-collector",
 	}
 }
 
-func (m *MockFactCollector) Collect(_ context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error) {
+// NewMockSystemFactCollector creates a mock collector that can be used for SSH operations
+func NewMockSystemFactCollector() *MockSystemFactCollector {
+	return &MockSystemFactCollector{
+		MockFactCollector: NewMockFactCollector(),
+	}
+}
+
+func (m *MockFactCollector) Collect(_ context.Context, _ *spookytypes.Machine) (*spookytypesfacts.FactCollection, error) {
 	return &spookytypesfacts.FactCollection{
-		MachineID:   machine.Hostname,
+		MachineID:   "a1b2c3d4e5f678901234567890123456", // Valid 32-character hex string
 		CollectedAt: time.Now(),
 		Facts: &spookytypesfacts.Facts{
 			System: &spookytypesfacts.SystemFacts{
@@ -51,6 +63,11 @@ func (m *MockFactCollector) Collect(_ context.Context, machine *spookytypes.Mach
 		},
 		Metadata: make(map[string]interface{}),
 	}, nil
+}
+
+func (m *MockFactCollector) CollectViaSSH(_ context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error) {
+	// Return the same mock data for SSH collection
+	return m.Collect(context.Background(), machine)
 }
 
 func (m *MockFactCollector) GetName() string {

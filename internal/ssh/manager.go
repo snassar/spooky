@@ -6,6 +6,9 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	spookyinterfaces "spooky/internal/interfaces"
@@ -19,7 +22,7 @@ import (
 
 // Manager implements the SSHManager interface
 type Manager struct {
-	client *Client
+	client *ReusableSSHClient
 	logger spookytypeslogging.Logger
 }
 
@@ -39,8 +42,8 @@ func NewManager(logger spookytypeslogging.Logger) spookyinterfaces.SSHManager {
 		StrictHostKeyCheck: true,
 	}
 
-	// Create Client directly with the logger
-	client := NewClient(config, logger)
+	// Create ReusableSSHClient for connection reuse
+	client := NewReusableSSHClient(config, logger)
 
 	return &Manager{
 		client: client,
@@ -50,12 +53,10 @@ func NewManager(logger spookytypeslogging.Logger) spookyinterfaces.SSHManager {
 
 // CreateClient creates a new SSH client with the given configuration
 func (m *Manager) CreateClient(_ context.Context, config *spookytypes.ClientConfig) (*spookytypes.Client, error) {
-	// For now, we'll use the existing Client
-	// In a more sophisticated implementation, we might create different client types
-	// based on the configuration
-	_ = NewClient(config, m.logger)
+	// Create a new ReusableSSHClient with the provided configuration
+	_ = NewReusableSSHClient(config, m.logger)
 
-	// Convert Client to the interface type
+	// Convert to the interface type
 	sshClient := &spookytypes.Client{
 		Config:    config,
 		Status:    spookytypesssh.ClientStatusInitialized,
@@ -73,19 +74,61 @@ func (m *Manager) Connect(_ context.Context, request *spookytypes.ConnectionRequ
 		"user": request.User,
 	})
 
-	// Use the Client to establish the connection
-	connectionResult, err := m.client.Connect(context.Background(), request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to establish SSH connection: %w", err)
+	// Convert ConnectionRequest to Machine for the ReusableSSHClient
+	machine := &spookytypes.Machine{
+		Hostname:   request.Host,
+		Host:       request.Host,
+		Port:       request.Port,
+		User:       request.User,
+		Password:   request.Password,
+		KeyFile:    request.KeyPath,
+		Passphrase: "", // TODO: Add passphrase support to ConnectionRequest
 	}
 
-	return connectionResult, nil
+	// Test connection by running a simple command
+	ctx, cancel := context.WithTimeout(context.Background(), request.Timeout)
+	defer cancel()
+
+	_, err := m.client.RunCommand(ctx, machine, "echo 'connection test'")
+	if err != nil {
+		return &spookytypes.ConnectionResult{
+			Request:       request,
+			Success:       false,
+			Error:         err.Error(),
+			ConnectTime:   request.Timeout, // We don't have exact timing here
+			RetryAttempts: 0,
+			CompletedAt:   time.Now(),
+		}, nil
+	}
+
+	// Create connection result
+	startTime := time.Now()
+	connection := &spookytypes.Connection{
+		Host:          request.Host,
+		Port:          request.Port,
+		User:          request.User,
+		Status:        spookytypesssh.ConnectionStatusConnected,
+		ConnectedAt:   &startTime,
+		ClientVersion: "spooky-reusable-client",
+		ServerVersion: "unknown", // We don't have this info from the reusable client
+		Latency:       0,         // We don't have exact latency info
+	}
+
+	result := &spookytypes.ConnectionResult{
+		Connection:  connection,
+		Request:     request,
+		Success:     true,
+		ConnectTime: time.Since(startTime),
+		CompletedAt: time.Now(),
+	}
+
+	return result, nil
 }
 
 // Authenticate authenticates with the given credentials
 func (m *Manager) Authenticate(_ context.Context, _ *spookytypes.Connection, _ *spookytypes.Authentication) (*spookytypes.AuthenticationResult, error) {
-	// For now, authentication is handled during connection establishment
-	// In a more sophisticated implementation, we might support re-authentication
+	// Authentication is handled during connection establishment in the ReusableSSHClient
+	// The ReusableSSHClient caches authentication info and reuses it
 	return &spookytypes.AuthenticationResult{
 		Success: true,
 	}, nil
@@ -100,6 +143,7 @@ func (m *Manager) CreateSession(_ context.Context, connection *spookytypes.Conne
 	})
 
 	// Create a session using the connection information
+	// Note: The ReusableSSHClient manages sessions internally
 	session := &spookytypes.Session{
 		SessionID:  fmt.Sprintf("%s-%d-%d", connection.Host, connection.Port, time.Now().UnixNano()),
 		Connection: connection,
@@ -110,25 +154,60 @@ func (m *Manager) CreateSession(_ context.Context, connection *spookytypes.Conne
 	return session, nil
 }
 
-// RunCommand runs a command via SSH
-func (m *Manager) RunCommand(_ context.Context, session *spookytypes.Session, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error) {
+// RunCommand runs a command via SSH with connection reuse
+func (m *Manager) RunCommand(ctx context.Context, session *spookytypes.Session, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error) {
 	m.logger.Debug("Running SSH command", map[string]interface{}{
 		"session_id": session.SessionID,
 		"command":    command.Command,
 		"host":       session.Connection.Host,
 	})
 
-	// Use the Client to run the command
-	commandResult, err := m.client.RunCommand(context.Background(), session.Connection, command)
-	if err != nil {
-		return nil, fmt.Errorf("failed to run SSH command: %w", err)
+	// Convert session.Connection to Machine for the ReusableSSHClient
+	machine := &spookytypes.Machine{
+		Hostname: session.Connection.Host,
+		Host:     session.Connection.Host,
+		Port:     session.Connection.Port,
+		User:     session.Connection.User,
+		// Note: We don't have password/key info in the session.Connection
+		// This is a limitation of the current interface design
 	}
 
-	return commandResult, nil
+	// Build the full command string
+	cmdStr := command.Command
+	if len(command.Args) > 0 {
+		cmdStr = cmdStr + " " + strings.Join(command.Args, " ")
+	}
+
+	// Run command using the ReusableSSHClient
+	startTime := time.Now()
+	stdout, err := m.client.RunCommand(ctx, machine, cmdStr)
+	endTime := time.Now()
+
+	// Create command result
+	result := &spookytypes.SSHCommandResult{
+		Command:   command,
+		Session:   session,
+		StartTime: startTime,
+		EndTime:   endTime,
+		Duration:  endTime.Sub(startTime),
+	}
+
+	if err != nil {
+		result.Success = false
+		result.Error = err.Error()
+		result.ExitCode = -1
+		result.Stderr = err.Error()
+	} else {
+		result.Success = true
+		result.ExitCode = 0
+		result.Stdout = stdout
+	}
+
+	return result, nil
 }
 
 // CreateActingSession creates a new SSH acting session
-func (m *Manager) CreateActingSession(_ context.Context, connection *spookytypes.Connection) (*spookytypesactions.ActingSession, error) {
+func (m *Manager) CreateActingSession(_ context.Context, connection *spookytypes.Connection) (*spookytypes.ActingSession, error) {
 	m.logger.Debug("Creating SSH acting session", map[string]interface{}{
 		"host": connection.Host,
 		"port": connection.Port,
@@ -137,7 +216,7 @@ func (m *Manager) CreateActingSession(_ context.Context, connection *spookytypes
 
 	// Create an acting session using the correct type from actions package
 	now := time.Now()
-	actingSession := &spookytypesactions.ActingSession{
+	actingSession := &spookytypes.ActingSession{
 		SessionID:     fmt.Sprintf("acting-%s-%d-%d", connection.Host, connection.Port, now.UnixNano()),
 		CreatedAt:     now,
 		ExpiresAt:     now.Add(24 * time.Hour), // Default 24 hour expiry
@@ -152,13 +231,11 @@ func (m *Manager) CreateActingSession(_ context.Context, connection *spookytypes
 	return actingSession, nil
 }
 
-// RunAction executes an action on a remote machine via SSH
+// RunAction executes an action on a remote machine via SSH with connection reuse
 func (m *Manager) RunAction(ctx context.Context, session *spookytypesactions.ActingSession, action *spookytypesactions.Action) (*spookytypesactions.ActingResult, error) {
-	m.logger.Debug("Running action via SSH", map[string]interface{}{
-		"session_id": session.SessionID,
-		"action":     action.Name,
-		"command":    action.CommandString,
-	})
+	// Log action execution start
+	startTime := time.Now()
+	m.logActionExecution(action, &spookytypes.Machine{Hostname: "unknown"}, session, startTime)
 
 	// Get the target machine from the session's machine inventory
 	var targetMachine *spookytypes.Machine
@@ -168,71 +245,47 @@ func (m *Manager) RunAction(ctx context.Context, session *spookytypesactions.Act
 		// action targeting rules or load balancing
 		targetMachine = &session.MachineInventory[0]
 	} else {
+		// Create error for no target machine
+		actionError := spookytypesssh.NewActionExecutionError(
+			action.Name,
+			"unknown",
+			session.SessionID,
+			action.CommandString,
+			"no target machine available in session",
+			0,
+			"",
+			"",
+		)
+
+		// Log the error
+		m.logger.Error("Action execution failed", actionError, map[string]interface{}{
+			"action_name": action.Name,
+			"session_id":  session.SessionID,
+			"error_type":  actionError.BaseError.ErrorType,
+			"error_code":  actionError.BaseError.ErrorCode,
+		})
+
 		return &spookytypesactions.ActingResult{
 			ActionName:  action.Name,
 			MachineName: "unknown",
 			Status:      "failed",
-			Error:       "no target machine available in session",
-			StartTime:   time.Now(),
+			Error:       actionError.BaseError.ErrorMessage,
+			StartTime:   startTime,
 			EndTime:     time.Now(),
-		}, nil
-	}
-
-	// Create a connection request for the action
-	connectionRequest := &spookytypes.ConnectionRequest{
-		Host:     targetMachine.Host,
-		Port:     targetMachine.Port,
-		User:     targetMachine.User,
-		Password: targetMachine.Password,
-		KeyPath:  targetMachine.KeyFile,
-		Timeout:  session.Timeout,
-	}
-
-	// Establish connection
-	connectionResult, err := m.Connect(ctx, connectionRequest)
-	if err != nil {
-		return &spookytypesactions.ActingResult{
-			ActionName:  action.Name,
-			MachineName: targetMachine.Hostname,
-			Status:      "failed",
-			Error:       fmt.Sprintf("connection failed: %v", err),
-			StartTime:   time.Now(),
-			EndTime:     time.Now(),
-		}, nil
-	}
-
-	// Create SSH session
-	sshSession, err := m.CreateSession(ctx, connectionResult.Connection)
-	if err != nil {
-		return &spookytypesactions.ActingResult{
-			ActionName:  action.Name,
-			MachineName: targetMachine.Hostname,
-			Status:      "failed",
-			Error:       fmt.Sprintf("session creation failed: %v", err),
-			StartTime:   time.Now(),
-			EndTime:     time.Now(),
-		}, nil
+		}, actionError
 	}
 
 	// Prepare command
 	commandStr := action.CommandString
 	if action.Command != nil {
 		commandStr = action.Command.Command
+		if len(action.Command.Args) > 0 {
+			commandStr = commandStr + " " + strings.Join(action.Command.Args, " ")
+		}
 	}
 
-	// Create SSH command
-	sshCommand := &spookytypes.SSHCommand{
-		Command:       commandStr,
-		Args:          action.Command.Args,
-		WorkingDir:    action.WorkingDir,
-		Environment:   action.Environment,
-		Timeout:       time.Duration(action.Timeout) * time.Second,
-		CaptureOutput: true,
-	}
-
-	// Run command
-	startTime := time.Now()
-	commandResult, err := m.RunCommand(ctx, sshSession, sshCommand)
+	// Run command using the ReusableSSHClient
+	stdout, err := m.client.RunCommand(ctx, targetMachine, commandStr)
 	endTime := time.Now()
 
 	// Create acting result
@@ -245,14 +298,53 @@ func (m *Manager) RunAction(ctx context.Context, session *spookytypesactions.Act
 	}
 
 	if err != nil {
+		// Create detailed action execution error
+		actionError := spookytypesssh.NewActionExecutionError(
+			action.Name,
+			targetMachine.Hostname,
+			session.SessionID,
+			commandStr,
+			err.Error(),
+			1, // Default exit code for SSH errors
+			stdout,
+			"", // stderr not available from RunCommand
+		)
+
+		// Set additional error context
+		actionError.ExecutionTime = endTime.Sub(startTime)
+		actionError.ActionFinished = &endTime
+		actionError.WorkingDir = action.WorkingDir
+		actionError.Timeout = time.Duration(action.Timeout) * time.Second
+
+		// Log the detailed error
+		m.logger.Error("Action execution failed", actionError, map[string]interface{}{
+			"action_name":    actionError.ActionName,
+			"machine_name":   actionError.MachineName,
+			"session_id":     actionError.SessionID,
+			"command":        actionError.CommandString,
+			"exit_code":      actionError.ExitCode,
+			"stdout":         actionError.Stdout,
+			"stderr":         actionError.Stderr,
+			"execution_time": actionError.ExecutionTime,
+			"error_type":     actionError.BaseError.ErrorType,
+			"error_code":     actionError.BaseError.ErrorCode,
+			"retryable":      actionError.BaseError.Retryable,
+			"recoverable":    actionError.BaseError.Recoverable,
+		})
+
 		actingResult.Status = "failed"
-		actingResult.Error = err.Error()
+		actingResult.Error = actionError.Error()
+		actingResult.ExitCode = actionError.ExitCode
+		actingResult.Stdout = actionError.Stdout
+		actingResult.Stderr = actionError.Stderr
 	} else {
 		actingResult.Status = "success"
-		actingResult.ExitCode = commandResult.ExitCode
-		actingResult.Stdout = commandResult.Stdout
-		actingResult.Stderr = commandResult.Stderr
+		actingResult.ExitCode = 0
+		actingResult.Stdout = stdout
 	}
+
+	// Log action completion
+	m.logActionCompletion(action, targetMachine, actingResult)
 
 	return actingResult, nil
 }
@@ -294,7 +386,7 @@ func (m *Manager) CollectResults(_ context.Context, sessions []*spookytypesactio
 	return results, nil
 }
 
-// PingMachine tests SSH connectivity to a machine
+// PingMachine tests SSH connectivity to a machine with connection reuse
 func (m *Manager) PingMachine(ctx context.Context, machine *spookytypes.Machine) (*spookytypes.MachineStatus, error) {
 	m.logger.Debug("Pinging machine", map[string]interface{}{
 		"hostname": machine.Hostname,
@@ -302,16 +394,6 @@ func (m *Manager) PingMachine(ctx context.Context, machine *spookytypes.Machine)
 		"port":     machine.Port,
 		"user":     machine.User,
 	})
-
-	// Create connection request
-	connectionRequest := &spookytypes.ConnectionRequest{
-		Host:     machine.Host,
-		Port:     machine.Port,
-		User:     machine.User,
-		Password: machine.Password,
-		KeyPath:  machine.KeyFile,
-		Timeout:  10 * time.Second, // Short timeout for ping
-	}
 
 	// Test DNS resolution first
 	if err := m.testDNSResolution(machine.Host); err != nil {
@@ -331,9 +413,9 @@ func (m *Manager) PingMachine(ctx context.Context, machine *spookytypes.Machine)
 		})
 	}
 
-	// Test SSH connectivity
+	// Test SSH connectivity using the ReusableSSHClient
 	startTime := time.Now()
-	_, err := m.Connect(ctx, connectionRequest)
+	_, err := m.client.RunCommand(ctx, machine, "echo 'ping test'")
 	endTime := time.Now()
 
 	latency := int(endTime.Sub(startTime).Milliseconds())
@@ -389,24 +471,133 @@ func (m *Manager) testICMPReachability(host string) error {
 	return nil
 }
 
-// TransferFile transfers a file via SSH
+// TransferFile transfers a file to/from a remote machine via SSH
 func (m *Manager) TransferFile(ctx context.Context, session *spookytypes.Session, transfer *spookytypes.FileTransfer) (*spookytypes.FileTransferResult, error) {
-	m.logger.Debug("Transferring file via SSH", map[string]interface{}{
+	m.logger.Info("Starting file transfer", map[string]interface{}{
 		"session_id":  session.SessionID,
 		"local_path":  transfer.LocalPath,
 		"remote_path": transfer.RemotePath,
 		"direction":   transfer.Direction,
-		"mode":        transfer.Mode,
 	})
 
-	// Use the Client's file transfer manager
-	fileTransferManager := m.client.GetFileTransferManager()
-	transferResult, err := fileTransferManager.TransferFile(ctx, session.Connection, transfer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to transfer file: %w", err)
+	// Convert session.Connection to Machine for the ReusableSSHClient
+	machine := &spookytypes.Machine{
+		Hostname: session.Connection.Host,
+		Host:     session.Connection.Host,
+		Port:     session.Connection.Port,
+		User:     session.Connection.User,
 	}
 
-	return transferResult, nil
+	// Execute file transfer
+	startTime := time.Now()
+	var bytesTransferred int64
+	var err error
+
+	switch transfer.Direction {
+	case spookytypesssh.TransferDirectionUpload:
+		bytesTransferred, err = m.uploadFile(ctx, machine, transfer)
+	case spookytypesssh.TransferDirectionDownload:
+		bytesTransferred, err = m.downloadFile(ctx, machine, transfer)
+	default:
+		err = fmt.Errorf("unsupported transfer direction: %s", transfer.Direction)
+	}
+
+	endTime := time.Now()
+
+	// Create file transfer result
+	result := &spookytypes.FileTransferResult{
+		Transfer:  transfer,
+		Session:   session,
+		StartTime: startTime,
+		EndTime:   endTime,
+		Duration:  endTime.Sub(startTime),
+	}
+
+	if err != nil {
+		result.Success = false
+		result.Error = err.Error()
+		result.BytesTransferred = 0
+	} else {
+		result.Success = true
+		result.BytesTransferred = bytesTransferred
+	}
+
+	return result, nil
+}
+
+// uploadFile uploads a file from local to remote machine
+func (m *Manager) uploadFile(ctx context.Context, machine *spookytypes.Machine, transfer *spookytypes.FileTransfer) (int64, error) {
+	// Read source file
+	sourceData, err := os.ReadFile(transfer.LocalPath)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read source file %s: %w", transfer.LocalPath, err)
+	}
+
+	// Create destination directory if needed
+	dirCommand := fmt.Sprintf("mkdir -p $(dirname %s)", transfer.RemotePath)
+	_, err = m.client.RunCommand(ctx, machine, dirCommand)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	// Upload file using cat command with stdin
+	uploadCommand := fmt.Sprintf("cat > %s", transfer.RemotePath)
+	_, err = m.client.RunCommandWithStdin(ctx, machine, uploadCommand, string(sourceData))
+	if err != nil {
+		return 0, fmt.Errorf("failed to upload file to %s: %w", transfer.RemotePath, err)
+	}
+
+	return int64(len(sourceData)), nil
+}
+
+// downloadFile downloads a file from remote to local machine
+func (m *Manager) downloadFile(ctx context.Context, machine *spookytypes.Machine, transfer *spookytypes.FileTransfer) (int64, error) {
+	// Read file from remote machine
+	remoteData, err := m.client.RunCommand(ctx, machine, fmt.Sprintf("cat %s", transfer.RemotePath))
+	if err != nil {
+		return 0, fmt.Errorf("failed to read remote file %s: %w", transfer.RemotePath, err)
+	}
+
+	// Create destination directory if needed
+	destDir := filepath.Dir(transfer.LocalPath)
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return 0, fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	// Write to local destination
+	err = os.WriteFile(transfer.LocalPath, []byte(remoteData), 0o600)
+	if err != nil {
+		return 0, fmt.Errorf("failed to write local file %s: %w", transfer.LocalPath, err)
+	}
+
+	return int64(len(remoteData)), nil
+}
+
+// logActionExecution logs action execution details
+func (m *Manager) logActionExecution(action *spookytypesactions.Action, machine *spookytypes.Machine, session *spookytypesactions.ActingSession, startTime time.Time) {
+	m.logger.Info("Starting action execution", map[string]interface{}{
+		"action_name":  action.Name,
+		"machine_name": machine.Hostname,
+		"machine_host": machine.Host,
+		"session_id":   session.SessionID,
+		"command":      action.CommandString,
+		"working_dir":  action.WorkingDir,
+		"timeout":      action.Timeout,
+		"parallel":     action.Parallel,
+		"start_time":   startTime,
+	})
+}
+
+// logActionCompletion logs action completion details
+func (m *Manager) logActionCompletion(action *spookytypesactions.Action, machine *spookytypes.Machine, result *spookytypesactions.ActingResult) {
+	m.logger.Info("Completed action execution", map[string]interface{}{
+		"action_name":  action.Name,
+		"machine_name": machine.Hostname,
+		"status":       result.Status,
+		"duration":     result.Duration,
+		"exit_code":    result.ExitCode,
+		"error":        result.Error,
+	})
 }
 
 // ValidateConnection validates SSH connection parameters
@@ -500,25 +691,69 @@ func (m *Manager) ValidateAuthentication(_ context.Context, auth *spookytypes.Au
 	}, nil
 }
 
-// GetConnectionPool returns the connection pool
+// GetConnectionPool returns the connection pool statistics
 func (m *Manager) GetConnectionPool() *spookytypes.ConnectionPool {
-	// Return the connection pool from the Client
-	// This is a simplified implementation - in a real implementation,
-	// we might want to expose more pool management functionality
+	// Get connection stats from the ReusableSSHClient
+	stats := m.client.GetConnectionStats()
+
 	return &spookytypes.ConnectionPool{
 		MaxConnections:     m.client.config.MaxConnections,
 		MaxIdleConnections: m.client.config.MaxIdleConnections,
 		IdleTimeout:        m.client.config.IdleTimeout,
 		ConnectionTimeout:  m.client.config.DefaultTimeout,
+		// Add additional stats from the reusable client
+		ActiveConnections: stats["healthy_connections"].(int),
+		IdleConnections:   stats["unhealthy_connections"].(int),
+		TotalConnections:  stats["total_connections"].(int),
 	}
 }
 
+// CleanupSession cleans up SSH resources for an acting session
+func (m *Manager) CleanupSession(_ context.Context, session *spookytypesactions.ActingSession) error {
+	if session == nil {
+		return nil
+	}
+
+	m.logger.Debug("Cleaning up SSH session", map[string]interface{}{
+		"session_id": session.SessionID,
+	})
+
+	// Close SSH connection if it exists
+	if session.SSHConnection != nil {
+		m.closeSSHConnection(session.SSHConnection)
+		session.SSHConnection = nil
+	}
+
+	// Clear SSH metadata
+	session.SSHMetadata = nil
+
+	return nil
+}
+
+// closeSSHConnection closes an SSH connection
+func (m *Manager) closeSSHConnection(connection *spookytypes.Connection) {
+	if connection == nil {
+		return
+	}
+
+	m.logger.Debug("Closing SSH connection", map[string]interface{}{
+		"host": connection.Host,
+		"port": connection.Port,
+	})
+
+	// Mark connection as closed
+	connection.Status = spookytypesssh.ConnectionStatusClosed
+
+	// Note: The ReusableSSHClient handles actual connection cleanup
+	// This method just updates the connection status
+}
+
 // Close closes all SSH connections
-func (m *Manager) Close(ctx context.Context) error {
+func (m *Manager) Close(_ context.Context) error {
 	m.logger.Info("Closing SSH manager and all connections")
 
-	// Close the Client
-	err := m.client.Close(ctx)
+	// Close the ReusableSSHClient
+	err := m.client.Close()
 	if err != nil {
 		return fmt.Errorf("failed to close SSH client: %w", err)
 	}
