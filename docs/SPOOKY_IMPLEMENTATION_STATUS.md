@@ -30,8 +30,8 @@ This document provides a comprehensive overview of the current implementation st
 | **Facts System** | ⚠️ Partially Implemented | Basic functionality exists but SSH-based fact collection has known issues |
 | **Actions System** | ⚠️ Partially Implemented | Basic functionality exists but SSH-based action orchestration has known issues |
 | **Variables System** | ⚠️ Partially Implemented | Basic functionality exists but SSH-based variable collection has known issues |
-| **Templates System** | ⚠️ Partially Implemented | Basic functionality exists but SSH-based template rendering has known issues |
-| **Secrets System** | ⚠️ Partially Implemented | Basic functionality exists but SSH-based secret collection has known issues |
+| **Templates System** | ⚠️ Partially Implemented | Basic functionality exists but no CLI commands and SSH-based template rendering has known issues |
+| **Secrets System** | ⚠️ Partially Implemented | Age encryption/decryption only - no secret management, storage, or SSH-based collection |
 
 ### Infrastructure Systems
 
@@ -180,11 +180,12 @@ This document provides a comprehensive overview of the current implementation st
 **Working Components:**
 - Template loading from HCL configuration files
 - Basic template validation and error handling
-- CLI integration with basic functionality
 - Project integration for template loading
 - Local template rendering capabilities
+- Basic template management functionality
 
 **Known Issues:**
+- No CLI commands implemented (`spooky templates` commands missing)
 - SSH-based template rendering has implementation issues
 - Cannot properly render templates on remote machines
 - No parallel template rendering support
@@ -192,29 +193,32 @@ This document provides a comprehensive overview of the current implementation st
 - No template caching or optimization
 
 **In Progress:**
+- CLI command implementation
 - SSH template rendering fixes
 - Parallel rendering improvements
 - Template function enhancements
 
 #### Secrets System
 **Working Components:**
-- Secret loading from HCL configuration files
-- Basic secret validation and error handling
-- CLI integration with basic functionality
-- Project integration for secret loading
-- Local encryption/decryption capabilities
+- Age encryption/decryption functionality
+- Age key validation and management
+- HCL value encryption/decryption
+- CLI integration with `spooky secrets validate` command
+- Project integration for encryption operations
+- Integration with variables, machines, and facts systems
 
 **Known Issues:**
-- SSH-based secret collection has implementation issues
-- Cannot properly collect secrets from remote machines
-- No parallel secret collection support
-- Limited secret management capabilities
-- No secret rotation or lifecycle management
+- No secret loading from HCL configuration files
+- No secret storage or management capabilities
+- No SSH-based secret collection from remote machines
+- No secret validation or lifecycle management
+- No secret export/import functionality
+- No secret caching or optimization
+- Limited to age encryption/decryption only
 
 **In Progress:**
-- SSH secret collection fixes
-- Parallel processing improvements
-- Secret lifecycle management
+- Integration enhancement with other systems
+- Documentation updates to reflect actual implementation
 
 ## Current Limitations
 

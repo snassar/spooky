@@ -1,255 +1,461 @@
-# Projects System Documentation Summary
+# Projects Documentation Summary
 
 ## Overview
 
-This document provides a comprehensive overview of the spooky projects system documentation. It serves as a guide to help you find the right documentation for your needs and understand how all the pieces fit together.
+This document provides a comprehensive overview of spooky project management, including project structure, configuration, and usage patterns.
+
+**Status: Implemented** - The project system is fully implemented with comprehensive functionality for project initialization, validation, and management.
+
+## Project Structure
+
+A spooky project follows a standardized directory structure defined by the `project-directory.schema.hcl` schema:
+
+```
+my-project/
+├── project.hcl              # Project metadata and configuration
+├── machines.hcl             # Machine inventory (optional)
+├── actions.hcl              # Action definitions (optional)
+├── variables.hcl            # Project variables (optional)
+├── variables/               # Additional variable files (optional)
+│   ├── environment.hcl
+│   └── secrets.hcl
+├── templates/               # Template files (optional)
+│   ├── deployment.sh.tmpl
+│   └── config.yaml.tmpl
+└── schemas/                 # Project-specific schemas (optional)
+    └── custom.schema.hcl
+```
+
+## Project Configuration
+
+### project.hcl
+
+The main project configuration file contains metadata and settings:
+
+```hcl
+project {
+  name = "my-automation-project"
+  description = "Automation project for web application deployment"
+  
+  metadata {
+    version = "1.0.0"
+    author = "John Doe"
+    email = "john@example.com"
+    url = "https://github.com/example/my-automation"
+    tags = ["web", "deployment", "production"]
+  }
+  
+  settings {
+    parallel_workers = 4
+    timeout_seconds = 300
+    log_level = "info"
+  }
+}
+```
+
+### machines.hcl
+
+Machine inventory configuration:
+
+```hcl
+machines {
+  machine "web-server" {
+    hostname = "web.example.com"
+    host = "192.168.1.100"
+    port = 22
+    user = "admin"
+    
+    authentication {
+      method = "ssh_key"
+      key_path = "~/.ssh/id_rsa"
+    }
+    
+    tags = {
+      environment = "production"
+      role = "web"
+    }
+    
+    groups = ["webservers", "production"]
+  }
+}
+```
+
+### actions.hcl
+
+Action definitions for automation:
+
+```hcl
+actions {
+  action "deploy-web" {
+    description = "Deploy web application"
+    
+    machines = ["web-server"]
+    parallel = true
+    
+    template {
+      source = "templates/deploy.sh.tmpl"
+      destination = "/tmp/deploy.sh"
+      permissions = "0755"
+    }
+    
+    command = "/tmp/deploy.sh"
+  }
+}
+```
+
+### variables.hcl
+
+Project variables and configuration:
 
-## Documentation Structure
+```hcl
+variables {
+  variable "app_version" {
+    type = "string"
+    description = "Application version to deploy"
+    default = "1.0.0"
+  }
+  
+  variable "database_url" {
+    type = "string"
+    description = "Database connection URL"
+    sensitive = true
+    encrypted = true
+  }
+}
+```
 
-### 📚 Core Documentation
+## Project Commands
 
-#### 1. [User Guide](PROJECTS_USER_GUIDE.md)
-**Audience:** End users, system administrators, DevOps engineers
-**Purpose:** Complete guide to using the projects system
+### Initialize Project
+
+```bash
+# Initialize a new project
+spooky project init my-automation
 
-**What it covers:**
-- Getting started with project creation and management
-- Project structure and organization
-- Project configuration and validation
-- Project lifecycle management
-- Advanced features and best practices
-- Real-world examples and use cases
+# Initialize with specific metadata
+spooky project init my-automation \
+  --name "My Automation Project" \
+  --description "Web application deployment automation" \
+  --version "1.0.0" \
+  --author "John Doe"
+```
 
-**When to use:** Start here if you're new to spooky projects or need to understand how to use the system effectively.
+### Validate Project
 
-#### 2. [API Reference](PROJECTS_API_REFERENCE.md)
-**Audience:** Developers, system integrators, contributors
-**Purpose:** Technical reference for the projects system APIs and implementation
+```bash
+# Validate project structure and configuration
+spooky project validate my-automation
+```
 
-**What it covers:**
-- Core interfaces and type definitions
-- Implementation details and algorithms
-- Error handling patterns
-- Configuration rules and schemas
-- CLI integration details
-- Code examples and patterns
+This command validates:
+- Project directory structure compliance
+- Configuration file syntax and schema validation
+- Required file presence and format
+- Cross-file consistency and dependencies
 
-**When to use:** Use this when developing with the projects system, extending functionality, or debugging implementation issues.
+### Encrypt Project
 
-#### 3. [Troubleshooting Guide](PROJECTS_TROUBLESHOOTING.md)
-**Audience:** System administrators, support engineers, users experiencing issues
-**Purpose:** Solutions for common problems and debugging techniques
-
-**What it covers:**
-- Common error messages and solutions
-- Project configuration problems
-- Validation issues and resolution
-- Performance problems and optimization
-- Configuration problems and debugging
-- Best practices for troubleshooting
+```bash
+# Encrypt all variables and machines with encrypted=true
+spooky project encrypt my-automation
 
-**When to use:** Use this when encountering problems or need to debug issues with the projects system.
+# Show what would be encrypted without making changes
+spooky project encrypt my-automation --dry-run
+```
 
-### 📁 Examples Directory
+## Project Lifecycle
 
-#### [Examples Overview](examples/README.md)
-**Audience:** All users
-**Purpose:** Practical examples and configuration patterns
+### 1. Initialization
 
-**What it covers:**
-- Basic project setup
-- Project structure examples
-- Configuration patterns
-- Best practices and patterns
-- Testing and validation examples
+```bash
+# Create new project
+spooky project init my-automation
+cd my-automation
 
-**Example Files:**
-- [`project-basic-setup.hcl`](examples/project-basic-setup.hcl) - Basic project configuration
-- [`project-advanced-config.hcl`](examples/project-advanced-config.hcl) - Advanced project setup
-- [`project-multi-environment.hcl`](examples/project-multi-environment.hcl) - Multi-environment project
-
-**When to use:** Use these as starting points for your own configurations or to learn best practices.
+# Edit configuration files
+# - project.hcl (metadata and settings)
+# - machines.hcl (inventory)
+# - actions.hcl (automation)
+# - variables.hcl (configuration)
+```
 
-## Quick Start Guide
+### 2. Validation
 
-### For New Users
+```bash
+# Validate project structure
+spooky project validate .
 
-1. **Read the User Guide** - Start with [PROJECTS_USER_GUIDE.md](PROJECTS_USER_GUIDE.md) to understand the basics
-2. **Try the Examples** - Copy and customize examples from the [examples/](examples/) directory
-3. **Test Your Configuration** - Use `spooky project validate` and `spooky project init` to test
-4. **Check Troubleshooting** - If you encounter issues, refer to [PROJECTS_TROUBLESHOOTING.md](PROJECTS_TROUBLESHOOTING.md)
+# Validate specific components
+spooky machines validate .
+spooky actions validate .
+spooky variables validate .
+```
 
-### For Developers
+### 3. Testing
 
-1. **Review the API Reference** - Understand the interfaces and implementation in [PROJECTS_API_REFERENCE.md](PROJECTS_API_REFERENCE.md)
-2. **Study the Examples** - See how the APIs are used in practice
-3. **Check the Code** - Review the actual implementation in `internal/project/`
-4. **Test Your Changes** - Use the examples to test your modifications
-
-### For System Administrators
-
-1. **Start with User Guide** - Understand the system capabilities
-2. **Review Examples** - See real-world configuration patterns
-3. **Plan Your Projects** - Design your project organization strategy
-4. **Implement Gradually** - Start with basic projects and expand
-5. **Monitor and Validate** - Use validation and testing regularly
-
-## Documentation Navigation
-
-### By Use Case
-
-#### Getting Started
-- [User Guide - Getting Started](PROJECTS_USER_GUIDE.md#getting-started)
-- [Examples - Basic Setup](examples/project-basic-setup.hcl)
-- [Examples README - Using Examples](examples/README.md#using-the-examples)
+```bash
+# Test machine connectivity
+spooky machines ping .
 
-#### Project Creation
-- [User Guide - Project Creation](PROJECTS_USER_GUIDE.md#project-creation)
-- [Examples - Basic Setup](examples/project-basic-setup.hcl)
-- [API Reference - Project Creation](PROJECTS_API_REFERENCE.md#project-creation)
-
-#### Project Configuration
-- [Examples - Advanced Configuration](examples/project-advanced-config.hcl)
-- [User Guide - Project Configuration](PROJECTS_USER_GUIDE.md#project-configuration)
-- [API Reference - Configuration Management](PROJECTS_API_REFERENCE.md#configuration-management)
-
-#### Troubleshooting
-- [Troubleshooting Guide - Common Errors](PROJECTS_TROUBLESHOOTING.md#common-error-messages)
-- [Troubleshooting Guide - Configuration Issues](PROJECTS_TROUBLESHOOTING.md#configuration-problems)
-- [User Guide - Validation and Troubleshooting](PROJECTS_USER_GUIDE.md#validation-and-troubleshooting)
-
-### By Topic
-
-#### Configuration
-- [User Guide - Project Configuration](PROJECTS_USER_GUIDE.md#project-configuration)
-- [API Reference - Type Definitions](PROJECTS_API_REFERENCE.md#type-definitions)
-- [Examples - Configuration Patterns](examples/README.md#configuration-patterns)
-
-#### Validation
-- [User Guide - Validation and Troubleshooting](PROJECTS_USER_GUIDE.md#validation-and-troubleshooting)
-- [API Reference - Validation Rules](PROJECTS_API_REFERENCE.md#validation-rules)
-- [Troubleshooting Guide - Validation Problems](PROJECTS_TROUBLESHOOTING.md#validation-problems)
+# Test with authentication
+spooky machines ping . --auth
 
-#### Project Structure
-- [User Guide - Project Structure](PROJECTS_USER_GUIDE.md#project-structure)
-- [API Reference - Structure Implementation](PROJECTS_API_REFERENCE.md#structure-implementation)
-- [Troubleshooting Guide - Structure Issues](PROJECTS_TROUBLESHOOTING.md#project-structure-issues)
+# Export facts for analysis
+spooky facts export . --output facts.hcl
+```
 
-#### CLI Usage
-- [User Guide - Project Management](PROJECTS_USER_GUIDE.md#project-management)
-- [API Reference - CLI Integration](PROJECTS_API_REFERENCE.md#cli-integration)
-- [Examples - Testing and Validation](examples/README.md#testing-and-validation)
+### 4. Execution
 
-## Key Concepts
+```bash
+# Run actions with dry-run
+spooky actions run . --dry-run
 
-### Core Features
+# Run actions with plan
+spooky actions run . --plan
 
-1. **Project Initialization** - Create new projects with proper structure
-2. **Project Validation** - Validate project configuration and structure
-3. **Project Information** - Display project details and metadata
-4. **Project Structure** - Standardized project directory organization
-5. **Configuration Management** - Project-level configuration handling
-6. **Schema Validation** - Validate against project schemas
+# Execute actions
+spooky actions run .
+```
 
-### Architecture Principles
+## Project Configuration Options
 
-1. **Interface-First Design** - All functionality through well-defined interfaces
-2. **Dependency Injection** - Loose coupling through interface-based dependencies
-3. **Comprehensive Configuration** - Multiple levels of configuration and validation
-4. **Extensible Design** - Easy to add new project types and features
-5. **Schema-Driven Validation** - Use schemas for configuration validation
+### Metadata Fields
 
-### Best Practices
-
-1. **Use Project Init** - Always use `spooky project init` for new projects
-2. **Validate Projects** - Validate projects before using them
-3. **Follow Structure** - Maintain proper project directory structure
-4. **Use Schemas** - Leverage schemas for configuration validation
-5. **Monitor Project Health** - Regularly validate project configurations
-6. **Document Projects** - Keep project documentation up-to-date
-
-## Implementation Status
-
-### ✅ Completed Features
-
-- **Core Project Management**
-  - Project initialization with proper structure
-  - Project validation against schemas
-  - Project information display
-  - Project configuration management
-  - Schema validation and enforcement
-  - Directory structure validation
-
-- **Advanced Features**
-  - Multi-environment project support
-  - Project metadata management
-  - Configuration inheritance
-  - Comprehensive validation rules
-  - Integration with all spooky components
-
-- **CLI Integration**
-  - `spooky project init` - Initialize new projects
-  - `spooky project validate` - Validate project configuration
-  - `spooky project info` - Display project information
-  - `spooky project show` - Show project details
-
-### 🚧 In Progress / Planned Features
-
-- **Advanced Project Types** - Specialized project templates
-- **Project Templates** - Custom project templates
-- **Project Migration** - Project structure migration tools
-- **Project Analytics** - Project usage and performance metrics
-
-### 📋 Future Enhancements
-
-- **Project Collaboration** - Multi-user project management
-- **Project Versioning** - Project configuration versioning
-- **Project Backup** - Automated project backup and restore
-- **Project Templates** - Community-contributed project templates
-- **Project Analytics** - Advanced project analytics and reporting
-
-## Getting Help
-
-### Documentation Resources
-
-1. **User Guide** - For usage questions and best practices
-2. **API Reference** - For technical implementation details
-3. **Troubleshooting Guide** - For problem resolution
-4. **Examples** - For configuration patterns and use cases
-
-### Common Questions
-
-#### "How do I get started?"
-Start with the [User Guide](PROJECTS_USER_GUIDE.md) and copy an example from the [examples/](examples/) directory.
-
-#### "How do I create a new project?"
-Use `spooky project init` and see the [Project Creation](PROJECTS_USER_GUIDE.md#project-creation) section.
-
-#### "How do I troubleshoot project issues?"
-Check the [Configuration Issues](PROJECTS_TROUBLESHOOTING.md#configuration-problems) section in the troubleshooting guide.
-
-#### "How do I validate my project?"
-Use `spooky project validate` and see the [Validation and Troubleshooting](PROJECTS_USER_GUIDE.md#validation-and-troubleshooting) section.
-
-#### "How do I integrate with other systems?"
-Review the [API Reference](PROJECTS_API_REFERENCE.md) for integration patterns and the planned features section above.
-
-### Contributing
-
-When contributing to the projects system:
-
-1. **Follow Interface Patterns** - Use the established interface architecture
-2. **Add Comprehensive Tests** - Include unit and integration tests
-3. **Update Documentation** - Keep documentation current with changes
-4. **Follow Error Handling** - Use structured error types and patterns
-5. **Consider Schema Validation** - Ensure proper schema validation
-
-## Conclusion
-
-The spooky projects system provides a comprehensive solution for managing spooky projects with proper structure, validation, and configuration management. The documentation is structured to support users at all levels, from beginners getting started to advanced users implementing complex project configurations.
-
-Start with the User Guide to understand the basics, use the examples as templates for your configurations, and refer to the troubleshooting guide when you encounter issues. The API reference provides the technical details needed for development and integration work.
-
-The system is designed to be extensible and maintainable, following interface-first architecture principles and comprehensive configuration patterns. As the system evolves, new features will be added while maintaining backward compatibility and following established patterns.
-
-For the most up-to-date information and examples, always refer to the latest version of the documentation and test your configurations with the current spooky release.
+- `name` - Project name (required)
+- `description` - Project description
+- `version` - Project version
+- `author` - Project author
+- `email` - Author email
+- `url` - Project URL
+- `tags` - Project tags
+
+### Settings Fields
+
+- `parallel_workers` - Number of parallel workers (default: 1)
+- `timeout_seconds` - Operation timeout in seconds (default: 300)
+- `log_level` - Logging level (debug, info, warn, error)
+- `log_format` - Logging format (text, json)
+
+## Project Validation
+
+The project validation system checks:
+
+### Structure Validation
+
+- Directory structure compliance with schema
+- Required files presence
+- Optional directories and files
+- File naming conventions
+
+### Configuration Validation
+
+- HCL syntax validation
+- Schema compliance validation
+- Cross-reference validation
+- Dependency validation
+
+### Content Validation
+
+- Machine configuration validation
+- Action definition validation
+- Variable definition validation
+- Template validation
+
+## Project Encryption
+
+Spooky supports encryption of sensitive data using age encryption:
+
+### Encrypted Fields
+
+- Variable values with `encrypted = true`
+- Machine authentication credentials with `encrypted = true`
+- Template content with `encrypted = true`
+
+### Encryption Configuration
+
+```hcl
+# Global configuration (spooky.hcl)
+age {
+  identities = "~/.config/spooky/identities"
+  recipients = "~/.config/spooky/recipients.txt"
+}
+```
+
+### Encryption Commands
+
+```bash
+# Encrypt project variables
+spooky variables armor .
+
+# Encrypt project machines
+spooky machines encrypt .
+
+# Encrypt entire project
+spooky project encrypt .
+```
+
+## Project Examples
+
+### Basic Web Application
+
+```bash
+# Initialize project
+spooky project init web-app
+
+# Configure machines
+cat > machines.hcl << 'EOF'
+machines {
+  machine "web-server" {
+    hostname = "web.example.com"
+    host = "192.168.1.100"
+    port = 22
+    user = "admin"
+    
+    authentication {
+      method = "ssh_key"
+      key_path = "~/.ssh/id_rsa"
+    }
+    
+    tags = {
+      environment = "production"
+      role = "web"
+    }
+  }
+}
+EOF
+
+# Configure actions
+cat > actions.hcl << 'EOF'
+actions {
+  action "deploy" {
+    description = "Deploy web application"
+    
+    machines = ["web-server"]
+    
+    template {
+      source = "templates/deploy.sh.tmpl"
+      destination = "/tmp/deploy.sh"
+      permissions = "0755"
+    }
+    
+    command = "/tmp/deploy.sh"
+  }
+}
+EOF
+
+# Configure variables
+cat > variables.hcl << 'EOF'
+variables {
+  variable "app_version" {
+    type = "string"
+    description = "Application version"
+    default = "1.0.0"
+  }
+}
+EOF
+
+# Validate and run
+spooky project validate .
+spooky machines ping .
+spooky actions run . --dry-run
+spooky actions run .
+```
+
+### Multi-Environment Project
+
+```bash
+# Initialize project
+spooky project init multi-env
+
+# Configure machines for multiple environments
+cat > machines.hcl << 'EOF'
+machines {
+  machine "web-prod" {
+    hostname = "web-prod.example.com"
+    host = "10.0.1.100"
+    user = "admin"
+    
+    authentication {
+      method = "ssh_key"
+      key_path = "~/.ssh/prod_key"
+    }
+    
+    tags = {
+      environment = "production"
+      role = "web"
+    }
+  }
+  
+  machine "web-staging" {
+    hostname = "web-staging.example.com"
+    host = "10.0.2.100"
+    user = "admin"
+    
+    authentication {
+      method = "ssh_key"
+      key_path = "~/.ssh/staging_key"
+    }
+    
+    tags = {
+      environment = "staging"
+      role = "web"
+    }
+  }
+}
+EOF
+
+# Run actions on specific environments
+spooky actions run . --tags environment=staging
+spooky actions run . --tags environment=production
+```
+
+## Best Practices
+
+### Project Organization
+
+1. **Use descriptive names** for projects and components
+2. **Group related machines** using tags and groups
+3. **Separate environments** using tags and different configurations
+4. **Use variables** for configuration values
+5. **Encrypt sensitive data** using age encryption
+
+### Configuration Management
+
+1. **Validate projects** before execution
+2. **Test connectivity** before running actions
+3. **Use dry-run mode** to preview changes
+4. **Version control** project configurations
+5. **Document project purpose** in descriptions
+
+### Security
+
+1. **Encrypt sensitive variables** and credentials
+2. **Use SSH keys** instead of passwords
+3. **Limit machine access** to necessary users
+4. **Regularly rotate** authentication credentials
+5. **Validate configurations** for security issues
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Project validation fails** - Check file syntax and schema compliance
+2. **Machine connectivity issues** - Verify SSH configuration and network access
+3. **Action execution fails** - Check template syntax and command paths
+4. **Variable resolution errors** - Verify variable definitions and dependencies
+
+### Debug Commands
+
+```bash
+# Enable verbose logging
+export SPOOKY_LOG_LEVEL=debug
+
+# Validate with detailed output
+spooky project validate . --verbose
+
+# Test connectivity with authentication
+spooky machines ping . --auth --verbose
+
+# Run actions with detailed output
+spooky actions run . --dry-run --verbose
+```

@@ -4,6 +4,8 @@
 
 This document provides a comprehensive overview of the spooky actions system documentation. It serves as a guide to help you find the right documentation for your needs and understand how all the pieces fit together.
 
+**Status: Implemented** - The actions system is fully implemented with comprehensive functionality for action definition, validation, and execution.
+
 ## Documentation Structure
 
 ### 📚 Core Documentation
@@ -16,7 +18,7 @@ This document provides a comprehensive overview of the spooky actions system doc
 - Getting started with action configuration
 - Basic and advanced usage patterns
 - Action types and configuration
-- Dependency management and running
+- Dependency management and execution
 - CLI commands and options
 - Real-world examples and use cases
 
@@ -45,7 +47,7 @@ This document provides a comprehensive overview of the spooky actions system doc
 - Configuration problems and fixes
 - Performance issues and optimization
 - Network and connectivity issues
-- Dependency and running problems
+- Dependency and execution problems
 - Recovery procedures and prevention strategies
 
 **When to use:** Use this when encountering problems or need to debug issues with the actions system.
@@ -94,479 +96,189 @@ This document provides a comprehensive overview of the spooky actions system doc
 4. **Implement Gradually** - Start with basic actions and expand
 5. **Monitor and Validate** - Use validation and testing regularly
 
-## Documentation Navigation
+## Actions System Overview
 
-### By Use Case
+### Core Concepts
 
-#### Getting Started
-- **New to spooky actions?** → [User Guide](ACTIONS_USER_GUIDE.md) - Getting Started section
-- **Setting up your first project?** → [User Guide](ACTIONS_USER_GUIDE.md) - Basic Usage section
-- **Need examples?** → [Examples Directory](examples/) - Basic examples
+The actions system provides a declarative way to define and execute automation tasks across multiple machines. Actions are defined in HCL configuration files and can include:
 
-#### Configuration
-- **Action configuration?** → [User Guide](ACTIONS_USER_GUIDE.md) - Action Configuration section
-- **Machine targeting?** → [User Guide](ACTIONS_USER_GUIDE.md) - Action Targeting section
-- **Dependency management?** → [User Guide](ACTIONS_USER_GUIDE.md) - Action Dependencies section
+- **Command execution** - Run commands on target machines
+- **Template rendering** - Generate dynamic content from templates
+- **File operations** - Upload, download, and manage files
+- **Conditional execution** - Execute actions based on conditions
+- **Parallel execution** - Run actions concurrently across machines
 
-#### Integration
-- **Using actions with machines?** → [User Guide](ACTIONS_USER_GUIDE.md) - Machine Integration section
-- **Using actions with variables?** → [User Guide](ACTIONS_USER_GUIDE.md) - Variables Integration section
-- **Using actions with facts?** → [User Guide](ACTIONS_USER_GUIDE.md) - Facts Integration section
+### Action Configuration
 
-#### Troubleshooting
-- **Action loading failures?** → [Troubleshooting Guide](ACTIONS_TROUBLESHOOTING.md) - Action Loading Errors section
-- **Run failures?** → [Troubleshooting Guide](ACTIONS_TROUBLESHOOTING.md) - Action Run Errors section
-- **Dependency issues?** → [Troubleshooting Guide](ACTIONS_TROUBLESHOOTING.md) - Dependency Errors section
+Actions are defined in `actions.hcl` files within spooky projects:
 
-#### Development
-- **Extending the system?** → [API Reference](ACTIONS_API_REFERENCE.md) - Core Interfaces section
-- **Adding new action types?** → [API Reference](ACTIONS_API_REFERENCE.md) - Action Types section
-- **Custom validators?** → [API Reference](ACTIONS_API_REFERENCE.md) - ActionValidator Interface section
+```hcl
+actions {
+  action "deploy-web" {
+    description = "Deploy web application"
+    
+    machines = ["web-server"]
+    parallel = true
+    
+    template {
+      source = "templates/deploy.sh.tmpl"
+      destination = "/tmp/deploy.sh"
+      permissions = "0755"
+    }
+    
+    command = "/tmp/deploy.sh"
+  }
+  
+  action "restart-services" {
+    description = "Restart application services"
+    
+    machines = ["web-server", "db-server"]
+    parallel = false
+    
+    command = "sudo systemctl restart myapp"
+  }
+}
+```
 
-### By Component
+### CLI Commands
 
-#### Action Configuration
-- **Overview** → [User Guide](ACTIONS_USER_GUIDE.md) - Actions System Concepts
-- **Configuration** → [User Guide](ACTIONS_USER_GUIDE.md) - Creating Actions
-- **Troubleshooting** → [Troubleshooting Guide](ACTIONS_TROUBLESHOOTING.md) - Action Configuration Issues
-- **API** → [API Reference](ACTIONS_API_REFERENCE.md) - Action Type
-
-#### Action Running
-- **Overview** → [User Guide](ACTIONS_USER_GUIDE.md) - Action Lifecycle
-- **Configuration** → [User Guide](ACTIONS_USER_GUIDE.md) - Running Actions
-- **Troubleshooting** → [Troubleshooting Guide](ACTIONS_TROUBLESHOOTING.md) - Action Run Errors
-- **API** → [API Reference](ACTIONS_API_REFERENCE.md) - ActionRunContext Type
-
-#### Dependency Management
-- **Overview** → [User Guide](ACTIONS_USER_GUIDE.md) - Action Dependencies
-- **Configuration** → [User Guide](ACTIONS_USER_GUIDE.md) - Dependency Configuration
-- **Troubleshooting** → [Troubleshooting Guide](ACTIONS_TROUBLESHOOTING.md) - Dependency Errors
-- **API** → [API Reference](ACTIONS_API_REFERENCE.md) - ActionDependency Type
-
-#### CLI Commands
-- **Overview** → [User Guide](ACTIONS_USER_GUIDE.md) - CLI Commands
-- **Commands** → [User Guide](ACTIONS_USER_GUIDE.md) - Command Options
-- **Troubleshooting** → [Troubleshooting Guide](ACTIONS_TROUBLESHOOTING.md) - CLI Issues
-- **API** → [API Reference](ACTIONS_API_REFERENCE.md) - CLI Integration
-
-## Key Concepts
-
-### Actions System Architecture
-
-The actions system consists of several key components:
-
-1. **Action** - Individual operations to be run on machines
-2. **ActionCollection** - Groups of related actions
-3. **ActionPlan** - Run plan with dependency resolution
-4. **ActionsIntegration** - Primary interface for action management
-5. **ActionValidator** - Validation of action configurations
-6. **SSHManager** - SSH connection and running capabilities
-7. **CLI Commands** - User interface for action management
-
-### Data Flow
-
-1. **Action Loading** - Load actions from HCL configuration files
-2. **Validation** - Validate action configurations against schema
-3. **Dependency Resolution** - Resolve action dependencies and create run order
-4. **Machine Targeting** - Determine target machines for each action
-5. **Run Planning** - Create run plan with proper ordering
-6. **Action Running** - Run actions on target machines via SSH
-7. **Result Collection** - Collect and aggregate run results
-
-### Action Types
-
-The system supports several types of actions:
-
-- **Command Actions** - Run shell commands on remote machines
-- **Script Actions** - Run script files with template processing
-- **Template Deploy Actions** - Deploy template files with variable substitution
-- **File Copy Actions** - Copy files between machines
-- **Service Control Actions** - Control system services
-
-## Common Patterns
-
-### Basic Action Configuration
+The actions system provides comprehensive CLI commands:
 
 ```bash
 # List actions in a project
 spooky actions list ./my-project
 
-# Validate action configuration
+# Validate action configurations
 spooky actions validate ./my-project
 
-# Run actions
+# Run actions with dry-run mode
+spooky actions run ./my-project --dry-run
+
+# Run actions with plan mode
+spooky actions run ./my-project --plan
+
+# Execute actions
 spooky actions run ./my-project
+
+# Run with parallel execution
+spooky actions run ./my-project --parallel 4
+
+# Run with decryption for debugging
+spooky actions run ./my-project --decrypt
 ```
 
-### Advanced Configuration
+### Action Execution Modes
 
-```hcl
-action "deploy-application" {
-  type = "template_deploy"
-  description = "Deploy application configuration"
-  
-  template {
-    source = "templates/app.conf.tmpl"
-    destination = "/etc/app/app.conf"
-    permissions = "0644"
-    owner = "app"
-    group = "app"
-  }
-  
-  machines = ["app-server"]
-  dependencies = ["prepare-database"]
-  parallel = false
-  timeout = 300
-}
+1. **Dry-run Mode** - Simulate execution without making changes
+2. **Plan Mode** - Show execution plan without running actions
+3. **Normal Mode** - Execute actions on target machines
+4. **Parallel Mode** - Execute actions concurrently across machines
+
+### Machine Targeting
+
+Actions can be targeted to specific machines using:
+
+- **Machine names** - Target specific machines by name
+- **Tags** - Target machines with specific tags
+- **Complex filters** - Use filter expressions for advanced targeting
+
+```bash
+# Target specific machines
+spooky actions run ./my-project --machine web-server
+
+# Target machines by tags
+spooky actions run ./my-project --tags environment=production
+
+# Use complex filters
+spooky actions run ./my-project --filter "environment=production AND role=web"
 ```
 
-## Implementation Status
+## Implementation Details
 
-### ✅ Fully Completed Features
+### Core Components
 
-- **Complete Acting Infrastructure**
-  - Fully functional action orchestration with SSH-based execution
-  - All action types (command, script, template_deploy, file_copy, service_control) fully implemented
-  - Complete dependency resolution and run order planning
-  - Machine targeting by names and tags with proper filtering
-  - Parallel running support with dependency resolution
-  - Comprehensive validation and error handling
+1. **Action Manager** - Manages action lifecycle and execution
+2. **Action Validator** - Validates action configurations
+3. **Action Loader** - Loads actions from configuration files
+4. **SSH Manager** - Handles SSH connections and command execution
+5. **Template Engine** - Renders templates with variables
 
-- **Advanced Features**
-  - Template deployment with variable substitution and SSH execution
-  - Service control with systemd integration via SSH
-  - File copy operations with permissions and SSH transfer
-  - Script running with template processing and SSH execution
-  - Resource limits and timeout management
-  - Retry logic and error recovery with session management
-  - Complete session lifecycle management and progress tracking
+### Integration Points
 
-- **CLI Integration**
-  - `spooky actions list` - List actions in a project
-  - `spooky actions validate` - Validate action configuration with detailed reporting
-  - `spooky actions run` - Run actions with plan and dry-run modes
-  - All CLI features fully functional and production-ready
+The actions system integrates with:
 
-### 🎯 Production Ready
+- **Machines System** - For machine inventory and connectivity
+- **Variables System** - For dynamic configuration values
+- **Templates System** - For template rendering and management
+- **Secrets System** - For encrypted configuration and credentials
+- **Facts System** - For machine-specific data and context
 
-The actions system is now **100% production-ready** with:
-- **Complete Acting Infrastructure**: No stubs, placeholders, or incomplete implementations
-- **Full SSH Integration**: All action types execute via SSH with proper connection management
-- **Robust Error Handling**: Comprehensive error recovery and detailed result reporting
-- **Performance Optimized**: Efficient execution with proper resource management
-- **Type Safe**: All interface contracts satisfied with proper validation
+### Error Handling
 
-### 📋 Future Enhancements
+The actions system provides comprehensive error handling:
 
-- **Action History** - Track action run history and analytics
-- **Rollback Support** - Automatic rollback capabilities for failed deployments
-- **Advanced Scheduling** - Time-based action scheduling and cron-like functionality
-- **Action Metrics** - Enhanced performance metrics and monitoring dashboards
-- **Web Interface** - Web-based action management interface
-- **Advanced Scripting** - Enhanced script running with better debugging tools
-- **Template Functions** - Additional template functions and helpers
-
-## Getting Help
-
-### Documentation Resources
-
-1. **User Guide** - For usage questions and best practices
-2. **API Reference** - For technical implementation details
-3. **Troubleshooting Guide** - For problem resolution
-4. **Examples** - For configuration patterns and use cases
-
-### Common Questions
-
-#### "How do I get started?"
-Start with the [User Guide](ACTIONS_USER_GUIDE.md) and copy an example from the [examples/](examples/) directory.
-
-#### "How do I configure actions?"
-See the [Action Configuration](ACTIONS_USER_GUIDE.md#creating-actions) section and the [basic configuration example](examples/basic-actions-project.hcl).
-
-#### "How do I troubleshoot action issues?"
-Check the [Action Loading Errors](ACTIONS_TROUBLESHOOTING.md#action-loading-errors) section in the troubleshooting guide.
-
-#### "How do I validate my configuration?"
-Use `spooky actions validate` and see the [Action Validation](ACTIONS_USER_GUIDE.md#validate-actions) section.
-
-#### "How do I integrate with other systems?"
-Review the [API Reference](ACTIONS_API_REFERENCE.md) for integration patterns and the planned features section above.
-
-### Contributing
-
-When contributing to the actions system:
-
-1. **Follow Interface Patterns** - Use the established interface architecture
-2. **Add Comprehensive Tests** - Include unit and integration tests
-3. **Update Documentation** - Keep documentation current with changes
-4. **Follow Error Handling** - Use structured error types and patterns
-5. **Consider Performance** - Optimize for efficient action running
-
-## Conclusion
-
-The spooky actions system provides a comprehensive solution for action orchestration across all spooky components. The documentation is structured to support users at all levels, from beginners getting started to advanced users implementing complex integrations.
-
-Start with the User Guide to understand the basics, use the examples as templates for your configurations, and refer to the troubleshooting guide when you encounter issues. The API reference provides the technical details needed for development and integration work.
-
-The system is designed to be extensible and maintainable, following interface-first architecture principles and comprehensive configuration patterns. As the system evolves, new features will be added while maintaining backward compatibility and following established patterns.
-
-For the most up-to-date information and examples, always refer to the latest version of the documentation and test your configurations with the current spooky release.
-
-## Integration with Other Systems
-
-### Project Integration
-
-Actions integrate with the project system:
-
-- **Machine Inventory**: Uses machines.hcl for target identification
-- **Project Structure**: Follows project directory structure
-- **Configuration**: Uses project-specific configuration
-
-### Variables Integration
-
-Actions can use variables for dynamic configuration:
-
-```hcl
-action "deploy-with-vars" {
-  type = "template_deploy"
-  
-  template {
-    source = "templates/app.conf.tmpl"
-    destination = "/etc/app/app.conf"
-  }
-  
-  environment = {
-    APP_VERSION = "${variables.app_version}"
-    ENVIRONMENT = "${variables.environment}"
-  }
-  
-  machines = ["${variables.target_machines}"]
-}
-```
-
-### Facts Integration
-
-Actions can use machine facts for conditional running:
-
-```hcl
-action "os-specific-command" {
-  type = "command"
-  
-  command = "if [ \"${facts.system.os.name}\" = \"Ubuntu\" ]; then apt update; else yum update; fi"
-  
-  machines = ["web-server"]
-}
-```
-
-### SSH Integration
-
-Actions use SSH for remote running:
-
-- **SSH Connections**: Secure SSH connections to target machines
-- **Authentication**: SSH key and password authentication
-- **Connection Pooling**: Efficient SSH connection management
-- **Error Handling**: Robust SSH error handling and recovery
-
-### Logging Integration
-
-Actions integrate with the logging system:
-
-- **Component Logging**: Actions use the "actions" logging component
-- **Run Logging**: Log action run details and results
-- **Error Logging**: Log action errors and failures
-- **Performance Logging**: Log action run performance metrics
+- **Validation errors** - Configuration and syntax validation
+- **Connection errors** - SSH connectivity issues
+- **Execution errors** - Command execution failures
+- **Template errors** - Template rendering issues
+- **Dependency errors** - Missing dependencies and resources
 
 ## Best Practices
 
 ### Action Design
 
-1. **Use Descriptive Names** - Choose clear, descriptive action names
-2. **Add Descriptions** - Include human-readable descriptions
-3. **Group Related Actions** - Use dependencies to group related operations
-4. **Use Tags for Organization** - Use tags to organize actions by purpose
-5. **Keep Actions Focused** - Each action should have a single, clear purpose
+1. **Use descriptive names** for actions
+2. **Provide clear descriptions** for action purpose
+3. **Group related actions** logically
+4. **Use templates** for dynamic content
+5. **Test actions** with dry-run mode
 
 ### Configuration Management
 
-1. **Use Template Variables** - Use variables for configuration values
-2. **Validate Templates** - Enable template validation for critical files
-3. **Use Backup Options** - Enable backups for file operations
-4. **Set Appropriate Permissions** - Use correct file permissions and ownership
-5. **Use Working Directories** - Set appropriate working directories
+1. **Validate configurations** before execution
+2. **Use variables** for configuration values
+3. **Encrypt sensitive data** using age encryption
+4. **Version control** action configurations
+5. **Document action dependencies** and requirements
 
-### Error Handling
+### Execution Strategy
 
-1. **Configure Retries** - Use retries for unreliable operations
-2. **Set Timeouts** - Use appropriate timeouts for long-running operations
-3. **Handle Dependencies** - Use dependencies to ensure proper order
-4. **Validate Before Running** - Always validate actions before running
-5. **Use Dry Run Mode** - Test actions with dry-run mode first
+1. **Start with dry-run** to preview changes
+2. **Use parallel execution** for efficiency
+3. **Monitor execution** progress and results
+4. **Handle errors** gracefully with retry logic
+5. **Log execution** details for audit trails
 
-### Performance Optimization
+## Troubleshooting
 
-1. **Use Parallel Running** - Enable parallel running when possible
-2. **Limit Concurrent Operations** - Use max_concurrent to prevent overload
-3. **Optimize Dependencies** - Minimize unnecessary dependencies
-4. **Use Resource Limits** - Set appropriate resource limits
-5. **Monitor Running** - Monitor action run performance
+### Common Issues
 
-### Security Considerations
+1. **Action validation fails** - Check syntax and schema compliance
+2. **SSH connection errors** - Verify machine connectivity and authentication
+3. **Template rendering errors** - Check template syntax and variable availability
+4. **Command execution failures** - Verify command paths and permissions
+5. **Parallel execution issues** - Check resource limits and connection pools
 
-1. **Use Sudo Sparingly** - Only use sudo when necessary
-2. **Set File Permissions** - Use appropriate file permissions
-3. **Validate Input** - Validate all input and configuration
-4. **Use Secure Connections** - Ensure SSH connections are secure
-5. **Audit Actions** - Regularly audit action configurations
+### Debug Commands
 
-## Examples
+```bash
+# Enable verbose logging
+export SPOOKY_LOG_LEVEL=debug
 
-### Web Application Deployment
+# Validate with detailed output
+spooky actions validate ./my-project --verbose
 
-```hcl
-# actions.hcl
-action "stop-application" {
-  type = "service_control"
-  description = "Stop application service"
-  
-  service_control {
-    service = "myapp"
-    action = "stop"
-  }
-  
-  machines = ["app-server"]
-}
+# Test with dry-run and verbose output
+spooky actions run ./my-project --dry-run --verbose
 
-action "backup-database" {
-  type = "script"
-  description = "Create database backup"
-  
-  script = "files/backup-db.sh"
-  variables = {
-    backup_dir = "/backups"
-    db_name = "myapp"
-  }
-  
-  machines = ["db-server"]
-}
-
-action "deploy-application" {
-  type = "template_deploy"
-  description = "Deploy application files"
-  
-  template {
-    source = "templates/app.conf.tmpl"
-    destination = "/etc/myapp/app.conf"
-    permissions = "0644"
-    owner = "myapp"
-    group = "myapp"
-    backup = true
-  }
-  
-  machines = ["app-server"]
-  dependencies = ["stop-application", "backup-database"]
-}
-
-action "start-application" {
-  type = "service_control"
-  description = "Start application service"
-  
-  service_control {
-    service = "myapp"
-    action = "start"
-    wait_for_status = "active"
-  }
-  
-  machines = ["app-server"]
-  dependencies = ["deploy-application"]
-}
+# Check machine connectivity
+spooky machines ping ./my-project --auth
 ```
 
-### Infrastructure Maintenance
+## Related Documentation
 
-```hcl
-action "update-packages" {
-  type = "command"
-  description = "Update system packages"
-  
-  command = "apt update && apt upgrade -y"
-  
-  machines = ["web-server", "app-server", "db-server"]
-  parallel = true
-  sudo = true
-  timeout = 600
-}
-
-action "restart-services" {
-  type = "service_control"
-  description = "Restart critical services"
-  
-  service_control {
-    service = "nginx"
-    action = "restart"
-    wait_for_status = "active"
-  }
-  
-  machines = ["web-server"]
-  dependencies = ["update-packages"]
-}
-```
-
-### Monitoring and Health Checks
-
-```hcl
-action "check-disk-space" {
-  type = "command"
-  description = "Check available disk space"
-  
-  command = "df -h"
-  
-  machines = ["web-server", "app-server", "db-server"]
-  parallel = true
-}
-
-action "check-service-status" {
-  type = "service_control"
-  description = "Check service status"
-  
-  service_control {
-    service = "nginx"
-    action = "status"
-  }
-  
-  machines = ["web-server"]
-}
-```
-
-This comprehensive documentation summary provides an overview of the spooky actions system documentation and helps users find the right information for their needs.
-
-## Recent Updates
-
-### Acting Infrastructure Completion (Latest)
-
-The actions system has been fully completed with comprehensive acting infrastructure:
-
-#### ✅ **Completed Features**
-- **Complete Acting Infrastructure**: Fully functional action orchestration with SSH-based execution
-- **All Action Types**: Command, script, template deploy, file copy, service control - all fully implemented
-- **Machine Targeting**: Full support for machine names and tags with proper filtering
-- **Dependency Resolution**: Complete dependency resolution and run order planning
-- **Parallel Execution**: Parallel action running with dependency resolution
-- **SSH Integration**: Complete SSH-based execution for all action types
-- **Error Handling**: Comprehensive error handling and result aggregation
-- **Session Management**: Full session lifecycle management and progress tracking
-- **Resource Management**: Proper resource cleanup and timeout handling
-
-#### 🎯 **Production Ready**
-- **100% Functional**: No stubs, placeholders, or incomplete implementations
-- **Type Safe**: All interface contracts satisfied with proper validation
-- **Performance Optimized**: Efficient execution with proper resource management
-- **Robust Error Handling**: Comprehensive error recovery and reporting
-
-#### 📚 **Updated Documentation**
-- **User Guide**: Updated implementation status to reflect production readiness
-- **API Reference**: Added implementation status indicators for all interfaces
-- **Troubleshooting Guide**: Added acting infrastructure status section
-- **Integration Guides**: Updated to reflect completed actions integration
-- **SSH User Guide**: Updated references to reflect completed implementation
-
-The actions system is now **production-ready** and fully functional for all documented features.
+- [Actions User Guide](ACTIONS_USER_GUIDE.md) - Complete user guide
+- [Actions API Reference](ACTIONS_API_REFERENCE.md) - Technical reference
+- [Actions Troubleshooting](ACTIONS_TROUBLESHOOTING.md) - Troubleshooting guide
+- [System Design](../design/systems/actions-system.md) - System design documentation
+- [CLI Reference](CLI_REFERENCE.md) - CLI command reference

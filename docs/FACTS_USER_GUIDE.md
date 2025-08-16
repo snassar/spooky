@@ -51,7 +51,7 @@ The fact collection process works as follows:
 6. **Direct Export**: Write facts directly to output file in requested format
 7. **Cleanup**: Memory is automatically managed during export
 
-### Fact Storage
+### Fact Export
 
 Facts are gathered directly and exported without intermediate storage:
 

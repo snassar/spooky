@@ -4,420 +4,405 @@
 
 This document provides a comprehensive API reference for the spooky logging system. It covers all interfaces, types, methods, and implementation details for developers working with the logging system.
 
-**Status: Production Ready** - The logging system is fully implemented with comprehensive configuration, formatters, and secure logging capabilities.
+**Status: Partially Implemented** - The logging system has basic functionality but the interface definitions and implementation details have known issues that need to be addressed.
 
 ## Core Interfaces
 
-### LoggingManager Interface
+### LogManager Interface
 
-The `LoggingManager` interface provides the primary entry point for logging operations:
+The `LogManager` interface provides the primary entry point for logging operations:
 
 ```go
-type LoggingManager interface {
-    // GetLogger returns a logger instance
-    GetLogger() Logger
+type LogManager interface {
+    // GetLogger gets a logger instance for the given name
+    GetLogger(name string) Logger
     
-    // GetLoggerWithContext returns a logger with context
-    GetLoggerWithContext(ctx context.Context) Logger
+    // GetLoggerWithContext gets a logger with context
+    GetLoggerWithContext(name string, ctx LogContext) Logger
     
-    // ConfigureLogging configures logging from configuration
-    ConfigureLogging(ctx context.Context, config *spookytypeslogging.Config) error
+    // SetLevel sets the logging level for all loggers
+    SetLevel(level LogLevel) error
     
-    // SetLogLevel sets the global log level
-    SetLogLevel(level string) error
+    // GetLevel gets the current logging level
+    GetLevel() LogLevel
     
-    // GetLogLevel returns the current log level
-    GetLogLevel() string
+    // AddHandler adds a log handler
+    AddHandler(handler LogHandler) error
+    
+    // RemoveHandler removes a log handler
+    RemoveHandler(handler LogHandler) error
+    
+    // Flush flushes all pending log entries
+    Flush() error
+    
+    // Close closes the log manager
+    Close() error
 }
 ```
-
-**Implementation Status**: ✅ **Fully Implemented** - Complete logging management functionality
 
 ### Logger Interface
 
-The `Logger` interface provides logging operations:
+The `Logger` interface provides logging methods:
 
 ```go
 type Logger interface {
-    // Basic logging methods
-    Debug(msg string, fields ...Field)
-    Info(msg string, fields ...Field)
-    Warn(msg string, fields ...Field)
-    Error(msg string, fields ...Field)
-    Fatal(msg string, fields ...Field)
+    // Debug logs a debug message
+    Debug(msg string, fields ...LogField)
     
-    // Context-aware logging
-    WithContext(ctx context.Context) Logger
-    WithFields(fields ...Field) Logger
+    // Info logs an info message
+    Info(msg string, fields ...LogField)
     
-    // Structured logging
+    // Warn logs a warning message
+    Warn(msg string, fields ...LogField)
+    
+    // Error logs an error message
+    Error(msg string, fields ...LogField)
+    
+    // Fatal logs a fatal message and exits
+    Fatal(msg string, fields ...LogField)
+    
+    // WithField adds a field to the logger
     WithField(key string, value interface{}) Logger
-    WithError(err error) Logger
     
-    // Sync flushes any buffered log entries
-    Sync() error
+    // WithFields adds multiple fields to the logger
+    WithFields(fields map[string]interface{}) Logger
+    
+    // WithContext adds context to the logger
+    WithContext(ctx LogContext) Logger
 }
 ```
 
-**Implementation Status**: ✅ **Fully Implemented** - Complete logging functionality with structured logging
+### LogHandler Interface
 
-## Current Implementation Status
+The `LogHandler` interface defines log output handlers:
 
-### ✅ Working Components
+```go
+type LogHandler interface {
+    // Handle handles a log entry
+    Handle(entry LogEntry) error
+    
+    // Flush flushes pending log entries
+    Flush() error
+    
+    // Close closes the handler
+    Close() error
+}
+```
 
-1. **Logging Configuration**: Comprehensive logging configuration system
-2. **Multiple Formatters**: JSON, text, and custom formatters
-3. **Multiple Outputs**: Console, file, and custom outputs
-4. **Log Levels**: Full log level support with filtering
-5. **Structured Logging**: Field-based structured logging
-6. **Context Support**: Context-aware logging
-7. **Secure Logging**: Sensitive data filtering and redaction
-8. **CLI Integration**: `spooky logging` commands with configuration
-9. **Project Integration**: Project-specific logging configuration
-10. **Global Integration**: Global logging configuration
-11. **Auto-Setup**: Automatic logging configuration setup
-12. **Validation**: Logging configuration validation
+## Core Types
 
-### ✅ Advanced Features
+### LogLevel
 
-1. **Formatter System**: Pluggable log formatters
-2. **Output System**: Pluggable log outputs
-3. **Filter System**: Log filtering capabilities
-4. **Performance**: Optimized logging performance
-5. **Thread Safety**: Thread-safe logging operations
-6. **Error Handling**: Comprehensive error handling
-7. **Configuration Validation**: Logging configuration validation
-8. **Default Configuration**: Sensible default logging configuration
+```go
+type LogLevel int
 
-### ✅ Integration Features
+const (
+    LogLevelDebug LogLevel = iota
+    LogLevelInfo
+    LogLevelWarn
+    LogLevelError
+    LogLevelFatal
+)
 
-1. **CLI Commands**: Complete CLI integration
-2. **Project Support**: Project-specific logging
-3. **Global Support**: Global logging configuration
-4. **Auto-Setup**: Automatic configuration setup
-5. **Schema Validation**: HCL schema validation
-6. **Configuration Loading**: Configuration file loading
+func (l LogLevel) String() string {
+    switch l {
+    case LogLevelDebug:
+        return "debug"
+    case LogLevelInfo:
+        return "info"
+    case LogLevelWarn:
+        return "warn"
+    case LogLevelError:
+        return "error"
+    case LogLevelFatal:
+        return "fatal"
+    default:
+        return "unknown"
+    }
+}
+```
+
+### LogEntry
+
+```go
+type LogEntry struct {
+    Timestamp time.Time
+    Level     LogLevel
+    Message   string
+    Fields    map[string]interface{}
+    Context   LogContext
+    Logger    string
+}
+```
+
+### LogContext
+
+```go
+type LogContext struct {
+    RequestID    string
+    UserID       string
+    SessionID    string
+    CorrelationID string
+    Metadata     map[string]interface{}
+}
+```
+
+### LogField
+
+```go
+type LogField struct {
+    Key   string
+    Value interface{}
+}
+
+func String(key, value string) LogField {
+    return LogField{Key: key, Value: value}
+}
+
+func Int(key string, value int) LogField {
+    return LogField{Key: key, Value: value}
+}
+
+func Float(key string, value float64) LogField {
+    return LogField{Key: key, Value: value}
+}
+
+func Bool(key string, value bool) LogField {
+    return LogField{Key: key, Value: value}
+}
+
+func Error(key string, err error) LogField {
+    return LogField{Key: key, Value: err}
+}
+```
 
 ## Implementation Details
 
-### Logging Configuration System
+### Current Implementation Status
 
-The logging system supports comprehensive configuration:
+The logging system currently has:
 
-```go
-type LoggingConfig struct {
-    // Global logging settings
-    Level   string `json:"level" hcl:"level"`
-    Format  string `json:"format" hcl:"format"`
-    Output  string `json:"output" hcl:"output"`
-    
-    // File output settings
-    File *FileOutputConfig `json:"file,omitempty" hcl:"file,optional"`
-    
-    // Console output settings
-    Console *ConsoleOutputConfig `json:"console,omitempty" hcl:"console,optional"`
-    
-    // Formatter settings
-    Formatters map[string]*FormatterConfig `json:"formatters,omitempty" hcl:"formatters,optional"`
-    
-    // Output settings
-    Outputs map[string]*OutputConfig `json:"outputs,omitempty" hcl:"outputs,optional"`
-    
-    // Security settings
-    Security *SecurityConfig `json:"security,omitempty" hcl:"security,optional"`
-    
-    // Performance settings
-    Performance *PerformanceConfig `json:"performance,omitempty" hcl:"performance,optional"`
-}
+1. **Basic Logger Implementation**: Simple logging with levels
+2. **Secure Logger**: Sensitive data filtering
+3. **Configuration Support**: HCL-based configuration
+4. **Multiple Output Formats**: JSON and text formats
 
-type FileOutputConfig struct {
-    Path       string `json:"path" hcl:"path"`
-    MaxSize    int    `json:"max_size" hcl:"max_size"`
-    MaxBackups int    `json:"max_backups" hcl:"max_backups"`
-    MaxAge     int    `json:"max_age" hcl:"max_age"`
-    Compress   bool   `json:"compress" hcl:"compress"`
-}
+### Missing Features
 
-type ConsoleOutputConfig struct {
-    Colorize bool `json:"colorize" hcl:"colorize"`
-    Timestamp bool `json:"timestamp" hcl:"timestamp"`
-}
+1. **Structured Logging**: Limited structured logging support
+2. **Log Handlers**: No pluggable log handlers
+3. **Context Support**: Limited context propagation
+4. **Performance Optimization**: No async logging
+5. **Log Rotation**: No log rotation support
 
-type FormatterConfig struct {
-    Type   string                 `json:"type" hcl:"type"`
-    Config map[string]interface{} `json:"config,omitempty" hcl:"config,optional"`
-}
+## Configuration
 
-type OutputConfig struct {
-    Type   string                 `json:"type" hcl:"type"`
-    Config map[string]interface{} `json:"config,omitempty" hcl:"config,optional"`
-}
+### Logging Configuration Structure
 
-type SecurityConfig struct {
-    RedactSensitive bool     `json:"redact_sensitive" hcl:"redact_sensitive"`
-    SensitiveFields []string `json:"sensitive_fields" hcl:"sensitive_fields"`
-    MaskPatterns    []string `json:"mask_patterns" hcl:"mask_patterns"`
-}
-
-type PerformanceConfig struct {
-    BufferSize int `json:"buffer_size" hcl:"buffer_size"`
-    Async      bool `json:"async" hcl:"async"`
+```hcl
+# Global logging configuration
+logging {
+  level = "info"
+  format = "text"
+  
+  # File output configuration
+  file {
+    path = "/var/log/spooky.log"
+    max_size = "100MB"
+    max_age = "30d"
+    max_backups = 10
+  }
+  
+  # Console output configuration
+  console {
+    enabled = true
+    color = true
+  }
+  
+  # Security configuration
+  security {
+    redact_sensitive = true
+    sensitive_fields = ["password", "secret", "key", "token"]
+  }
 }
 ```
 
-### Logging Manager Implementation
+### Project-Level Logging
 
-The logging manager provides centralized logging control:
-
-```go
-type LoggingManager struct {
-    logger  Logger
-    config  *spookytypeslogging.Config
-    mutex   sync.RWMutex
-}
-
-func NewLoggingManager() *LoggingManager {
-    return &LoggingManager{
-        logger: NewDefaultLogger(),
-        config: &spookytypeslogging.Config{},
+```hcl
+# Project-specific logging configuration
+project {
+  name = "my-project"
+  
+  logging {
+    level = "debug"
+    format = "json"
+    
+    # Project-specific file output
+    file {
+      path = "./logs/project.log"
+      max_size = "50MB"
     }
-}
-
-func (m *LoggingManager) ConfigureLogging(ctx context.Context, config *spookytypeslogging.Config) error {
-    m.mutex.Lock()
-    defer m.mutex.Unlock()
-    
-    // Validate configuration
-    if err := m.validateConfig(config); err != nil {
-        return fmt.Errorf("invalid logging configuration: %w", err)
-    }
-    
-    // Create new logger with configuration
-    logger, err := m.createLogger(config)
-    if err != nil {
-        return fmt.Errorf("failed to create logger: %w", err)
-    }
-    
-    m.logger = logger
-    m.config = config
-    
-    return nil
-}
-
-func (m *LoggingManager) GetLogger() Logger {
-    m.mutex.RLock()
-    defer m.mutex.RUnlock()
-    return m.logger
-}
-
-func (m *LoggingManager) GetLoggerWithContext(ctx context.Context) Logger {
-    m.mutex.RLock()
-    defer m.mutex.RUnlock()
-    return m.logger.WithContext(ctx)
+  }
 }
 ```
 
-### Secure Logging Implementation
+## Usage Examples
 
-The secure logging system filters sensitive information:
+### Basic Logging
+
+```go
+// Get a logger
+logger := logManager.GetLogger("my-component")
+
+// Log messages
+logger.Info("Application started")
+logger.Debug("Processing request", String("request_id", "123"))
+logger.Error("Failed to connect", Error("error", err))
+```
+
+### Structured Logging
+
+```go
+// Create logger with fields
+logger := logManager.GetLogger("database").
+    WithField("component", "database").
+    WithField("version", "1.0.0")
+
+// Log with additional fields
+logger.Info("Query executed",
+    String("query", "SELECT * FROM users"),
+    Int("duration_ms", 150),
+    Int("rows", 1000))
+```
+
+### Context-Aware Logging
+
+```go
+// Create context
+ctx := LogContext{
+    RequestID: "req-123",
+    UserID:    "user-456",
+}
+
+// Get logger with context
+logger := logManager.GetLoggerWithContext("api", ctx)
+
+// Log with context
+logger.Info("Request processed",
+    String("endpoint", "/api/users"),
+    Int("status_code", 200))
+```
+
+### Error Logging
+
+```go
+// Log errors with context
+if err != nil {
+    logger.Error("Database operation failed",
+        String("operation", "insert"),
+        String("table", "users"),
+        Error("error", err),
+        String("sql", query))
+}
+```
+
+## Security Features
+
+### Sensitive Data Filtering
+
+The logging system includes automatic filtering of sensitive data:
+
+```go
+// Sensitive data is automatically redacted
+logger.Info("User login",
+    String("username", "john.doe"),
+    String("password", "secret123")) // Password will be redacted
+
+// Output: User login username=john.doe password=[REDACTED]
+```
+
+### Secure Logger Implementation
 
 ```go
 type SecureLogger struct {
     logger          Logger
     sensitiveFields []string
-    maskPatterns    []*regexp.Regexp
 }
 
-func NewSecureLogger(logger Logger, config *SecurityConfig) *SecureLogger {
-    var patterns []*regexp.Regexp
-    for _, pattern := range config.MaskPatterns {
-        if re, err := regexp.Compile(pattern); err == nil {
-            patterns = append(patterns, re)
-        }
-    }
-    
-    return &SecureLogger{
-        logger:          logger,
-        sensitiveFields: config.SensitiveFields,
-        maskPatterns:    patterns,
-    }
-}
-
-func (l *SecureLogger) Info(msg string, fields ...Field) {
+func (l *SecureLogger) Info(msg string, fields ...LogField) {
     l.logger.Info(msg, l.sanitizeFields(fields)...)
 }
 
-func (l *SecureLogger) Error(msg string, fields ...Field) {
-    l.logger.Error(msg, l.sanitizeFields(fields)...)
-}
-
-func (l *SecureLogger) sanitizeFields(fields []Field) []Field {
-    sanitized := make([]Field, len(fields))
+func (l *SecureLogger) sanitizeFields(fields []LogField) []LogField {
+    sanitized := make([]LogField, len(fields))
     for i, field := range fields {
         if l.isSensitiveField(field.Key) {
             sanitized[i] = String(field.Key, "[REDACTED]")
         } else {
-            sanitized[i] = l.sanitizeValue(field)
+            sanitized[i] = field
         }
     }
     return sanitized
 }
-
-func (l *SecureLogger) isSensitiveField(key string) bool {
-    keyLower := strings.ToLower(key)
-    for _, sensitive := range l.sensitiveFields {
-        if strings.Contains(keyLower, sensitive) {
-            return true
-        }
-    }
-    return false
-}
-
-func (l *SecureLogger) sanitizeValue(field Field) Field {
-    if str, ok := field.Value.(string); ok {
-        for _, pattern := range l.maskPatterns {
-            str = pattern.ReplaceAllString(str, "[MASKED]")
-        }
-        return String(field.Key, str)
-    }
-    return field
-}
 ```
 
-## Type Definitions
+## Performance Considerations
 
-### Logging Types
+### Current Limitations
+
+1. **Synchronous Logging**: All logging operations are synchronous
+2. **No Buffering**: No log entry buffering for performance
+3. **Limited Async Support**: No asynchronous log processing
+4. **Memory Usage**: No memory usage optimization
+
+### Recommended Improvements
+
+1. **Async Logging**: Implement asynchronous log processing
+2. **Log Buffering**: Add log entry buffering
+3. **Performance Monitoring**: Add logging performance metrics
+4. **Memory Optimization**: Optimize memory usage for high-volume logging
+
+## Integration with Other Systems
+
+### SSH Integration
 
 ```go
-// LogLevel represents logging levels
-type LogLevel string
+// SSH operations use structured logging
+sshLogger := logManager.GetLogger("ssh").
+    WithField("component", "ssh")
 
-const (
-    LogLevelDebug LogLevel = "debug"
-    LogLevelInfo  LogLevel = "info"
-    LogLevelWarn  LogLevel = "warn"
-    LogLevelError LogLevel = "error"
-    LogLevelFatal LogLevel = "fatal"
-)
-
-// Field represents a structured logging field
-type Field struct {
-    Key   string
-    Value interface{}
-}
-
-// LogEntry represents a log entry
-type LogEntry struct {
-    Timestamp time.Time              `json:"timestamp"`
-    Level     LogLevel               `json:"level"`
-    Message   string                 `json:"message"`
-    Fields    map[string]interface{} `json:"fields,omitempty"`
-    Context   map[string]interface{} `json:"context,omitempty"`
-    Error     string                 `json:"error,omitempty"`
-}
-
-// LoggingContext provides context for logging operations
-type LoggingContext struct {
-    // Project path
-    ProjectPath string `json:"project_path" hcl:"project_path"`
-    
-    // Logging configuration
-    Config *LoggingConfig `json:"config" hcl:"config"`
-    
-    // Operation timestamp
-    Timestamp time.Time `json:"timestamp" hcl:"timestamp"`
-    
-    // Operation metadata
-    Metadata map[string]interface{} `json:"metadata,omitempty" hcl:"metadata,optional"`
-}
-
-// LoggingResult represents the result of logging operations
-type LoggingResult struct {
-    // Logging context
-    Context *LoggingContext `json:"context" hcl:"context"`
-    
-    // Operation success
-    Success bool `json:"success" hcl:"success"`
-    
-    // Log entries written
-    EntriesWritten int `json:"entries_written" hcl:"entries_written"`
-    
-    // Operation error
-    Error string `json:"error,omitempty" hcl:"error,optional"`
-    
-    // Operation duration
-    Duration time.Duration `json:"duration" hcl:"duration"`
-}
+sshLogger.Info("SSH connection established",
+    String("host", hostname),
+    String("user", username),
+    Int("port", port))
 ```
 
-### Configuration Types
+### Facts Integration
 
 ```go
-// LoggingConfig represents logging configuration
-type LoggingConfig struct {
-    // Global settings
-    Level   string `json:"level" hcl:"level"`
-    Format  string `json:"format" hcl:"format"`
-    Output  string `json:"output" hcl:"output"`
-    
-    // File output configuration
-    File *FileOutputConfig `json:"file,omitempty" hcl:"file,optional"`
-    
-    // Console output configuration
-    Console *ConsoleOutputConfig `json:"console,omitempty" hcl:"console,optional"`
-    
-    // Formatter configurations
-    Formatters map[string]*FormatterConfig `json:"formatters,omitempty" hcl:"formatters,optional"`
-    
-    // Output configurations
-    Outputs map[string]*OutputConfig `json:"outputs,omitempty" hcl:"outputs,optional"`
-    
-    // Security configuration
-    Security *SecurityConfig `json:"security,omitempty" hcl:"security,optional"`
-    
-    // Performance configuration
-    Performance *PerformanceConfig `json:"performance,omitempty" hcl:"performance,optional"`
-}
+// Facts collection uses context-aware logging
+factsLogger := logManager.GetLogger("facts").
+    WithField("component", "facts")
 
-// FileOutputConfig represents file output configuration
-type FileOutputConfig struct {
-    Path       string `json:"path" hcl:"path"`
-    MaxSize    int    `json:"max_size" hcl:"max_size"`
-    MaxBackups int    `json:"max_backups" hcl:"max_backups"`
-    MaxAge     int    `json:"max_age" hcl:"max_age"`
-    Compress   bool   `json:"compress" hcl:"compress"`
-}
+factsLogger.Info("Facts collected",
+    String("machine", machine),
+    Int("fact_count", len(facts)),
+    String("collection_time", duration.String()))
+```
 
-// ConsoleOutputConfig represents console output configuration
-type ConsoleOutputConfig struct {
-    Colorize  bool `json:"colorize" hcl:"colorize"`
-    Timestamp bool `json:"timestamp" hcl:"timestamp"`
-}
+### Actions Integration
 
-// FormatterConfig represents formatter configuration
-type FormatterConfig struct {
-    Type   string                 `json:"type" hcl:"type"`
-    Config map[string]interface{} `json:"config,omitempty" hcl:"config,optional"`
-}
+```go
+// Action execution uses structured logging
+actionLogger := logManager.GetLogger("actions").
+    WithField("component", "actions")
 
-// OutputConfig represents output configuration
-type OutputConfig struct {
-    Type   string                 `json:"type" hcl:"type"`
-    Config map[string]interface{} `json:"config,omitempty" hcl:"config,optional"`
-}
-
-// SecurityConfig represents security configuration
-type SecurityConfig struct {
-    RedactSensitive bool     `json:"redact_sensitive" hcl:"redact_sensitive"`
-    SensitiveFields []string `json:"sensitive_fields" hcl:"sensitive_fields"`
-    MaskPatterns    []string `json:"mask_patterns" hcl:"mask_patterns"`
-}
-
-// PerformanceConfig represents performance configuration
-type PerformanceConfig struct {
-    BufferSize int  `json:"buffer_size" hcl:"buffer_size"`
-    Async      bool `json:"async" hcl:"async"`
-}
+actionLogger.Info("Action executed",
+    String("action", actionName),
+    String("machine", machine),
+    Int("exit_code", exitCode),
+    String("duration", duration.String()))
 ```
 
 ## Error Handling
@@ -425,302 +410,145 @@ type PerformanceConfig struct {
 ### Logging Errors
 
 ```go
-// LoggingError represents logging operation errors
-type LoggingError struct {
-    Operation string `json:"operation" hcl:"operation"`
-    Error     string `json:"error" hcl:"error"`
-    Details   string `json:"details,omitempty" hcl:"details,optional"`
-}
-
-// LoggingValidationError represents logging validation errors
-type LoggingValidationError struct {
-    Field   string `json:"field" hcl:"field"`
-    Message string `json:"message" hcl:"message"`
-    Value   string `json:"value,omitempty" hcl:"value,optional"`
+// Handle logging errors gracefully
+if err := logger.Error("Failed to process request", Error("error", err)); err != nil {
+    // Fallback to stderr if logging fails
+    fmt.Fprintf(os.Stderr, "Logging failed: %v\n", err)
 }
 ```
 
-### Validation Implementation
+### Configuration Errors
 
 ```go
-// ValidateLoggingConfig validates logging configuration
-func ValidateLoggingConfig(config *LoggingConfig) error {
-    if config == nil {
-        return fmt.Errorf("logging configuration cannot be nil")
-    }
-    
-    // Validate log level
-    validLevels := []string{"debug", "info", "warn", "error", "fatal"}
-    valid := false
-    for _, level := range validLevels {
-        if config.Level == level {
-            valid = true
-            break
-        }
-    }
-    if !valid {
-        return fmt.Errorf("invalid log level: %s (valid levels: %v)", config.Level, validLevels)
-    }
-    
-    // Validate format
-    validFormats := []string{"json", "text", "custom"}
-    valid = false
-    for _, format := range validFormats {
-        if config.Format == format {
-            valid = true
-            break
-        }
-    }
-    if !valid {
-        return fmt.Errorf("invalid log format: %s (valid formats: %v)", config.Format, validFormats)
-    }
-    
-    // Validate output
-    validOutputs := []string{"console", "file", "custom"}
-    valid = false
-    for _, output := range validOutputs {
-        if config.Output == output {
-            valid = true
-            break
-        }
-    }
-    if !valid {
-        return fmt.Errorf("invalid log output: %s (valid outputs: %v)", config.Output, validOutputs)
-    }
-    
-    // Validate file output configuration
-    if config.File != nil {
-        if err := validateFileOutputConfig(config.File); err != nil {
-            return fmt.Errorf("invalid file output configuration: %w", err)
-        }
-    }
-    
-    // Validate security configuration
-    if config.Security != nil {
-        if err := validateSecurityConfig(config.Security); err != nil {
-            return fmt.Errorf("invalid security configuration: %w", err)
-        }
-    }
-    
-    return nil
+// Validate logging configuration
+if err := validateLogConfig(config); err != nil {
+    return fmt.Errorf("invalid logging configuration: %w", err)
 }
 ```
 
-## CLI Commands
+## Testing
 
-### Logging Configuration Command
-
-```bash
-# Show current logging configuration
-spooky logging config
-
-# Show logging configuration for a project
-spooky logging config ./my-project
-
-# Show global logging configuration
-spooky logging config --global
-```
-
-### Logging Validation Command
-
-```bash
-# Validate logging configuration
-spooky logging validate
-
-# Validate logging configuration for a project
-spooky logging validate ./my-project
-
-# Validate global logging configuration
-spooky logging validate --global
-```
-
-### Logging Test Command
-
-```bash
-# Test logging configuration
-spooky logging test
-
-# Test logging configuration for a project
-spooky logging test ./my-project
-
-# Test logging with specific level
-spooky logging test --level debug
-```
-
-## Integration Examples
-
-### Basic Logging Configuration
-
-```hcl
-# logging.hcl
-logging {
-  level = "info"
-  format = "json"
-  output = "console"
-  
-  console {
-    colorize = true
-    timestamp = true
-  }
-  
-  security {
-    redact_sensitive = true
-    sensitive_fields = ["password", "secret", "key", "token"]
-    mask_patterns = [
-      "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b",
-      "\\b\\d{4}[- ]?\\d{4}[- ]?\\d{4}[- ]?\\d{4}\\b"
-    ]
-  }
-  
-  performance {
-    buffer_size = 1024
-    async = true
-  }
-}
-```
-
-### Project-Specific Logging
-
-```hcl
-# project/logging.hcl
-logging {
-  level = "debug"
-  format = "text"
-  output = "file"
-  
-  file {
-    path = "logs/project.log"
-    max_size = 100
-    max_backups = 3
-    max_age = 30
-    compress = true
-  }
-  
-  security {
-    redact_sensitive = true
-    sensitive_fields = ["api_key", "database_password"]
-  }
-}
-```
-
-### Logging Integration
+### Logger Testing
 
 ```go
-// Logging integration example
-func setupLogging(projectPath string) error {
-    ctx := context.Background()
-    
-    // Create logging manager
-    manager := spookylogging.NewLoggingManager()
-    
-    // Load logging configuration
-    config, err := loadLoggingConfig(projectPath)
-    if err != nil {
-        return fmt.Errorf("failed to load logging configuration: %w", err)
-    }
-    
-    // Configure logging
-    if err := manager.ConfigureLogging(ctx, config); err != nil {
-        return fmt.Errorf("failed to configure logging: %w", err)
-    }
-    
-    // Get logger
-    logger := manager.GetLogger()
+func TestLogger(t *testing.T) {
+    // Create test logger
+    logger := NewTestLogger()
     
     // Test logging
-    logger.Info("Logging system initialized", 
-        String("project", projectPath),
-        String("level", config.Level),
-        String("format", config.Format),
-    )
+    logger.Info("Test message")
     
-    return nil
-}
-
-// Structured logging example
-func logOperation(ctx context.Context, operation string, details map[string]interface{}) {
-    logger := spookylogging.GetLogger().WithContext(ctx)
-    
-    fields := []Field{
-        String("operation", operation),
-        String("timestamp", time.Now().Format(time.RFC3339)),
-    }
-    
-    for key, value := range details {
-        fields = append(fields, Any(key, value))
-    }
-    
-    logger.Info("Operation completed", fields...)
+    // Verify log entries
+    entries := logger.GetEntries()
+    assert.Len(t, entries, 1)
+    assert.Equal(t, "Test message", entries[0].Message)
 }
 ```
 
-### Secure Logging Example
+### Mock Logger
 
 ```go
-// Secure logging example
-func logSensitiveData(ctx context.Context, userData map[string]interface{}) {
-    logger := spookylogging.GetLogger().WithContext(ctx)
+type MockLogger struct {
+    entries []LogEntry
+    mutex   sync.RWMutex
+}
+
+func (l *MockLogger) Info(msg string, fields ...LogField) {
+    l.mutex.Lock()
+    defer l.mutex.Unlock()
     
-    // Log with sensitive data (will be redacted)
-    logger.Info("User data processed",
-        String("user_id", userData["id"].(string)),
-        String("email", userData["email"].(string)),
-        String("password", userData["password"].(string)), // Will be redacted
-    )
+    l.entries = append(l.entries, LogEntry{
+        Timestamp: time.Now(),
+        Level:     LogLevelInfo,
+        Message:   msg,
+        Fields:    fieldsToMap(fields),
+    })
+}
+
+func (l *MockLogger) GetEntries() []LogEntry {
+    l.mutex.RLock()
+    defer l.mutex.RUnlock()
     
-    // Log without sensitive data
-    logger.Info("User authentication successful",
-        String("user_id", userData["id"].(string)),
-        String("timestamp", time.Now().Format(time.RFC3339)),
-    )
+    result := make([]LogEntry, len(l.entries))
+    copy(result, l.entries)
+    return result
 }
 ```
 
-## Current Capabilities
+## Best Practices
 
-### Configuration Management
+### Log Level Usage
 
-1. **Global Configuration**: System-wide logging configuration
-2. **Project Configuration**: Project-specific logging configuration
-3. **Auto-Setup**: Automatic configuration file creation
-4. **Validation**: Configuration validation and error reporting
-5. **Schema Support**: HCL schema validation
-6. **Default Values**: Sensible default configuration
+1. **Debug**: Detailed information for debugging
+2. **Info**: General operational information
+3. **Warn**: Warning conditions that don't stop operation
+4. **Error**: Error conditions that affect operation
+5. **Fatal**: Critical errors that require immediate attention
 
-### Output Management
+### Structured Logging
 
-1. **Console Output**: Colored console output with timestamps
-2. **File Output**: Rotating file output with compression
-3. **Custom Outputs**: Pluggable output system
-4. **Multiple Outputs**: Support for multiple simultaneous outputs
-5. **Performance**: Optimized output performance
+```go
+// Good: Structured logging with fields
+logger.Info("User action completed",
+    String("user_id", userID),
+    String("action", action),
+    Int("duration_ms", duration),
+    String("status", status))
 
-### Formatting System
+// Bad: Unstructured logging
+logger.Info(fmt.Sprintf("User %s completed action %s in %dms with status %s",
+    userID, action, duration, status))
+```
 
-1. **JSON Format**: Structured JSON logging
-2. **Text Format**: Human-readable text logging
-3. **Custom Formats**: Pluggable formatter system
-4. **Field Support**: Structured field logging
-5. **Context Support**: Context-aware formatting
+### Error Context
 
-### Security Features
+```go
+// Good: Include error context
+logger.Error("Database query failed",
+    String("query", query),
+    Error("error", err),
+    String("table", tableName))
 
-1. **Sensitive Data Redaction**: Automatic redaction of sensitive fields
-2. **Pattern Masking**: Regex-based pattern masking
-3. **Field Filtering**: Configurable sensitive field filtering
-4. **Secure Defaults**: Secure default configuration
-5. **Audit Support**: Audit logging capabilities
+// Bad: Minimal error information
+logger.Error("Database error: " + err.Error())
+```
 
-### Performance Features
+### Performance Logging
 
-1. **Buffered Output**: Configurable output buffering
-2. **Async Logging**: Asynchronous logging support
-3. **Level Filtering**: Efficient level-based filtering
-4. **Memory Management**: Optimized memory usage
-5. **Thread Safety**: Thread-safe logging operations
+```go
+// Good: Include performance metrics
+start := time.Now()
+// ... operation ...
+duration := time.Since(start)
 
-## Summary
+logger.Info("Operation completed",
+    String("operation", operationName),
+    Duration("duration", duration),
+    Int("result_count", len(results)))
+```
 
-The logging system is fully implemented and production-ready with comprehensive configuration, multiple output formats, secure logging capabilities, and excellent performance characteristics. It provides all the features needed for production logging in the spooky system.
+## Future Enhancements
 
-**Status**: ✅ **Production Ready** - Complete logging system with advanced features and excellent performance.
+### Planned Features
+
+1. **Log Aggregation**: Support for log aggregation systems
+2. **Metrics Integration**: Integration with metrics systems
+3. **Log Sampling**: Configurable log sampling for high-volume scenarios
+4. **Custom Formatters**: Pluggable log formatters
+5. **Log Compression**: Automatic log compression
+6. **Distributed Tracing**: Integration with distributed tracing systems
+
+### Architecture Improvements
+
+1. **Plugin System**: Pluggable log handlers and formatters
+2. **Performance Optimization**: Async logging and buffering
+3. **Configuration Validation**: Enhanced configuration validation
+4. **Monitoring Integration**: Integration with monitoring systems
+5. **Security Enhancements**: Enhanced security features
+
+## Related Documentation
+
+- [Logging User Guide](LOGGING_USER_GUIDE.md) - User guide for logging features
+- [Logging Configuration Strategy](LOGGING_CONFIGURATION_STRATEGY.md) - Configuration strategies
+- [Logging Framework](LOGGING_FRAMEWORK.md) - Framework architecture
+- [Logging Troubleshooting](LOGGING_TROUBLESHOOTING.md) - Troubleshooting guide

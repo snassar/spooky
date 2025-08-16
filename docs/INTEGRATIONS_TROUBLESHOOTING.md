@@ -175,17 +175,16 @@ spooky variables resolve /path/to/project
 - Template syntax errors
 - Variable injection failures
 - Template function errors
+- No CLI commands available
 
 **Diagnostic Commands:**
 ```bash
-# Check templates
-spooky templates list /path/to/project
+# Note: Templates CLI commands are not yet implemented
+# Use integrations command to check templates status
+spooky integrations list /path/to/project
 
-# Validate templates
-spooky templates validate /path/to/project
-
-# Test template rendering
-spooky templates render /path/to/project template.tmpl --dry-run
+# Check templates integration status
+spooky integrations validate /path/to/project
 ```
 
 **Solutions:**
@@ -193,6 +192,7 @@ spooky templates render /path/to/project template.tmpl --dry-run
 2. **Syntax errors**: Fix template syntax and variable references
 3. **Variable issues**: Check variable resolution and injection
 4. **Function errors**: Verify template functions are available
+5. **CLI commands**: Templates CLI commands are not yet implemented - use integrations commands instead
 
 ### Machines Integration Issues
 
@@ -227,24 +227,24 @@ spooky machines ping /path/to/project
 - Key validation failures
 - Encryption/decryption errors
 - Key permissions issues
+- Age encryption configuration issues
 
 **Diagnostic Commands:**
 ```bash
-# Check secrets configuration
-spooky secrets validate
+# Check secrets configuration and validate age setup
+spooky secrets validate /path/to/project
 
-# Test key validation
-spooky secrets test-key
-
-# Check encryption
-spooky secrets encrypt --test
+# Note: Other secrets commands are not yet implemented
+# Use integrations command to check secrets status
+spooky integrations list /path/to/project
 ```
 
 **Solutions:**
-1. **Missing keys**: Import encryption keys (spooky does not generate keys)
-2. **Key validation**: Fix key format and permissions
-3. **Encryption errors**: Check encryption libraries and algorithms
+1. **Missing keys**: Import age encryption keys (spooky does not generate keys)
+2. **Key validation**: Fix age key format and permissions
+3. **Encryption errors**: Check age encryption libraries and algorithms
 4. **Permission issues**: Fix key file permissions (600)
+5. **Age configuration**: Ensure age configuration is properly set up
 
 ### Config Integration Issues
 

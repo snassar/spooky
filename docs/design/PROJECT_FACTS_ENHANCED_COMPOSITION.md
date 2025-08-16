@@ -37,9 +37,9 @@ This document describes the enhanced composition pattern implemented for project
   - JSON performance constraints
 
 #### 3. `project-facts-memory.hcl` (Enhanced)
-- **Purpose**: Memory-based storage features and validation
+- **Purpose**: Memory-based export features and validation
 - **Features**:
-  - Memory-efficient storage during export operations
+  - Memory-efficient export operations
   - Direct export to JSON and HCL formats
   - No intermediate storage (gather → export)
   - Minimal memory footprint
@@ -109,7 +109,7 @@ project_facts {
 - **Extensions**: Export structure, import structure, schema integration
 
 ### Memory Schema Enhancements
-- **Features**: Memory-efficient storage, direct export, thread-safe operations
+- **Features**: Memory-efficient export, direct export, thread-safe operations
 - **Validation**: Memory usage, export format validation, thread safety
 - **Constraints**: Memory constraints, export constraints, performance constraints
 - **Extensions**: Export structure, memory management, cleanup operations

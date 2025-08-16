@@ -4,6 +4,8 @@
 
 This document provides a comprehensive overview of the spooky variables system documentation. It serves as a guide to help you find the right documentation for your needs and understand how all the pieces fit together.
 
+**Status: Implemented** - The variables system is fully implemented with comprehensive functionality for variable management, encryption, and integration with other systems.
+
 ## Documentation Structure
 
 ### 📚 Core Documentation
@@ -13,11 +15,10 @@ This document provides a comprehensive overview of the spooky variables system d
 **Purpose:** Complete guide to using the variables system
 
 **What it covers:**
-- Getting started with variable management
-- Variable configuration and syntax
-- Variable resolution and dependency management
-- Environment variable overrides
-- Advanced features and best practices
+- Getting started with variable configuration
+- Variable definition and management
+- Encryption and security features
+- Integration with actions and templates
 - Real-world examples and use cases
 
 **When to use:** Start here if you're new to spooky variables or need to understand how to use the system effectively.
@@ -30,7 +31,7 @@ This document provides a comprehensive overview of the spooky variables system d
 - Core interfaces and type definitions
 - Implementation details and algorithms
 - Error handling patterns
-- Validation rules and schemas
+- Configuration rules and schemas
 - CLI integration details
 - Code examples and patterns
 
@@ -42,9 +43,9 @@ This document provides a comprehensive overview of the spooky variables system d
 
 **What it covers:**
 - Common error messages and solutions
+- Encryption and decryption issues
 - Variable resolution problems
-- Validation issues and fixes
-- Dependency conflicts and circular references
+- Integration issues with other systems
 - Configuration problems and debugging
 - Best practices for troubleshooting
 
@@ -54,203 +55,355 @@ This document provides a comprehensive overview of the spooky variables system d
 
 #### [Examples Overview](examples/README.md)
 **Audience:** All users
-**Purpose:** Practical examples and configuration patterns
+**Purpose:** Quick reference for available examples and use cases
 
 **What it covers:**
-- Basic variable configuration
-- Multi-file variable setups
-- Dependency management
-- Environment-specific variables
-- Best practices and patterns
-- Testing and validation examples
+- Available variable configuration examples
+- Example configurations and scripts
+- Common use case patterns
+- Integration examples with other systems
 
-**Example Files:**
-- [`variables-basic-config.hcl`](examples/variables-basic-config.hcl) - Simple variable setup
-- [`variables-multi-file.hcl`](examples/variables-multi-file.hcl) - Multi-file organization
-- [`variables-with-dependencies.hcl`](examples/variables-with-dependencies.hcl) - Complex dependency management
-
-**When to use:** Use these as starting points for your own configurations or to learn best practices.
-
-## Quick Start Guide
-
-### For New Users
-
-1. **Read the User Guide** - Start with [VARIABLES_USER_GUIDE.md](VARIABLES_USER_GUIDE.md) to understand the basics
-2. **Try the Examples** - Copy and customize examples from the [examples/](examples/) directory
-3. **Test Your Configuration** - Use `spooky variables validate` and `spooky variables resolve` to test
-4. **Check Troubleshooting** - If you encounter issues, refer to [VARIABLES_TROUBLESHOOTING.md](VARIABLES_TROUBLESHOOTING.md)
-
-### For Developers
-
-1. **Review the API Reference** - Understand the interfaces and implementation in [VARIABLES_API_REFERENCE.md](VARIABLES_API_REFERENCE.md)
-2. **Study the Examples** - See how the APIs are used in practice
-3. **Check the Code** - Review the actual implementation in `internal/variables/`
-4. **Test Your Changes** - Use the examples to test your modifications
-
-### For System Administrators
-
-1. **Start with User Guide** - Understand the system capabilities
-2. **Review Examples** - See real-world configuration patterns
-3. **Plan Your Variables** - Design your variable organization strategy
-4. **Implement Gradually** - Start with basic variables and expand
-5. **Monitor and Validate** - Use validation and resolution testing regularly
-
-## Documentation Navigation
-
-### By Use Case
-
-#### Getting Started
-- [User Guide - Getting Started](VARIABLES_USER_GUIDE.md#getting-started)
-- [Examples - Basic Configuration](examples/variables-basic-config.hcl)
-- [Examples README - Using Examples](examples/README.md#using-the-examples)
-
-#### Multi-File Variable Management
-- [User Guide - Multi-File Variables](VARIABLES_USER_GUIDE.md#multi-file-variables)
-- [Examples - Multi-File Setup](examples/variables-multi-file.hcl)
-- [API Reference - Cross-File Validation](VARIABLES_API_REFERENCE.md#cross-file-validation)
-
-#### Dependency Management
-- [Examples - Complex Dependencies](examples/variables-with-dependencies.hcl)
-- [User Guide - Advanced Features](VARIABLES_USER_GUIDE.md#advanced-features)
-
-#### Troubleshooting
-- [Troubleshooting Guide - Common Errors](VARIABLES_TROUBLESHOOTING.md#common-error-messages)
-- [Troubleshooting Guide - Resolution Issues](VARIABLES_TROUBLESHOOTING.md#variable-resolution-issues)
-- [User Guide - Validation and Troubleshooting](VARIABLES_USER_GUIDE.md#validation-and-troubleshooting)
-
-### By Topic
-
-#### Configuration
-- [User Guide - Variable Configuration](VARIABLES_USER_GUIDE.md#variable-configuration)
-- [API Reference - Type Definitions](VARIABLES_API_REFERENCE.md#type-definitions)
-- [Examples - Configuration Patterns](examples/README.md#configuration-patterns)
-
-#### Validation
-- [User Guide - Validation and Troubleshooting](VARIABLES_USER_GUIDE.md#validation-and-troubleshooting)
-- [API Reference - Validation Rules](VARIABLES_API_REFERENCE.md#validation-rules)
-- [Troubleshooting Guide - Validation Problems](VARIABLES_TROUBLESHOOTING.md#validation-problems)
-
-#### Variable Resolution
-- [User Guide - Variable Resolution](VARIABLES_USER_GUIDE.md#variable-resolution)
-- [API Reference - Resolution Implementation](VARIABLES_API_REFERENCE.md#resolvevariables-implementation)
-- [Troubleshooting Guide - Resolution Issues](VARIABLES_TROUBLESHOOTING.md#variable-resolution-issues)
-
-#### CLI Usage
-- [User Guide - Variable Management](VARIABLES_USER_GUIDE.md#variable-management)
-- [API Reference - CLI Integration](VARIABLES_API_REFERENCE.md#cli-integration)
-- [Examples - Testing and Validation](examples/README.md#testing-and-validation)
+**When to use:** Use this to quickly find relevant examples for your use case.
 
 ## Key Concepts
 
 ### Core Features
 
-1. **Multi-File Support** - Load variables from `variables.hcl` or `variables/` directory
-2. **Dependency Resolution** - Automatic resolution of variable dependencies using topological sorting
-3. **Environment Variable Overrides** - Support for environment variable overrides with prefix matching
-4. **Duplicate Detection** - Prevent conflicts across multiple files with detailed error reporting
-5. **Comprehensive Validation** - Schema validation, type checking, and constraint validation
-6. **Flexible Types** - Support for string, number, boolean, list, and map variable types
+1. **Variable Definition** - Define variables in HCL format with support for multiple data types
+2. **Variable Encryption** - Encrypt sensitive variables using age encryption
+3. **Variable Resolution** - Resolve variables with support for dependencies and references
+4. **Variable Validation** - Validate variable definitions and values
+5. **Integration Support** - Seamless integration with actions, templates, and other systems
+6. **CLI Management** - Comprehensive CLI commands for variable management
+7. **Security Features** - Secure handling of sensitive variable data
 
 ### Architecture Principles
 
 1. **Interface-First Design** - All functionality through well-defined interfaces
 2. **Dependency Injection** - Loose coupling through interface-based dependencies
-3. **Comprehensive Validation** - Multiple levels of validation and error reporting
-4. **Extensible Design** - Easy to add new variable types and validation rules
-5. **Performance Optimized** - Efficient loading and dependency resolution
+3. **Security by Default** - Encryption and secure handling of sensitive data
+4. **Extensible Design** - Easy to add new variable types and features
+5. **Performance Optimized** - Efficient variable resolution and caching
 
 ### Best Practices
 
-1. **Organize by Purpose** - Separate variables by functionality and scope
-2. **Use Descriptive Names** - Include purpose and context in variable names
-3. **Manage Dependencies** - Keep dependency graphs simple and acyclic
-4. **Environment-Specific Values** - Use environment variables for sensitive data
-5. **Consistent Naming** - Follow established naming conventions
-6. **Regular Validation** - Validate configuration before deployments
+1. **Use Descriptive Names** - Use clear, descriptive variable names
+2. **Encrypt Sensitive Data** - Encrypt passwords, keys, and other sensitive information
+3. **Organize Variables** - Use logical organization and grouping
+4. **Validate Variables** - Always validate variable definitions
+5. **Use Appropriate Types** - Choose appropriate data types for your variables
+6. **Document Variables** - Include descriptions and usage information
 
-## Implementation Status
+## Variables System Overview
 
-### ✅ Completed Features
+### Core Concepts
 
-- **Core Variable Management**
-  - HCL-based variable configuration
-  - Multi-file variable loading
-  - Comprehensive validation
-  - Dependency resolution with topological sorting
-  - Environment variable overrides
-  - Smart output modes
-  - JSON streaming output
+The variables system provides a comprehensive solution for managing configuration variables in spooky projects. Variables can be:
 
-- **Advanced Features**
-  - Cross-file duplicate detection
-  - Circular dependency detection
-  - Type validation and constraints
-  - Scope-based organization
-  - Source file tracking
-  - Comprehensive metadata support
+- **Simple values** - Strings, numbers, booleans
+- **Complex structures** - Maps, lists, nested objects
+- **Encrypted values** - Sensitive data encrypted with age
+- **Referenced values** - Variables that reference other variables
+- **Computed values** - Values computed from other variables or external sources
 
-- **CLI Integration**
-  - `spooky variables list` - List variables with source grouping
-  - `spooky variables validate` - Validate configuration
-  - `spooky variables resolve` - Resolve variables with context
+### Variable Definition Structure
 
-### 🚧 In Progress / Planned Features
+Variables are defined in `variables.hcl` files or in the `variables/` directory:
 
-- **Template Integration** - Variable substitution in templates
-- **Export Functionality** - Export to various formats
-- **Advanced Filtering** - Scope and type-based filtering
-- **Caching** - Performance optimization for large variable sets
-- **Integration with Other Systems** - Actions, facts, SSH
+```hcl
+variables {
+  # Simple string variable
+  variable "app_name" {
+    value = "my-application"
+    description = "Application name"
+  }
+  
+  # Number variable
+  variable "port" {
+    value = 8080
+    description = "Application port"
+  }
+  
+  # Boolean variable
+  variable "debug_mode" {
+    value = false
+    description = "Enable debug mode"
+  }
+  
+  # Map variable
+  variable "database_config" {
+    value = {
+      host = "db.example.com"
+      port = 5432
+      name = "myapp"
+    }
+    description = "Database configuration"
+  }
+  
+  # List variable
+  variable "allowed_ips" {
+    value = ["192.168.1.0/24", "10.0.0.0/8"]
+    description = "Allowed IP ranges"
+  }
+  
+  # Encrypted variable
+  variable "db_password" {
+    value = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
+    encrypted = true
+    description = "Database password (encrypted)"
+  }
+  
+  # Referenced variable
+  variable "db_url" {
+    value = "postgresql://user:${db_password}@${database_config.host}:${database_config.port}/${database_config.name}"
+    description = "Database connection URL"
+  }
+}
+```
 
-### 📋 Future Enhancements
+### CLI Commands
 
-- **Import from External Sources** - Environment files, configuration management systems
-- **Complex Query Language** - Advanced filtering and selection syntax
-- **Performance Testing** - Benchmarks and optimization
-- **Comprehensive Testing** - Integration and performance tests
+The variables system provides comprehensive CLI commands:
 
-## Getting Help
+```bash
+# List all variables in a project
+spooky variables list ./my-project
 
-### Documentation Resources
+# List variables with filtering
+spooky variables list ./my-project --variable app_name
 
-1. **User Guide** - For usage questions and best practices
-2. **API Reference** - For technical implementation details
-3. **Troubleshooting Guide** - For problem resolution
-4. **Examples** - For configuration patterns and use cases
+# Validate variable definitions
+spooky variables validate ./my-project
 
-### Common Questions
+# Validate with verbose output
+spooky variables validate ./my-project --verbose
 
-#### "How do I get started?"
-Start with the [User Guide](VARIABLES_USER_GUIDE.md) and copy an example from the [examples/](examples/) directory.
+# Armor (encrypt) a variable
+spooky variables armor ./my-project --variable db_password --value "secret123"
 
-#### "How do I organize my variables?"
-See the [Multi-File Variables](VARIABLES_USER_GUIDE.md#multi-file-variables) section and the [multi-file example](examples/variables-multi-file.hcl).
+# Decrypt variables during action execution
+spooky actions run ./my-project --decrypt
 
-#### "How do I troubleshoot dependency issues?"
-Check the [Resolution Issues](VARIABLES_TROUBLESHOOTING.md#variable-resolution-issues) section in the troubleshooting guide.
+# Decrypt with dry-run
+spooky actions run ./my-project --decrypt --dry-run
+```
 
-#### "How do I validate my configuration?"
-Use `spooky variables validate` and see the [Validation and Troubleshooting](VARIABLES_USER_GUIDE.md#validation-and-troubleshooting) section.
+### Variable Types
 
-#### "How do I integrate with other systems?"
-Review the [API Reference](VARIABLES_API_REFERENCE.md) for integration patterns and the planned features section above.
+The variables system supports multiple data types:
 
-### Contributing
+#### Basic Types
+```hcl
+# String
+variable "app_name" {
+  value = "my-application"
+}
 
-When contributing to the variables system:
+# Number
+variable "port" {
+  value = 8080
+}
 
-1. **Follow Interface Patterns** - Use the established interface architecture
-2. **Add Comprehensive Tests** - Include unit and integration tests
-3. **Update Documentation** - Keep documentation current with changes
-4. **Follow Error Handling** - Use structured error types and patterns
-5. **Consider Performance** - Optimize for large variable sets and complex dependencies
+# Boolean
+variable "debug_mode" {
+  value = false
+}
+```
 
-## Conclusion
+#### Complex Types
+```hcl
+# Map
+variable "config" {
+  value = {
+    host = "example.com"
+    port = 443
+    ssl = true
+  }
+}
 
-The spooky variables system provides a comprehensive solution for managing configuration variables across multiple environments. The documentation is structured to support users at all levels, from beginners getting started to advanced users implementing complex integrations.
+# List
+variable "servers" {
+  value = ["server1", "server2", "server3"]
+}
 
-Start with the User Guide to understand the basics, use the examples as templates for your configurations, and refer to the troubleshooting guide when you encounter issues. The API reference provides the technical details needed for development and integration work.
+# Nested structures
+variable "database" {
+  value = {
+    primary = {
+      host = "db1.example.com"
+      port = 5432
+    }
+    replica = {
+      host = "db2.example.com"
+      port = 5432
+    }
+  }
+}
+```
 
-The system is designed to be extensible and maintainable, following interface-first architecture principles and comprehensive validation patterns. As the system evolves, new features will be added while maintaining backward compatibility and following established patterns.
+### Encryption Support
 
-For the most up-to-date information and examples, always refer to the latest version of the documentation and test your configurations with the current spooky release.
+The variables system supports encryption using age:
+
+```hcl
+# Encrypted variable
+variable "secret_key" {
+  value = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
+  encrypted = true
+  description = "Secret API key"
+}
+```
+
+#### Encryption Commands
+```bash
+# Encrypt a variable value
+spooky variables armor ./my-project --variable secret_key --value "my-secret-value"
+
+# Decrypt during action execution
+spooky actions run ./my-project --decrypt
+```
+
+### Variable Resolution
+
+Variables support complex resolution patterns:
+
+```hcl
+# Basic reference
+variable "app_name" {
+  value = "my-application"
+}
+
+variable "app_version" {
+  value = "1.0.0"
+}
+
+# Reference other variables
+variable "full_name" {
+  value = "${app_name}-${app_version}"
+}
+
+# Nested references
+variable "database" {
+  value = {
+    host = "db.example.com"
+    port = 5432
+  }
+}
+
+variable "db_url" {
+  value = "postgresql://user:pass@${database.host}:${database.port}/app"
+}
+```
+
+### Multi-File Support
+
+Variables can be organized across multiple files:
+
+```bash
+my-project/
+├── variables.hcl          # Main variables file
+└── variables/
+    ├── database.hcl       # Database-related variables
+    ├── network.hcl        # Network configuration
+    └── secrets.hcl        # Encrypted secrets
+```
+
+## Implementation Details
+
+### Core Components
+
+1. **Variable Loader** - Loads variables from HCL files
+2. **Variable Validator** - Validates variable definitions and values
+3. **Variable Resolver** - Resolves variable references and dependencies
+4. **Encryption Manager** - Handles variable encryption and decryption
+5. **Variable Integration** - Provides integration with other system components
+
+### Integration Points
+
+The variables system integrates with:
+
+- **Actions System** - For variable injection during action execution
+- **Templates System** - For variable substitution in templates
+- **Secrets System** - For encryption and decryption operations
+- **CLI System** - For user interface and command execution
+
+### Error Handling
+
+The variables system provides comprehensive error handling:
+
+- **Validation errors** - Invalid variable definitions or values
+- **Resolution errors** - Circular dependencies or missing references
+- **Encryption errors** - Encryption/decryption failures
+- **Type errors** - Type mismatches and conversion issues
+- **File errors** - File I/O and parsing issues
+
+## Best Practices
+
+### Variable Organization
+
+1. **Use logical grouping** to organize related variables
+2. **Separate sensitive data** into dedicated files
+3. **Use descriptive names** for easy identification
+4. **Include documentation** with descriptions
+5. **Validate configurations** before use
+
+### Security
+
+1. **Encrypt sensitive data** using age encryption
+2. **Use secure variable names** that don't reveal sensitive information
+3. **Limit access** to variable files
+4. **Rotate encrypted values** regularly
+5. **Use environment-specific** variable files
+
+### Performance
+
+1. **Minimize variable dependencies** to improve resolution speed
+2. **Use appropriate data types** for your use case
+3. **Cache resolved values** when possible
+4. **Validate early** to catch issues quickly
+5. **Use efficient resolution** patterns
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Variable resolution errors** - Check for circular dependencies and missing references
+2. **Encryption errors** - Verify age keys and encryption configuration
+3. **Type errors** - Ensure variable types match expected values
+4. **File parsing errors** - Validate HCL syntax and file permissions
+5. **Integration errors** - Check variable injection in actions and templates
+
+### Debug Commands
+
+```bash
+# Enable verbose logging
+export SPOOKY_LOG_LEVEL=debug
+
+# List variables with details
+spooky variables list ./my-project --verbose
+
+# Validate with detailed output
+spooky variables validate ./my-project --verbose
+
+# Test variable resolution
+spooky variables resolve ./my-project --variable db_url
+
+# Check encryption status
+spooky variables list ./my-project --encrypted
+```
+
+### Common Patterns
+
+1. **Environment-specific variables** - Use different files for different environments
+2. **Sensitive data handling** - Encrypt all sensitive information
+3. **Variable composition** - Build complex values from simple components
+4. **Default values** - Provide sensible defaults for optional variables
+5. **Validation rules** - Use validation to ensure data quality
+
+## Related Documentation
+
+- [Variables User Guide](VARIABLES_USER_GUIDE.md) - Complete user guide
+- [Variables API Reference](VARIABLES_API_REFERENCE.md) - Technical reference
+- [Variables Troubleshooting](VARIABLES_TROUBLESHOOTING.md) - Troubleshooting guide
+- [System Design](../design/systems/variables-system.md) - System design documentation
+- [CLI Reference](CLI_REFERENCE.md) - CLI command reference

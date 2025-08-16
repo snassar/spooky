@@ -399,13 +399,13 @@ sudo spooky facts gather ./my-project
 spooky facts gather ./my-project --include-processes
 ```
 
-## Storage Issues
+## Export Issues
 
 ### Memory Management Problems
 
-#### "Memory initialization failed"
+#### "Memory allocation failed during export"
 
-**Problem:** Cannot initialize memory storage.
+**Problem:** Cannot allocate memory for fact export.
 
 **Solution:**
 ```bash
@@ -415,37 +415,37 @@ free -h
 # Check system limits
 ulimit -a
 
-# Use memory-efficient mode
-spooky facts gather ./my-project --memory-efficient
-
 # Reduce memory usage
-spooky facts gather ./my-project --parallel 1
+spooky facts export ./my-project --parallel 1
+
+# Export fewer machines at once
+spooky facts export ./my-project --machine specific-machine --output single-machine-facts.json
 ```
 
-#### "Memory corruption detected"
+#### "Memory corruption detected during export"
 
-**Problem:** Memory corruption detected in fact storage.
+**Problem:** Memory corruption detected during fact export.
 
 **Solution:**
 ```bash
 # Restart spooky process
 pkill spooky
 
-# Re-collect facts with fresh memory
-spooky facts gather ./my-project
+# Re-export facts with fresh memory
+spooky facts export ./my-project
 
 # Use memory validation
-spooky facts gather ./my-project --validate-memory
+spooky facts export ./my-project --validate-memory
 
 # Check for memory leaks
-spooky facts gather ./my-project --memory-profile
+spooky facts export ./my-project --memory-profile
 ```
 
-### Memory System Issues
+### Export System Issues
 
 #### "Failed to allocate facts memory"
 
-**Problem:** Cannot allocate memory for fact gathering and export.
+**Problem:** Cannot allocate memory for fact export.
 
 **Solution:**
 ```bash
@@ -466,39 +466,39 @@ spooky facts export ./my-project --machine specific-machine --output single-mach
 
 ### Collection Performance
 
-#### "Fact collection is slow for many machines"
+#### "Fact export is slow for many machines"
 
-**Problem:** Collection is slow with many machines.
+**Problem:** Export is slow with many machines.
 
 **Solution:**
 ```bash
 # Use parallel collection
-spooky facts gather ./my-project --parallel 16
+spooky facts export ./my-project --parallel 16
 
 # Use connection pooling
-spooky facts gather ./my-project --connection-pool 20
+spooky facts export ./my-project --connection-pool 20
 
-# Collect in batches
-spooky facts gather ./my-project --batch-size 10
+# Export in batches
+spooky facts export ./my-project --batch-size 10
 ```
 
-#### "High CPU usage during collection"
+#### "High CPU usage during export"
 
-**Problem:** Fact collection is consuming too much CPU.
+**Problem:** Fact export is consuming too much CPU.
 
 **Solution:**
 ```bash
 # Reduce parallel workers
-spooky facts gather ./my-project --parallel 2
+spooky facts export ./my-project --parallel 2
 
 # Use less intensive collection
-spooky facts gather ./my-project --basic-facts-only
+spooky facts export ./my-project --basic-facts-only
 
 # Profile CPU usage
-spooky facts gather ./my-project --profile
+spooky facts export ./my-project --profile
 ```
 
-### Storage Performance
+### Export Performance
 
 #### "Slow fact access"
 

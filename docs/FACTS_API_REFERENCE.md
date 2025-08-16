@@ -14,388 +14,559 @@ The `FactsIntegration` interface provides the primary entry point for facts oper
 
 ```go
 type FactsIntegration interface {
-    // CollectFacts collects facts from the given source
-    CollectFacts(ctx context.Context, source string) (interface{}, error)
-    
-    // ExportFacts exports facts to the specified format and output
-    ExportFacts(ctx context.Context, projectPath string, format string, outputPath string) error
-    
-    // ValidateFacts validates fact collection and storage
-    ValidateFacts(ctx context.Context, projectPath string) (*ValidationResult, error)
+    // CollectFacts collects facts from the given machine
+    CollectFacts(ctx context.Context, machine spookytypes.Machine) (*spookytypes.FactCollection, error)
+
+    // StoreFacts stores facts in the facts database
+    StoreFacts(ctx context.Context, facts *spookytypes.FactCollection) error
+
+    // GetFacts retrieves facts from the facts database
+    GetFacts(ctx context.Context, machine string) (*spookytypes.FactCollection, error)
+
+    // ListFacts lists all facts in the facts database
+    ListFacts(ctx context.Context) ([]*spookytypes.FactCollection, error)
+
+    // ValidateFacts validates facts
+    ValidateFacts(ctx context.Context, facts *spookytypes.FactCollection) (*spookytypes.ValidationResult, error)
+
+    // GetSSHManager returns the SSH manager for fact collection
+    GetSSHManager() SSHManager
 }
 ```
 
-**Implementation Status**: ⚠️ **Partially Implemented** - Basic functionality exists but SSH-based collection has issues
+**Implementation Status**: ⚠️ **Partially Implemented** - Basic functionality exists but SSH-based fact collection has issues
 
-### FactsManager Interface
+### FactManager Interface
 
-The `FactsManager` interface provides fact collection and management:
+The `FactManager` interface provides fact management and collection:
 
 ```go
-type FactsManager interface {
+type FactManager interface {
     // CollectFacts collects facts from the given machine
-    CollectFacts(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error)
-    
-    // ExportFacts exports facts to the specified format
-    ExportFacts(ctx context.Context, facts *spookytypesfacts.FactCollection, format string, outputPath string) error
-    
-    // ValidateFacts validates fact collection
-    ValidateFacts(ctx context.Context, facts *spookytypesfacts.FactCollection) (*ValidationResult, error)
+    CollectFacts(ctx context.Context, machine spookytypes.Machine) (*spookytypes.FactCollection, error)
+
+    // StoreFacts stores facts in the facts database
+    StoreFacts(ctx context.Context, facts *spookytypes.FactCollection) error
+
+    // GetFacts retrieves facts from the facts database
+    GetFacts(ctx context.Context, machine string) (*spookytypes.FactCollection, error)
+
+    // ListFacts lists all facts in the facts database
+    ListFacts(ctx context.Context) ([]*spookytypes.FactCollection, error)
+
+    // ValidateFacts validates facts
+    ValidateFacts(ctx context.Context, facts *spookytypes.FactCollection) (*spookytypes.ValidationResult, error)
+
+    // GetSSHManager returns the SSH manager for fact collection
+    GetSSHManager() SSHManager
 }
 ```
 
-**Implementation Status**: ⚠️ **Partially Implemented** - Basic collection exists but SSH integration has issues
+**Implementation Status**: ⚠️ **Partially Implemented** - Basic loading and validation exist but collection has issues
 
 ## Current Implementation Status
 
 ### ✅ Working Components
 
-1. **Basic Fact Collection**: System fact collection using SSH commands
-2. **Memory Storage**: In-memory fact storage during export operations
-3. **Export Functionality**: Facts export to JSON and HCL formats
-4. **CLI Integration**: `spooky facts export` command with filtering options
-5. **Machine Integration**: Facts collection from project machine inventory
-6. **Basic Validation**: Fact collection validation and error handling
-7. **Parallel Processing**: Support for parallel fact collection
-8. **Filtering**: Support for machine, tag, and group filtering
+1. **Fact Loading**: Loading facts from HCL configuration files
+2. **Fact Validation**: Basic validation of fact definitions
+3. **Fact Structure**: Proper fact type definitions and structures
+4. **CLI Integration**: `spooky facts gather` command with filtering options
+5. **Project Integration**: Facts loading from project configuration
+6. **Basic Validation**: Fact definition validation and error handling
+7. **Filtering Support**: Support for machine and tag filtering
+8. **Export Management**: Basic fact export management
+9. **SSH Manager Integration**: SSH manager for fact collection
+10. **Export Support**: Facts export to JSON format
 
 ### ⚠️ Known Issues
 
 1. **SSH-Based Collection**: SSH-based fact collection has implementation issues
-2. **Persistent Storage**: No persistent storage - facts are only stored in memory during export
-3. **Fact History**: No historical fact tracking or comparison
-4. **Import Functionality**: No fact import capabilities
+2. **Fact Collection**: Facts cannot be properly collected from remote machines
+3. **Authentication Testing**: SSH authentication testing has issues
+4. **Connection Pooling**: SSH connection pooling has problems
+5. **Host Key Validation**: Host key validation has implementation issues
+6. **Parallel Processing**: No parallel fact collection support
 
 ### 🔄 In Progress
 
 1. **SSH Collection Fixes**: Addressing SSH-based fact collection issues
-2. **Storage Improvements**: Implementing persistent storage options
-3. **Collection Enhancements**: Improving fact collection reliability
+2. **Collection Improvements**: Implementing proper fact collection functionality
+3. **Authentication Fixes**: Fixing SSH authentication testing
 
 ## Implementation Details
 
-### Fact Collection System
+### Fact Loading System
 
-The facts system uses a single `SystemFactCollector` that collects facts using SSH commands:
+The facts system loads facts from HCL configuration files:
 
 ```go
-type SystemFactCollector struct {
-    name string
+type Manager struct {
+    logger          spookytypeslogging.Logger
+    validator       spookyinterfaces.FactValidator
+    sshManager      spookyinterfaces.SSHManager
+    schemaValidator *spookyschemas.Validator
+    
 }
 
-func (c *SystemFactCollector) Collect(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error) {
-    // Get machine ID from /etc/machine-id
-    machineID, err := c.getMachineID(machine)
-    if err != nil {
-        return nil, fmt.Errorf("failed to get machine ID: %w", err)
-    }
+func NewManager(
+    logger spookytypeslogging.Logger,
+    validator spookyinterfaces.FactValidator,
+    sshManager spookyinterfaces.SSHManager,
+    schemaValidator *spookyschemas.Validator,
     
-    // Collect system facts using SSH commands
-    facts, err := c.collectSystemFacts(machine)
-    if err != nil {
-        return nil, fmt.Errorf("failed to collect system facts: %w", err)
+) spookyinterfaces.FactsIntegration {
+    return &Manager{
+        logger:          logger,
+        validator:       validator,
+        sshManager:      sshManager,
+        schemaValidator: schemaValidator,
+        
     }
-    
-    return &spookytypesfacts.FactCollection{
-        MachineID:   machineID,
-        CollectedAt: time.Now(),
-        Facts:       facts,
-    }, nil
 }
 ```
 
-**Collected Facts:**
-- **OS Facts**: Operating system information (name, version, architecture)
-- **Hardware Facts**: CPU, memory, disk information
-- **Network Facts**: Network interfaces and configuration
-- **Load Average**: System load information
-- **Process Facts**: Basic process information
-
-### Memory Storage Implementation
-
-Facts are gathered directly and exported without intermediate storage:
+### Fact Collection Implementation
 
 ```go
-type MemoryFactStorage struct {
-    mutex sync.RWMutex
-}
+// CollectFacts collects facts from the specified machine
+func (m *Manager) CollectFacts(ctx context.Context, machine spookytypes.Machine) (*spookytypes.FactCollection, error) {
+    m.logger.Info("Collecting facts", map[string]interface{}{
+        "machine": machine.Hostname,
+    })
 
-func (s *MemoryFactStorage) GetStats() (map[string]interface{}, error) {
-    return map[string]interface{}{
-        "storage_type": "in_memory_only",
-        "description":  "Facts are stored in memory for the duration of operations only",
-    }, nil
-}
-
-func (s *MemoryFactStorage) ExportToJSON(facts map[string]*spookytypesfacts.FactCollection, outputPath string) error {
-    // Export facts directly to JSON format
-    data, err := json.MarshalIndent(facts, "", "  ")
-    if err != nil {
-        return fmt.Errorf("failed to marshal facts to JSON: %w", err)
+    // Create fact collection
+    collection := &spookytypes.FactCollection{
+        Machine:   machine.Hostname,
+        Timestamp: time.Now(),
+        Facts:     make(map[string]interface{}),
     }
-    
-    return os.WriteFile(outputPath, data, 0644)
+
+    // Collect system facts
+    if err := m.collectSystemFacts(ctx, machine, collection); err != nil {
+        m.logger.Error("Failed to collect system facts", err, map[string]interface{}{
+            "machine": machine.Hostname,
+        })
+        return nil, fmt.Errorf("failed to collect system facts: %w", err)
+    }
+
+    // Collect network facts
+    if err := m.collectNetworkFacts(ctx, machine, collection); err != nil {
+        m.logger.Error("Failed to collect network facts", err, map[string]interface{}{
+            "machine": machine.Hostname,
+        })
+        return nil, fmt.Errorf("failed to collect network facts: %w", err)
+    }
+
+    // Collect application facts
+    if err := m.collectApplicationFacts(ctx, machine, collection); err != nil {
+        m.logger.Error("Failed to collect application facts", err, map[string]interface{}{
+            "machine": machine.Hostname,
+        })
+        return nil, fmt.Errorf("failed to collect application facts: %w", err)
+    }
+
+    m.logger.Info("Fact collection completed", map[string]interface{}{
+        "machine": machine.Hostname,
+        "facts":   len(collection.Facts),
+    })
+
+    return collection, nil
 }
 
-func (s *MemoryFactStorage) ExportToHCL(facts map[string]*spookytypesfacts.FactCollection, outputPath string) error {
-    // Export facts directly to HCL format
-    // Implementation follows facts-structure.schema.hcl
+func (m *Manager) collectSystemFacts(ctx context.Context, machine spookytypes.Machine, collection *spookytypes.FactCollection) error {
+    // Use SSH manager to collect system facts
+    sshManager := m.GetSSHManager()
+    if sshManager == nil {
+        return fmt.Errorf("SSH manager not available")
+    }
+
+    // Get SSH connection
+    conn, err := sshManager.GetConnection(machine.Hostname, machine.Port, machine.User)
+    if err != nil {
+        return fmt.Errorf("failed to get SSH connection: %w", err)
+    }
+    defer sshManager.ReturnConnection(conn)
+
+    // Collect basic system facts
+    facts := map[string]interface{}{
+        "os":        m.getOSInfo(conn),
+        "hostname":  m.getHostname(conn),
+        "uptime":    m.getUptime(conn),
+        "memory":    m.getMemoryInfo(conn),
+        "disk":      m.getDiskInfo(conn),
+        "cpu":       m.getCPUInfo(conn),
+        "kernel":    m.getKernelInfo(conn),
+    }
+
+    // Add facts to collection
+    for key, value := range facts {
+        collection.Facts[key] = value
+    }
+
+    return nil
+}
+
+func (m *Manager) collectNetworkFacts(ctx context.Context, machine spookytypes.Machine, collection *spookytypes.FactCollection) error {
+    // Use SSH manager to collect network facts
+    sshManager := m.GetSSHManager()
+    if sshManager == nil {
+        return fmt.Errorf("SSH manager not available")
+    }
+
+    // Get SSH connection
+    conn, err := sshManager.GetConnection(machine.Hostname, machine.Port, machine.User)
+    if err != nil {
+        return fmt.Errorf("failed to get SSH connection: %w", err)
+    }
+    defer sshManager.ReturnConnection(conn)
+
+    // Collect network facts
+    facts := map[string]interface{}{
+        "interfaces": m.getNetworkInterfaces(conn),
+        "routes":     m.getNetworkRoutes(conn),
+        "dns":        m.getDNSInfo(conn),
+    }
+
+    // Add facts to collection
+    for key, value := range facts {
+        collection.Facts[key] = value
+    }
+
+    return nil
+}
+
+func (m *Manager) collectApplicationFacts(ctx context.Context, machine spookytypes.Machine, collection *spookytypes.FactCollection) error {
+    // Use SSH manager to collect application facts
+    sshManager := m.GetSSHManager()
+    if sshManager == nil {
+        return fmt.Errorf("SSH manager not available")
+    }
+
+    // Get SSH connection
+    conn, err := sshManager.GetConnection(machine.Hostname, machine.Port, machine.User)
+    if err != nil {
+        return fmt.Errorf("failed to get SSH connection: %w", err)
+    }
+    defer sshManager.ReturnConnection(conn)
+
+    // Collect application facts
+    facts := map[string]interface{}{
+        "services": m.getServiceStatus(conn),
+        "processes": m.getProcessInfo(conn),
+        "packages": m.getPackageInfo(conn),
+    }
+
+    // Add facts to collection
+    for key, value := range facts {
+        collection.Facts[key] = value
+    }
+
     return nil
 }
 ```
 
-### CLI Integration
-
-Facts commands integrate with the CLI system:
+### Fact Export Implementation
 
 ```go
-// Facts export command implementation
-func handleFactsExport(projectPath, format, outputPath string, machines, tags, groups []string) error {
-    ctx := context.Background()
-    
-    // Initialize facts manager
-    manager := spookyfacts.NewManager(collector, validator, logger)
-    
-    // Load project and get machines
-    project, err := loadProject(projectPath)
-    if err != nil {
-        return fmt.Errorf("failed to load project: %w", err)
-    }
-    
-    // Filter machines based on criteria
-    targetMachines := filterMachines(project.Machines, machines, tags, groups)
-    
-    // Collect facts in parallel
-    facts := make(map[string]*spookytypesfacts.FactCollection)
-    var wg sync.WaitGroup
-    results := make(chan error, len(targetMachines))
-    
-    for _, machine := range targetMachines {
-        wg.Add(1)
-        go func(m *spookytypes.Machine) {
-            defer wg.Done()
-            
-            factCollection, err := manager.CollectFacts(ctx, m)
-            if err != nil {
-                results <- fmt.Errorf("failed to collect facts for %s: %w", m.Hostname, err)
-                return
-            }
-            
-            facts[m.Hostname] = factCollection
-        }(machine)
-    }
-    
-    wg.Wait()
-    close(results)
-    
-    // Check for errors
-    for err := range results {
+// ExportFacts exports facts directly to file
+func (m *Manager) ExportFacts(ctx context.Context, machineIDs []string, format, outputPath string) error {
+    m.logger.Info("Exporting facts", map[string]interface{}{
+        "machines": len(machineIDs),
+        "format":   format,
+        "output":   outputPath,
+    })
+
+    // Collect facts for the specified machines
+    var allFacts []*spookytypesfacts.FactCollection
+    for _, machineID := range machineIDs {
+        facts, err := m.CollectFacts(ctx, &spookytypes.Machine{Hostname: machineID})
         if err != nil {
-            return err
+            m.logger.Error("Failed to collect facts for machine", err, map[string]interface{}{
+                "machine": machineID,
+            })
+            return fmt.Errorf("failed to collect facts for machine %s: %w", machineID, err)
+        }
+        allFacts = append(allFacts, facts)
+    }
+
+    // Export based on format
+    switch format {
+    case "json":
+        return m.exportToJSON(allFacts, outputPath)
+    case "hcl":
+        return m.exportToHCL(allFacts, outputPath)
+    default:
+        return fmt.Errorf("unsupported export format: %s", format)
+    }
+}
+
+// GetFacts retrieves facts for a specific machine (collects on demand)
+func (m *Manager) GetFacts(ctx context.Context, machineID string) (*spookytypesfacts.FactCollection, error) {
+    m.logger.Info("Getting facts for machine", map[string]interface{}{
+        "machine": machineID,
+    })
+
+    // Facts are collected on demand since there's no persistent storage
+    return m.CollectFacts(ctx, &spookytypes.Machine{Hostname: machineID})
+}
+```
+
+### Fact Validation Implementation
+
+```go
+// ValidateFacts validates a fact collection
+func (m *Manager) ValidateFacts(ctx context.Context, facts *spookytypes.FactCollection) (*spookytypes.ValidationResult, error) {
+    m.logger.Info("Validating facts", map[string]interface{}{
+        "machine": facts.Machine,
+        "facts":   len(facts.Facts),
+    })
+
+    var errors []spookyschemas.SchemaError
+    var warnings []spookyschemas.SchemaError
+
+    // Validate fact collection structure
+    if err := m.validateFactCollection(facts); err != nil {
+        errors = append(errors, spookyschemas.SchemaError{
+            Message: err.Error(),
+        })
+    }
+
+    // Validate individual facts
+    for key, value := range facts.Facts {
+        if err := m.validateFact(key, value); err != nil {
+            errors = append(errors, spookyschemas.SchemaError{
+                Message: fmt.Sprintf("fact[%s]: %s", key, err.Error()),
+            })
         }
     }
-    
-    // Export facts
-    return manager.ExportFacts(ctx, facts, format, outputPath)
+
+    return &spookytypes.ValidationResult{
+        Valid:    len(errors) == 0,
+        Errors:   errors,
+        Warnings: warnings,
+    }, nil
+}
+
+func (m *Manager) validateFactCollection(facts *spookytypes.FactCollection) error {
+    if facts == nil {
+        return fmt.Errorf("fact collection cannot be nil")
+    }
+
+    if facts.Machine == "" {
+        return fmt.Errorf("machine name is required")
+    }
+
+    if facts.Facts == nil {
+        return fmt.Errorf("facts map cannot be nil")
+    }
+
+    return nil
+}
+
+func (m *Manager) validateFact(key string, value interface{}) error {
+    if key == "" {
+        return fmt.Errorf("fact key cannot be empty")
+    }
+
+    if value == nil {
+        return fmt.Errorf("fact value cannot be nil")
+    }
+
+    // Validate fact key format
+    if !regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`).MatchString(key) {
+        return fmt.Errorf("invalid fact key format: %s", key)
+    }
+
+    return nil
 }
 ```
 
 ## Type Definitions
 
-### Fact Collection Types
+### Fact Types
 
 ```go
 // FactCollection represents a collection of facts for a machine
 type FactCollection struct {
-    // Machine ID (32-character hex string from /etc/machine-id)
-    MachineID string `json:"machine_id" hcl:"machine_id"`
-    
+    // Machine hostname
+    Machine string `json:"machine" hcl:"machine"`
+
     // Collection timestamp
-    CollectedAt time.Time `json:"collected_at" hcl:"collected_at"`
-    
-    // Collection of facts for this machine
-    Facts *Facts `json:"facts" hcl:"facts"`
-    
-    // Metadata about the collection
+    Timestamp time.Time `json:"timestamp" hcl:"timestamp"`
+
+    // Facts map
+    Facts map[string]interface{} `json:"facts" hcl:"facts"`
+
+    // Collection metadata
     Metadata map[string]interface{} `json:"metadata,omitempty" hcl:"metadata,optional"`
 }
 
-// Facts represents the actual fact data
-type Facts struct {
-    // System facts
-    System *SystemFacts `json:"system" hcl:"system"`
-    
-    // Hardware facts
-    Hardware *HardwareFacts `json:"hardware" hcl:"hardware"`
-    
-    // Network facts
-    Network *NetworkFacts `json:"network" hcl:"network"`
-    
-    // Custom facts
-    Custom map[string]interface{} `json:"custom,omitempty" hcl:"custom,optional"`
+// Fact represents a single fact
+type Fact struct {
+    // Fact key
+    Key string `json:"key" hcl:"key"`
+
+    // Fact value
+    Value interface{} `json:"value" hcl:"value"`
+
+    // Fact type
+    Type string `json:"type" hcl:"type"`
+
+    // Fact description
+    Description string `json:"description,omitempty" hcl:"description,optional"`
+
+    // Fact metadata
+    Metadata map[string]interface{} `json:"metadata,omitempty" hcl:"metadata,optional"`
 }
 
-// SystemFacts represents system information
+// SystemFacts represents system-related facts
 type SystemFacts struct {
     // Operating system information
-    OS *OSFacts `json:"os" hcl:"os"`
-    
-    // Load average
-    LoadAverage *LoadAverageFacts `json:"load_average" hcl:"load_average"`
-    
+    OS *OSInfo `json:"os" hcl:"os"`
+
+    // Hostname
+    Hostname string `json:"hostname" hcl:"hostname"`
+
+    // System uptime
+    Uptime time.Duration `json:"uptime" hcl:"uptime"`
+
+    // Memory information
+    Memory *MemoryInfo `json:"memory" hcl:"memory"`
+
+    // Disk information
+    Disk *DiskInfo `json:"disk" hcl:"disk"`
+
+    // CPU information
+    CPU *CPUInfo `json:"cpu" hcl:"cpu"`
+
+    // Kernel information
+    Kernel *KernelInfo `json:"kernel" hcl:"kernel"`
+}
+
+// NetworkFacts represents network-related facts
+type NetworkFacts struct {
+    // Network interfaces
+    Interfaces []*NetworkInterface `json:"interfaces" hcl:"interfaces"`
+
+    // Network routes
+    Routes []*NetworkRoute `json:"routes" hcl:"routes"`
+
+    // DNS information
+    DNS *DNSInfo `json:"dns" hcl:"dns"`
+}
+
+// ApplicationFacts represents application-related facts
+type ApplicationFacts struct {
+    // Service status
+    Services []*ServiceStatus `json:"services" hcl:"services"`
+
     // Process information
-    Processes *ProcessFacts `json:"processes" hcl:"processes"`
-}
+    Processes []*ProcessInfo `json:"processes" hcl:"processes"`
 
-// OSFacts represents operating system information
-type OSFacts struct {
-    Name         string `json:"name" hcl:"name"`
-    Version      string `json:"version" hcl:"version"`
-    Architecture string `json:"architecture" hcl:"architecture"`
-    Kernel       string `json:"kernel" hcl:"kernel"`
-    Distribution string `json:"distribution" hcl:"distribution"`
+    // Package information
+    Packages []*PackageInfo `json:"packages" hcl:"packages"`
 }
 ```
 
-### Fact Storage Types
+### Fact Configuration Types
 
 ```go
-// FactStorage provides storage operations for fact collections
-type FactStorage interface {
-    // Store stores facts for a machine
-    Store(ctx context.Context, machineID string, facts *FactCollection) error
-    
-    // Get retrieves facts for a machine
-    Get(ctx context.Context, machineID string) (*FactCollection, error)
-    
-    // List lists all machine IDs with stored facts
-    List(ctx context.Context) ([]string, error)
-    
-    // Clear removes all facts from storage
-    Clear(ctx context.Context) error
-    
-    // GetStats returns storage statistics for debugging
-    GetStats() (map[string]interface{}, error)
+// FactCollector represents a fact collector
+type FactCollector struct {
+    // Collector name
+    Name string `json:"name" hcl:"name"`
+
+    // Collector description
+    Description string `json:"description,omitempty" hcl:"description,optional"`
+
+    // Collector type
+    Type string `json:"type" hcl:"type"`
+
+    // Collector configuration
+    Config map[string]interface{} `json:"config,omitempty" hcl:"config,optional"`
+
+    // Collector enabled
+    Enabled bool `json:"enabled" hcl:"enabled"`
+
+    // Collector metadata
+    Metadata map[string]interface{} `json:"metadata,omitempty" hcl:"metadata,optional"`
 }
 
-// FactCollector collects facts from a machine
-type FactCollector interface {
-    // Collect collects facts from the given machine
-    Collect(ctx context.Context, machine interface{}) (*FactCollection, error)
-    
-    // GetName returns the collector name
-    GetName() string
-}
-```
+// FactFilter represents a fact filter
+type FactFilter struct {
+    // Filter by machines
+    Machines []string `json:"machines,omitempty" hcl:"machines,optional"`
 
-## Error Handling
+    // Filter by fact keys
+    Keys []string `json:"keys,omitempty" hcl:"keys,optional"`
 
-### Fact Collection Errors
+    // Filter by fact types
+    Types []string `json:"types,omitempty" hcl:"types,optional"`
 
-```go
-// FactCollectionError represents fact collection errors
-type FactCollectionError struct {
-    MachineID string `json:"machine_id" hcl:"machine_id"`
-    Error     string `json:"error" hcl:"error"`
-    Details   string `json:"details,omitempty" hcl:"details,optional"`
-}
-
-// FactValidationError represents fact validation errors
-type FactValidationError struct {
-    Field   string `json:"field" hcl:"field"`
-    Message string `json:"message" hcl:"message"`
-    Value   string `json:"value,omitempty" hcl:"value,optional"`
-}
-```
-
-### Validation Implementation
-
-```go
-// ValidateFacts validates facts against schema
-func (m *Manager) ValidateFacts(_ context.Context, facts *spookytypesfacts.FactCollection) (*spookytypes.ValidationResult, error) {
-    if facts == nil {
-        return &spookytypes.ValidationResult{
-            Valid:    false,
-            Errors:   []spookyschemas.SchemaError{{Message: "facts cannot be nil"}},
-            Warnings: []spookyschemas.SchemaError{},
-        }, nil
-    }
-
-    // Basic validation
-    var errors []spookyschemas.SchemaError
-    var warnings []spookyschemas.SchemaError
-
-    // Validate machine ID
-    if facts.MachineID == "" {
-        errors = append(errors, spookyschemas.SchemaError{Message: "machine_id is required"})
-    } else if !isValidMachineID(facts.MachineID) {
-        errors = append(errors, spookyschemas.SchemaError{Message: "machine_id must be a 32-character hexadecimal string"})
-    }
-
-    // Validate collection timestamp
-    if facts.CollectedAt.IsZero() {
-        errors = append(errors, spookyschemas.SchemaError{Message: "collected_at is required"})
-    }
-
-    // Validate facts structure
-    if facts.Facts == nil {
-        errors = append(errors, spookyschemas.SchemaError{Message: "facts structure is required"})
-    } else {
-        // Validate system facts
-        if facts.Facts.System == nil {
-            errors = append(errors, spookyschemas.SchemaError{Message: "system facts are required"})
-        } else {
-            if facts.Facts.System.OS == nil {
-                errors = append(errors, spookyschemas.SchemaError{Message: "system.os facts are required"})
-            }
-            if facts.Facts.System.Hardware == nil {
-                errors = append(errors, spookyschemas.SchemaError{Message: "system.hardware facts are required"})
-            }
-            if facts.Facts.System.Network == nil {
-                errors = append(errors, spookyschemas.SchemaError{Message: "system.network facts are required"})
-            }
-        }
-    }
-
-    valid := len(errors) == 0
-
-    return &spookytypes.ValidationResult{
-        Valid:    valid,
-        Errors:   errors,
-        Warnings: warnings,
-    }, nil
+    // Complex filter query
+    Query string `json:"query,omitempty" hcl:"query,optional"`
 }
 ```
 
 ## CLI Commands
 
+### Facts Gather Command
+
+```bash
+# Gather facts from all machines
+spooky facts gather ./my-project
+
+# Gather facts from specific machines
+spooky facts gather ./my-project --machine web-server
+
+# Gather facts by tags
+spooky facts gather ./my-project --tags "environment=production"
+
+# Gather facts in parallel
+spooky facts gather ./my-project --parallel 4
+
+# Gather facts with timeout
+spooky facts gather ./my-project --timeout 300
+```
+
+### Facts List Command
+
+```bash
+# List all facts
+spooky facts list ./my-project
+
+# List facts with details
+spooky facts list ./my-project --verbose
+
+# List facts for specific machines
+spooky facts list ./my-project --machine web-server
+
+# List facts by keys
+spooky facts list ./my-project --key "os,hostname,uptime"
+```
+
+### Facts Validate Command
+
+```bash
+# Validate facts
+spooky facts validate ./my-project
+
+# Validate with detailed output
+spooky facts validate ./my-project --verbose
+
+# Validate specific facts
+spooky facts validate ./my-project --machine web-server
+```
+
 ### Facts Export Command
 
 ```bash
-# Export facts to JSON format
-spooky facts export ./my-project --format json --output facts.json
+# Export facts to JSON
+spooky facts export ./my-project --json --output facts.json
 
-# Export facts to HCL format
-spooky facts export ./my-project --format hcl --output facts.hcl
-
-# Export facts for specific machines
-spooky facts export ./my-project --machines web-server,app-server --format json --output selected-facts.json
-
-# Export facts for machines with specific tags
-spooky facts export ./my-project --tags production,web --format json --output production-facts.json
-
-# Export facts for machines in specific groups
-spooky facts export ./my-project --groups webservers,databases --format json --output group-facts.json
-```
-
-### Facts Validation Command
-
-```bash
-# Validate facts collection
-spooky facts validate ./my-project
-
-# Validate facts with comparison
-spooky facts validate ./my-project --compare
+# Export with filtering
+spooky facts export ./my-project --json --output production-facts.json --tags "environment=production"
 ```
 
 ## Integration Examples
@@ -403,118 +574,174 @@ spooky facts validate ./my-project --compare
 ### Basic Fact Collection
 
 ```go
-// Basic fact collection example
-func collectFactsForMachine(hostname string) error {
-    ctx := context.Background()
-    
-    // Create fact collector
-    collector := spookyfacts.NewSystemFactCollector()
-    
-    // Create machine object
-    machine := &spookytypes.Machine{
-        Hostname: hostname,
-        Port:     22,
-        User:     "admin",
-    }
-    
-    // Collect facts
-    facts, err := collector.Collect(ctx, machine)
-    if err != nil {
-        return fmt.Errorf("failed to collect facts: %w", err)
-    }
-    
-    // Print facts
-    fmt.Printf("Machine ID: %s\n", facts.MachineID)
-    fmt.Printf("OS: %s %s\n", facts.Facts.System.OS.Name, facts.Facts.System.OS.Version)
-    fmt.Printf("Architecture: %s\n", facts.Facts.System.OS.Architecture)
-    
-    return nil
-}
-```
-
-### Parallel Fact Collection
-
-```go
-// Parallel fact collection example
-func collectFactsForMultipleMachines(machines []*spookytypes.Machine) error {
+// Fact collection example
+func collectFacts(projectPath string, machines []spookytypes.Machine) error {
     ctx := context.Background()
     
     // Create fact manager
-    manager := spookyfacts.NewManager(collector, validator, logger)
+    manager := spookyfacts.NewManager(logger, validator, sshManager, schemaValidator)
     
-    // Collect facts in parallel
-    err := manager.CollectAndStoreFactsParallel(ctx, machines, 4)
-    if err != nil {
-        return fmt.Errorf("failed to collect facts: %w", err)
+    // Collect facts from each machine
+    for _, machine := range machines {
+        // Collect facts
+        facts, err := manager.CollectFacts(ctx, machine)
+        if err != nil {
+            fmt.Printf("Failed to collect facts from %s: %v\n", machine.Hostname, err)
+            continue
+        }
+        
+        fmt.Printf("Collected %d facts from %s\n", len(facts.Facts), machine.Hostname)
     }
     
     return nil
 }
 ```
 
-### Fact Export
+### Fact Retrieval and Validation
 
 ```go
-// Fact export example
-func exportFactsToJSON(facts map[string]*spookytypesfacts.FactCollection, outputPath string) error {
+// Fact retrieval and validation example
+func retrieveAndValidateFacts(projectPath string, machine string) error {
     ctx := context.Background()
     
     // Create fact manager
-    manager := spookyfacts.NewManager(collector, validator, logger)
+    manager := spookyfacts.NewManager(logger, validator, sshManager, schemaValidator)
     
-    // Export facts
-    err := manager.ExportFacts(ctx, facts, "json", outputPath)
+    // Get facts
+    facts, err := manager.GetFacts(ctx, machine)
     if err != nil {
-        return fmt.Errorf("failed to export facts: %w", err)
+        return fmt.Errorf("failed to get facts: %w", err)
     }
     
+    // Validate facts
+    result, err := manager.ValidateFacts(ctx, facts)
+    if err != nil {
+        return fmt.Errorf("failed to validate facts: %w", err)
+    }
+    
+    if !result.Valid {
+        fmt.Println("Fact validation failed:")
+        for _, error := range result.Errors {
+            fmt.Printf("  - %s\n", error.Message)
+        }
+        return fmt.Errorf("fact validation failed")
+    }
+    
+    fmt.Printf("Retrieved and validated %d facts from %s\n", len(facts.Facts), machine)
     return nil
 }
 ```
 
-## Current Limitations
+## Error Handling
 
-### Storage Characteristics
+### Fact Errors
 
-1. **Ephemeral Storage**: Facts are only stored in memory during export (this is intentional)
-2. **No Fact History**: No historical fact tracking or comparison (facts are gathered fresh each time)
-3. **No Persistent Storage**: Facts are not saved to disk (memory-only during export)
-4. **No Import Functionality**: Facts cannot be imported (only export is supported)
+```go
+// Error handling example
+func handleFactError(err error) {
+    if err == nil {
+        return
+    }
+    
+    // Check for specific error types
+    switch {
+    case strings.Contains(err.Error(), "failed to collect facts"):
+        fmt.Println("Fact collection failed - check SSH connectivity")
+    case strings.Contains(err.Error(), "failed to export facts"):
+        fmt.Println("Fact export failed - check file permissions and format")
+    case strings.Contains(err.Error(), "failed to collect facts"):
+        fmt.Println("Fact collection failed - check SSH connectivity")
+    case strings.Contains(err.Error(), "SSH connection failed"):
+        fmt.Println("SSH connection failed - check SSH configuration")
+    case strings.Contains(err.Error(), "fact validation failed"):
+        fmt.Println("Fact validation failed - check fact format")
+    default:
+        fmt.Printf("Fact error: %v\n", err)
+    }
+}
+```
 
-### Collection Limitations
+### Validation Errors
 
-1. **Single Collector**: Only system fact collector available
-2. **No Custom Facts**: No support for custom fact collection
-3. **No Fact Caching**: No caching of previously collected facts
-4. **No Incremental Collection**: Always collects all facts
+```go
+// Validation error handling
+func handleValidationError(result *spookytypes.ValidationResult) error {
+    if result.Valid {
+        return nil
+    }
+    
+    fmt.Println("Fact validation failed:")
+    for _, err := range result.Errors {
+        fmt.Printf("  - %s\n", err.Message)
+    }
+    
+    for _, warning := range result.Warnings {
+        fmt.Printf("  Warning: %s\n", warning.Message)
+    }
+    
+    return fmt.Errorf("fact validation failed with %d errors", len(result.Errors))
+}
+```
 
-### Integration Limitations
+## Performance Considerations
 
-1. **No Template Integration**: Facts not integrated with template system
-2. **No Variable Integration**: Facts not used in variable resolution
-3. **No Action Integration**: Facts not integrated with action system
-4. **No Real-time Monitoring**: No real-time fact monitoring
+### Parallel Processing
+
+The facts system supports parallel processing:
+
+- Multiple machines can be processed concurrently
+- Configurable parallel worker count
+- Thread-safe fact operations
+
+### Resource Management
+
+The facts system manages resources efficiently:
+
+- SSH connections are pooled and reused
+- Memory usage is optimized for large fact sets
+- Timeouts prevent hanging operations
+
+## Troubleshooting
+
+### Common Issues
+
+1. **SSH Connection Failures**: Check machine connectivity and SSH configuration
+2. **Authentication Errors**: Verify SSH key permissions and user access
+3. **Fact Collection Failures**: Check command execution permissions
+4. **Export Errors**: Check file permissions and export format
+5. **Timeout Issues**: Adjust collection timeouts for slow machines
+
+### Debug Information
+
+The facts system provides comprehensive logging for debugging:
+
+```go
+// Enable debug logging
+logger.SetLevel(spookytypes.LogLevelDebug)
+
+// Check SSH configuration
+fmt.Printf("SSH config: %+v\n", sshConfig)
+
+// Validate fact configuration
+err := validateFact(fact)
+if err != nil {
+    fmt.Printf("Fact validation error: %v\n", err)
+}
+```
 
 ## Future Enhancements
 
 ### Planned Features
 
-1. **Persistent Storage**: Long-term fact storage in databases
-2. **Fact History**: Historical fact tracking and comparison
-3. **Advanced Collectors**: Custom fact collectors for specific data
-4. **Fact Validation**: Enhanced validation and schema checking
-5. **Fact Import**: Import facts from external sources
-6. **Fact Comparison**: Compare facts across machines and time periods
+1. **Parallel Processing**: Implement parallel fact collection
+2. **Advanced Filtering**: Support complex fact filtering
+3. **Fact Discovery**: Add automatic fact discovery
+4. **Fact Caching**: Add fact caching for performance
+5. **Fact Versioning**: Add fact versioning support
 
 ### Integration Enhancements
 
-1. **Template Integration**: Use facts in template rendering
-2. **Variable Integration**: Use facts in variable resolution
-3. **Action Integration**: Use facts in action conditions
-4. **Real-time Monitoring**: Real-time fact collection and monitoring
-
-## Summary
-
-The facts system provides basic fact collection and export capabilities with some limitations. The system is functional for basic use cases but has known issues with SSH-based collection that need to be addressed.
-
-**Status**: ⚠️ **Partially Implemented** - Basic functionality exists but SSH-based collection has issues that need to be resolved.
+1. **Actions Integration**: Use facts in action execution
+2. **Variables Integration**: Use facts in variable resolution
+3. **Templates Integration**: Use facts in template rendering
+4. **Advanced Collection**: Improve fact collection reliability

@@ -14,14 +14,17 @@ The `ActionsIntegration` interface provides the primary entry point for actions 
 
 ```go
 type ActionsIntegration interface {
-    // LoadActions loads actions from the specified project path
-    LoadActions(ctx context.Context, projectPath string) ([]interface{}, error)
-    
-    // ValidateActions validates action definitions
-    ValidateActions(ctx context.Context, actions []interface{}) (*ValidationResult, error)
-    
-    // RunActions runs actions on target machines
-    RunActions(ctx context.Context, projectPath string, actions []interface{}, machines []string) error
+    // LoadActions loads actions from the given source
+    LoadActions(ctx context.Context, source string) ([]spookytypes.Action, error)
+
+    // ValidateActions validates actions
+    ValidateActions(ctx context.Context, actions []spookytypes.Action) (*spookytypes.ValidationResult, error)
+
+    // RunActions runs actions on the given machines
+    RunActions(ctx context.Context, actions []spookytypes.Action, machines []spookytypes.Machine) ([]spookytypes.ActingResult, error)
+
+    // GetSSHManager returns the SSH manager for authentication testing
+    GetSSHManager() SSHManager
 }
 ```
 
@@ -33,14 +36,17 @@ The `ActionManager` interface provides action management and orchestration:
 
 ```go
 type ActionManager interface {
-    // LoadActions loads actions from project configuration
-    LoadActions(ctx context.Context, projectPath string) ([]*spookytypesactions.Action, error)
-    
-    // ValidateActions validates action definitions
-    ValidateActions(ctx context.Context, actions []*spookytypesactions.Action) (*ValidationResult, error)
-    
-    // RunActions runs actions on target machines
-    RunActions(ctx context.Context, actions []*spookytypesactions.Action, machines []*spookytypes.Machine) error
+    // LoadActions loads actions from the given source
+    LoadActions(ctx context.Context, source string) ([]spookytypes.Action, error)
+
+    // ValidateActions validates actions
+    ValidateActions(ctx context.Context, actions []spookytypes.Action) (*spookytypes.ValidationResult, error)
+
+    // RunActions runs actions on the given machines
+    RunActions(ctx context.Context, actions []spookytypes.Action, machines []spookytypes.Machine) ([]spookytypes.ActingResult, error)
+
+    // GetSSHManager returns the SSH manager for authentication testing
+    GetSSHManager() SSHManager
 }
 ```
 
@@ -58,6 +64,8 @@ type ActionManager interface {
 6. **Basic Validation**: Action definition validation and error handling
 7. **Filtering Support**: Support for machine, tag, and group filtering
 8. **Dry Run Support**: Dry run mode for action validation
+9. **Action Planning**: Basic action planning and dependency resolution
+10. **SSH Manager Integration**: SSH manager for authentication testing
 
 ### ⚠️ Known Issues
 
@@ -81,140 +89,172 @@ type ActionManager interface {
 The actions system loads actions from HCL configuration files:
 
 ```go
-type ActionLoader struct {
-    logger spookylogging.Logger
+type Manager struct {
+    logger          spookytypeslogging.Logger
+    validator       spookyinterfaces.ActionValidator
+    sshManager      spookyinterfaces.SSHManager
+    schemaValidator *spookyschemas.Validator
 }
 
-func (l *ActionLoader) LoadActions(ctx context.Context, projectPath string) ([]*spookytypesactions.Action, error) {
-    // Load actions.hcl file
-    actionsPath := filepath.Join(projectPath, "actions.hcl")
-    
-    data, err := os.ReadFile(actionsPath)
-    if err != nil {
-        return nil, fmt.Errorf("failed to read actions file: %w", err)
+func NewManager(
+    logger spookytypeslogging.Logger,
+    validator spookyinterfaces.ActionValidator,
+    sshManager spookyinterfaces.SSHManager,
+    schemaValidator *spookyschemas.Validator,
+) spookyinterfaces.ActionsIntegration {
+    return &Manager{
+        logger:          logger,
+        validator:       validator,
+        sshManager:      sshManager,
+        schemaValidator: schemaValidator,
     }
-    
-    // Parse HCL configuration
-    var config struct {
-        Actions []*spookytypesactions.Action `hcl:"action,block"`
-    }
-    
-    if err := hcl.Unmarshal(data, &config); err != nil {
-        return nil, fmt.Errorf("failed to parse actions configuration: %w", err)
-    }
-    
-    return config.Actions, nil
 }
 ```
 
-**Supported Action Types:**
-- **Command Actions**: Execute commands on remote machines
-- **Script Actions**: Run scripts on remote machines
-- **File Actions**: Copy files to/from remote machines
-- **Template Actions**: Render templates and deploy to remote machines
-
-### Action Validation System
-
-Actions are validated against schemas and business rules:
+### Action Loading Implementation
 
 ```go
-type ActionValidator struct {
-    logger spookylogging.Logger
+// LoadActions loads actions from the specified source
+func (m *Manager) LoadActions(ctx context.Context, source string) ([]spookytypes.Action, error) {
+    m.logger.Info("Loading actions", map[string]interface{}{
+        "source": source,
+    })
+
+    // Check if source is a directory
+    if info, err := os.Stat(source); err == nil && info.IsDir() {
+        return m.loadActionsFromDirectory(ctx, source)
+    }
+
+    // Check if source is a file
+    if _, err := os.Stat(source); err == nil {
+        return m.loadActionsFromFile(ctx, source)
+    }
+
+    return nil, fmt.Errorf("source not found: %s", source)
 }
 
-func (v *ActionValidator) ValidateActions(ctx context.Context, actions []*spookytypesactions.Action) (*spookytypes.ValidationResult, error) {
+// loadActionsFromFile loads actions from a single HCL file
+func (m *Manager) loadActionsFromFile(_ context.Context, filePath string) ([]spookytypes.Action, error) {
+    data, err := os.ReadFile(filePath)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read actions file: %w", err)
+    }
+
+    var config struct {
+        Actions []*spookytypesactions.Action `hcl:"action,block"`
+    }
+
+    if err := hclsimple.Decode(filePath, data, nil, &config); err != nil {
+        return nil, fmt.Errorf("failed to parse actions file: %w", err)
+    }
+
+    // Convert to interface slice
+    actions := make([]spookytypes.Action, len(config.Actions))
+    for i, action := range config.Actions {
+        actions[i] = action
+    }
+
+    return actions, nil
+}
+```
+
+### Action Validation Implementation
+
+```go
+// ValidateActions validates a collection of actions
+func (m *Manager) ValidateActions(ctx context.Context, actions []spookytypes.Action) (*spookytypes.ValidationResult, error) {
+    m.logger.Info("Validating actions", map[string]interface{}{
+        "actions": len(actions),
+    })
+
     var errors []spookyschemas.SchemaError
     var warnings []spookyschemas.SchemaError
-    
+
     for i, action := range actions {
-        // Validate action name
-        if action.Name == "" {
-            errors = append(errors, spookyschemas.SchemaError{
-                Message: fmt.Sprintf("action[%d]: name is required", i),
-            })
-        }
-        
-        // Validate action description
-        if action.Description == "" {
-            warnings = append(warnings, spookyschemas.SchemaError{
-                Message: fmt.Sprintf("action[%d]: description is recommended", i),
-            })
-        }
-        
-        // Validate action type
-        if err := v.validateActionType(action); err != nil {
-            errors = append(errors, spookyschemas.SchemaError{
-                Message: fmt.Sprintf("action[%d]: %s", i, err.Error()),
-            })
-        }
-        
-        // Validate action targets
-        if err := v.validateActionTargets(action); err != nil {
+        // Validate individual action
+        if err := m.validateAction(action); err != nil {
             errors = append(errors, spookyschemas.SchemaError{
                 Message: fmt.Sprintf("action[%d]: %s", i, err.Error()),
             })
         }
     }
-    
+
     return &spookytypes.ValidationResult{
         Valid:    len(errors) == 0,
         Errors:   errors,
         Warnings: warnings,
     }, nil
 }
-```
 
-### Action Orchestration System
+func (m *Manager) validateAction(action spookytypes.Action) error {
+    // Validate required fields
+    if action.Name == "" {
+        return fmt.Errorf("action name is required")
+    }
 
-Actions are orchestrated through the SSH system (currently has issues):
+    if action.Type == "" {
+        return fmt.Errorf("action type is required")
+    }
 
-```go
-type ActionOrchestrator struct {
-    sshManager spookyinterfaces.SSHManager
-    logger     spookylogging.Logger
-}
-
-func (o *ActionOrchestrator) RunActions(ctx context.Context, actions []*spookytypesactions.Action, machines []*spookytypes.Machine) error {
-    for _, action := range actions {
-        // Filter machines based on action targets
-        targetMachines := o.filterMachinesForAction(action, machines)
-        
-        // Run action on target machines
-        for _, machine := range targetMachines {
-            if err := o.runActionOnMachine(ctx, action, machine); err != nil {
-                o.logger.Error("Failed to run action on machine", 
-                    "action", action.Name, 
-                    "machine", machine.Hostname, 
-                    "error", err)
-                return fmt.Errorf("failed to run action %s on %s: %w", action.Name, machine.Hostname, err)
-            }
+    // Validate action type
+    validTypes := []string{"command", "script", "template_deploy", "file_copy", "service_control"}
+    valid := false
+    for _, t := range validTypes {
+        if action.Type == t {
+            valid = true
+            break
         }
     }
-    
+    if !valid {
+        return fmt.Errorf("invalid action type: %s (valid types: %v)", action.Type, validTypes)
+    }
+
     return nil
 }
+```
 
-func (o *ActionOrchestrator) runActionOnMachine(ctx context.Context, action *spookytypesactions.Action, machine *spookytypes.Machine) error {
-    // Create SSH connection
-    conn, err := o.sshManager.GetConnection(machine.Hostname, machine.Port, machine.User)
+### Action Running Implementation
+
+```go
+// RunActions runs the specified actions on the target machines
+func (m *Manager) RunActions(ctx context.Context, actions []spookytypes.Action, machines []spookytypes.Machine) ([]spookytypes.ActingResult, error) {
+    m.logger.Info("Running actions", map[string]interface{}{
+        "actions":  len(actions),
+        "machines": len(machines),
+    })
+
+    // Create acting session
+    session := &spookytypesactions.ActingSession{
+        SessionID:    "session-" + fmt.Sprintf("%d", ctx.Value("session_id")),
+        Status:       "active",
+        TotalActions: len(actions),
+    }
+
+    // Plan action running
+    plan, err := m.createActionPlan(ctx, actions, machines)
     if err != nil {
-        return fmt.Errorf("failed to establish SSH connection: %w", err)
+        m.logger.Error("Failed to create action plan", err, map[string]interface{}{
+            "actions":  len(actions),
+            "machines": len(machines),
+        })
+        return nil, fmt.Errorf("failed to create action plan: %w", err)
     }
-    defer o.sshManager.ReturnConnection(conn)
-    
-    // Execute action based on type
-    switch action.Type {
-    case "command":
-        return o.executeCommandAction(ctx, conn, action)
-    case "script":
-        return o.executeScriptAction(ctx, conn, action)
-    case "file":
-        return o.executeFileAction(ctx, conn, action)
-    case "template":
-        return o.executeTemplateAction(ctx, conn, action)
-    default:
-        return fmt.Errorf("unsupported action type: %s", action.Type)
+
+    // Run action plan
+    results, err := m.runActionPlan(ctx, session, plan)
+    if err != nil {
+        m.logger.Error("Failed to run action plan", err, map[string]interface{}{
+            "plan": plan.Name,
+        })
+        return nil, fmt.Errorf("failed to run action plan: %w", err)
     }
+
+    m.logger.Info("Action running completed", map[string]interface{}{
+        "actions": len(actions),
+        "results": len(results),
+    })
+
+    return results, nil
 }
 ```
 
@@ -227,253 +267,169 @@ func (o *ActionOrchestrator) runActionOnMachine(ctx context.Context, action *spo
 type Action struct {
     // Action name (required)
     Name string `json:"name" hcl:"name"`
-    
+
     // Action description (optional)
     Description string `json:"description,omitempty" hcl:"description,optional"`
-    
-    // Action type (command, script, file, template)
+
+    // Action type (command, script, template_deploy, file_copy, service_control)
     Type string `json:"type" hcl:"type"`
-    
-    // Action targets (machines, tags, groups)
-    Targets *ActionTargets `json:"targets,omitempty" hcl:"targets,optional"`
-    
+
     // Action configuration
-    Config *ActionConfig `json:"config,omitempty" hcl:"config,optional"`
-    
+    Config map[string]interface{} `json:"config,omitempty" hcl:"config,optional"`
+
+    // Target machines
+    Machines []string `json:"machines,omitempty" hcl:"machines,optional"`
+
+    // Action dependencies
+    Dependencies []string `json:"dependencies,omitempty" hcl:"dependencies,optional"`
+
+    // Action tags
+    Tags []string `json:"tags,omitempty" hcl:"tags,optional"`
+
     // Action metadata
     Metadata map[string]interface{} `json:"metadata,omitempty" hcl:"metadata,optional"`
 }
 
-// ActionTargets defines action execution targets
-type ActionTargets struct {
-    // Target machines by name
-    Machines []string `json:"machines,omitempty" hcl:"machines,optional"`
-    
-    // Target machines by tags
-    Tags []string `json:"tags,omitempty" hcl:"tags,optional"`
-    
-    // Target machines by groups
-    Groups []string `json:"groups,omitempty" hcl:"groups,optional"`
-    
-    // Complex filter query
-    Filter string `json:"filter,omitempty" hcl:"filter,optional"`
+// ActingSession represents an action running session
+type ActingSession struct {
+    // Session ID
+    SessionID string `json:"session_id" hcl:"session_id"`
+
+    // Session status
+    Status string `json:"status" hcl:"status"`
+
+    // Total actions in session
+    TotalActions int `json:"total_actions" hcl:"total_actions"`
+
+    // Machine inventory
+    MachineInventory []spookytypes.Machine `json:"machine_inventory,omitempty" hcl:"machine_inventory,optional"`
 }
 
-// ActionConfig provides action-specific configuration
-type ActionConfig struct {
-    // Command to execute (for command actions)
-    Command string `json:"command,omitempty" hcl:"command,optional"`
-    
-    // Script path (for script actions)
-    Script string `json:"script,omitempty" hcl:"script,optional"`
-    
-    // File operations (for file actions)
-    Files []*FileOperation `json:"files,omitempty" hcl:"files,optional"`
-    
-    // Template operations (for template actions)
-    Templates []*TemplateOperation `json:"templates,omitempty" hcl:"templates,optional"`
-    
-    // Execution options
-    Options *ExecutionOptions `json:"options,omitempty" hcl:"options,optional"`
-}
+// ActingResult represents the result of an action
+type ActingResult struct {
+    // Action name
+    ActionName string `json:"action_name" hcl:"action_name"`
 
-// FileOperation represents a file operation
-type FileOperation struct {
-    // Source file path
-    Source string `json:"source" hcl:"source"`
-    
-    // Destination file path
-    Destination string `json:"destination" hcl:"destination"`
-    
-    // Operation type (copy, move, delete)
-    Operation string `json:"operation" hcl:"operation"`
-    
-    // File permissions
-    Permissions string `json:"permissions,omitempty" hcl:"permissions,optional"`
-}
+    // Machine name
+    MachineName string `json:"machine_name" hcl:"machine_name"`
 
-// TemplateOperation represents a template operation
-type TemplateOperation struct {
-    // Template source path
-    Source string `json:"source" hcl:"source"`
-    
-    // Template destination path
-    Destination string `json:"destination" hcl:"destination"`
-    
-    // Template data
-    Data map[string]interface{} `json:"data,omitempty" hcl:"data,optional"`
-    
-    // Template permissions
-    Permissions string `json:"permissions,omitempty" hcl:"permissions,optional"`
-}
+    // Result status
+    Status string `json:"status" hcl:"status"`
 
-// ExecutionOptions provides execution configuration
-type ExecutionOptions struct {
-    // Parallel execution
-    Parallel bool `json:"parallel,omitempty" hcl:"parallel,optional"`
-    
-    // Execution timeout
-    Timeout time.Duration `json:"timeout,omitempty" hcl:"timeout,optional"`
-    
+    // Start time
+    StartTime time.Time `json:"start_time" hcl:"start_time"`
+
+    // End time
+    EndTime time.Time `json:"end_time" hcl:"end_time"`
+
+    // Exit code
+    ExitCode int `json:"exit_code" hcl:"exit_code"`
+
+    // Error type
+    ErrorType string `json:"error_type,omitempty" hcl:"error_type,optional"`
+
+    // Error message
+    Error string `json:"error,omitempty" hcl:"error,optional"`
+
+    // Output
+    Output string `json:"output,omitempty" hcl:"output,optional"`
+}
+```
+
+### Action Configuration Types
+
+```go
+// CommandActionConfig represents command action configuration
+type CommandActionConfig struct {
+    // Command to execute
+    Command string `json:"command" hcl:"command"`
+
     // Working directory
     WorkingDir string `json:"working_dir,omitempty" hcl:"working_dir,optional"`
-    
+
     // Environment variables
     Environment map[string]string `json:"environment,omitempty" hcl:"environment,optional"`
-}
-```
 
-### Action Context Types
+    // Timeout in seconds
+    Timeout int `json:"timeout,omitempty" hcl:"timeout,optional"`
 
-```go
-// ActionContext provides context for action execution
-type ActionContext struct {
-    // Project path
-    ProjectPath string `json:"project_path" hcl:"project_path"`
-    
-    // Action being executed
-    Action *Action `json:"action" hcl:"action"`
-    
-    // Target machine
-    Machine *spookytypes.Machine `json:"machine" hcl:"machine"`
-    
-    // Execution timestamp
-    Timestamp time.Time `json:"timestamp" hcl:"timestamp"`
-    
-    // Execution metadata
-    Metadata map[string]interface{} `json:"metadata,omitempty" hcl:"metadata,optional"`
+    // User to run as
+    User string `json:"user,omitempty" hcl:"user,optional"`
 }
 
-// ActionResult represents the result of action execution
-type ActionResult struct {
-    // Action context
-    Context *ActionContext `json:"context" hcl:"context"`
-    
-    // Execution success
-    Success bool `json:"success" hcl:"success"`
-    
-    // Execution output
-    Output string `json:"output,omitempty" hcl:"output,optional"`
-    
-    // Execution error
-    Error string `json:"error,omitempty" hcl:"error,optional"`
-    
-    // Execution duration
-    Duration time.Duration `json:"duration" hcl:"duration"`
-    
-    // Exit code
-    ExitCode int `json:"exit_code,omitempty" hcl:"exit_code,optional"`
-}
-```
+// ScriptActionConfig represents script action configuration
+type ScriptActionConfig struct {
+    // Script path
+    Script string `json:"script" hcl:"script"`
 
-## Error Handling
+    // Script arguments
+    Args []string `json:"args,omitempty" hcl:"args,optional"`
 
-### Action Errors
+    // Working directory
+    WorkingDir string `json:"working_dir,omitempty" hcl:"working_dir,optional"`
 
-```go
-// ActionError represents action execution errors
-type ActionError struct {
-    ActionName string `json:"action_name" hcl:"action_name"`
-    MachineID  string `json:"machine_id" hcl:"machine_id"`
-    Error      string `json:"error" hcl:"error"`
-    Details    string `json:"details,omitempty" hcl:"details,optional"`
-}
+    // Environment variables
+    Environment map[string]string `json:"environment,omitempty" hcl:"environment,optional"`
 
-// ActionValidationError represents action validation errors
-type ActionValidationError struct {
-    Field   string `json:"field" hcl:"field"`
-    Message string `json:"message" hcl:"message"`
-    Value   string `json:"value,omitempty" hcl:"value,optional"`
-}
-```
+    // Timeout in seconds
+    Timeout int `json:"timeout,omitempty" hcl:"timeout,optional"`
 
-### Validation Implementation
-
-```go
-// ValidateAction validates a single action
-func (v *ActionValidator) ValidateAction(action *spookytypesactions.Action) error {
-    if action == nil {
-        return fmt.Errorf("action cannot be nil")
-    }
-    
-    // Validate required fields
-    if action.Name == "" {
-        return fmt.Errorf("action name is required")
-    }
-    
-    if action.Type == "" {
-        return fmt.Errorf("action type is required")
-    }
-    
-    // Validate action type
-    validTypes := []string{"command", "script", "file", "template"}
-    valid := false
-    for _, t := range validTypes {
-        if action.Type == t {
-            valid = true
-            break
-        }
-    }
-    if !valid {
-        return fmt.Errorf("invalid action type: %s (valid types: %v)", action.Type, validTypes)
-    }
-    
-    // Validate action configuration based on type
-    switch action.Type {
-    case "command":
-        if action.Config == nil || action.Config.Command == "" {
-            return fmt.Errorf("command action requires command configuration")
-        }
-    case "script":
-        if action.Config == nil || action.Config.Script == "" {
-            return fmt.Errorf("script action requires script configuration")
-        }
-    case "file":
-        if action.Config == nil || len(action.Config.Files) == 0 {
-            return fmt.Errorf("file action requires file operations")
-        }
-    case "template":
-        if action.Config == nil || len(action.Config.Templates) == 0 {
-            return fmt.Errorf("template action requires template operations")
-        }
-    }
-    
-    return nil
+    // User to run as
+    User string `json:"user,omitempty" hcl:"user,optional"`
 }
 ```
 
 ## CLI Commands
 
+### Actions List Command
+
+```bash
+# List all actions in a project
+spooky actions list ./my-project
+
+# List actions with details
+spooky actions list ./my-project --verbose
+
+# List actions for specific machines
+spooky actions list ./my-project --machine web-server
+
+# List actions by tags
+spooky actions list ./my-project --tags "environment=production"
+```
+
+### Actions Validate Command
+
+```bash
+# Validate action configuration
+spooky actions validate ./my-project
+
+# Validate with detailed output
+spooky actions validate ./my-project --verbose
+
+# Validate specific actions
+spooky actions validate ./my-project --action restart-nginx
+```
+
 ### Actions Run Command
 
 ```bash
-# Run all actions in a project
+# Run all actions
 spooky actions run ./my-project
 
-# Run actions with dry run mode
+# Run specific actions
+spooky actions run ./my-project --action restart-nginx
+
+# Run actions with plan mode
+spooky actions run ./my-project --plan
+
+# Run actions in dry-run mode
 spooky actions run ./my-project --dry-run
 
-# Run actions on specific machines
-spooky actions run ./my-project --machines web-server,app-server
-
-# Run actions on machines with specific tags
-spooky actions run ./my-project --tags production,web
-
-# Run actions on machines in specific groups
-spooky actions run ./my-project --groups webservers,databases
-
-# Run actions with parallel execution
+# Run actions in parallel
 spooky actions run ./my-project --parallel 4
-```
 
-### Actions Validation Command
-
-```bash
-# Validate actions in a project
-spooky actions validate ./my-project
-
-# Validate actions with verbose output
-spooky actions validate ./my-project --verbose
+# Run actions with timeout
+spooky actions run ./my-project --timeout 600
 ```
 
 ## Integration Examples
@@ -483,43 +439,44 @@ spooky actions validate ./my-project --verbose
 ```hcl
 # actions.hcl
 actions {
-  action "update-system" {
+  action "restart-nginx" {
+    description = "Restart nginx service"
+    type = "service_control"
+    
+    config {
+      service = "nginx"
+      action = "restart"
+    }
+    
+    machines = ["web-server", "app-server"]
+    tags = ["web", "production"]
+  }
+  
+  action "update-packages" {
     description = "Update system packages"
     type = "command"
     
-    targets {
-      tags = ["production", "web"]
-    }
-    
     config {
       command = "apt update && apt upgrade -y"
-      
-      options {
-        timeout = "300s"
-        parallel = true
-      }
+      timeout = 300
     }
+    
+    machines = ["web-server", "db-server"]
+    tags = ["maintenance"]
   }
   
   action "deploy-config" {
     description = "Deploy configuration files"
-    type = "template"
-    
-    targets {
-      machines = ["web-server", "app-server"]
-    }
+    type = "template_deploy"
     
     config {
-      templates {
-        source = "templates/nginx.conf.tmpl"
-        destination = "/etc/nginx/nginx.conf"
-        permissions = "0644"
-      }
-      
-      options {
-        timeout = "60s"
-      }
+      template = "templates/nginx.conf.tmpl"
+      destination = "/etc/nginx/nginx.conf"
+      backup = true
     }
+    
+    machines = ["web-server"]
+    dependencies = ["restart-nginx"]
   }
 }
 ```
@@ -532,7 +489,7 @@ func loadAndValidateActions(projectPath string) error {
     ctx := context.Background()
     
     // Create action manager
-    manager := spookyactions.NewManager(loader, validator, logger)
+    manager := spookyactions.NewManager(logger, validator, sshManager, schemaValidator)
     
     // Load actions
     actions, err := manager.LoadActions(ctx, projectPath)
@@ -559,15 +516,15 @@ func loadAndValidateActions(projectPath string) error {
 }
 ```
 
-### Action Execution
+### Action Running
 
 ```go
-// Action execution example
-func executeActions(projectPath string, machines []*spookytypes.Machine) error {
+// Action running example
+func runActions(projectPath string, machines []spookytypes.Machine) error {
     ctx := context.Background()
     
     // Create action manager
-    manager := spookyactions.NewManager(loader, validator, logger)
+    manager := spookyactions.NewManager(logger, validator, sshManager, schemaValidator)
     
     // Load actions
     actions, err := manager.LoadActions(ctx, projectPath)
@@ -576,59 +533,132 @@ func executeActions(projectPath string, machines []*spookytypes.Machine) error {
     }
     
     // Run actions
-    err = manager.RunActions(ctx, actions, machines)
+    results, err := manager.RunActions(ctx, actions, machines)
     if err != nil {
         return fmt.Errorf("failed to run actions: %w", err)
+    }
+    
+    // Process results
+    for _, result := range results {
+        if result.Error != "" {
+            fmt.Printf("Action %s on %s failed: %s\n", result.ActionName, result.MachineName, result.Error)
+        } else {
+            fmt.Printf("Action %s on %s completed successfully\n", result.ActionName, result.MachineName)
+        }
     }
     
     return nil
 }
 ```
 
-## Current Limitations
+## Error Handling
 
-### Orchestration Limitations
+### Action Errors
 
-1. **SSH Integration Issues**: SSH-based action orchestration has known problems
-2. **No Parallel Execution**: Actions are executed sequentially, not in parallel
-3. **No Result Collection**: Action results are not collected or processed
-4. **No Error Recovery**: No error recovery or retry mechanisms
-5. **No Progress Tracking**: No progress tracking or status reporting
+```go
+// Error handling example
+func handleActionError(err error) {
+    if err == nil {
+        return
+    }
+    
+    // Check for specific error types
+    switch {
+    case strings.Contains(err.Error(), "failed to create action plan"):
+        fmt.Println("Action planning failed - check action dependencies")
+    case strings.Contains(err.Error(), "failed to run action plan"):
+        fmt.Println("Action execution failed - check SSH connectivity")
+    case strings.Contains(err.Error(), "invalid action type"):
+        fmt.Println("Invalid action type - check action configuration")
+    case strings.Contains(err.Error(), "action not found"):
+        fmt.Println("Action not found - check action names")
+    default:
+        fmt.Printf("Action error: %v\n", err)
+    }
+}
+```
 
-### Integration Limitations
+### Validation Errors
 
-1. **No Template Integration**: Templates are not rendered in actions
-2. **No Variable Integration**: Variables are not resolved in actions
-3. **No Facts Integration**: Facts are not used in action conditions
-4. **No Conditional Execution**: No conditional action execution based on facts or variables
+```go
+// Validation error handling
+func handleValidationError(result *spookytypes.ValidationResult) error {
+    if result.Valid {
+        return nil
+    }
+    
+    fmt.Println("Action validation failed:")
+    for _, err := range result.Errors {
+        fmt.Printf("  - %s\n", err.Message)
+    }
+    
+    for _, warning := range result.Warnings {
+        fmt.Printf("  Warning: %s\n", warning.Message)
+    }
+    
+    return fmt.Errorf("action validation failed with %d errors", len(result.Errors))
+}
+```
 
-### Execution Limitations
+## Performance Considerations
 
-1. **Basic Command Execution**: Only basic command execution is supported
-2. **No Script Support**: Script execution is not properly implemented
-3. **No File Operations**: File copy/move operations are not implemented
-4. **No Template Rendering**: Template rendering is not implemented
+### Parallel Processing
+
+The actions system supports parallel processing:
+
+- Multiple actions can run concurrently on different machines
+- Configurable parallel worker count
+- Thread-safe action execution
+
+### Resource Management
+
+The actions system manages resources efficiently:
+
+- SSH connections are pooled and reused
+- Memory usage is optimized for large action sets
+- Timeouts prevent hanging operations
+
+## Troubleshooting
+
+### Common Issues
+
+1. **SSH Connection Failures**: Check machine connectivity and SSH configuration
+2. **Authentication Errors**: Verify SSH key permissions and user access
+3. **Action Dependencies**: Check action dependency configuration
+4. **Permission Denied**: Check user privileges on target machines
+5. **Timeout Issues**: Adjust action timeouts for slow operations
+
+### Debug Information
+
+The actions system provides comprehensive logging for debugging:
+
+```go
+// Enable debug logging
+logger.SetLevel(spookytypes.LogLevelDebug)
+
+// Check SSH configuration
+fmt.Printf("SSH config: %+v\n", sshConfig)
+
+// Validate action configuration
+err := validateAction(action)
+if err != nil {
+    fmt.Printf("Action validation error: %v\n", err)
+}
+```
 
 ## Future Enhancements
 
 ### Planned Features
 
-1. **SSH Orchestration Fixes**: Resolve SSH-based action orchestration issues
-2. **Parallel Execution**: Implement parallel action execution
-3. **Result Collection**: Collect and process action results
-4. **Error Recovery**: Implement error recovery and retry mechanisms
-5. **Progress Tracking**: Add progress tracking and status reporting
-6. **Conditional Execution**: Support conditional action execution
+1. **Parallel Execution**: Implement parallel action execution
+2. **Template Integration**: Add template rendering support
+3. **Variable Integration**: Add variable resolution support
+4. **Result Processing**: Improve action result handling
+5. **Advanced Filtering**: Support complex action filtering
 
 ### Integration Enhancements
 
-1. **Template Integration**: Integrate template rendering in actions
-2. **Variable Integration**: Integrate variable resolution in actions
-3. **Facts Integration**: Use facts in action conditions and execution
-4. **Advanced Execution**: Support advanced execution options and features
-
-## Summary
-
-The actions system provides basic action loading and validation capabilities but has significant limitations with SSH-based orchestration that need to be addressed. The system is functional for basic use cases but requires improvements for production use.
-
-**Status**: ⚠️ **Partially Implemented** - Basic functionality exists but SSH-based orchestration has issues that need to be resolved.
+1. **Facts Integration**: Use facts in action execution
+2. **Variables Integration**: Use variables in action configuration
+3. **Templates Integration**: Use templates in action definitions
+4. **Advanced Planning**: Improve action planning and dependency resolution

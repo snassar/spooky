@@ -4,7 +4,7 @@
 
 This document provides a comprehensive API reference for the spooky secrets system. It covers all interfaces, types, methods, and implementation details for developers working with the secrets system.
 
-**Status: Mostly Implemented** - The secrets system has comprehensive functionality for local secrets, age encryption, and HCL parsing. SSH-based secret collection is the main missing feature.
+**Status: Fully Implemented** - The secrets system has complete age encryption functionality with HCL integration support, recipient management, and comprehensive validation.
 
 ## Core Interfaces
 
@@ -14,671 +14,383 @@ The `SecretsIntegration` interface provides the primary entry point for secrets 
 
 ```go
 type SecretsIntegration interface {
-    // LoadSecrets loads secrets from the specified project path
-    LoadSecrets(ctx context.Context, projectPath string) (map[string]interface{}, error)
-    
-    // ValidateSecrets validates secret definitions
-    ValidateSecrets(ctx context.Context, secrets map[string]interface{}) (*ValidationResult, error)
-    
-    // EncryptSecrets encrypts secrets using age encryption
-    EncryptSecrets(ctx context.Context, secrets map[string]interface{}, publicKey string) (map[string]string, error)
-    
-    // DecryptSecrets decrypts secrets using age decryption
-    DecryptSecrets(ctx context.Context, encryptedSecrets map[string]string, privateKey string) (map[string]interface{}, error)
+    // Age-specific methods
+    EncryptWithAge(ctx context.Context, data []byte, recipients []string) ([]byte, error)
+    DecryptWithAge(ctx context.Context, data []byte, identityPath string) ([]byte, error)
+    EncryptWithPassphrase(ctx context.Context, data []byte, passphrase string) ([]byte, error)
+    DecryptWithPassphrase(ctx context.Context, data []byte, passphrase string) ([]byte, error)
+
+    // Key management
+    ValidateAgeKey(ctx context.Context, keyPath string) error
+    ListRecipients(ctx context.Context, encryptedData []byte) ([]string, error)
+
+    // Application-level validation
+    ValidateAgeEncryptedValue(ctx context.Context, value string) error
+    LoadRecipients(ctx context.Context, recipientsPath string) ([]string, error)
+    LoadIdentities(ctx context.Context, identitiesPath string) ([]string, error)
+
+    // HCL encryption and decryption methods
+    EncryptHCLValues(ctx context.Context, data interface{}, recipients []string, dryRun bool) error
+    EncryptHCLValuesSensitive(ctx context.Context, data interface{}, recipients []string, dryRun bool, shouldEncrypt func(path []string, value interface{}) bool) error
+    EncryptHCLValuesWithJSONSupport(ctx context.Context, data interface{}, recipients []string, dryRun bool) error
+    DecryptHCLValues(ctx context.Context, data interface{}, identityPath string) error
+    DecryptHCLValuesWithJSONSupport(ctx context.Context, data interface{}, identityPath string) error
 }
 ```
 
-**Implementation Status**: ✅ **Fully Implemented** - Complete age encryption/decryption functionality with SSH infrastructure support
-
-### SecretsManager Interface
-
-The `SecretsManager` interface provides secrets management and encryption:
-
-```go
-type SecretsManager interface {
-    // LoadSecrets loads secrets from project configuration
-    LoadSecrets(ctx context.Context, projectPath string) (map[string]*spookytypessecrets.Secret, error)
-    
-    // ValidateSecrets validates secret definitions
-    ValidateSecrets(ctx context.Context, secrets map[string]*spookytypessecrets.Secret) (*ValidationResult, error)
-    
-    // EncryptSecrets encrypts secrets using age encryption
-    EncryptSecrets(ctx context.Context, secrets map[string]*spookytypessecrets.Secret, publicKey string) (map[string]string, error)
-    
-    // DecryptSecrets decrypts secrets using age decryption
-    DecryptSecrets(ctx context.Context, encryptedSecrets map[string]string, privateKey string) (map[string]*spookytypessecrets.Secret, error)
-}
-```
-
-**Implementation Status**: ✅ **Mostly Implemented** - Complete loading, validation, and encryption functionality. SSH-based collection not yet implemented.
+**Implementation Status**: ✅ **Fully Implemented** - Complete age encryption/decryption functionality with HCL integration support
 
 ## Current Implementation Status
 
 ### ✅ Working Components
 
-1. **Secret Loading**: Loading secrets from HCL configuration files
-2. **Secret Validation**: Basic validation of secret definitions
-3. **Secret Structure**: Proper secret type definitions and structures
-4. **CLI Integration**: `spooky secrets list` command with filtering options
-5. **Project Integration**: Secrets loading from project configuration
-6. **Basic Validation**: Secret definition validation and error handling
-7. **Filtering Support**: Support for secret name and type filtering
-8. **Export Support**: Secret export to JSON and HCL formats
-9. **Age Encryption**: Full age encryption/decryption functionality
-10. **HCL Parsing**: Complete HCL parsing and validation
-11. **SSH Infrastructure**: SSH connections and authentication work properly
+1. **Age Encryption**: Full age encryption/decryption functionality with X25519 and scrypt recipients
+2. **Age Key Management**: Complete age key validation and management
+3. **HCL Integration**: Full HCL value encryption/decryption with JSON support
+4. **CLI Integration**: `spooky secrets validate` command
+5. **Project Integration**: Secrets integration with variables, machines, and facts systems
+6. **Validation**: Comprehensive age configuration and encrypted value validation
+7. **Recipient Management**: Loading and managing age recipients from files
+8. **Identity Management**: Loading and managing age identities from directories
+9. **Passphrase Support**: Passphrase-based encryption/decryption using scrypt
+10. **Armored Output**: Support for armored age output with configuration
+11. **Integration Support**: Full integration with variables, machines, and facts systems
+12. **Legacy Method Support**: Legacy methods return appropriate error messages directing users to age methods
 
-### ⚠️ Known Issues
+### ✅ Fully Implemented Features
 
-1. **SSH-Based Secret Collection**: SSH-based secret collection is not implemented (SSH infrastructure works, but secret collection from remote machines is missing)
-2. **Parallel Processing**: No parallel secret collection support
-3. **Import Functionality**: No secret import capabilities
-4. **Template Integration**: No template secret integration
+#### Age Encryption Methods
+- `EncryptWithAge()` - Encrypt data with X25519 recipients
+- `DecryptWithAge()` - Decrypt data with identity files
+- `EncryptWithPassphrase()` - Encrypt data with scrypt passphrase
+- `DecryptWithPassphrase()` - Decrypt data with scrypt passphrase
 
-### 🔄 In Progress
+#### Key Management
+- `ValidateAgeKey()` - Validate age identity files
+- `ListRecipients()` - Extract recipient information from encrypted data
+- `LoadRecipients()` - Load recipients from files
+- `LoadIdentities()` - Load identities from directories
 
-1. **SSH Collection Implementation**: Implementing SSH-based secret collection functionality
-2. **Collection Enhancements**: Improving secret collection reliability
+#### HCL Integration
+- `EncryptHCLValues()` - Encrypt values in HCL structures
+- `DecryptHCLValues()` - Decrypt values in HCL structures
+- `EncryptHCLValuesSensitive()` - Encrypt with sensitivity awareness
+- `EncryptHCLValuesWithJSONSupport()` - Encrypt with JSON serialization
+- `DecryptHCLValuesWithJSONSupport()` - Decrypt with JSON deserialization
+
+#### Validation
+- `ValidateAgeEncryptedValue()` - Validate age-encrypted values
+- Comprehensive error handling and logging
+- Support for both armored and binary age formats
+
+### ❌ Intentionally Not Implemented
+
+The following components are intentionally not implemented as they are not needed for the secrets system design:
+
+1. **Secret Loading**: No dedicated secret loading from HCL configuration files (secrets are handled through existing systems)
+2. **Secret Storage**: No dedicated secret storage (secrets are part of machines inventories, custom facts, and variables)
+3. **Secret Export/Import**: No export/import functionality (not needed for the system design)
+4. **Secret Caching**: No secret caching (not needed for the system design)
+5. **Secret Templates**: No secret template integration (not needed for the system design)
 
 ## Implementation Details
 
-### Secret Loading System
+### Age Integration Implementation
 
-The secrets system loads secrets from HCL configuration files:
+The secrets system uses the `filippo.io/age` library for all encryption operations:
 
 ```go
-type SecretLoader struct {
-    logger spookylogging.Logger
+// Integration implements the SecretsIntegration interface with age encryption
+type Integration struct {
+    logger       spookytypeslogging.Logger
+    config       *spookytypes.AgeConfig
+    hclProcessor *HCLProcessor
 }
 
-func (l *SecretLoader) LoadSecrets(ctx context.Context, projectPath string) (map[string]*spookytypessecrets.Secret, error) {
-    secrets := make(map[string]*spookytypessecrets.Secret)
-    
-    // Load secrets.hcl file
-    secretsPath := filepath.Join(projectPath, "secrets.hcl")
-    if data, err := os.ReadFile(secretsPath); err == nil {
-        if err := l.parseSecretsFile(data, secrets); err != nil {
-            return nil, fmt.Errorf("failed to parse secrets.hcl: %w", err)
-        }
+// NewIntegration creates a new age-focused secrets integration
+func NewIntegration(logger spookytypeslogging.Logger, config *spookytypes.AgeConfig) spookyinterfaces.SecretsIntegration {
+    return &Integration{
+        logger:       logger,
+        config:       config,
+        hclProcessor: NewHCLProcessor(logger),
     }
-    
-    // Load secrets from secrets/ directory
-    secretsDir := filepath.Join(projectPath, "secrets")
-    if entries, err := os.ReadDir(secretsDir); err == nil {
-        for _, entry := range entries {
-            if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".hcl") {
-                filePath := filepath.Join(secretsDir, entry.Name())
-                if data, err := os.ReadFile(filePath); err == nil {
-                    if err := l.parseSecretsFile(data, secrets); err != nil {
-                        return nil, fmt.Errorf("failed to parse %s: %w", entry.Name(), err)
-                    }
-                }
-            }
-        }
-    }
-    
-    return secrets, nil
+}
+```
+
+### HCL Processor Implementation
+
+The HCL processor handles encryption and decryption of values in HCL-compatible structures:
+
+```go
+// HCLProcessor handles encryption and decryption of HCL values
+type HCLProcessor struct {
+    logger spookytypeslogging.Logger
 }
 
-func (l *SecretLoader) parseSecretsFile(data []byte, secrets map[string]*spookytypessecrets.Secret) error {
-    var config struct {
-        Secrets []*spookytypessecrets.Secret `hcl:"secret,block"`
+// NewHCLProcessor creates a new HCL processor
+func NewHCLProcessor(logger spookytypeslogging.Logger) *HCLProcessor {
+    return &HCLProcessor{
+        logger: logger,
+    }
+}
+```
+
+### Configuration Support
+
+The secrets system supports age configuration through the `AgeConfig` type:
+
+```go
+type AgeConfig struct {
+    Encryption *AgeEncryptionConfig `hcl:"encryption,block"`
+}
+
+type AgeEncryptionConfig struct {
+    Armor bool `hcl:"armor,optional"`
+}
+```
+
+## Usage Examples
+
+### Basic Age Encryption
+
+```go
+// Basic age encryption example
+func encryptDataWithAge(data []byte, recipients []string) error {
+    ctx := context.Background()
+    
+    // Create secrets integration
+    secretsIntegration := spookysecrets.NewIntegration(logger, config)
+    
+    // Encrypt data
+    encrypted, err := secretsIntegration.EncryptWithAge(ctx, data, recipients)
+    if err != nil {
+        return fmt.Errorf("failed to encrypt data: %w", err)
     }
     
-    if err := hcl.Unmarshal(data, &config); err != nil {
-        return fmt.Errorf("failed to parse HCL: %w", err)
-    }
+    fmt.Printf("Encrypted data: %s\n", string(encrypted))
+    return nil
+}
+```
+
+### HCL Value Encryption
+
+```go
+// HCL value encryption example
+func encryptHCLValues(data interface{}, recipients []string) error {
+    ctx := context.Background()
     
-    for _, secret := range config.Secrets {
-        if secret.Name == "" {
-            return fmt.Errorf("secret name is required")
-        }
-        
-        if _, exists := secrets[secret.Name]; exists {
-            return fmt.Errorf("duplicate secret name: %s", secret.Name)
-        }
-        
-        secrets[secret.Name] = secret
+    // Create secrets integration
+    secretsIntegration := spookysecrets.NewIntegration(logger, config)
+    
+    // Encrypt HCL values
+    err := secretsIntegration.EncryptHCLValues(ctx, data, recipients, false)
+    if err != nil {
+        return fmt.Errorf("failed to encrypt HCL values: %w", err)
     }
     
     return nil
 }
 ```
 
-**Supported Secret Sources:**
-- **Local Secrets**: Secrets defined in `secrets.hcl` and `secrets/*.hcl` files ✅
-- **Environment Secrets**: Secrets from environment variables ✅
-- **SSH Secrets**: Secrets collected from remote machines (not yet implemented) ❌
-- **Computed Secrets**: Secrets computed from other secrets (not yet implemented) ❌
-
-### Secret Validation System
-
-Secrets are validated against schemas and business rules:
+### Age Key Validation
 
 ```go
-type SecretValidator struct {
-    logger spookylogging.Logger
-}
-
-func (v *SecretValidator) ValidateSecrets(ctx context.Context, secrets map[string]*spookytypessecrets.Secret) (*spookytypes.ValidationResult, error) {
-    var errors []spookyschemas.SchemaError
-    var warnings []spookyschemas.SchemaError
+// Age key validation example
+func validateAgeKey(keyPath string) error {
+    ctx := context.Background()
     
-    for name, secret := range secrets {
-        // Validate secret name
-        if name == "" {
-            errors = append(errors, spookyschemas.SchemaError{
-                Message: "secret name cannot be empty",
-            })
-            continue
-        }
-        
-        // Validate secret structure
-        if err := v.validateSecretStructure(secret); err != nil {
-            errors = append(errors, spookyschemas.SchemaError{
-                Message: fmt.Sprintf("secret %s: %s", name, err.Error()),
-            })
-        }
-        
-        // Validate secret type
-        if err := v.validateSecretType(secret); err != nil {
-            errors = append(errors, spookyschemas.SchemaError{
-                Message: fmt.Sprintf("secret %s: %s", name, err.Error()),
-            })
-        }
-        
-        // Validate secret constraints
-        if err := v.validateSecretConstraints(secret); err != nil {
-            errors = append(errors, spookyschemas.SchemaError{
-                Message: fmt.Sprintf("secret %s: %s", name, err.Error()),
-            })
-        }
+    // Create secrets integration
+    secretsIntegration := spookysecrets.NewIntegration(logger, config)
+    
+    // Validate age key
+    err := secretsIntegration.ValidateAgeKey(ctx, keyPath)
+    if err != nil {
+        return fmt.Errorf("invalid age key: %w", err)
     }
     
-    return &spookytypes.ValidationResult{
-        Valid:    len(errors) == 0,
-        Errors:   errors,
-        Warnings: warnings,
-    }, nil
+    return nil
 }
 ```
 
-### Secret Encryption System
+## CLI Integration
 
-Secrets are encrypted using age encryption (fully functional):
+### Secrets Validation Command
+
+```bash
+# Validate age configuration
+spooky secrets validate
+
+# Validate age keys
+spooky secrets validate --key ~/.config/spooky/identities/age.key
+
+# Validate encrypted values
+spooky secrets validate --value "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
+```
+
+## Integration with Other Systems
+
+### Variables System Integration
+
+The secrets system integrates with the variables system to encrypt variable values:
 
 ```go
-type SecretEncryptor struct {
-    logger spookylogging.Logger
-}
-
-func (e *SecretEncryptor) EncryptSecrets(ctx context.Context, secrets map[string]*spookytypessecrets.Secret, publicKey string) (map[string]string, error) {
-    encrypted := make(map[string]string)
+// Encrypt variables example
+func encryptVariables(projectPath string, recipients []string) error {
+    ctx := context.Background()
     
-    for name, secret := range secrets {
-        // Convert secret to string
-        secretData, err := e.secretToString(secret)
-        if err != nil {
-            return nil, fmt.Errorf("failed to convert secret %s to string: %w", name, err)
-        }
-        
-        // Encrypt secret using age
-        encryptedData, err := e.encryptWithAge(secretData, publicKey)
-        if err != nil {
-            return nil, fmt.Errorf("failed to encrypt secret %s: %w", name, err)
-        }
-        
-        encrypted[name] = encryptedData
+    // Get variables integration
+    variablesIntegration := manager.GetVariablesIntegration()
+    
+    // Get secrets integration
+    secretsIntegration := manager.GetSecretsIntegration()
+    
+    // Load variables
+    variables, err := variablesIntegration.LoadVariables(ctx, projectPath)
+    if err != nil {
+        return fmt.Errorf("failed to load variables: %w", err)
     }
     
-    return encrypted, nil
-}
-
-func (e *SecretEncryptor) DecryptSecrets(ctx context.Context, encryptedSecrets map[string]string, privateKey string) (map[string]*spookytypessecrets.Secret, error) {
-    decrypted := make(map[string]*spookytypessecrets.Secret)
-    
-    for name, encryptedData := range encryptedSecrets {
-        // Decrypt secret using age
-        decryptedData, err := e.decryptWithAge(encryptedData, privateKey)
-        if err != nil {
-            return nil, fmt.Errorf("failed to decrypt secret %s: %w", name, err)
-        }
-        
-        // Convert string back to secret
-        secret, err := e.stringToSecret(decryptedData)
-        if err != nil {
-            return nil, fmt.Errorf("failed to convert decrypted data for secret %s: %w", name, err)
-        }
-        
-        decrypted[name] = secret
+    // Encrypt variables
+    err = variablesIntegration.EncryptVariables(ctx, projectPath, secretsIntegration, recipients, false)
+    if err != nil {
+        return fmt.Errorf("failed to encrypt variables: %w", err)
     }
     
-    return decrypted, nil
+    return nil
 }
 ```
 
-## Type Definitions
+### Facts System Integration
 
-### Secret Types
+The secrets system integrates with the facts system to decrypt encrypted fact values:
 
 ```go
-// Secret represents a secret definition
-type Secret struct {
-    // Secret name (required)
-    Name string `json:"name" hcl:"name"`
+// Decrypt facts example
+func decryptFacts(facts interface{}, identityPath string) error {
+    ctx := context.Background()
     
-    // Secret description (optional)
-    Description string `json:"description,omitempty" hcl:"description,optional"`
+    // Get facts integration
+    factsIntegration := manager.GetFactsIntegration()
     
-    // Secret type (password, key, certificate, token)
-    Type string `json:"type" hcl:"type"`
+    // Get secrets integration
+    secretsIntegration := manager.GetSecretsIntegration()
     
-    // Secret value (for local secrets)
-    Value interface{} `json:"value,omitempty" hcl:"value,optional"`
+    // Decrypt facts
+    err := factsIntegration.DecryptFacts(ctx, facts, secretsIntegration, identityPath)
+    if err != nil {
+        return fmt.Errorf("failed to decrypt facts: %w", err)
+    }
     
-    // Secret source (for remote secrets)
-    Source *SecretSource `json:"source,omitempty" hcl:"source,optional"`
-    
-    // Secret constraints
-    Constraints *SecretConstraints `json:"constraints,omitempty" hcl:"constraints,optional"`
-    
-    // Secret metadata
-    Metadata map[string]interface{} `json:"metadata,omitempty" hcl:"metadata,optional"`
-}
-
-// SecretSource defines how to obtain secret values
-type SecretSource struct {
-    // Source type (environment, ssh, computed)
-    Type string `json:"type" hcl:"type"`
-    
-    // Source configuration
-    Config map[string]interface{} `json:"config,omitempty" hcl:"config,optional"`
-    
-    // SSH source configuration
-    SSH *SSHSecretSource `json:"ssh,omitempty" hcl:"ssh,optional"`
-    
-    // Environment source configuration
-    Environment *EnvironmentSecretSource `json:"environment,omitempty" hcl:"environment,optional"`
-}
-
-// SSHSecretSource defines SSH-based secret collection
-type SSHSecretSource struct {
-    // Target machine
-    Machine string `json:"machine" hcl:"machine"`
-    
-    // SSH command to execute
-    Command string `json:"command" hcl:"command"`
-    
-    // File path to read (alternative to command)
-    File string `json:"file,omitempty" hcl:"file,optional"`
-    
-    // Parse configuration
-    Parse *ParseConfig `json:"parse,omitempty" hcl:"parse,optional"`
-}
-
-// EnvironmentSecretSource defines environment secret collection
-type EnvironmentSecretSource struct {
-    // Environment variable name
-    Name string `json:"name" hcl:"name"`
-    
-    // Default value if not set
-    Default interface{} `json:"default,omitempty" hcl:"default,optional"`
-}
-
-// SecretConstraints defines secret validation constraints
-type SecretConstraints struct {
-    // Required constraint
-    Required bool `json:"required,omitempty" hcl:"required,optional"`
-    
-    // String constraints
-    MinLength int    `json:"min_length,omitempty" hcl:"min_length,optional"`
-    MaxLength int    `json:"max_length,omitempty" hcl:"max_length,optional"`
-    Pattern   string `json:"pattern,omitempty" hcl:"pattern,optional"`
-    
-    // Allowed values
-    AllowedValues []interface{} `json:"allowed_values,omitempty" hcl:"allowed_values,optional"`
-}
-
-// ParseConfig defines how to parse secret values
-type ParseConfig struct {
-    // Parse format (json, yaml, hcl, text)
-    Format string `json:"format" hcl:"format"`
-    
-    // Parse path (for nested values)
-    Path string `json:"path,omitempty" hcl:"path,optional"`
-    
-    // Parse options
-    Options map[string]interface{} `json:"options,omitempty" hcl:"options,optional"`
+    return nil
 }
 ```
 
-### Secret Context Types
+### Machines System Integration
+
+The secrets system integrates with the machines system to decrypt encrypted machine secrets:
 
 ```go
-// SecretContext provides context for secret operations
-type SecretContext struct {
-    // Project path
-    ProjectPath string `json:"project_path" hcl:"project_path"`
+// Decrypt machines example
+func decryptMachines(machines []spookytypes.Machine, identityPath string) error {
+    ctx := context.Background()
     
-    // Secret being processed
-    Secret *Secret `json:"secret" hcl:"secret"`
+    // Get machines integration
+    machinesIntegration := manager.GetMachinesIntegration()
     
-    // Operation timestamp
-    Timestamp time.Time `json:"timestamp" hcl:"timestamp"`
+    // Get secrets integration
+    secretsIntegration := manager.GetSecretsIntegration()
     
-    // Operation metadata
-    Metadata map[string]interface{} `json:"metadata,omitempty" hcl:"metadata,optional"`
-}
-
-// SecretResult represents the result of secret operations
-type SecretResult struct {
-    // Secret context
-    Context *SecretContext `json:"context" hcl:"context"`
+    // Decrypt machines
+    err := machinesIntegration.DecryptMachines(ctx, machines, secretsIntegration, identityPath)
+    if err != nil {
+        return fmt.Errorf("failed to decrypt machines: %w", err)
+    }
     
-    // Operation success
-    Success bool `json:"success" hcl:"success"`
-    
-    // Secret value
-    Value interface{} `json:"value,omitempty" hcl:"value,optional"`
-    
-    // Operation error
-    Error string `json:"error,omitempty" hcl:"error,optional"`
-    
-    // Operation duration
-    Duration time.Duration `json:"duration" hcl:"duration"`
+    return nil
 }
 ```
 
 ## Error Handling
 
-### Secret Errors
+The secrets system provides comprehensive error handling:
 
 ```go
-// SecretError represents secret operation errors
-type SecretError struct {
-    SecretName string `json:"secret_name" hcl:"secret_name"`
-    Error      string `json:"error" hcl:"error"`
-    Details    string `json:"details,omitempty" hcl:"details,optional"`
-}
-
-// SecretValidationError represents secret validation errors
-type SecretValidationError struct {
-    Field   string `json:"field" hcl:"field"`
-    Message string `json:"message" hcl:"message"`
-    Value   string `json:"value,omitempty" hcl:"value,optional"`
+// Error handling example
+func handleSecretsError(err error) {
+    if err == nil {
+        return
+    }
+    
+    // Check for specific error types
+    switch {
+    case strings.Contains(err.Error(), "failed to parse identity file"):
+        fmt.Println("Invalid age identity file format")
+    case strings.Contains(err.Error(), "failed to create age encryptor"):
+        fmt.Println("Invalid recipient format")
+    case strings.Contains(err.Error(), "failed to decrypt data"):
+        fmt.Println("Decryption failed - check identity file")
+    default:
+        fmt.Printf("Secrets error: %v\n", err)
+    }
 }
 ```
 
-### Validation Implementation
+## Performance Considerations
+
+### Memory Usage
+
+The secrets system is designed for efficient memory usage:
+
+- Encryption operations use streaming for large data
+- HCL processing handles large structures efficiently
+- No unnecessary data copying during operations
+
+### Parallel Processing
+
+The secrets system supports parallel operations:
+
+- Multiple encryption operations can run concurrently
+- HCL processing can handle multiple structures in parallel
+- Integration with other systems supports parallel processing
+
+## Security Best Practices
+
+### Key Management
+
+1. **Secure Key Storage**: Store age identity files with appropriate permissions (600)
+2. **Key Rotation**: Regularly rotate age keys for enhanced security
+3. **Recipient Management**: Carefully manage recipient lists to prevent unauthorized access
+4. **Passphrase Security**: Use strong passphrases for scrypt-based encryption
+
+### Configuration Security
+
+1. **Configuration Validation**: Always validate age configuration before use
+2. **Error Handling**: Handle encryption/decryption errors appropriately
+3. **Logging**: Use secure logging practices to avoid exposing sensitive data
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Invalid Identity File**: Ensure age identity files are properly formatted
+2. **Recipient Format**: Verify recipient strings are in correct age format
+3. **Permission Errors**: Check file permissions for identity and recipient files
+4. **HCL Structure**: Ensure HCL structures are properly formatted for encryption
+
+### Debug Information
+
+The secrets system provides comprehensive logging for debugging:
 
 ```go
-// ValidateSecret validates a single secret
-func (v *SecretValidator) ValidateSecret(secret *spookytypessecrets.Secret) error {
-    if secret == nil {
-        return fmt.Errorf("secret cannot be nil")
-    }
-    
-    // Validate required fields
-    if secret.Name == "" {
-        return fmt.Errorf("secret name is required")
-    }
-    
-    if secret.Type == "" {
-        return fmt.Errorf("secret type is required")
-    }
-    
-    // Validate secret type
-    validTypes := []string{"password", "key", "certificate", "token"}
-    valid := false
-    for _, t := range validTypes {
-        if secret.Type == t {
-            valid = true
-            break
-        }
-    }
-    if !valid {
-        return fmt.Errorf("invalid secret type: %s (valid types: %v)", secret.Type, validTypes)
-    }
-    
-    // Validate secret source
-    if secret.Source != nil {
-        if err := v.validateSecretSource(secret.Source); err != nil {
-            return fmt.Errorf("invalid secret source: %w", err)
-        }
-    }
-    
-    // Validate secret constraints
-    if secret.Constraints != nil {
-        if err := v.validateSecretConstraints(secret.Constraints); err != nil {
-            return fmt.Errorf("invalid secret constraints: %w", err)
-        }
-    }
-    
-    return nil
+// Enable debug logging
+logger.SetLevel(spookytypes.LogLevelDebug)
+
+// Check encryption configuration
+fmt.Printf("Age config: %+v\n", config)
+
+// Validate encrypted values
+err := secretsIntegration.ValidateAgeEncryptedValue(ctx, encryptedValue)
+if err != nil {
+    fmt.Printf("Validation error: %v\n", err)
 }
 ```
-
-## CLI Commands
-
-### Secrets List Command
-
-```bash
-# List all secrets in a project
-spooky secrets list ./my-project
-
-# List secrets with specific types
-spooky secrets list ./my-project --type password,key
-
-# List secrets with specific names
-spooky secrets list ./my-project --names db_password,api_key
-
-# List secrets with verbose output
-spooky secrets list ./my-project --verbose
-```
-
-### Secrets Export Command
-
-```bash
-# Export secrets to JSON format
-spooky secrets export ./my-project --format json --output secrets.json
-
-# Export secrets to HCL format
-spooky secrets export ./my-project --format hcl --output secrets.hcl
-
-# Export secrets with specific types
-spooky secrets export ./my-project --type password,key --format json --output password-secrets.json
-```
-
-### Secrets Validation Command
-
-```bash
-# Validate secrets in a project
-spooky secrets validate ./my-project
-
-# Validate secrets with verbose output
-spooky secrets validate ./my-project --verbose
-```
-
-## Integration Examples
-
-### Basic Secret Definition
-
-```hcl
-# secrets.hcl
-secrets {
-  secret "db_password" {
-    description = "Database password"
-    type = "password"
-    value = "secret_password_123"
-    
-    constraints {
-      required = true
-      min_length = 8
-    }
-  }
-  
-  secret "api_key" {
-    description = "API key for external service"
-    type = "key"
-    
-    source {
-      type = "ssh"
-      ssh {
-        machine = "app-server"
-        command = "cat /etc/app/api.key"
-      }
-    }
-    
-    constraints {
-      required = true
-      min_length = 32
-    }
-  }
-  
-  secret "ssl_certificate" {
-    description = "SSL certificate"
-    type = "certificate"
-    
-    source {
-      type = "ssh"
-      ssh {
-        machine = "web-server"
-        file = "/etc/ssl/certs/website.crt"
-      }
-    }
-    
-    constraints {
-      required = true
-    }
-  }
-  
-  secret "auth_token" {
-    description = "Authentication token"
-    type = "token"
-    
-    source {
-      type = "environment"
-      environment {
-        name = "AUTH_TOKEN"
-      }
-    }
-    
-    constraints {
-      required = true
-      min_length = 16
-    }
-  }
-}
-```
-
-### Secret Loading and Validation
-
-```go
-// Secret loading and validation example
-func loadAndValidateSecrets(projectPath string) error {
-    ctx := context.Background()
-    
-    // Create secret manager
-    manager := spookysecrets.NewManager(loader, validator, logger)
-    
-    // Load secrets
-    secrets, err := manager.LoadSecrets(ctx, projectPath)
-    if err != nil {
-        return fmt.Errorf("failed to load secrets: %w", err)
-    }
-    
-    // Validate secrets
-    result, err := manager.ValidateSecrets(ctx, secrets)
-    if err != nil {
-        return fmt.Errorf("failed to validate secrets: %w", err)
-    }
-    
-    if !result.Valid {
-        fmt.Println("Secret validation failed:")
-        for _, error := range result.Errors {
-            fmt.Printf("  - %s\n", error.Message)
-        }
-        return fmt.Errorf("secret validation failed")
-    }
-    
-    fmt.Printf("Loaded and validated %d secrets\n", len(secrets))
-    return nil
-}
-```
-
-### Secret Encryption
-
-```go
-// Secret encryption example
-func encryptSecrets(projectPath string, publicKey string) error {
-    ctx := context.Background()
-    
-    // Create secret manager
-    manager := spookysecrets.NewManager(loader, validator, logger)
-    
-    // Load secrets
-    secrets, err := manager.LoadSecrets(ctx, projectPath)
-    if err != nil {
-        return fmt.Errorf("failed to load secrets: %w", err)
-    }
-    
-    // Encrypt secrets
-    encrypted, err := manager.EncryptSecrets(ctx, secrets, publicKey)
-    if err != nil {
-        return fmt.Errorf("failed to encrypt secrets: %w", err)
-    }
-    
-    // Print encrypted secrets
-    for name, encryptedData := range encrypted {
-        fmt.Printf("%s: %s\n", name, encryptedData)
-    }
-    
-    return nil
-}
-```
-
-## Current Limitations
-
-### Collection Limitations
-
-1. **SSH Integration Missing**: SSH-based secret collection is not yet implemented (SSH infrastructure works)
-2. **No Parallel Collection**: Secrets are collected sequentially, not in parallel
-3. **No Result Caching**: Secret values are not cached between operations
-4. **No Incremental Collection**: Always collects all secrets
-5. **Limited Source Types**: Only local and environment sources are supported
-
-### Encryption Limitations
-
-1. **No Key Management**: No built-in key management system (use external age tools)
-2. **No Key Rotation**: No key rotation capabilities
-3. **No Audit Logging**: No audit logging for secret operations
-
-### Integration Limitations
-
-1. **No Template Integration**: Secrets are not integrated with template system
-2. **No Action Integration**: Secrets are not used in action system
-3. **No Facts Integration**: Secrets are not integrated with facts system
-4. **No Conditional Access**: No conditional secret access
-
-## Future Enhancements
-
-### Planned Features
-
-1. **SSH Collection Implementation**: Implement SSH-based secret collection functionality
-2. **Parallel Collection**: Implement parallel secret collection
-3. **Result Caching**: Add secret value caching
-4. **Incremental Collection**: Support incremental secret collection
-5. **Advanced Sources**: Support more secret source types
-
-### Integration Enhancements
-
-1. **Template Integration**: Integrate secrets with template system
-2. **Action Integration**: Use secrets in action system
-3. **Facts Integration**: Integrate secrets with facts system
-4. **Advanced Encryption**: Support advanced encryption features
-
-## Summary
-
-The secrets system provides comprehensive secret loading, validation, and age encryption capabilities. The system is functional for local secrets and age encryption/decryption, with SSH-based secret collection being the main missing feature for production use.
-
-**Status**: ✅ **Mostly Implemented** - Comprehensive functionality exists for local secrets and age encryption. SSH-based collection is the primary missing feature.

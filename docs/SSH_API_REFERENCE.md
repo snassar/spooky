@@ -4,7 +4,7 @@
 
 This document provides a comprehensive API reference for the spooky SSH system. It covers all interfaces, types, methods, and implementation details for developers working with the SSH system.
 
-**Status: Production Ready** - The SSH system is fully implemented with enhanced key support, SSH certificate support, and comprehensive error handling.
+**Status: Partially Implemented** - The SSH system has basic functionality but connection management and authentication have known issues that need to be addressed.
 
 ## Core Interfaces
 
@@ -14,431 +14,620 @@ The `SSHManager` interface provides the primary entry point for SSH operations:
 
 ```go
 type SSHManager interface {
-    // Connection management
-    GetConnection(host string, port int, user string) (*ssh.Client, error)
-    ReturnConnection(conn *ssh.Client) error
-    Close() error
-    
-    // Authentication
-    ValidateAuthentication(ctx context.Context, auth *spookytypes.Authentication) (*spookytypes.ValidationResult, error)
-    
-    // Connection pool management
-    GetConnectionPool() *spookytypes.ConnectionPool
-    
-    // Health and metrics
-    GetConnectionStats() map[string]interface{}
+    // GetConnection gets an SSH connection for the given machine
+    GetConnection(hostname string, port int, user string) (*ssh.Client, error)
+
+    // ReturnConnection returns an SSH connection to the pool
+    ReturnConnection(conn *ssh.Client)
+
+    // TestConnection tests SSH connectivity to a machine
+    TestConnection(hostname string, port int, user string) error
+
+    // ExecuteCommand executes a command on a remote machine
+    ExecuteCommand(conn *ssh.Client, command string) (string, error)
+
+    // CopyFile copies a file to a remote machine
+    CopyFile(conn *ssh.Client, localPath string, remotePath string) error
+
+    // GetFile retrieves a file from a remote machine
+    GetFile(conn *ssh.Client, remotePath string, localPath string) error
 }
 ```
 
-**Implementation Status**: ✅ **Fully Implemented** - Complete SSH connection management with pooling and authentication
+**Implementation Status**: ⚠️ **Partially Implemented** - Basic functionality exists but connection management has issues
 
 ### SSHClient Interface
 
-The `SSHClient` interface provides SSH client functionality:
+The `SSHClient` interface provides SSH client operations:
 
 ```go
 type SSHClient interface {
-    // Connection management
-    Connect(host string, port int, user string, auth *spookytypes.Authentication) (*ssh.Client, error)
-    Disconnect(client *ssh.Client) error
-    
-    // Command execution
-    RunCommand(client *ssh.Client, command string) (*spookytypes.CommandResult, error)
-    RunCommandWithTimeout(client *ssh.Client, command string, timeout time.Duration) (*spookytypes.CommandResult, error)
-    
-    // File operations
-    CopyFile(client *ssh.Client, localPath, remotePath string) error
-    CopyFileFrom(client *ssh.Client, remotePath, localPath string) error
-    
-    // Health checking
-    Ping(host string, port int, timeout time.Duration) error
+    // Connect establishes an SSH connection
+    Connect() (*ssh.Client, error)
+
+    // ExecuteCommand executes a command on the remote machine
+    ExecuteCommand(command string) (string, error)
+
+    // CopyFile copies a file to the remote machine
+    CopyFile(localPath string, remotePath string) error
+
+    // GetFile retrieves a file from the remote machine
+    GetFile(remotePath string, localPath string) error
+
+    // Close closes the SSH connection
+    Close() error
 }
 ```
 
-**Implementation Status**: ✅ **Fully Implemented** - Complete SSH client with command execution and file transfer
+**Implementation Status**: ⚠️ **Partially Implemented** - Basic connection exists but operations have issues
 
 ## Current Implementation Status
 
-### ✅ Fully Implemented Components
+### ✅ Working Components
 
-1. **Complete SSH Infrastructure**: Fully functional SSH client with connection pooling
-2. **Enhanced Key Support**: Full support for ED25519, ED25519-SK, and RSA 4096-bit keys
-3. **SSH Certificate Support**: Complete certificate authentication with validation
-4. **Connection Pooling**: Efficient connection management and reuse with health monitoring
-5. **Key Validation**: Comprehensive key type and size validation
-6. **Error Handling**: Detailed error messages and troubleshooting information
-7. **Performance Optimization**: Connection pooling and retry mechanisms
-8. **CLI Integration**: Complete CLI command set with all features functional
-9. **Authentication Methods**: Support for password, public key, and certificate authentication
-10. **File Transfer**: SFTP and SCP support for file operations
+1. **SSH Connection**: Basic SSH connection establishment
+2. **SSH Configuration**: SSH configuration management
+3. **SSH Structure**: Proper SSH type definitions and structures
+4. **CLI Integration**: SSH connectivity testing via `spooky machines ping`
+5. **Project Integration**: SSH configuration loading from project configuration
+6. **Basic Validation**: SSH configuration validation and error handling
+7. **Authentication Support**: Support for SSH key authentication
+8. **Connection Pooling**: Basic SSH connection pooling
+9. **Host Key Management**: Basic host key validation
+10. **File Transfer**: Basic file transfer operations
 
-### 🎯 Production Ready
+### ⚠️ Known Issues
 
-The SSH system is now **production-ready** with:
-- **100% Functional SSH Infrastructure**: No more stubs or placeholders
-- **Type Safe**: All interface contracts satisfied with proper validation
-- **Performance Optimized**: Efficient connection management with pooling
-- **Robust Error Handling**: Comprehensive error recovery and reporting
+1. **Connection Management**: SSH connection management has implementation issues
+2. **Authentication Testing**: SSH authentication testing has problems
+3. **Connection Pooling**: SSH connection pooling has issues
+4. **Host Key Validation**: Host key validation has implementation problems
+5. **File Transfer**: File transfer operations have issues
+6. **Parallel Processing**: No parallel SSH operations support
 
-## Key Features
+### 🔄 In Progress
 
-### Enhanced Key Support
+1. **Connection Fixes**: Addressing SSH connection management issues
+2. **Authentication Improvements**: Implementing proper SSH authentication testing
+3. **Pooling Fixes**: Fixing SSH connection pooling
 
-The SSH system supports modern key types with comprehensive validation:
+## Implementation Details
+
+### SSH Manager System
+
+The SSH system manages SSH connections and operations:
 
 ```go
-// Supported key types
-const (
-    KeyTypeED25519   = "ed25519"
-    KeyTypeED25519SK = "ed25519-sk"
-    KeyTypeRSA4096   = "rsa-4096"
-    MinRSAKeySize    = 4096
-)
+type Manager struct {
+    logger          spookytypeslogging.Logger
+    config          *spookytypes.SSHConfig
+    connectionPool  *ConnectionPool
+    hostKeyManager  *HostKeyManager
+}
 
-// Key validation ensures only supported key types are used
-func (c *Client) validateKeyType(signer ssh.Signer) error {
-    keyType := signer.PublicKey().Type()
-    
-    switch keyType {
-    case "ssh-ed25519":
-        return nil // ED25519 keys are always valid
-    case "ssh-rsa":
-        // Validate RSA key size (minimum 4096 bits)
-        if keySize := getRSAKeySize(signer.PublicKey()); keySize < 4096 {
-            return &KeyValidationError{
-                KeyType: keyType,
-                Reason:  fmt.Sprintf("RSA key size %d bits is below minimum 4096 bits", keySize),
-            }
-        }
-        return nil
-    case "ssh-ed25519-sk":
-        return nil // Security key support (implementation pending)
-    default:
-        return &KeyValidationError{
-            KeyType: keyType,
-            Reason:  "unsupported key type",
-        }
+func NewManager(
+    logger spookytypeslogging.Logger,
+    config *spookytypes.SSHConfig,
+) spookyinterfaces.SSHManager {
+    return &Manager{
+        logger:         logger,
+        config:         config,
+        connectionPool: NewConnectionPool(config),
+        hostKeyManager: NewHostKeyManager(config),
     }
 }
 ```
 
-### Connection Pooling
-
-The SSH system implements efficient connection pooling:
+### SSH Connection Implementation
 
 ```go
-// Connection pool manages multiple SSH connections
-type ConnectionPool struct {
-    connections map[string]*Connection
-    mutex       sync.RWMutex
-    maxConnections int
-    timeout       time.Duration
-    cleanupInterval time.Duration
-}
+// GetConnection gets an SSH connection for the given machine
+func (m *Manager) GetConnection(hostname string, port int, user string) (*ssh.Client, error) {
+    m.logger.Info("Getting SSH connection", map[string]interface{}{
+        "hostname": hostname,
+        "port":     port,
+        "user":     user,
+    })
 
-func (p *ConnectionPool) GetConnection(host string, config *SSHConfig) (*Connection, error) {
-    p.mutex.RLock()
-    if conn, exists := p.connections[host]; exists && conn.IsHealthy() {
-        p.mutex.RUnlock()
+    // Check connection pool first
+    if conn := m.connectionPool.GetConnection(hostname); conn != nil {
+        m.logger.Debug("Reusing connection from pool", map[string]interface{}{
+            "hostname": hostname,
+        })
         return conn, nil
     }
-    p.mutex.RUnlock()
-    
-    // Create new connection if not in pool
-    return p.createNewConnection(host, config)
-}
-```
 
-### Advanced Connection Pool
-
-The system includes an advanced connection pool with comprehensive metrics:
-
-```go
-// Advanced connection pool with health monitoring
-type AdvancedConnectionPool struct {
-    connections map[string]*PooledConnection
-    metrics     *ConnectionPoolMetrics
-    config      *spookytypes.ClientConfig
-    logger      spookytypeslogging.Logger
-    hostKeyManager *HostKeyManager
-    ctx         context.Context
-    cancel      context.CancelFunc
-    mu          sync.RWMutex
-    cleanupTicker *time.Ticker
-}
-
-// PooledConnection represents a connection in the pool with metadata
-type PooledConnection struct {
-    Client       *ssh.Client
-    Host         string
-    Port         int
-    User         string
-    CreatedAt    time.Time
-    LastUsed     time.Time
-    UseCount     int
-    ErrorCount   int
-    Latency      time.Duration
-    IsHealthy    bool
-    IsIdle       bool
-    ConnectionID string
-}
-
-// ConnectionPoolMetrics tracks pool performance and health
-type ConnectionPoolMetrics struct {
-    TotalConnections    int
-    ActiveConnections   int
-    IdleConnections     int
-    ConnectionAttempts  int
-    ConnectionErrors    int
-    HealthCheckPasses   int
-    HealthCheckFailures int
-    AverageConnectTime  time.Duration
-    LastCleanup         time.Time
-}
-```
-
-## Error Handling
-
-### SSH Error Types
-
-```go
-// SSHError represents SSH-specific errors
-type SSHError struct {
-    Type    string `json:"type" hcl:"type"`
-    Message string `json:"message" hcl:"message"`
-    Details string `json:"details,omitempty" hcl:"details,optional"`
-}
-
-// KeyValidationError represents key validation errors
-type KeyValidationError struct {
-    KeyType string `json:"key_type" hcl:"key_type"`
-    Reason  string `json:"reason" hcl:"reason"`
-}
-
-// ConnectionError represents connection-specific errors
-type ConnectionError struct {
-    Host    string `json:"host" hcl:"host"`
-    Port    int    `json:"port" hcl:"port"`
-    Message string `json:"message" hcl:"message"`
-    Details string `json:"details,omitempty" hcl:"details,optional"`
-}
-```
-
-### Authentication Error Handling
-
-```go
-// ValidateAuthentication validates SSH authentication parameters
-func (m *Manager) ValidateAuthentication(_ context.Context, auth *spookytypes.Authentication) (*spookytypes.ValidationResult, error) {
-    // Basic validation of authentication parameters
-    if auth == nil {
-        return &spookytypes.ValidationResult{
-            Valid: false,
-            Errors: []spookyschemas.SchemaError{
-                *spookyschemas.NewSchemaError("authentication", "ssh", "authentication configuration is required"),
-            },
-        }, nil
+    // Create new connection
+    conn, err := m.createConnection(hostname, port, user)
+    if err != nil {
+        m.logger.Error("Failed to create SSH connection", err, map[string]interface{}{
+            "hostname": hostname,
+            "port":     port,
+            "user":     user,
+        })
+        return nil, fmt.Errorf("failed to create SSH connection: %w", err)
     }
 
-    // Validate based on authentication method
-    switch auth.Method {
-    case spookytypesssh.AuthMethodPassword:
-        if auth.Password == "" {
-            return &spookytypes.ValidationResult{
-                Valid: false,
-                Errors: []spookyschemas.SchemaError{
-                    *spookyschemas.NewSchemaError("authentication", "ssh", "password is required for password authentication"),
-                },
-            }, nil
-        }
-    case spookytypesssh.AuthMethodPublicKey:
-        if auth.KeyPath == "" {
-            return &spookytypes.ValidationResult{
-                Valid: false,
-                Errors: []spookyschemas.SchemaError{
-                    *spookyschemas.NewSchemaError("authentication", "ssh", "key_path is required for public key authentication"),
-                },
-            }, nil
-        }
-    default:
-        return &spookytypes.ValidationResult{
-            Valid: false,
-            Errors: []spookyschemas.SchemaError{
-                *spookyschemas.NewSchemaError("authentication", "ssh", fmt.Sprintf("unsupported authentication method: %s", auth.Method)),
-            },
-        }, nil
+    // Add to connection pool
+    m.connectionPool.AddConnection(hostname, conn)
+
+    m.logger.Info("SSH connection established", map[string]interface{}{
+        "hostname": hostname,
+    })
+
+    return conn, nil
+}
+
+// ReturnConnection returns an SSH connection to the pool
+func (m *Manager) ReturnConnection(conn *ssh.Client) {
+    if conn == nil {
+        return
     }
 
-    return &spookytypes.ValidationResult{
-        Valid: true,
-    }, nil
+    // Return connection to pool
+    m.connectionPool.ReturnConnection(conn)
+
+    m.logger.Debug("SSH connection returned to pool")
+}
+
+func (m *Manager) createConnection(hostname string, port int, user string) (*ssh.Client, error) {
+    // Create SSH client configuration
+    config, err := m.createSSHConfig(user)
+    if err != nil {
+        return nil, fmt.Errorf("failed to create SSH config: %w", err)
+    }
+
+    // Establish connection
+    conn, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", hostname, port), config)
+    if err != nil {
+        return nil, fmt.Errorf("failed to establish SSH connection: %w", err)
+    }
+
+    return conn, nil
+}
+
+func (m *Manager) createSSHConfig(user string) (*ssh.ClientConfig, error) {
+    // Load private key
+    key, err := m.loadPrivateKey()
+    if err != nil {
+        return nil, fmt.Errorf("failed to load private key: %w", err)
+    }
+
+    // Create SSH client configuration
+    config := &ssh.ClientConfig{
+        User: user,
+        Auth: []ssh.AuthMethod{
+            ssh.PublicKeys(key),
+        },
+        HostKeyCallback: m.hostKeyManager.GetHostKeyCallback(),
+        Timeout:         m.config.Timeout,
+    }
+
+    return config, nil
+}
+
+func (m *Manager) loadPrivateKey() (ssh.Signer, error) {
+    // Read private key file
+    keyData, err := os.ReadFile(m.config.KeyPath)
+    if err != nil {
+        return nil, fmt.Errorf("failed to read private key file: %w", err)
+    }
+
+    // Parse private key
+    var signer ssh.Signer
+    if m.config.Passphrase != "" {
+        signer, err = ssh.ParsePrivateKeyWithPassphrase(keyData, []byte(m.config.Passphrase))
+    } else {
+        signer, err = ssh.ParsePrivateKey(keyData)
+    }
+    if err != nil {
+        return nil, fmt.Errorf("failed to parse private key: %w", err)
+    }
+
+    return signer, nil
+}
+```
+
+### SSH Command Execution Implementation
+
+```go
+// ExecuteCommand executes a command on a remote machine
+func (m *Manager) ExecuteCommand(conn *ssh.Client, command string) (string, error) {
+    m.logger.Info("Executing SSH command", map[string]interface{}{
+        "command": command,
+    })
+
+    // Create SSH session
+    session, err := conn.NewSession()
+    if err != nil {
+        m.logger.Error("Failed to create SSH session", err, map[string]interface{}{
+            "command": command,
+        })
+        return "", fmt.Errorf("failed to create SSH session: %w", err)
+    }
+    defer session.Close()
+
+    // Execute command
+    output, err := session.CombinedOutput(command)
+    if err != nil {
+        m.logger.Error("Failed to execute SSH command", err, map[string]interface{}{
+            "command": command,
+            "output":  string(output),
+        })
+        return string(output), fmt.Errorf("failed to execute SSH command: %w", err)
+    }
+
+    m.logger.Info("SSH command executed successfully", map[string]interface{}{
+        "command": command,
+        "output":  string(output),
+    })
+
+    return string(output), nil
+}
+
+// TestConnection tests SSH connectivity to a machine
+func (m *Manager) TestConnection(hostname string, port int, user string) error {
+    m.logger.Info("Testing SSH connection", map[string]interface{}{
+        "hostname": hostname,
+        "port":     port,
+        "user":     user,
+    })
+
+    // Get connection
+    conn, err := m.GetConnection(hostname, port, user)
+    if err != nil {
+        m.logger.Error("SSH connection test failed", err, map[string]interface{}{
+            "hostname": hostname,
+        })
+        return fmt.Errorf("SSH connection test failed: %w", err)
+    }
+    defer m.ReturnConnection(conn)
+
+    // Test with simple command
+    _, err = m.ExecuteCommand(conn, "echo 'SSH connection test successful'")
+    if err != nil {
+        m.logger.Error("SSH command test failed", err, map[string]interface{}{
+            "hostname": hostname,
+        })
+        return fmt.Errorf("SSH command test failed: %w", err)
+    }
+
+    m.logger.Info("SSH connection test successful", map[string]interface{}{
+        "hostname": hostname,
+    })
+
+    return nil
+}
+```
+
+### SSH File Transfer Implementation
+
+```go
+// CopyFile copies a file to a remote machine
+func (m *Manager) CopyFile(conn *ssh.Client, localPath string, remotePath string) error {
+    m.logger.Info("Copying file to remote machine", map[string]interface{}{
+        "local":  localPath,
+        "remote": remotePath,
+    })
+
+    // Open local file
+    localFile, err := os.Open(localPath)
+    if err != nil {
+        m.logger.Error("Failed to open local file", err, map[string]interface{}{
+            "local": localPath,
+        })
+        return fmt.Errorf("failed to open local file: %w", err)
+    }
+    defer localFile.Close()
+
+    // Create SSH session
+    session, err := conn.NewSession()
+    if err != nil {
+        m.logger.Error("Failed to create SSH session", err)
+        return fmt.Errorf("failed to create SSH session: %w", err)
+    }
+    defer session.Close()
+
+    // Create remote file
+    remoteFile, err := session.StdinPipe()
+    if err != nil {
+        m.logger.Error("Failed to create stdin pipe", err)
+        return fmt.Errorf("failed to create stdin pipe: %w", err)
+    }
+
+    // Start scp command
+    if err := session.Start(fmt.Sprintf("scp -t %s", remotePath)); err != nil {
+        m.logger.Error("Failed to start scp command", err)
+        return fmt.Errorf("failed to start scp command: %w", err)
+    }
+
+    // Copy file data
+    if _, err := io.Copy(remoteFile, localFile); err != nil {
+        m.logger.Error("Failed to copy file data", err)
+        return fmt.Errorf("failed to copy file data: %w", err)
+    }
+
+    // Close remote file
+    if err := remoteFile.Close(); err != nil {
+        m.logger.Error("Failed to close remote file", err)
+        return fmt.Errorf("failed to close remote file: %w", err)
+    }
+
+    // Wait for session to complete
+    if err := session.Wait(); err != nil {
+        m.logger.Error("Failed to complete file copy", err)
+        return fmt.Errorf("failed to complete file copy: %w", err)
+    }
+
+    m.logger.Info("File copied successfully", map[string]interface{}{
+        "local":  localPath,
+        "remote": remotePath,
+    })
+
+    return nil
+}
+
+// GetFile retrieves a file from a remote machine
+func (m *Manager) GetFile(conn *ssh.Client, remotePath string, localPath string) error {
+    m.logger.Info("Retrieving file from remote machine", map[string]interface{}{
+        "remote": remotePath,
+        "local":  localPath,
+    })
+
+    // Create SSH session
+    session, err := conn.NewSession()
+    if err != nil {
+        m.logger.Error("Failed to create SSH session", err)
+        return fmt.Errorf("failed to create SSH session: %w", err)
+    }
+    defer session.Close()
+
+    // Create local file
+    localFile, err := os.Create(localPath)
+    if err != nil {
+        m.logger.Error("Failed to create local file", err, map[string]interface{}{
+            "local": localPath,
+        })
+        return fmt.Errorf("failed to create local file: %w", err)
+    }
+    defer localFile.Close()
+
+    // Get remote file
+    remoteFile, err := session.StdoutPipe()
+    if err != nil {
+        m.logger.Error("Failed to create stdout pipe", err)
+        return fmt.Errorf("failed to create stdout pipe: %w", err)
+    }
+
+    // Start scp command
+    if err := session.Start(fmt.Sprintf("scp -f %s", remotePath)); err != nil {
+        m.logger.Error("Failed to start scp command", err)
+        return fmt.Errorf("failed to start scp command: %w", err)
+    }
+
+    // Copy file data
+    if _, err := io.Copy(localFile, remoteFile); err != nil {
+        m.logger.Error("Failed to copy file data", err)
+        return fmt.Errorf("failed to copy file data: %w", err)
+    }
+
+    // Wait for session to complete
+    if err := session.Wait(); err != nil {
+        m.logger.Error("Failed to complete file retrieval", err)
+        return fmt.Errorf("failed to complete file retrieval: %w", err)
+    }
+
+    m.logger.Info("File retrieved successfully", map[string]interface{}{
+        "remote": remotePath,
+        "local":  localPath,
+    })
+
+    return nil
 }
 ```
 
 ## Type Definitions
 
+### SSH Types
+
+```go
+// SSHConfig represents SSH configuration
+type SSHConfig struct {
+    // SSH key path
+    KeyPath string `json:"key_path" hcl:"key_path"`
+
+    // SSH key passphrase (optional)
+    Passphrase string `json:"passphrase,omitempty" hcl:"passphrase,optional"`
+
+    // SSH timeout in seconds
+    Timeout time.Duration `json:"timeout" hcl:"timeout"`
+
+    // SSH connection retries
+    Retries int `json:"retries,omitempty" hcl:"retries,optional"`
+
+    // SSH connection retry delay in seconds
+    RetryDelay time.Duration `json:"retry_delay,omitempty" hcl:"retry_delay,optional"`
+
+    // SSH host key checking (default: true)
+    HostKeyChecking bool `json:"host_key_checking" hcl:"host_key_checking"`
+
+    // SSH known hosts file
+    KnownHostsFile string `json:"known_hosts_file,omitempty" hcl:"known_hosts_file,optional"`
+
+    // SSH connection pool size
+    PoolSize int `json:"pool_size,omitempty" hcl:"pool_size,optional"`
+
+    // SSH connection pool timeout
+    PoolTimeout time.Duration `json:"pool_timeout,omitempty" hcl:"pool_timeout,optional"`
+}
+
+// SSHConnection represents an SSH connection
+type SSHConnection struct {
+    // Connection client
+    Client *ssh.Client `json:"-" hcl:"-"`
+
+    // Connection hostname
+    Hostname string `json:"hostname" hcl:"hostname"`
+
+    // Connection port
+    Port int `json:"port" hcl:"port"`
+
+    // Connection user
+    User string `json:"user" hcl:"user"`
+
+    // Connection creation time
+    CreatedAt time.Time `json:"created_at" hcl:"created_at"`
+
+    // Connection last used time
+    LastUsed time.Time `json:"last_used" hcl:"last_used"`
+
+    // Connection status
+    Status string `json:"status" hcl:"status"`
+}
+
+// SSHCommand represents an SSH command
+type SSHCommand struct {
+    // Command to execute
+    Command string `json:"command" hcl:"command"`
+
+    // Command timeout
+    Timeout time.Duration `json:"timeout,omitempty" hcl:"timeout,optional"`
+
+    // Command working directory
+    WorkingDir string `json:"working_dir,omitempty" hcl:"working_dir,optional"`
+
+    // Command environment variables
+    Environment map[string]string `json:"environment,omitempty" hcl:"environment,optional"`
+
+    // Command user
+    User string `json:"user,omitempty" hcl:"user,optional"`
+}
+
+// SSHCommandResult represents the result of an SSH command
+type SSHCommandResult struct {
+    // Command that was executed
+    Command string `json:"command" hcl:"command"`
+
+    // Command output
+    Output string `json:"output" hcl:"output"`
+
+    // Command error
+    Error string `json:"error,omitempty" hcl:"error,optional"`
+
+    // Command exit code
+    ExitCode int `json:"exit_code" hcl:"exit_code"`
+
+    // Command execution time
+    ExecutionTime time.Duration `json:"execution_time" hcl:"execution_time"`
+
+    // Command timestamp
+    Timestamp time.Time `json:"timestamp" hcl:"timestamp"`
+}
+```
+
 ### SSH Configuration Types
 
 ```go
-// SSH configuration types
-type SSHConfig struct {
-    Host            string            `json:"host" hcl:"host"`
-    Port            int               `json:"port" hcl:"port"`
-    User            string            `json:"user" hcl:"user"`
-    Authentication  *Authentication   `json:"authentication" hcl:"authentication"`
-    Timeout         time.Duration     `json:"timeout" hcl:"timeout"`
-    Keepalive       *KeepaliveConfig  `json:"keepalive,omitempty" hcl:"keepalive,optional"`
-    HostKeyCheck    *HostKeyConfig    `json:"host_key_check,omitempty" hcl:"host_key_check,optional"`
-}
+// SSHClientConfig represents SSH client configuration
+type SSHClientConfig struct {
+    // SSH server hostname
+    Hostname string `json:"hostname" hcl:"hostname"`
 
-type Authentication struct {
-    Method     string `json:"method" hcl:"method"`
-    KeyPath    string `json:"key_path,omitempty" hcl:"key_path,optional"`
-    Password   string `json:"password,omitempty" hcl:"password,optional"`
+    // SSH server port
+    Port int `json:"port" hcl:"port"`
+
+    // SSH user
+    User string `json:"user" hcl:"user"`
+
+    // SSH authentication method
+    AuthMethod string `json:"auth_method" hcl:"auth_method"`
+
+    // SSH key path (for key authentication)
+    KeyPath string `json:"key_path,omitempty" hcl:"key_path,optional"`
+
+    // SSH key passphrase (for key authentication)
     Passphrase string `json:"passphrase,omitempty" hcl:"passphrase,optional"`
+
+    // SSH password (for password authentication)
+    Password string `json:"password,omitempty" hcl:"password,optional"`
+
+    // SSH timeout
+    Timeout time.Duration `json:"timeout" hcl:"timeout"`
+
+    // SSH host key checking
+    HostKeyChecking bool `json:"host_key_checking" hcl:"host_key_checking"`
+
+    // SSH known hosts file
+    KnownHostsFile string `json:"known_hosts_file,omitempty" hcl:"known_hosts_file,optional"`
 }
 
-type KeepaliveConfig struct {
-    Interval time.Duration `json:"interval" hcl:"interval"`
-    Count    int           `json:"count" hcl:"count"`
-}
+// SSHConnectionPool represents an SSH connection pool
+type SSHConnectionPool struct {
+    // Pool connections
+    Connections map[string]*SSHConnection `json:"connections" hcl:"connections"`
 
-type HostKeyConfig struct {
-    StrictCheck bool   `json:"strict_check" hcl:"strict_check"`
-    KnownHosts  string `json:"known_hosts,omitempty" hcl:"known_hosts,optional"`
-}
-```
+    // Pool mutex
+    Mutex sync.RWMutex `json:"-" hcl:"-"`
 
-### SSH Acting Types
+    // Pool configuration
+    Config *SSHConfig `json:"config" hcl:"config"`
 
-```go
-// SSH acting types for command execution
-type ActingCommand struct {
-    Command   string            `json:"command" hcl:"command"`
-    Timeout   time.Duration     `json:"timeout,omitempty" hcl:"timeout,optional"`
-    Environment map[string]string `json:"environment,omitempty" hcl:"environment,optional"`
-    WorkingDir string           `json:"working_dir,omitempty" hcl:"working_dir,optional"`
-}
+    // Pool size limit
+    MaxSize int `json:"max_size" hcl:"max_size"`
 
-type ActingResult struct {
-    Command     string    `json:"command" hcl:"command"`
-    ExitCode    int       `json:"exit_code" hcl:"exit_code"`
-    Stdout      string    `json:"stdout" hcl:"stdout"`
-    Stderr      string    `json:"stderr" hcl:"stderr"`
-    Duration    time.Duration `json:"duration" hcl:"duration"`
-    StartTime   time.Time `json:"start_time" hcl:"start_time"`
-    EndTime     time.Time `json:"end_time" hcl:"end_time"`
-    Error       string    `json:"error,omitempty" hcl:"error,optional"`
+    // Pool cleanup interval
+    CleanupInterval time.Duration `json:"cleanup_interval" hcl:"cleanup_interval"`
 }
 ```
 
-## CLI Integration
+## CLI Commands
 
-### SSH Commands
-
-The SSH system provides comprehensive CLI commands:
+### SSH Test Command
 
 ```bash
-# Test SSH connectivity
-spooky machines ping <project>
+# Test SSH connectivity to a machine
+spooky ssh test web-server
 
-# Validate SSH configuration
-spooky machines validate <project>
+# Test SSH connectivity with custom port
+spooky ssh test web-server --port 2222
 
-# List SSH connections
-spooky ssh connections
+# Test SSH connectivity with custom user
+spooky ssh test web-server --user admin
 
-# Show SSH statistics
-spooky ssh stats
+# Test SSH connectivity with timeout
+spooky ssh test web-server --timeout 30
 ```
 
-### Machine Ping Command
+### SSH Execute Command
 
-The `spooky machines ping` command provides SSH reachability testing:
+```bash
+# Execute command on remote machine
+spooky ssh execute web-server "ls -la"
 
-```go
-// Machine ping implementation
-func handleMachinesPing(projectPath string) error {
-    // Load project configuration
-    project, err := loadProject(projectPath)
-    if err != nil {
-        return fmt.Errorf("failed to load project: %w", err)
-    }
-    
-    // Test SSH connectivity for each machine
-    for _, machine := range project.Machines {
-        fmt.Printf("Testing SSH connectivity to %s...\n", machine.Hostname)
-        
-        // Test DNS resolution
-        if err := testDNSResolution(machine.Hostname); err != nil {
-            fmt.Printf("❌ DNS resolution failed: %v\n", err)
-            continue
-        }
-        
-        // Test SSH connection
-        if err := testSSHConnection(machine); err != nil {
-            fmt.Printf("❌ SSH connection failed: %v\n", err)
-            continue
-        }
-        
-        fmt.Printf("✅ SSH connection successful\n")
-    }
-    
-    return nil
-}
+# Execute command with custom user
+spooky ssh execute web-server "whoami" --user admin
+
+# Execute command with timeout
+spooky ssh execute web-server "sleep 10" --timeout 15
+
+# Execute command with working directory
+spooky ssh execute web-server "pwd" --working-dir /tmp
 ```
 
-## Performance and Scalability
+### SSH Copy Command
 
-### Connection Pooling Benefits
+```bash
+# Copy file to remote machine
+spooky ssh copy web-server local-file.txt /tmp/remote-file.txt
 
-The SSH system provides efficient connection management:
+# Copy file from remote machine
+spooky ssh copy web-server /tmp/remote-file.txt local-file.txt
 
-1. **Connection Reuse**: Reuses existing connections when possible
-2. **Health Monitoring**: Monitors connection health and removes unhealthy connections
-3. **Load Balancing**: Distributes connections across multiple targets
-4. **Resource Management**: Limits concurrent connections to prevent resource exhaustion
-5. **Automatic Cleanup**: Removes idle connections to free resources
+# Copy file with custom user
+spooky ssh copy web-server local-file.txt /tmp/remote-file.txt --user admin
 
-### Performance Metrics
-
-The system tracks comprehensive performance metrics:
-
-```go
-// Performance metrics tracking
-type SSHMetrics struct {
-    TotalConnections    int64
-    ActiveConnections   int64
-    FailedConnections   int64
-    AverageConnectTime  time.Duration
-    TotalCommands       int64
-    SuccessfulCommands  int64
-    FailedCommands      int64
-    AverageCommandTime  time.Duration
-}
-```
-
-## Security Features
-
-### Key Validation
-
-The SSH system enforces strict key validation:
-
-1. **Key Type Validation**: Only supports ED25519, ED25519-SK, and RSA 4096-bit keys
-2. **Key Size Validation**: Enforces minimum key sizes for security
-3. **Key Format Validation**: Validates key file format and permissions
-4. **Certificate Validation**: Validates SSH certificates for authenticity
-
-### Host Key Verification
-
-The system supports configurable host key verification:
-
-```go
-// Host key verification configuration
-type HostKeyConfig struct {
-    StrictCheck bool   `json:"strict_check" hcl:"strict_check"`
-    KnownHosts  string `json:"known_hosts,omitempty" hcl:"known_hosts,optional"`
-    AllowInsecure bool `json:"allow_insecure,omitempty" hcl:"allow_insecure,optional"`
-}
+# Copy file with custom permissions
+spooky ssh copy web-server local-file.txt /tmp/remote-file.txt --permissions 0644
 ```
 
 ## Integration Examples
@@ -446,82 +635,205 @@ type HostKeyConfig struct {
 ### Basic SSH Connection
 
 ```go
-// Basic SSH connection example
-func connectToServer(host, user, keyPath string) error {
-    sshManager := spookyssh.NewManager()
-    
-    // Create authentication config
-    auth := &spookytypes.Authentication{
-        Method:  "public_key",
-        KeyPath: keyPath,
+// SSH connection example
+func connectToMachine(hostname string, port int, user string) error {
+    // Create SSH manager
+    config := &spookytypes.SSHConfig{
+        KeyPath:        "~/.ssh/id_rsa",
+        Timeout:        30 * time.Second,
+        HostKeyChecking: true,
     }
     
-    // Get connection
-    conn, err := sshManager.GetConnection(host, 22, user)
+    manager := spookyssh.NewManager(logger, config)
+    
+    // Get SSH connection
+    conn, err := manager.GetConnection(hostname, port, user)
     if err != nil {
-        return fmt.Errorf("failed to connect: %w", err)
+        return fmt.Errorf("failed to get SSH connection: %w", err)
     }
-    defer sshManager.ReturnConnection(conn)
+    defer manager.ReturnConnection(conn)
     
-    // Run command
-    result, err := sshManager.RunCommand(conn, "echo 'Hello, World!'")
-    if err != nil {
-        return fmt.Errorf("command failed: %w", err)
-    }
-    
-    fmt.Printf("Command output: %s\n", result.Stdout)
+    fmt.Printf("Connected to %s\n", hostname)
     return nil
 }
 ```
 
-### Parallel SSH Operations
+### SSH Command Execution
 
 ```go
-// Parallel SSH operations example
-func runParallelCommands(hosts []string, command string) error {
-    sshManager := spookyssh.NewManager()
-    
-    var wg sync.WaitGroup
-    results := make(chan error, len(hosts))
-    
-    for _, host := range hosts {
-        wg.Add(1)
-        go func(h string) {
-            defer wg.Done()
-            
-            conn, err := sshManager.GetConnection(h, 22, "admin")
-            if err != nil {
-                results <- fmt.Errorf("failed to connect to %s: %w", h, err)
-                return
-            }
-            defer sshManager.ReturnConnection(conn)
-            
-            result, err := sshManager.RunCommand(conn, command)
-            if err != nil {
-                results <- fmt.Errorf("command failed on %s: %w", h, err)
-                return
-            }
-            
-            fmt.Printf("Command on %s: %s\n", h, result.Stdout)
-        }(host)
+// SSH command execution example
+func executeCommand(hostname string, command string) error {
+    // Create SSH manager
+    config := &spookytypes.SSHConfig{
+        KeyPath:        "~/.ssh/id_rsa",
+        Timeout:        30 * time.Second,
+        HostKeyChecking: true,
     }
     
-    wg.Wait()
-    close(results)
+    manager := spookyssh.NewManager(logger, config)
     
-    // Check for errors
-    for err := range results {
-        if err != nil {
-            return err
-        }
+    // Get SSH connection
+    conn, err := manager.GetConnection(hostname, 22, "admin")
+    if err != nil {
+        return fmt.Errorf("failed to get SSH connection: %w", err)
+    }
+    defer manager.ReturnConnection(conn)
+    
+    // Execute command
+    output, err := manager.ExecuteCommand(conn, command)
+    if err != nil {
+        return fmt.Errorf("failed to execute command: %w", err)
     }
     
+    fmt.Printf("Command output: %s\n", output)
     return nil
 }
 ```
 
-## Summary
+### SSH File Transfer
 
-The SSH system provides comprehensive SSH connectivity and management capabilities with enhanced key support, SSH certificate support, and robust connection management. The system is production-ready with complete implementation of all documented features.
+```go
+// SSH file transfer example
+func copyFile(hostname string, localPath string, remotePath string) error {
+    // Create SSH manager
+    config := &spookytypes.SSHConfig{
+        KeyPath:        "~/.ssh/id_rsa",
+        Timeout:        30 * time.Second,
+        HostKeyChecking: true,
+    }
+    
+    manager := spookyssh.NewManager(logger, config)
+    
+    // Get SSH connection
+    conn, err := manager.GetConnection(hostname, 22, "admin")
+    if err != nil {
+        return fmt.Errorf("failed to get SSH connection: %w", err)
+    }
+    defer manager.ReturnConnection(conn)
+    
+    // Copy file
+    if err := manager.CopyFile(conn, localPath, remotePath); err != nil {
+        return fmt.Errorf("failed to copy file: %w", err)
+    }
+    
+    fmt.Printf("File copied successfully: %s -> %s\n", localPath, remotePath)
+    return nil
+}
+```
 
-**Status**: ✅ **Production Ready** - The SSH system is fully implemented and ready for production use.
+## Error Handling
+
+### SSH Errors
+
+```go
+// Error handling example
+func handleSSHError(err error) {
+    if err == nil {
+        return
+    }
+    
+    // Check for specific error types
+    switch {
+    case strings.Contains(err.Error(), "connection refused"):
+        fmt.Println("SSH connection refused - check machine connectivity")
+    case strings.Contains(err.Error(), "authentication failed"):
+        fmt.Println("SSH authentication failed - check credentials")
+    case strings.Contains(err.Error(), "host key verification failed"):
+        fmt.Println("SSH host key verification failed - check known hosts")
+    case strings.Contains(err.Error(), "timeout"):
+        fmt.Println("SSH connection timeout - check network connectivity")
+    case strings.Contains(err.Error(), "permission denied"):
+        fmt.Println("SSH permission denied - check user privileges")
+    default:
+        fmt.Printf("SSH error: %v\n", err)
+    }
+}
+```
+
+### Connection Errors
+
+```go
+// Connection error handling
+func handleConnectionError(err error) error {
+    if err == nil {
+        return nil
+    }
+    
+    // Check for specific connection error types
+    switch {
+    case strings.Contains(err.Error(), "failed to create SSH connection"):
+        return fmt.Errorf("SSH connection creation failed - check SSH configuration")
+    case strings.Contains(err.Error(), "failed to load private key"):
+        return fmt.Errorf("SSH private key loading failed - check key file and permissions")
+    case strings.Contains(err.Error(), "failed to parse private key"):
+        return fmt.Errorf("SSH private key parsing failed - check key format and passphrase")
+    case strings.Contains(err.Error(), "failed to establish SSH connection"):
+        return fmt.Errorf("SSH connection establishment failed - check network and SSH service")
+    default:
+        return fmt.Errorf("SSH connection error: %w", err)
+    }
+}
+```
+
+## Performance Considerations
+
+### Connection Pooling
+
+The SSH system supports connection pooling:
+
+- SSH connections are pooled and reused
+- Configurable pool size and timeout
+- Thread-safe connection management
+
+### Resource Management
+
+The SSH system manages resources efficiently:
+
+- SSH connections are properly closed
+- Memory usage is optimized for large connection sets
+- Timeouts prevent hanging connections
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Connection Refused**: Check machine connectivity and SSH service
+2. **Authentication Failed**: Verify SSH key permissions and user access
+3. **Host Key Verification Failed**: Check known hosts configuration
+4. **Permission Denied**: Check SSH key permissions and user privileges
+5. **Timeout Issues**: Adjust SSH timeouts for slow connections
+
+### Debug Information
+
+The SSH system provides comprehensive logging for debugging:
+
+```go
+// Enable debug logging
+logger.SetLevel(spookytypes.LogLevelDebug)
+
+// Check SSH configuration
+fmt.Printf("SSH config: %+v\n", sshConfig)
+
+// Validate SSH key
+err := validateSSHKey(keyPath)
+if err != nil {
+    fmt.Printf("SSH key validation error: %v\n", err)
+}
+```
+
+## Future Enhancements
+
+### Planned Features
+
+1. **Parallel Processing**: Implement parallel SSH operations
+2. **Advanced Authentication**: Support for multiple authentication methods
+3. **Connection Monitoring**: Add connection health monitoring
+4. **Advanced File Transfer**: Improve file transfer reliability
+5. **SSH Tunneling**: Add SSH tunneling support
+
+### Integration Enhancements
+
+1. **Actions Integration**: Use SSH in action execution
+2. **Facts Integration**: Use SSH in fact collection
+3. **Machines Integration**: Use SSH in machine connectivity testing
+4. **Advanced Security**: Improve SSH security features
