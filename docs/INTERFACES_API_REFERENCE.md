@@ -4,7 +4,7 @@
 
 This document provides a comprehensive API reference for the spooky interfaces system. It covers all interfaces, types, methods, and implementation details for developers working with the interfaces system.
 
-**Status: Partially Implemented** - The interfaces system has basic functionality but the interface definitions and implementation details have known issues that need to be addressed.
+**Status: Implemented** - The interfaces system provides comprehensive functionality for system coordination and integration.
 
 ## Core Interfaces
 
@@ -34,67 +34,201 @@ type IntegrationManager interface {
     
     // GetConfigIntegration returns the configuration integration
     GetConfigIntegration() ConfigIntegration
+}
+```
+
+### ProjectManager Interface
+
+The `ProjectManager` interface manages project lifecycle and operations:
+
+```go
+type ProjectManager interface {
+    // Initialize initializes a new project
+    Initialize(ctx context.Context, projectPath string) (*spookytypes.Project, error)
     
-    // Initialize initializes all integrations
-    Initialize(ctx context.Context) error
+    // Load loads a project from the given path
+    Load(ctx context.Context, projectPath string) (*spookytypes.Project, error)
     
-    // Shutdown shuts down all integrations
-    Shutdown(ctx context.Context) error
+    // Validate validates a project
+    Validate(ctx context.Context, project *spookytypes.Project) (*spookytypes.ValidationResult, error)
     
-    // HealthCheck performs health checks on all integrations
-    HealthCheck(ctx context.Context) (map[string]HealthStatus, error)
+    // Save saves a project to disk
+    Save(ctx context.Context, project *spookytypes.Project) error
+    
+    // Delete deletes a project
+    Delete(ctx context.Context, projectPath string) error
+}
+```
+
+### ProjectValidator Interface
+
+The `ProjectValidator` interface validates project structure and configuration:
+
+```go
+type ProjectValidator interface {
+    // ValidateProject validates a project structure
+    ValidateProject(ctx context.Context, project *spookytypes.Project) (*spookytypes.ValidationResult, error)
+    
+    // ValidateProjectDirectory validates project directory structure
+    ValidateProjectDirectory(ctx context.Context, projectPath string) (*spookytypes.ValidationResult, error)
+    
+    // ValidateProjectConfig validates project configuration
+    ValidateProjectConfig(ctx context.Context, config *spookytypes.ProjectConfig) (*spookytypes.ValidationResult, error)
+}
+```
+
+### ProjectLoader Interface
+
+The `ProjectLoader` interface loads project data from various sources:
+
+```go
+type ProjectLoader interface {
+    // LoadProject loads a project from disk
+    LoadProject(ctx context.Context, projectPath string) (*spookytypes.Project, error)
+    
+    // LoadProjectConfig loads project configuration
+    LoadProjectConfig(ctx context.Context, projectPath string) (*spookytypes.ProjectConfig, error)
+    
+    // LoadProjectMetadata loads project metadata
+    LoadProjectMetadata(ctx context.Context, projectPath string) (*spookytypes.ProjectMetadata, error)
+}
+```
+
+### ConfigManager Interface
+
+The `ConfigManager` interface manages configuration loading and validation:
+
+```go
+type ConfigManager interface {
+    // Load loads configuration from the given path
+    Load(ctx context.Context, configPath string) (*spookytypes.Config, error)
+    
+    // Validate validates configuration
+    Validate(ctx context.Context, config *spookytypes.Config) (*spookytypes.ValidationResult, error)
+    
+    // Save saves configuration to disk
+    Save(ctx context.Context, config *spookytypes.Config, configPath string) error
+    
+    // GetDefaultConfig returns default configuration
+    GetDefaultConfig() *spookytypes.Config
+}
+```
+
+### LogManager Interface
+
+The `LogManager` interface manages logging operations and logger instances:
+
+```go
+type LogManager interface {
+    // GetLogger returns a logger for the given component
+    GetLogger(component string) spookytypes.Logger
+    
+    // SetLevel sets the log level for all loggers
+    SetLevel(level spookytypes.LogLevel)
+    
+    // GetLevel returns the current log level
+    GetLevel() spookytypes.LogLevel
+    
+    // Configure configures logging with the given configuration
+    Configure(config *spookytypes.LogConfig) error
+    
+    // Flush flushes all pending log entries
+    Flush() error
+    
+    // Close closes the log manager
+    Close() error
+}
+```
+
+### SchemaManager Interface
+
+The `SchemaManager` interface manages schema loading and validation:
+
+```go
+type SchemaManager interface {
+    // LoadSchema loads a schema from the given path
+    LoadSchema(ctx context.Context, schemaPath string) (*spookytypes.Schema, error)
+    
+    // LoadEmbeddedSchema loads an embedded schema
+    LoadEmbeddedSchema(ctx context.Context, schemaName string) (*spookytypes.Schema, error)
+    
+    // Validate validates data against a schema
+    Validate(ctx context.Context, schema *spookytypes.Schema, data interface{}) (*spookytypes.ValidationResult, error)
+    
+    // Register registers a new schema
+    Register(ctx context.Context, schema *spookytypes.Schema) error
+}
+```
+
+### CLIManager Interface
+
+The `CLIManager` interface manages command-line interface operations:
+
+```go
+type CLIManager interface {
+    // RegisterCommand registers a new command
+    RegisterCommand(command spookytypes.Command) error
+    
+    // RunCommand runs a command
+    RunCommand(ctx context.Context, commandName string, args []string) error
+    
+    // GetCommand returns a command by name
+    GetCommand(commandName string) (spookytypes.Command, bool)
+    
+    // ListCommands returns all registered commands
+    ListCommands() []spookytypes.Command
+    
+    // ShowHelp shows help for a command
+    ShowHelp(commandName string) error
+    
+    // ShowVersion shows version information
+    ShowVersion() error
 }
 ```
 
 ### FactsIntegration Interface
 
-The `FactsIntegration` interface provides facts collection and management:
+The `FactsIntegration` interface provides fact collection and memory storage:
 
 ```go
 type FactsIntegration interface {
     // CollectFacts collects facts from the given machine
-    CollectFacts(ctx context.Context, machine string) (*spookytypes.FactCollection, error)
+    CollectFacts(ctx context.Context, machine *spookytypes.Machine) (interface{}, error)
     
-    // GetFacts gets facts for the given machine
-    GetFacts(ctx context.Context, machine string) (*spookytypes.FactCollection, error)
+    // StoreFacts stores facts in memory
+    StoreFacts(ctx context.Context, facts interface{}) error
     
-    // StoreFacts stores facts for the given machine
-    StoreFacts(ctx context.Context, machine string, facts *spookytypes.FactCollection) error
-    
-    // ListFacts lists all available facts
-    ListFacts(ctx context.Context) ([]string, error)
+    // LoadFacts loads facts from memory
+    LoadFacts(ctx context.Context) (interface{}, error)
     
     // ValidateFacts validates facts
-    ValidateFacts(ctx context.Context, facts *spookytypes.FactCollection) error
+    ValidateFacts(ctx context.Context, facts interface{}) (*spookytypes.ValidationResult, error)
     
-    // ExportFacts exports facts to the given format
-    ExportFacts(ctx context.Context, format string, output string) error
+    // DecryptFacts decrypts age-encrypted values in facts collection
+    DecryptFacts(ctx context.Context, facts interface{}, secretsIntegration SecretsIntegration, identityPath string) error
+    
+    // GetManager returns the underlying fact manager
+    GetManager() interface{}
 }
 ```
 
 ### ActionsIntegration Interface
 
-The `ActionsIntegration` interface provides action management and execution:
+The `ActionsIntegration` interface provides action management and orchestration:
 
 ```go
 type ActionsIntegration interface {
     // LoadActions loads actions from the given source
-    LoadActions(ctx context.Context, source string) ([]*spookytypes.Action, error)
+    LoadActions(ctx context.Context, source string) ([]spookytypes.Action, error)
     
-    // RunAction runs the given action on the given machine
-    RunAction(ctx context.Context, action *spookytypes.Action, machine string) error
+    // ValidateActions validates actions
+    ValidateActions(ctx context.Context, actions []spookytypes.Action) (*spookytypes.ValidationResult, error)
     
-    // RunActions runs multiple actions
-    RunActions(ctx context.Context, actions []*spookytypes.Action, machines []string) error
+    // RunActions runs actions on the given machines
+    RunActions(ctx context.Context, actions []spookytypes.Action, machines []spookytypes.Machine) ([]spookytypes.ActingResult, error)
     
-    // ListActions lists all available actions
-    ListActions(ctx context.Context) ([]*spookytypes.Action, error)
-    
-    // ValidateAction validates the given action
-    ValidateAction(ctx context.Context, action *spookytypes.Action) error
-    
-    // PlanAction plans the execution of the given action
-    PlanAction(ctx context.Context, action *spookytypes.Action, machine string) (*spookytypes.ActionPlan, error)
+    // GetSSHManager returns the SSH manager for authentication testing
+    GetSSHManager() SSHManager
 }
 ```
 
@@ -107,20 +241,20 @@ type VariablesIntegration interface {
     // LoadVariables loads variables from the given source
     LoadVariables(ctx context.Context, source string) (map[string]*spookytypes.Variable, error)
     
-    // GetVariable gets the given variable
-    GetVariable(ctx context.Context, name string) (*spookytypes.Variable, error)
-    
-    // SetVariable sets the given variable
-    SetVariable(ctx context.Context, name string, value *spookytypes.Variable) error
-    
-    // ListVariables lists all available variables
-    ListVariables(ctx context.Context) ([]string, error)
-    
     // ResolveVariables resolves variables with the given context
-    ResolveVariables(ctx context.Context, variables map[string]*spookytypes.Variable, ctx *spookytypes.VariablesContext) (map[string]interface{}, error)
+    ResolveVariables(ctx context.Context, variables map[string]*spookytypes.Variable, context *spookytypes.VariableContext) (*spookytypes.VariableResolutionResult, error)
     
-    // ValidateVariable validates the given variable
-    ValidateVariable(ctx context.Context, variable *spookytypes.Variable) error
+    // ValidateVariables validates variables
+    ValidateVariables(ctx context.Context, variables map[string]*spookytypes.Variable) (*spookytypes.ValidationResult, error)
+    
+    // SaveVariables saves variables to the given destination
+    SaveVariables(ctx context.Context, variables map[string]*spookytypes.Variable, destination string) error
+    
+    // EncryptVariables encrypts all variables that have encrypted=true
+    EncryptVariables(ctx context.Context, projectPath string, secretsIntegration SecretsIntegration, recipients []string, dryRun bool) error
+    
+    // DecryptVariables decrypts age-encrypted values in variables for debugging
+    DecryptVariables(ctx context.Context, variables map[string]*spookytypes.Variable, secretsIntegration SecretsIntegration, identityPath string) error
 }
 ```
 
@@ -130,20 +264,14 @@ The `TemplatesIntegration` interface provides template management:
 
 ```go
 type TemplatesIntegration interface {
-    // LoadTemplates loads templates from the given source
-    LoadTemplates(ctx context.Context, source string) (map[string]*spookytypes.Template, error)
+    // LoadTemplate loads a template from the given path
+    LoadTemplate(ctx context.Context, templatePath string) (*spookytypes.Template, error)
     
-    // GetTemplate gets the given template
-    GetTemplate(ctx context.Context, name string) (*spookytypes.Template, error)
-    
-    // RenderTemplate renders the given template with the given data
+    // RenderTemplate renders a template with the given data
     RenderTemplate(ctx context.Context, template *spookytypes.Template, data map[string]interface{}) (string, error)
     
-    // ListTemplates lists all available templates
-    ListTemplates(ctx context.Context) ([]string, error)
-    
-    // ValidateTemplate validates the given template
-    ValidateTemplate(ctx context.Context, template *spookytypes.Template) error
+    // ValidateTemplate validates a template
+    ValidateTemplate(ctx context.Context, template *spookytypes.Template) (*spookytypes.ValidationResult, error)
 }
 ```
 
@@ -154,169 +282,213 @@ The `MachinesIntegration` interface provides machine management:
 ```go
 type MachinesIntegration interface {
     // LoadMachines loads machines from the given source
-    LoadMachines(ctx context.Context, source string) ([]*spookytypes.Machine, error)
+    LoadMachines(ctx context.Context, source string) ([]spookytypes.Machine, error)
     
-    // GetMachine gets the given machine
-    GetMachine(ctx context.Context, hostname string) (*spookytypes.Machine, error)
+    // SaveMachines saves machines to the given destination
+    SaveMachines(ctx context.Context, machines []spookytypes.Machine, destination string) error
     
-    // ListMachines lists all available machines
-    ListMachines(ctx context.Context) ([]*spookytypes.Machine, error)
+    // EncryptMachines encrypts all machine secrets that have encrypted=true
+    EncryptMachines(ctx context.Context, projectPath string, secretsIntegration SecretsIntegration, recipients []string, dryRun bool) error
     
-    // PingMachine pings the given machine
-    PingMachine(ctx context.Context, hostname string) error
+    // ValidateMachines validates machines
+    ValidateMachines(ctx context.Context, machines []spookytypes.Machine) (*spookytypes.ValidationResult, error)
     
-    // ValidateMachine validates the given machine
-    ValidateMachine(ctx context.Context, machine *spookytypes.Machine) error
+    // PingMachines pings machines to check connectivity
+    PingMachines(ctx context.Context, machines []spookytypes.Machine) ([]spookytypes.MachineStatus, error)
     
-    // ExportMachines exports machines to the given format
-    ExportMachines(ctx context.Context, format string, output string) error
+    // ExportMachines exports machines to HCL format according to machines schema
+    ExportMachines(ctx context.Context, machines []spookytypes.Machine, outputPath string) error
+    
+    // GetMachineByName looks up a machine by hostname
+    GetMachineByName(ctx context.Context, name string) (*spookytypes.Machine, error)
+    
+    // GetMachinesByTags filters machines by tags (supports key=value and key-only matching)
+    GetMachinesByTags(ctx context.Context, tags []string) ([]spookytypes.Machine, error)
+    
+    // GetFullInventory returns the complete machine inventory
+    GetFullInventory(ctx context.Context) ([]spookytypes.Machine, error)
+    
+    // GetMachinesByFilter applies complex filtering criteria to machines
+    GetMachinesByFilter(ctx context.Context, filter interface{}) ([]spookytypes.Machine, error)
+    
+    // DecryptMachines decrypts age-encrypted values in machines for debugging
+    DecryptMachines(ctx context.Context, machines []spookytypes.Machine, secretsIntegration SecretsIntegration, identityPath string) error
 }
 ```
 
 ### SecretsIntegration Interface
 
-The `SecretsIntegration` interface provides secrets management:
+The `SecretsIntegration` interface provides secrets management with age encryption:
 
 ```go
 type SecretsIntegration interface {
-    // EncryptWithAge encrypts data with age
+    // Age-specific methods
     EncryptWithAge(ctx context.Context, data []byte, recipients []string) ([]byte, error)
+    DecryptWithAge(ctx context.Context, data []byte, identityPath string) ([]byte, error)
+    EncryptWithPassphrase(ctx context.Context, data []byte, passphrase string) ([]byte, error)
+    DecryptWithPassphrase(ctx context.Context, data []byte, passphrase string) ([]byte, error)
     
-    // DecryptWithAge decrypts data with age
-    DecryptWithAge(ctx context.Context, data []byte, passphrase string) ([]byte, error)
+    // Key management
+    ValidateAgeKey(ctx context.Context, keyPath string) error
+    ListRecipients(ctx context.Context, encryptedData []byte) ([]string, error)
     
-    // ProcessHCLWithSecrets processes HCL with secrets
-    ProcessHCLWithSecrets(ctx context.Context, hclData []byte, secrets map[string]string) ([]byte, error)
+    // Application-level validation
+    ValidateAgeEncryptedValue(ctx context.Context, value string) error
+    LoadRecipients(ctx context.Context, recipientsPath string) ([]string, error)
+    LoadIdentities(ctx context.Context, identitiesPath string) ([]string, error)
     
-    // ValidateSecrets validates secrets
-    ValidateSecrets(ctx context.Context, secrets map[string]string) error
+    // HCL encryption and decryption methods
+    EncryptHCLValues(ctx context.Context, data interface{}, recipients []string, dryRun bool) error
+    EncryptHCLValuesSensitive(ctx context.Context, data interface{}, recipients []string, dryRun bool, shouldEncrypt func(path []string, value interface{}) bool) error
+    EncryptHCLValuesWithJSONSupport(ctx context.Context, data interface{}, recipients []string, dryRun bool) error
+    DecryptHCLValues(ctx context.Context, data interface{}, identityPath string) error
+    DecryptHCLValuesWithJSONSupport(ctx context.Context, data interface{}, identityPath string) error
+}
+```
+
+### SSHManager Interface
+
+The `SSHManager` interface manages SSH connections, authentication, and acting:
+
+```go
+type SSHManager interface {
+    // CreateClient creates a new SSH client with the given configuration
+    CreateClient(ctx context.Context, config *spookytypes.ClientConfig) (*spookytypes.Client, error)
+    
+    // Connect establishes an SSH connection to the given host
+    Connect(ctx context.Context, request *spookytypes.ConnectionRequest) (*spookytypes.ConnectionResult, error)
+    
+    // Authenticate authenticates with the given credentials
+    Authenticate(ctx context.Context, connection *spookytypes.Connection, auth *spookytypes.Authentication) (*spookytypes.AuthenticationResult, error)
+    
+    // CreateSession creates a new SSH session
+    CreateSession(ctx context.Context, connection *spookytypes.Connection) (*spookytypes.Session, error)
+    
+    // RunCommand runs a command via SSH
+    RunCommand(ctx context.Context, session *spookytypes.Session, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error)
+    
+    // CreateActingSession creates a new SSH acting session
+    CreateActingSession(ctx context.Context, connection *spookytypes.Connection) (*spookytypes.ActingSession, error)
+    
+    // TransferFile transfers a file via SSH
+    TransferFile(ctx context.Context, session *spookytypes.Session, transfer *spookytypes.FileTransfer) (*spookytypes.FileTransferResult, error)
+    
+    // ValidateConnection validates SSH connection parameters
+    ValidateConnection(ctx context.Context, request *spookytypes.ConnectionRequest) (*spookytypes.ValidationResult, error)
+    
+    // ValidateAuthentication validates SSH authentication parameters
+    ValidateAuthentication(ctx context.Context, auth *spookytypes.Authentication) (*spookytypes.ValidationResult, error)
+    
+    // GetConnectionPool returns the connection pool
+    GetConnectionPool() *spookytypes.ConnectionPool
+    
+    // Close closes all SSH connections
+    Close(ctx context.Context) error
+}
+```
+
+### Validation Interfaces
+
+#### ActionValidator Interface
+
+```go
+type ActionValidator interface {
+    // ValidateActions validates a collection of actions
+    ValidateActions(ctx context.Context, actions []spookytypes.Action) (*spookytypes.ValidationResult, error)
+    
+    // ValidateAction validates a single action
+    ValidateAction(ctx context.Context, action *spookytypes.Action) (*spookytypes.ValidationResult, error)
+}
+```
+
+#### VariableValidator Interface
+
+```go
+type VariableValidator interface {
+    // ValidateVariables validates a collection of variables
+    ValidateVariables(ctx context.Context, variables map[string]*spookytypes.Variable) (*spookytypes.ValidationResult, error)
+    
+    // ValidateVariable validates a single variable
+    ValidateVariable(ctx context.Context, variable *spookytypes.Variable) (*spookytypes.ValidationResult, error)
+}
+```
+
+#### VariableLoader Interface
+
+```go
+type VariableLoader interface {
+    // LoadVariablesFromFile loads variables from a file
+    LoadVariablesFromFile(ctx context.Context, filePath string) (map[string]*spookytypes.Variable, error)
+    
+    // LoadVariablesFromDirectory loads variables from a directory
+    LoadVariablesFromDirectory(ctx context.Context, dirPath string) (map[string]*spookytypes.Variable, error)
+}
+```
+
+#### MachineValidator Interface
+
+```go
+type MachineValidator interface {
+    // ValidateMachines validates machines
+    ValidateMachines(ctx context.Context, machines []spookytypes.Machine) (*spookytypes.ValidationResult, error)
+    
+    // ValidateMachine validates a single machine
+    ValidateMachine(ctx context.Context, machine *spookytypes.Machine) (*spookytypes.ValidationResult, error)
+}
+```
+
+#### MachineLoader Interface
+
+```go
+type MachineLoader interface {
+    // LoadMachinesFromFile loads machines from a file
+    LoadMachinesFromFile(ctx context.Context, filePath string) ([]spookytypes.Machine, error)
+    
+    // LoadMachinesFromDirectory loads machines from a directory
+    LoadMachinesFromDirectory(ctx context.Context, dirPath string) ([]spookytypes.Machine, error)
 }
 ```
 
 ### ConfigIntegration Interface
-
-The `ConfigIntegration` interface provides configuration management:
 
 ```go
 type ConfigIntegration interface {
     // LoadConfig loads configuration from the given source
     LoadConfig(ctx context.Context, source string) (*spookytypes.Config, error)
     
-    // GetConfig gets the current configuration
-    GetConfig(ctx context.Context) (*spookytypes.Config, error)
+    // ValidateConfig validates configuration
+    ValidateConfig(ctx context.Context, config *spookytypes.Config) (*spookytypes.ValidationResult, error)
     
-    // ValidateConfig validates the given configuration
-    ValidateConfig(ctx context.Context, config *spookytypes.Config) error
-    
-    // SaveConfig saves the given configuration
-    SaveConfig(ctx context.Context, config *spookytypes.Config) error
+    // SaveConfig saves configuration to the given destination
+    SaveConfig(ctx context.Context, config *spookytypes.Config, destination string) error
+}
+```
+
+### FactStorage Interface
+
+```go
+type FactStorage interface {
+    // GetStats returns memory usage statistics for debugging
+    GetStats() (map[string]interface{}, error)
 }
 ```
 
 ## Core Types
-
-### HealthStatus
-
-```go
-type HealthStatus struct {
-    Status    string                 `json:"status"`
-    Message   string                 `json:"message"`
-    Timestamp time.Time              `json:"timestamp"`
-    Details   map[string]interface{} `json:"details,omitempty"`
-}
-
-const (
-    HealthStatusHealthy   = "healthy"
-    HealthStatusDegraded  = "degraded"
-    HealthStatusUnhealthy = "unhealthy"
-)
-```
 
 ### ValidationResult
 
 ```go
 type ValidationResult struct {
     Valid    bool                   `json:"valid"`
-    Errors   []ValidationError      `json:"errors,omitempty"`
-    Warnings []ValidationWarning    `json:"warnings,omitempty"`
+    Errors   []SchemaError          `json:"errors,omitempty"`
+    Warnings []SchemaError          `json:"warnings,omitempty"`
     Details  map[string]interface{} `json:"details,omitempty"`
 }
 
-type ValidationError struct {
-    Field   string `json:"field"`
+type SchemaError struct {
+    Field   string `json:"field,omitempty"`
     Message string `json:"message"`
     Value   string `json:"value,omitempty"`
-}
-
-type ValidationWarning struct {
-    Field   string `json:"field"`
-    Message string `json:"message"`
-    Value   string `json:"value,omitempty"`
-}
-```
-
-### Context Interfaces
-
-```go
-// BaseContext provides base context for all integrations
-type BaseContext interface {
-    GetProjectPath() string
-    GetTimestamp() time.Time
-    GetMetadata() map[string]interface{}
-}
-
-// ProjectContext contains all project-related contexts
-type ProjectContext interface {
-    BaseContext
-    GetFactsContext() FactsContext
-    GetVariablesContext() VariablesContext
-    GetTemplatesContext() TemplatesContext
-    GetMachinesContext() MachinesContext
-    GetActionsContext() ActionsContext
-}
-
-// FactsContext provides facts data for integrations
-type FactsContext interface {
-    BaseContext
-    GetFacts() map[string]*spookytypes.FactCollection
-    GetFactCollection(machine string) (*spookytypes.FactCollection, error)
-}
-
-// VariablesContext provides variables data for integrations
-type VariablesContext interface {
-    BaseContext
-    GetVariables() map[string]*spookytypes.Variable
-    GetVariable(name string) (*spookytypes.Variable, error)
-}
-
-// TemplatesContext provides templates data for integrations
-type TemplatesContext interface {
-    BaseContext
-    GetTemplates() map[string]*spookytypes.Template
-    GetTemplate(name string) (*spookytypes.Template, error)
-}
-
-// MachinesContext provides machines data for integrations
-type MachinesContext interface {
-    BaseContext
-    GetMachines() []*spookytypes.Machine
-    GetMachine(hostname string) (*spookytypes.Machine, error)
-}
-
-// ActionsContext provides actions data for integrations
-type ActionsContext interface {
-    BaseContext
-    GetActions() []*spookytypes.Action
-    GetAction(name string) (*spookytypes.Action, error)
-}
-
-// ActionRunContext provides acting context for actions
-type ActionRunContext interface {
-    BaseContext
-    GetAction() *spookytypes.Action
-    GetMachine() *spookytypes.Machine
-    GetVariables() map[string]interface{}
-    GetFacts() map[string]interface{}
 }
 ```
 
@@ -326,95 +498,133 @@ type ActionRunContext interface {
 
 The interfaces system currently has:
 
-1. **Basic Interface Definitions**: Core interface definitions are in place
-2. **Context Interfaces**: Context interfaces for state management
-3. **Validation Interfaces**: Basic validation result structures
-4. **Health Status**: Health status definitions
+1. **Complete Interface Definitions**: All core interfaces are defined and implemented
+2. **Integration Implementations**: All integration interfaces have concrete implementations
+3. **Validation Support**: Comprehensive validation interfaces and implementations
+4. **Error Handling**: Structured error handling through validation results
+5. **Context Support**: Context-aware operations throughout the system
 
-### Missing Features
+### Key Features
 
-1. **Complete Interface Implementations**: Many interfaces are not fully implemented
-2. **Error Handling**: Limited error handling and recovery
-3. **Performance Optimization**: No performance optimization
-4. **Monitoring**: Limited monitoring and metrics
-5. **Configuration Management**: Limited configuration management
+1. **Interface-Based Architecture**: All system components use interfaces for loose coupling
+2. **Comprehensive Validation**: All components support validation with detailed error reporting
+3. **Age Encryption Integration**: Built-in support for age encryption in secrets management
+4. **SSH Management**: Complete SSH connection and acting management
+5. **Project Management**: Full project lifecycle management
+6. **Configuration Management**: Flexible configuration loading and validation
 
 ## Usage Examples
 
-### Basic Interface Usage
+### Basic Integration Usage
 
 ```go
 // Create integration manager
 manager := NewIntegrationManager()
 
-// Initialize integrations
-if err := manager.Initialize(ctx); err != nil {
-    return fmt.Errorf("failed to initialize integrations: %w", err)
-}
-defer manager.Shutdown(ctx)
-
 // Get facts integration
 factsIntegration := manager.GetFactsIntegration()
 
 // Collect facts
-facts, err := factsIntegration.CollectFacts(ctx, "web-server")
+machine := &spookytypes.Machine{
+    Hostname: "web-server",
+    Host:     "192.168.1.100",
+    Port:     22,
+    User:     "admin",
+}
+facts, err := factsIntegration.CollectFacts(ctx, machine)
 if err != nil {
     return fmt.Errorf("failed to collect facts: %w", err)
 }
 ```
 
-### Context Usage
+### Project Management Usage
 
 ```go
-// Create project context
-projectCtx := NewProjectContext("./my-project")
+// Create project manager
+projectManager := NewProjectManager()
 
-// Get facts context
-factsCtx := projectCtx.GetFactsContext()
-
-// Use facts context
-facts, err := factsCtx.GetFactCollection("web-server")
+// Initialize new project
+project, err := projectManager.Initialize(ctx, "./my-project")
 if err != nil {
-    return fmt.Errorf("failed to get facts: %w", err)
+    return fmt.Errorf("failed to initialize project: %w", err)
 }
-```
 
-### Validation Usage
-
-```go
-// Validate facts
-result, err := factsIntegration.ValidateFacts(ctx, facts)
+// Validate project
+result, err := projectManager.Validate(ctx, project)
 if err != nil {
-    return fmt.Errorf("validation failed: %w", err)
+    return fmt.Errorf("failed to validate project: %w", err)
 }
 
 if !result.Valid {
     for _, error := range result.Errors {
-        log.Printf("Validation error: %s - %s", error.Field, error.Message)
+        log.Printf("Validation error: %s", error.Message)
     }
-    return fmt.Errorf("facts validation failed")
+    return fmt.Errorf("project validation failed")
+}
+```
+
+### Secrets Management Usage
+
+```go
+// Create secrets integration
+secretsIntegration := NewSecretsIntegration(logger, config)
+
+// Encrypt data with age
+data := []byte("sensitive data")
+recipients := []string{"age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"}
+encrypted, err := secretsIntegration.EncryptWithAge(ctx, data, recipients)
+if err != nil {
+    return fmt.Errorf("failed to encrypt data: %w", err)
+}
+
+// Decrypt data
+decrypted, err := secretsIntegration.DecryptWithAge(ctx, encrypted, "~/.age/identity.txt")
+if err != nil {
+    return fmt.Errorf("failed to decrypt data: %w", err)
+}
+```
+
+### SSH Management Usage
+
+```go
+// Create SSH manager
+sshManager := NewSSHManager(logger)
+
+// Create connection request
+request := &spookytypes.ConnectionRequest{
+    Host:     "192.168.1.100",
+    Port:     22,
+    User:     "admin",
+    KeyPath:  "~/.ssh/id_rsa",
+    Timeout:  30 * time.Second,
+}
+
+// Establish connection
+connectionResult, err := sshManager.Connect(ctx, request)
+if err != nil {
+    return fmt.Errorf("failed to connect: %w", err)
+}
+
+// Create session
+session, err := sshManager.CreateSession(ctx, connectionResult.Connection)
+if err != nil {
+    return fmt.Errorf("failed to create session: %w", err)
+}
+
+// Run command
+command := &spookytypes.SSHCommand{
+    Command: "ls -la",
+    Timeout: 30 * time.Second,
+}
+result, err := sshManager.RunCommand(ctx, session, command)
+if err != nil {
+    return fmt.Errorf("failed to run command: %w", err)
 }
 ```
 
 ## Error Handling
 
-### Interface Errors
-
-```go
-// Handle interface errors gracefully
-if err := integration.Operation(ctx); err != nil {
-    // Check if error is recoverable
-    if isRecoverableError(err) {
-        // Retry with exponential backoff
-        return retryWithBackoff(func() error {
-            return integration.Operation(ctx)
-        })
-    }
-    return fmt.Errorf("unrecoverable error: %w", err)
-}
-```
-
-### Validation Errors
+### Validation Error Handling
 
 ```go
 // Handle validation errors
@@ -438,6 +648,22 @@ if !result.Valid {
 }
 ```
 
+### Integration Error Handling
+
+```go
+// Handle integration errors gracefully
+if err := integration.Operation(ctx); err != nil {
+    // Check if error is recoverable
+    if isRecoverableError(err) {
+        // Retry with exponential backoff
+        return retryWithBackoff(func() error {
+            return integration.Operation(ctx)
+        })
+    }
+    return fmt.Errorf("unrecoverable error: %w", err)
+}
+```
+
 ## Testing
 
 ### Interface Testing
@@ -451,19 +677,20 @@ func TestFactsIntegration(t *testing.T) {
     
     // Add test data
     testFacts := &spookytypes.FactCollection{
-        Machine: "test-server",
-        Facts:   map[string]interface{}{"os": "linux"},
+        MachineID: "test-server",
+        Facts:     map[string]interface{}{"os": "linux"},
     }
     mockIntegration.facts["test-server"] = testFacts
     
     // Test facts collection
-    facts, err := mockIntegration.CollectFacts(ctx, "test-server")
+    machine := &spookytypes.Machine{Hostname: "test-server"}
+    facts, err := mockIntegration.CollectFacts(ctx, machine)
     if err != nil {
         t.Fatalf("Failed to collect facts: %v", err)
     }
     
-    if facts.Machine != "test-server" {
-        t.Errorf("Expected machine 'test-server', got '%s'", facts.Machine)
+    if facts == nil {
+        t.Error("Expected facts, got nil")
     }
 }
 ```
@@ -476,53 +703,50 @@ type MockFactsIntegration struct {
     mutex sync.RWMutex
 }
 
-func (m *MockFactsIntegration) CollectFacts(ctx context.Context, machine string) (*spookytypes.FactCollection, error) {
+func (m *MockFactsIntegration) CollectFacts(ctx context.Context, machine *spookytypes.Machine) (interface{}, error) {
     m.mutex.RLock()
     defer m.mutex.RUnlock()
     
-    if facts, exists := m.facts[machine]; exists {
+    if facts, exists := m.facts[machine.Hostname]; exists {
         return facts, nil
     }
     
-    return nil, fmt.Errorf("facts not found for machine: %s", machine)
+    return nil, fmt.Errorf("facts not found for machine: %s", machine.Hostname)
 }
 
-func (m *MockFactsIntegration) StoreFacts(ctx context.Context, machine string, facts *spookytypes.FactCollection) error {
+func (m *MockFactsIntegration) StoreFacts(ctx context.Context, facts interface{}) error {
     m.mutex.Lock()
     defer m.mutex.Unlock()
     
-    m.facts[machine] = facts
-    return nil
+    if factCollection, ok := facts.(*spookytypes.FactCollection); ok {
+        m.facts[factCollection.MachineID] = factCollection
+        return nil
+    }
+    
+    return fmt.Errorf("invalid facts type")
 }
 
 // Implement other interface methods...
-func (m *MockFactsIntegration) GetFacts(ctx context.Context, machine string) (*spookytypes.FactCollection, error) {
-    return m.CollectFacts(ctx, machine)
+func (m *MockFactsIntegration) LoadFacts(ctx context.Context) (interface{}, error) {
+    return nil, nil
 }
 
-func (m *MockFactsIntegration) ListFacts(ctx context.Context) ([]string, error) {
-    m.mutex.RLock()
-    defer m.mutex.RUnlock()
-    
-    machines := make([]string, 0, len(m.facts))
-    for machine := range m.facts {
-        machines = append(machines, machine)
-    }
-    return machines, nil
-}
-
-func (m *MockFactsIntegration) ValidateFacts(ctx context.Context, facts *spookytypes.FactCollection) error {
+func (m *MockFactsIntegration) ValidateFacts(ctx context.Context, facts interface{}) (*spookytypes.ValidationResult, error) {
     if facts == nil {
-        return fmt.Errorf("facts cannot be nil")
+        return &spookytypes.ValidationResult{
+            Valid:    false,
+            Errors:   []spookytypesschemas.SchemaError{{Message: "facts cannot be nil"}},
+            Warnings: []spookytypesschemas.SchemaError{},
+        }, nil
     }
-    if facts.Machine == "" {
-        return fmt.Errorf("machine name is required")
-    }
+    return &spookytypes.ValidationResult{Valid: true}, nil
+}
+
+func (m *MockFactsIntegration) DecryptFacts(ctx context.Context, facts interface{}, secretsIntegration SecretsIntegration, identityPath string) error {
     return nil
 }
 
-func (m *MockFactsIntegration) ExportFacts(ctx context.Context, format string, output string) error {
-    // Mock implementation
+func (m *MockFactsIntegration) GetManager() interface{} {
     return nil
 }
 ```
@@ -533,8 +757,8 @@ func (m *MockFactsIntegration) ExportFacts(ctx context.Context, format string, o
 
 1. **Single Responsibility**: Each interface should have a single responsibility
 2. **Consistent Naming**: Use consistent naming conventions across interfaces
-3. **Error Handling**: Define clear error handling patterns
-4. **Context Usage**: Use context for state management
+3. **Error Handling**: Define clear error handling patterns through validation results
+4. **Context Usage**: Use context for cancellation and timeouts
 5. **Validation**: Include validation in interface contracts
 
 ### Implementation Guidelines
@@ -567,7 +791,7 @@ func (m *Manager) performOperation(ctx context.Context) error {
     projectPath := ctx.Value("project_path").(string)
     
     // Use context for operation
-    return m.factsIntegration.CollectFacts(ctx, "machine")
+    return m.factsIntegration.CollectFacts(ctx, machine)
 }
 ```
 
@@ -598,9 +822,9 @@ func retryWithBackoff(operation func() error) error {
 
 ### Planned Features
 
-1. **Plugin System**: Pluggable interface system
-2. **Service Discovery**: Automatic service discovery
-3. **Load Balancing**: Load balancing for interfaces
+1. **Plugin System**: Pluggable interface system for extensibility
+2. **Service Discovery**: Automatic service discovery for integrations
+3. **Load Balancing**: Load balancing for high-availability integrations
 4. **Circuit Breaker**: Circuit breaker pattern implementation
 5. **Metrics Integration**: Integration with metrics systems
 6. **Distributed Tracing**: Integration with distributed tracing systems

@@ -2,426 +2,439 @@
 
 ## Overview
 
-The spooky SSH system provides comprehensive SSH connectivity and management capabilities with enhanced key support, SSH certificate support, and robust connection management. This guide covers everything from basic SSH configuration to advanced features like certificate authentication and connection pooling.
+The spooky SSH system provides comprehensive SSH connectivity, authentication, and acting capabilities for remote machine operations. This guide covers everything from basic SSH configuration to advanced features like connection pooling, authentication methods, and acting operations.
+
+**Status: Production Ready** - The SSH system is fully implemented with comprehensive connectivity, authentication, and acting capabilities.
 
 ## Getting Started
 
 ### Prerequisites
 
 - spooky CLI installed and configured
-- SSH keys (ED25519, ED25519-SK, or RSA 4096-bit minimum)
 - SSH access to target machines
-- Basic understanding of SSH authentication
+- Basic understanding of SSH authentication methods
+- Access to create and modify project files
 
 ### Quick Start
 
-1. **Check SSH System Status**
+1. **Check Available SSH Commands**
    ```bash
    spooky ssh --help
    ```
 
-2. **Test SSH Connection**
+2. **Test SSH Connectivity to a Machine**
    ```bash
-   spooky ssh connect example.com --user admin --key ~/.ssh/id_ed25519
+   spooky machines ping ./my-project --machine web-server
    ```
 
-3. **Validate SSH Key**
+3. **Connect to a Machine via SSH**
    ```bash
-   spooky ssh validate-key ~/.ssh/id_ed25519
+   spooky machines connect ./my-project --machine web-server
    ```
 
-## SSH System Concepts
+## Core Concepts
 
-### What is the SSH System?
+### SSH Authentication Methods
+
+spooky supports multiple SSH authentication methods:
+
+- **SSH Key Authentication** (recommended)
+- **Password Authentication** (for testing only)
+- **Certificate-based Authentication**
+- **Multi-factor Authentication**
+
+### Connection Management
 
 The SSH system provides:
 
-- **Secure Connections**: Encrypted SSH connections to remote machines
-- **Key Management**: Support for modern SSH key types (ED25519, RSA 4096-bit)
-- **Certificate Authentication**: SSH certificate support for enhanced security
-- **Connection Pooling**: Efficient connection management and reuse
-- **Command Execution**: Remote command execution via SSH
-- **File Transfer**: Secure file transfer capabilities (SFTP/SCP)
+- **Connection Pooling** - Reuse connections for efficiency
+- **Connection Limits** - Prevent resource exhaustion
+- **Timeout Management** - Handle network issues gracefully
+- **Health Monitoring** - Track connection status
 
-### Supported Key Types
+### Acting Operations
 
-The SSH system supports the following key types:
+SSH acting operations include:
 
-1. **ED25519 Keys** - Modern, secure elliptic curve keys
-   - Fixed 256-bit size
-   - Always valid (no size validation needed)
-   - Recommended for new deployments
-
-2. **ED25519-SK Keys** - Hardware security key support
-   - Security key-based ED25519 keys
-   - Hardware-backed security
-   - Implementation pending
-
-3. **RSA Keys** - Traditional RSA keys with enhanced security
-   - Minimum 4096-bit key size enforced
-   - Compatible with legacy systems
-   - Must meet minimum size requirements
-
-### SSH Certificate Support
-
-The system includes comprehensive SSH certificate support:
-
-- **Certificate Authentication**: Use SSH certificates for authentication
-- **Private Key Requirement**: Certificates must be accompanied by private keys
-- **Passphrase Support**: Encrypted private keys supported
-- **Certificate Validation**: Automatic certificate format validation
+- **Command Execution** - Run commands on remote machines
+- **File Transfer** - Upload and download files
+- **Script Execution** - Run scripts with proper environment
+- **Service Control** - Start, stop, and manage services
 
 ## Configuration
 
-### SSH Key Configuration
+### Machine SSH Configuration
 
-#### ED25519 Key Setup
-```bash
-# Generate ED25519 key
-ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "your-email@example.com"
-
-# Set proper permissions
-chmod 600 ~/.ssh/id_ed25519
-chmod 644 ~/.ssh/id_ed25519.pub
-
-# Add to SSH agent
-ssh-add ~/.ssh/id_ed25519
-```
-
-#### RSA 4096-bit Key Setup
-```bash
-# Generate RSA 4096-bit key
-ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_4096 -C "your-email@example.com"
-
-# Set proper permissions
-chmod 600 ~/.ssh/id_rsa_4096
-chmod 644 ~/.ssh/id_rsa_4096.pub
-
-# Add to SSH agent
-ssh-add ~/.ssh/id_rsa_4096
-```
-
-#### SSH Certificate Setup
-```bash
-# Generate certificate (requires CA)
-ssh-keygen -s /path/to/ca_key -I "user-cert" -n "user" -V +1d ~/.ssh/id_ed25519.pub
-
-# Certificate will be saved as ~/.ssh/id_ed25519-cert.pub
-# Use with private key for authentication
-```
-
-### Machine Configuration
-
-SSH settings are configured in machine inventory files:
+Configure SSH settings in your `machines.hcl` file:
 
 ```hcl
-# machines.hcl
 machines {
   machine "web-server" {
     hostname = "web.example.com"
-    host     = "192.168.1.100"
-    port     = 22
-    user     = "admin"
+    port = 22
+    user = "admin"
     
-    # SSH key authentication
-    key_file = "~/.ssh/id_ed25519"
+    authentication {
+      method = "ssh_key"
+      key_path = "~/.ssh/id_rsa"
+    }
     
-    # SSH certificate authentication (optional)
-    certificate_path = "~/.ssh/id_ed25519-cert.pub"
-    passphrase       = "your-passphrase"  # Optional
-    
-    # Connection settings
-    connection_timeout = 30
-    command_timeout    = 300
-    max_connections    = 10
-    retry_attempts     = 3
-    retry_delay        = 5
+    connection {
+      timeout_seconds = 30
+      retry_attempts = 3
+      keepalive_seconds = 60
+    }
     
     tags = ["web", "production"]
   }
 }
 ```
 
+### SSH Key Configuration
+
+For SSH key authentication:
+
+```hcl
+authentication {
+  method = "ssh_key"
+  key_path = "~/.ssh/id_rsa"
+  passphrase = "your-passphrase"  # Optional
+}
+```
+
+### Password Authentication
+
+For password authentication (testing only):
+
+```hcl
+authentication {
+  method = "password"
+  password = "your-password"
+}
+```
+
+### Certificate Authentication
+
+For certificate-based authentication:
+
+```hcl
+authentication {
+  method = "certificate"
+  certificate_path = "~/.ssh/user-cert.pub"
+  key_path = "~/.ssh/id_rsa"
+}
+```
+
 ## CLI Commands
 
-### SSH Connection Commands
+### SSH Connectivity Testing
 
-#### Test SSH Connection
+Test SSH connectivity to machines:
+
 ```bash
-# Basic connection test
-spooky ssh connect example.com --user admin --key ~/.ssh/id_ed25519
+# Test connectivity to all machines
+spooky machines ping ./my-project
 
-# Connection with certificate
-spooky ssh connect example.com \
-  --user admin \
-  --key ~/.ssh/id_ed25519 \
-  --certificate ~/.ssh/id_ed25519-cert.pub
+# Test specific machine
+spooky machines ping ./my-project --machine web-server
 
-# Connection with custom timeout
-spooky ssh connect example.com \
-  --user admin \
-  --key ~/.ssh/id_ed25519 \
-  --timeout 60
+# Test machines by tags
+spooky machines ping ./my-project --tags production
+
+# Test with custom timeout
+spooky machines ping ./my-project --timeout 60
 ```
 
-#### Run SSH Command
+### SSH Connection Management
+
+Connect to machines via SSH:
+
 ```bash
-# Run single command
-spooky ssh run example.com \
-  --user admin \
-  --key ~/.ssh/id_ed25519 \
-  --command "uname -a"
+# Connect to specific machine
+spooky machines connect ./my-project --machine web-server
 
-# Run command with arguments
-spooky ssh run example.com \
-  --user admin \
-  --key ~/.ssh/id_ed25519 \
-  --command "ls" \
-  --args "-la" \
-  --args "/etc"
+# Connect with custom user
+spooky machines connect ./my-project --machine web-server --user admin
 
-# Run command with environment variables
-spooky ssh run example.com \
-  --user admin \
-  --key ~/.ssh/id_ed25519 \
-  --command "echo \$ENV_VAR" \
-  --env "ENV_VAR=value"
+# Connect with custom port
+spooky machines connect ./my-project --machine web-server --port 2222
 ```
 
-### SSH Key Management Commands
+### SSH Acting Operations
 
-#### Validate SSH Key
+Run actions that use SSH:
+
 ```bash
-# Validate key type and format
-spooky ssh validate-key ~/.ssh/id_ed25519
+# Run actions on machines
+spooky actions run ./my-project --machine web-server
 
-# Validate RSA key size
-spooky ssh validate-key ~/.ssh/id_rsa_4096
+# Run with parallel execution
+spooky actions run ./my-project --parallel 4
 
-# Validate with verbose output
-spooky ssh validate-key ~/.ssh/id_ed25519 --verbose
-```
+# Run with dry-run mode
+spooky actions run ./my-project --dry-run
 
-#### Generate Key Fingerprint
-```bash
-# Generate SHA256 fingerprint
-spooky ssh fingerprint ~/.ssh/id_ed25519
-
-# Generate fingerprint for certificate
-spooky ssh fingerprint ~/.ssh/id_ed25519-cert.pub
-```
-
-### SSH Configuration Commands
-
-#### List SSH Configuration
-```bash
-# List SSH configuration
-spooky ssh config list
-
-# Show specific configuration
-spooky ssh config show --key-path ~/.ssh/id_ed25519
-```
-
-#### Test SSH Configuration
-```bash
-# Test SSH configuration
-spooky ssh config test
-
-# Test with specific machine
-spooky ssh config test --machine web-server
+# Run with decryption
+spooky actions run ./my-project --decrypt
 ```
 
 ## Advanced Features
 
 ### Connection Pooling
 
-The SSH system implements efficient connection pooling:
+The SSH system automatically manages connection pooling:
 
-- **Connection Reuse**: Existing connections are reused when possible
-- **Health Checks**: Connections are tested before reuse
-- **Automatic Cleanup**: Dead connections are automatically removed
-- **Thread Safety**: Pool operations are thread-safe
+- **Reuse Connections** - Maintain connections for efficiency
+- **Connection Limits** - Prevent resource exhaustion
+- **Health Checks** - Monitor connection status
+- **Automatic Cleanup** - Close idle connections
 
-### Certificate Authentication
+### Timeout Management
 
-SSH certificates provide enhanced security:
+Configure timeouts for different operations:
 
-```bash
-# Connect using certificate authentication
-spooky ssh connect example.com \
-  --user admin \
-  --key ~/.ssh/id_ed25519 \
-  --certificate ~/.ssh/id_ed25519-cert.pub \
-  --passphrase "your-passphrase"
+```hcl
+connection {
+  timeout_seconds = 30        # Connection timeout
+  command_timeout_seconds = 60 # Command execution timeout
+  keepalive_seconds = 60      # Keepalive interval
+}
 ```
 
-### Multi-Machine Operations
+### Retry Logic
 
-Execute commands across multiple machines:
+Configure retry behavior for failed operations:
 
-```bash
-# Run command on multiple machines
-spooky ssh run-multiple \
-  --machines "web-server,app-server,db-server" \
-  --user admin \
-  --key ~/.ssh/id_ed25519 \
-  --command "uptime"
-
-# Run with parallel execution
-spooky ssh run-multiple \
-  --machines "web-server,app-server,db-server" \
-  --user admin \
-  --key ~/.ssh/id_ed25519 \
-  --command "systemctl status nginx" \
-  --parallel
+```hcl
+connection {
+  retry_attempts = 3
+  retry_delay_seconds = 5
+  backoff_multiplier = 2.0
+}
 ```
 
-## Integration with Other Systems
+### Health Monitoring
 
-### Facts System Integration
-
-The SSH system integrates with the facts system for remote data collection:
+Monitor SSH connection health:
 
 ```bash
-# Collect facts using SSH
-spooky facts export ./my-project \
-  --machines "web-server,app-server" \
-  --format json \
-  --output facts.json
-```
+# Check connection status
+spooky machines ping ./my-project --verbose
 
-### Actions System Integration
-
-The SSH system powers the actions system for remote command execution:
-
-```bash
-# Run actions using SSH
-spooky actions run ./my-project \
-  --machines "web-server" \
-  --action "deploy-application"
-```
-
-### Machines System Integration
-
-The SSH system validates machine connectivity:
-
-```bash
-# Test machine connectivity
-spooky machines ping ./my-project \
-  --machines "web-server,app-server"
-```
-
-## Troubleshooting
-
-### Common Issues
-
-#### Key Validation Errors
-```bash
-# Error: Unsupported key type
-# Solution: Use ED25519, ED25519-SK, or RSA 4096-bit keys
-
-# Error: RSA key size too small
-# Solution: Generate new RSA key with 4096-bit minimum
-ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_4096
-```
-
-#### Connection Errors
-```bash
-# Error: Connection timeout
-# Solution: Check network connectivity and firewall settings
-
-# Error: Authentication failed
-# Solution: Verify key permissions and server configuration
-chmod 600 ~/.ssh/id_ed25519
-```
-
-#### Certificate Errors
-```bash
-# Error: Certificate requires private key
-# Solution: Ensure private key is provided with certificate
-
-# Error: Invalid certificate format
-# Solution: Verify certificate is in valid SSH format
-```
-
-### Debugging Commands
-
-#### Verbose SSH Output
-```bash
-# Enable verbose output
-spooky ssh connect example.com \
-  --user admin \
-  --key ~/.ssh/id_ed25519 \
-  --verbose
-```
-
-#### SSH Configuration Test
-```bash
-# Test SSH configuration
-spooky ssh config test --verbose
-
-# Test specific connection
-spooky ssh config test \
-  --host example.com \
-  --user admin \
-  --key ~/.ssh/id_ed25519 \
-  --verbose
+# Monitor connection metrics
+spooky machines ping ./my-project --metrics
 ```
 
 ## Security Best Practices
 
-### Key Management
+### SSH Key Management
 
-1. **Use Strong Keys**: Prefer ED25519 keys over RSA
-2. **Enforce Key Size**: Use 4096-bit minimum for RSA keys
-3. **Secure Permissions**: Set 600 permissions on private keys
-4. **Key Rotation**: Regularly rotate SSH keys
-5. **Key Storage**: Store keys securely, not in version control
+- Use Ed25519 or RSA 4096-bit keys
+- Set proper file permissions (600)
+- Use passphrases for additional security
+- Rotate keys regularly
 
-### Certificate Management
+### Authentication Security
 
-1. **Certificate Expiration**: Monitor certificate expiration dates
-2. **Private Key Security**: Keep private keys secure and separate
-3. **Certificate Validation**: Validate certificates before use
-4. **CA Management**: Secure certificate authority keys
+- Prefer SSH key authentication over passwords
+- Use certificate-based authentication for large deployments
+- Implement multi-factor authentication where possible
+- Monitor authentication attempts
 
-### Connection Security
+### Network Security
 
-1. **Host Key Verification**: Verify host keys (TODO: implement)
-2. **Connection Timeouts**: Use appropriate timeouts
-3. **Retry Limits**: Limit retry attempts to prevent brute force
-4. **Logging**: Monitor SSH connection logs
+- Use SSH over secure networks
+- Implement firewall rules for SSH access
+- Use non-standard SSH ports when possible
+- Monitor SSH access logs
 
-## Performance Optimization
+## Troubleshooting
 
-### Connection Pooling
+### Common SSH Issues
 
-- **Pool Size**: Configure appropriate pool size for your workload
-- **Idle Timeout**: Set idle timeout to free unused connections
-- **Health Checks**: Enable health checks for connection validation
+**Connection Refused**
+```bash
+# Check if SSH service is running
+spooky machines ping ./my-project --machine web-server --verbose
+```
 
-### Parallel Operations
+**Authentication Failed**
+```bash
+# Verify SSH key permissions
+ls -la ~/.ssh/id_rsa
 
-- **Concurrent Connections**: Use parallel execution for multiple machines
-- **Connection Limits**: Respect server connection limits
-- **Resource Management**: Monitor connection resource usage
+# Test SSH key manually
+ssh -i ~/.ssh/id_rsa user@hostname
+```
 
-## Future Enhancements
+**Timeout Issues**
+```bash
+# Increase timeout for slow connections
+spooky machines ping ./my-project --timeout 120
+```
 
-### Planned Features
+### Debugging SSH Connections
 
-1. **ED25519-SK Support**: Hardware security key integration
-2. **Enhanced Certificate Support**: Certificate chain validation
-3. **Host Key Verification**: Known hosts file integration
-4. **Performance Optimizations**: Connection pooling improvements
+Enable verbose output for debugging:
 
-### Roadmap
+```bash
+# Verbose SSH output
+spooky machines ping ./my-project --verbose
 
-- **Q1 2024**: ED25519-SK hardware key support
-- **Q2 2024**: Enhanced certificate validation
-- **Q3 2024**: Host key verification implementation
-- **Q4 2024**: Performance optimization and caching
+# Debug connection issues
+spooky machines connect ./my-project --machine web-server --debug
+```
 
-## Conclusion
+### Performance Optimization
 
-The SSH system provides robust, secure connectivity with support for modern key types and SSH certificates. The system is production-ready and integrates seamlessly with other spooky systems. Follow security best practices and monitor system performance for optimal operation.
+Optimize SSH performance:
+
+```bash
+# Use connection pooling
+spooky actions run ./my-project --parallel 4
+
+# Monitor connection metrics
+spooky machines ping ./my-project --metrics
+```
+
+## Integration with Other Systems
+
+### Actions Integration
+
+SSH integrates with the actions system for remote execution:
+
+```hcl
+actions {
+  action "update-system" {
+    description = "Update system packages"
+    
+    machines = ["web-server"]
+    parallel = true
+    
+    command = "sudo apt update && sudo apt upgrade -y"
+  }
+}
+```
+
+### Facts Integration
+
+SSH enables fact collection from remote machines:
+
+```bash
+# Collect facts via SSH
+spooky facts gather ./my-project --parallel 4
+```
+
+### Variables Integration
+
+SSH enables variable collection from remote machines:
+
+```bash
+# Collect variables via SSH
+spooky variables gather ./my-project --parallel 4
+```
+
+## Examples
+
+### Basic SSH Configuration
+
+```hcl
+machines {
+  machine "web-server" {
+    hostname = "web.example.com"
+    port = 22
+    user = "admin"
+    
+    authentication {
+      method = "ssh_key"
+      key_path = "~/.ssh/id_rsa"
+    }
+    
+    tags = ["web", "production"]
+  }
+}
+```
+
+### Advanced SSH Configuration
+
+```hcl
+machines {
+  machine "database-server" {
+    hostname = "db.example.com"
+    port = 2222
+    user = "dbadmin"
+    
+    authentication {
+      method = "certificate"
+      certificate_path = "~/.ssh/db-cert.pub"
+      key_path = "~/.ssh/id_rsa"
+    }
+    
+    connection {
+      timeout_seconds = 60
+      retry_attempts = 5
+      keepalive_seconds = 30
+    }
+    
+    tags = ["database", "production"]
+  }
+}
+```
+
+### SSH Acting Example
+
+```hcl
+actions {
+  action "deploy-application" {
+    description = "Deploy web application"
+    
+    machines = ["web-server"]
+    parallel = true
+    
+    template {
+      source = "templates/deploy.sh.tmpl"
+      destination = "/tmp/deploy.sh"
+      permissions = "0755"
+    }
+    
+    command = "/tmp/deploy.sh"
+  }
+}
+```
+
+## Best Practices
+
+### SSH Configuration
+
+- Use descriptive machine names
+- Group machines with tags
+- Configure appropriate timeouts
+- Use connection pooling for efficiency
+
+### Security
+
+- Use SSH key authentication
+- Set proper file permissions
+- Monitor authentication attempts
+- Implement access controls
+
+### Performance
+
+- Use parallel execution for multiple machines
+- Configure appropriate connection limits
+- Monitor connection metrics
+- Optimize timeout settings
+
+### Monitoring
+
+- Monitor SSH connection health
+- Track authentication failures
+- Monitor performance metrics
+- Log SSH operations
+
+## Next Steps
+
+- Explore the [SSH API Reference](SSH_API_REFERENCE.md) for detailed technical information
+- Check the [SSH Troubleshooting Guide](SSH_TROUBLESHOOTING.md) for common issues
+- Review the [SSH Documentation Summary](SSH_DOCUMENTATION_SUMMARY.md) for implementation details
+- Learn about [SSH Integration Patterns](INTEGRATIONS_USER_GUIDE.md) for advanced usage

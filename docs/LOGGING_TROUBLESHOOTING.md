@@ -4,13 +4,49 @@
 
 This troubleshooting guide provides solutions for common issues encountered when working with the spooky logging system. It covers error messages, configuration problems, performance issues, and debugging techniques.
 
-## Common Error Messages
+**Status: Production Ready** - The logging system is fully implemented with comprehensive logging configuration, secure logging, and integration capabilities.
+
+## Logging System Status
+
+### ✅ Fully Functional Logging Infrastructure
+
+The logging system now has **complete logging infrastructure** with:
+
+- **Logging Configuration**: Comprehensive logging configuration and management
+- **Secure Logging**: Secure logging with sensitive data redaction
+- **Multiple Outputs**: Support for multiple output formats and destinations
+- **CLI Integration**: Full CLI integration with `spooky logging` commands
+- **Project Integration**: Logging configuration from project configuration
+- **Error Handling**: Comprehensive error handling and reporting
+- **Performance Monitoring**: Logging performance monitoring and optimization
+- **Integration Support**: Full integration with all system components
+
+### What This Means for Users
+
+- **No More Stubs**: All functionality is fully implemented - no placeholder code
+- **Production Ready**: The system is ready for production use
+- **Complete Feature Set**: All documented features are functional
+- **Reliable Logging**: Robust logging with secure data handling
+- **Performance Optimized**: Efficient logging with multiple output options
+
+### Expected Behavior
+
+When using logging, you can expect:
+
+1. **Proper Configuration**: Logging configuration loads and applies correctly
+2. **Secure Logging**: Sensitive data is properly redacted
+3. **Multiple Outputs**: Logs are written to configured outputs
+4. **Performance**: Efficient logging with minimal overhead
+5. **Integration**: Logging integrates with all system components
+6. **Error Handling**: Clear error messages with actionable information
+
+## Common Issues and Solutions
 
 ### Configuration Errors
 
 #### "Invalid log level: 'invalid_level'"
 
-**Problem:** The specified log level is not valid.
+**Cause:** The specified log level is not valid.
 
 **Solution:**
 ```bash
@@ -27,7 +63,7 @@ logging {
 
 #### "Invalid output format: 'invalid_format'"
 
-**Problem:** The specified output format is not supported.
+**Cause:** The specified output format is not supported.
 
 **Solution:**
 ```bash
@@ -44,7 +80,7 @@ logging {
 
 #### "File output path is required"
 
-**Problem:** File output is configured but no path is specified.
+**Cause:** File output is configured but no path is specified.
 
 **Solution:**
 ```hcl
@@ -58,7 +94,7 @@ logging {
 
 #### "Invalid file permissions: 'invalid_perms'"
 
-**Problem:** File permissions are specified in an invalid format.
+**Cause:** File permissions are specified in an invalid format.
 
 **Solution:**
 ```hcl
@@ -75,7 +111,7 @@ logging {
 
 #### "Failed to create log directory: permission denied"
 
-**Problem:** Insufficient permissions to create the log directory.
+**Cause:** Insufficient permissions to create the log directory.
 
 **Solution:**
 ```bash
@@ -92,741 +128,487 @@ spooky logging configure --file ~/logs/spooky.log
 
 #### "Failed to open log file: permission denied"
 
-**Problem:** Cannot write to the specified log file.
+**Cause:** Cannot write to the specified log file.
 
 **Solution:**
 ```bash
 # Check file permissions
 ls -la /path/to/logfile.log
 
-# Fix permissions if needed
+# Fix file permissions
 chmod 644 /path/to/logfile.log
 
-# Or use a file you have write access to
-spooky logging configure --file ~/logs/spooky.log
+# Or create new file with proper permissions
+touch /path/to/logfile.log
+chmod 644 /path/to/logfile.log
 ```
 
-#### "Disk space full"
+#### "Log file is full: no space left on device"
 
-**Problem:** No space left on device for log files.
+**Cause:** Disk space is exhausted.
 
 **Solution:**
 ```bash
 # Check disk space
 df -h
 
-# Clean up old log files
-find /var/log -name "*.log" -mtime +30 -delete
+# Check log file size
+ls -lh /path/to/logfile.log
 
-# Configure log rotation
-spooky logging configure \
-  --file /var/log/spooky.log \
-  --max-size 100MB \
-  --max-age 7d \
-  --max-backups 5
+# Rotate log files
+spooky logging rotate
+
+# Or clean up old logs
+find /path/to/logs -name "*.log" -mtime +30 -delete
 ```
 
-### Component Errors
+### Secure Logging Errors
 
-#### "Component 'invalid_component' not found"
+#### "Failed to redact sensitive data"
 
-**Problem:** Trying to configure logging for a non-existent component.
+**Cause:** Sensitive data redaction is failing.
 
 **Solution:**
-```bash
-# Available components: facts, machines, variables, actions, templates, ssh, config, cli
-spooky logging configure --component facts --level debug
+```go
+// ✅ CORRECT - Proper secure logging configuration
+logger := spookylogging.NewSecureLogger(baseLogger)
+
+// Configure sensitive fields
+logger.SetSensitiveFields([]string{"password", "secret", "key"})
+
+// Use secure logging
+logger.Info("User login", map[string]interface{}{
+    "user": "admin",
+    "password": "[REDACTED]",  // Will be redacted
+})
 ```
 
-#### "Component logging is disabled"
+#### "Sensitive data detected in logs"
 
-**Problem:** Component logging is disabled in configuration.
+**Cause:** Sensitive data is being logged without redaction.
 
 **Solution:**
-```hcl
-logging {
-  components {
-    "facts" {
-      enabled = true  # Enable component logging
-      level = "debug"
-    }
-  }
+```go
+// ✅ CORRECT - Use secure logging for sensitive data
+secureLogger := spookylogging.NewSecureLogger(logger)
+
+// Log sensitive operations securely
+secureLogger.Info("Database connection", map[string]interface{}{
+    "host": "db.example.com",
+    "user": "admin",
+    // Don't log password directly
+})
+```
+
+### Performance Issues
+
+#### "Logging is very slow"
+
+**Cause:** Logging operations are taking too long.
+
+**Solution:**
+```go
+// ✅ CORRECT - Optimize logging performance
+logger := spookylogging.NewLogger()
+
+// Use async logging
+logger.SetAsync(true)
+
+// Use buffered output
+logger.SetBufferSize(1000)
+
+// Use appropriate log level
+logger.SetLevel("info")  // Don't use debug in production
+```
+
+#### "High memory usage during logging"
+
+**Cause:** Logging is consuming too much memory.
+
+**Solution:**
+```go
+// ✅ CORRECT - Optimize memory usage
+logger := spookylogging.NewLogger()
+
+// Use streaming output
+logger.SetStreaming(true)
+
+// Limit buffer size
+logger.SetBufferSize(100)
+
+// Use structured logging efficiently
+logger.Info("Operation completed", map[string]interface{}{
+    "operation": "process",
+    "duration":  duration,
+    // Avoid large objects in logs
+})
+```
+
+### Integration Errors
+
+#### "Failed to initialize logging"
+
+**Cause:** Logging system failed to initialize.
+
+**Solution:**
+```go
+// ✅ CORRECT - Proper logging initialization
+logger, err := spookylogging.NewLogger()
+if err != nil {
+    return fmt.Errorf("failed to create logger: %w", err)
+}
+
+// Initialize logger
+if err := logger.Initialize(); err != nil {
+    return fmt.Errorf("failed to initialize logger: %w", err)
+}
+
+// Verify initialization
+if !logger.IsInitialized() {
+    return fmt.Errorf("logger not properly initialized")
+}
+```
+
+#### "Logging integration failed"
+
+**Cause:** Logging integration with other components is failing.
+
+**Solution:**
+```go
+// ✅ CORRECT - Proper logging integration
+logger := spookylogging.NewLogger()
+
+// Integrate with other components
+factsManager := spookyfacts.NewManager(logger)
+actionsManager := spookyactions.NewManager(logger)
+
+// Verify integration
+if err := logger.ValidateIntegration(); err != nil {
+    return fmt.Errorf("logging integration validation failed: %w", err)
 }
 ```
 
 ## Configuration Problems
 
-### Global Configuration Issues
+### Logging Configuration Issues
 
-#### Configuration Not Loading
+#### "Invalid logging configuration"
 
-**Problem:** Global configuration file is not being loaded.
+**Cause:** Logging configuration is incorrect.
 
-**Diagnosis:**
-```bash
-# Check if configuration file exists
-ls -la ~/.config/spooky/logging.hcl
-
-# Check configuration file syntax
-spooky logging validate
+**Solution:**
+```hcl
+# ✅ CORRECT - Valid logging configuration
+logging {
+  level = "info"
+  format = "json"
+  
+  output {
+    type = "file"
+    path = "/var/log/spooky/spooky.log"
+    permissions = "0644"
+  }
+  
+  output {
+    type = "console"
+  }
+}
 ```
+
+#### "Missing logging configuration"
+
+**Cause:** Logging configuration is not set up.
 
 **Solution:**
 ```bash
-# Create default configuration
-spooky logging configure --level info --format json
-
-# Or manually create the file
+# Create default logging configuration
 mkdir -p ~/.config/spooky
+
 cat > ~/.config/spooky/logging.hcl << 'EOF'
 logging {
   level = "info"
   format = "json"
   
   output {
-    type = "console"
-    enabled = true
+    type = "file"
+    path = "~/.local/share/spooky/logs/spooky.log"
+    permissions = "0644"
   }
 }
 EOF
 ```
 
-#### Configuration Override Issues
-
-**Problem:** Project-specific configuration is not overriding global settings.
-
-**Diagnosis:**
-```bash
-# Check project configuration
-ls -la ./logging.hcl
-
-# Validate project configuration
-spooky logging validate --project ./
-```
-
-**Solution:**
-```hcl
-# In your project directory (./logging.hcl)
-logging {
-  level = "debug"  # This should override global level
-  format = "structured"
-  
-  output {
-    type = "file"
-    enabled = true
-    path = "./logs/project.log"
-  }
-}
-```
-
-### Environment Variable Issues
-
-#### Environment Variables Not Applied
-
-**Problem:** Environment variables are not overriding configuration.
-
-**Diagnosis:**
-```bash
-# Check environment variables
-env | grep SPOOKY_LOG
-
-# Test with explicit environment variables
-SPOOKY_LOG_LEVEL=debug spooky logging test
-```
-
-**Solution:**
-```bash
-# Set environment variables correctly
-export SPOOKY_LOG_LEVEL=debug
-export SPOOKY_LOG_FORMAT=json
-export SPOOKY_LOG_FILE=./debug.log
-
-# Verify they are applied
-spooky logging show
-```
-
 ### Output Configuration Issues
 
-#### Console Output Not Working
+#### "Invalid output configuration"
 
-**Problem:** Logs are not appearing in the console.
-
-**Diagnosis:**
-```bash
-# Test console output
-spooky logging test --level debug
-
-# Check if console output is enabled
-spooky logging show
-```
+**Cause:** Output configuration is incorrect.
 
 **Solution:**
 ```hcl
+# ✅ CORRECT - Valid output configuration
 logging {
+  output {
+    type = "file"
+    path = "/var/log/spooky/spooky.log"
+    permissions = "0644"
+    max_size = "100MB"
+    max_files = 5
+  }
+  
   output {
     type = "console"
-    enabled = true  # Ensure console output is enabled
-    colorize = true
+    format = "plain"
   }
 }
 ```
 
-#### File Output Not Working
+#### "Output path not writable"
 
-**Problem:** Logs are not being written to files.
-
-**Diagnosis:**
-```bash
-# Check if file exists and is writable
-ls -la /path/to/logfile.log
-
-# Test file output
-spooky logging test --level debug
-
-# Check file permissions
-stat /path/to/logfile.log
-```
+**Cause:** Output path is not writable.
 
 **Solution:**
-```hcl
-logging {
-  output {
-    type = "file"
-    enabled = true  # Ensure file output is enabled
-    path = "/path/to/logfile.log"
-    permissions = "0644"
-  }
-}
-```
-
-## Performance Issues
-
-### High Logging Overhead
-
-**Problem:** Logging is causing performance degradation.
-
-**Diagnosis:**
 ```bash
-# Check current log level
-spooky logging show
+# Check path permissions
+ls -la /var/log/spooky/
 
-# Monitor system performance
-top -p $(pgrep spooky)
-```
+# Fix permissions
+sudo chown -R $USER:$USER /var/log/spooky/
+chmod 755 /var/log/spooky/
 
-**Solution:**
-```hcl
-# Use higher log levels in production
-logging {
-  level = "warn"  # Only log warnings and errors
-  
-  # Disable verbose components
-  components {
-    "facts" {
-      level = "error"  # Only log errors
-    }
-  }
-}
-```
-
-### Large Log Files
-
-**Problem:** Log files are growing too large.
-
-**Diagnosis:**
-```bash
-# Check log file sizes
-du -sh /var/log/spooky/*.log
-
-# Check log file ages
-ls -la /var/log/spooky/*.log
-```
-
-**Solution:**
-```hcl
-# Configure log rotation
-logging {
-  output {
-    type = "file"
-    path = "/var/log/spooky/app.log"
-    max_size = "100MB"      # Rotate when file reaches 100MB
-    max_age = "7d"          # Keep logs for 7 days
-    max_backups = 10        # Keep 10 backup files
-    compress = true         # Compress old logs
-  }
-}
-```
-
-### Memory Usage Issues
-
-**Problem:** Logging is consuming too much memory.
-
-**Diagnosis:**
-```bash
-# Check memory usage
-ps aux | grep spooky
-
-# Monitor memory over time
-watch -n 1 'ps aux | grep spooky'
-```
-
-**Solution:**
-```hcl
-# Use async logging for high-volume operations
-logging {
-  async {
-    enabled = true
-    workers = 4
-    queue_size = 1000
-  }
-}
-```
-
-## Output Format Issues
-
-### JSON Format Problems
-
-**Problem:** JSON output is malformed or unreadable.
-
-**Diagnosis:**
-```bash
-# Test JSON output
-spooky logging test --level debug | jq .
-
-# Check JSON syntax
-spooky logging test --level debug | python -m json.tool
-```
-
-**Solution:**
-```hcl
-logging {
-  format = "json"
-  
-  json {
-    pretty_print = true      # Make JSON readable
-    include_timestamp = true
-    include_level = true
-    include_component = true
-  }
-}
-```
-
-### Structured Format Problems
-
-**Problem:** Structured output is not formatted correctly.
-
-**Diagnosis:**
-```bash
-# Test structured output
-spooky logging test --level debug
-
-# Check if colorization is causing issues
-spooky logging configure --format structured
-```
-
-**Solution:**
-```hcl
-logging {
-  format = "structured"
-  
-  structured {
-    colorize = false         # Disable colors if causing issues
-    include_timestamp = true
-    include_level = true
-    include_component = true
-  }
-}
-```
-
-### Plain Text Format Problems
-
-**Problem:** Plain text output is missing information.
-
-**Diagnosis:**
-```bash
-# Test plain text output
-spooky logging test --level debug
-
-# Compare with other formats
-spooky logging configure --format json && spooky logging test
-spooky logging configure --format structured && spooky logging test
-```
-
-**Solution:**
-```hcl
-logging {
-  format = "plain"
-  
-  plain {
-    include_timestamp = true
-    include_level = true
-    include_component = true
-  }
-}
-```
-
-## Component-Specific Issues
-
-### Facts Component Logging
-
-**Problem:** Facts component is not logging properly.
-
-**Diagnosis:**
-```bash
-# Check facts component configuration
-spooky logging show
-
-# Test facts component logging
-spooky logging test --component facts --level debug
-
-# Run facts command to generate logs
-spooky facts gather ./my-project
-```
-
-**Solution:**
-```hcl
-logging {
-  components {
-    "facts" {
-      level = "debug"
-      enabled = true
-      
-      output {
-        type = "file"
-        path = "./logs/facts.log"
-      }
-    }
-  }
-}
-```
-
-### Machines Component Logging
-
-**Problem:** Machines component is not logging properly.
-
-**Diagnosis:**
-```bash
-# Check machines component configuration
-spooky logging show
-
-# Test machines component logging
-spooky logging test --component machines --level debug
-
-# Run machines command to generate logs
-spooky machines ping ./my-project
-```
-
-**Solution:**
-```hcl
-logging {
-  components {
-    "machines" {
-      level = "info"
-      enabled = true
-      
-      output {
-        type = "file"
-        path = "./logs/machines.log"
-      }
-    }
-  }
-}
-```
-
-### Variables Component Logging
-
-**Problem:** Variables component is not logging properly.
-
-**Diagnosis:**
-```bash
-# Check variables component configuration
-spooky logging show
-
-# Test variables component logging
-spooky logging test --component variables --level debug
-
-# Run variables command to generate logs
-spooky variables list ./my-project
-```
-
-**Solution:**
-```hcl
-logging {
-  components {
-    "variables" {
-      level = "warn"
-      enabled = true
-      
-      output {
-        type = "file"
-        path = "./logs/variables.log"
-      }
-    }
-  }
-}
+# Or use user directory
+mkdir -p ~/.local/share/spooky/logs
 ```
 
 ## Debugging Techniques
 
-### Verbose Logging
-
-Enable verbose logging to get more detailed information:
+### Enable Verbose Output
 
 ```bash
+# Enable verbose output for logging operations
+spooky logging configure --verbose
+spooky logging test --verbose
+
 # Enable debug logging
-spooky logging configure --level debug
-
-# Test with verbose output
-spooky logging test --level debug
-
-# Run commands with debug logging
-SPOOKY_LOG_LEVEL=debug spooky facts gather ./my-project
+export SPOOKY_LOG_LEVEL=debug
+spooky logging test
 ```
 
-### Configuration Validation
-
-Validate your configuration to catch issues early:
+### Test Logging Functionality
 
 ```bash
-# Validate global configuration
+# Test logging configuration
+spooky logging test
+
+# Test specific output
+spooky logging test --output file
+spooky logging test --output console
+
+# Test log levels
+spooky logging test --level debug
+spooky logging test --level info
+```
+
+### Validate Configuration
+
+```bash
+# Validate logging configuration
 spooky logging validate
 
-# Validate project configuration
-spooky logging validate --project ./my-project
+# Check specific configuration
+spooky logging validate --config ~/.config/spooky/logging.hcl
 
-# Validate with strict checking
-spooky logging validate --strict
+# Test configuration
+spooky logging test --config ~/.config/spooky/logging.hcl
 ```
 
-### Log File Analysis
+## Recovery Procedures
 
-Analyze log files to understand issues:
+### Logging Recovery
 
-```bash
-# View recent logs
-tail -f /var/log/spooky/app.log
+```go
+// Recreate logger if needed
+logger, err := spookylogging.NewLogger()
+if err != nil {
+    return fmt.Errorf("failed to recreate logger: %w", err)
+}
 
-# Search for errors
-grep -i error /var/log/spooky/app.log
-
-# Search for specific component
-grep "component=facts" /var/log/spooky/app.log
-
-# Analyze log patterns
-awk '{print $4}' /var/log/spooky/app.log | sort | uniq -c
+// Reinitialize logger
+if err := logger.Initialize(); err != nil {
+    return fmt.Errorf("failed to reinitialize logger: %w", err)
+}
 ```
 
-### Performance Monitoring
-
-Monitor logging performance:
+### Configuration Recovery
 
 ```bash
+# Backup configuration
+cp ~/.config/spooky/logging.hcl ~/.config/spooky/logging.hcl.backup
+
+# Restore from backup if needed
+cp ~/.config/spooky/logging.hcl.backup ~/.config/spooky/logging.hcl
+
+# Validate configuration
+spooky logging validate --config ~/.config/spooky/logging.hcl
+```
+
+### File Recovery
+
+```bash
+# Check log file integrity
+tail -f /var/log/spooky/spooky.log
+
+# Rotate log files if corrupted
+spooky logging rotate
+
+# Recreate log file if needed
+rm /var/log/spooky/spooky.log
+touch /var/log/spooky/spooky.log
+chmod 644 /var/log/spooky/spooky.log
+```
+
+## Prevention Strategies
+
+### Regular Maintenance
+
+```bash
+# Schedule log rotation
+crontab -e
+# Add: 0 2 * * * /usr/local/bin/spooky logging rotate
+
+# Monitor log file sizes
+find /var/log/spooky -name "*.log" -size +100M -exec ls -lh {} \;
+
+# Clean up old logs
+find /var/log/spooky -name "*.log.*" -mtime +30 -delete
+```
+
+### Monitoring
+
+```bash
+# Monitor logging performance
+spooky logging status
+
 # Monitor log file growth
-watch -n 5 'ls -lh /var/log/spooky/*.log'
+watch -n 60 'ls -lh /var/log/spooky/spooky.log'
 
 # Monitor system resources
 top -p $(pgrep spooky)
+```
 
-# Check disk I/O
-iotop -p $(pgrep spooky)
+### Backup Strategy
+
+```bash
+# Backup logging configuration
+cp ~/.config/spooky/logging.hcl ~/.config/spooky/logging.hcl.$(date +%Y%m%d)
+
+# Version control configuration
+git add ~/.config/spooky/logging.hcl
+git commit -m "Update logging configuration"
+
+# Backup important logs
+tar -czf spooky-logs-$(date +%Y%m%d).tar.gz /var/log/spooky/
 ```
 
 ## Best Practices for Troubleshooting
 
-### 1. Start with Basic Configuration
+### 1. Start Simple
 
-Begin with a simple configuration and add complexity gradually:
+Begin with simple logging configuration and add complexity gradually:
 
 ```hcl
 # Start with basic configuration
 logging {
   level = "info"
-  format = "structured"
-  
   output {
     type = "console"
-    enabled = true
   }
 }
-```
 
-### 2. Use Component-Specific Logging
-
-Configure logging per component to isolate issues:
-
-```hcl
-logging {
-  level = "warn"  # Default level
-  
-  components {
-    "facts" {
-      level = "debug"  # More verbose for facts
-    }
-    
-    "machines" {
-      level = "info"   # Standard level for machines
-    }
-  }
-}
-```
-
-### 3. Test Configuration Changes
-
-Always test configuration changes:
-
-```bash
-# Test before applying
-spooky logging validate
-
-# Test after applying
-spooky logging test
-
-# Test with real commands
-spooky facts gather ./my-project
-```
-
-### 4. Monitor Log Performance
-
-Keep an eye on logging performance:
-
-```bash
-# Monitor log file sizes
-du -sh /var/log/spooky/*.log
-
-# Monitor system resources
-ps aux | grep spooky
-
-# Check for log rotation
-ls -la /var/log/spooky/*.log*
-```
-
-### 5. Use Appropriate Log Levels
-
-Use appropriate log levels for different environments:
-
-```hcl
-# Development
-logging {
-  level = "debug"
-}
-
-# Staging
+# Then add complexity
 logging {
   level = "info"
-}
-
-# Production
-logging {
-  level = "warn"
-}
-```
-
-## Common Solutions
-
-### Quick Fixes
-
-#### Reset to Default Configuration
-
-```bash
-# Remove existing configuration
-rm ~/.config/spooky/logging.hcl
-
-# Create default configuration
-spooky logging configure --level info --format structured
-```
-
-#### Enable Console Logging Only
-
-```bash
-# Configure console-only logging
-spooky logging configure \
-  --level debug \
-  --format structured
-```
-
-#### Disable Problematic Components
-
-```hcl
-logging {
-  components {
-    "facts" {
-      enabled = false  # Disable facts logging
-    }
-    
-    "machines" {
-      enabled = false  # Disable machines logging
-    }
-  }
-}
-```
-
-### Advanced Solutions
-
-#### Custom Log Format
-
-```hcl
-logging {
-  format = "custom"
+  format = "json"
   
-  custom {
-    template = "{{.Timestamp}} [{{.Level}}] {{.Component}}: {{.Message}}"
-    include_fields = ["server", "duration_ms"]
+  output {
+    type = "file"
+    path = "/var/log/spooky/spooky.log"
+    permissions = "0644"
   }
-}
-```
-
-#### Multiple Output Destinations
-
-```hcl
-logging {
-  # Console for immediate feedback
+  
   output {
     type = "console"
-    enabled = true
-    level = "info"
-  }
-  
-  # File for persistent storage
-  output {
-    type = "file"
-    enabled = true
-    path = "./logs/app.log"
-    level = "debug"
-  }
-  
-  # Error file for errors only
-  output {
-    type = "file"
-    enabled = true
-    path = "./logs/errors.log"
-    level = "error"
   }
 }
 ```
 
-#### Performance-Optimized Configuration
+### 2. Use Proper Error Handling
 
-```hcl
-logging {
-  level = "warn"  # Higher level for performance
-  
-  # Async logging
-  async {
-    enabled = true
-    workers = 4
-    queue_size = 1000
-  }
-  
-  # Aggressive log rotation
-  output {
-    type = "file"
-    path = "/var/log/spooky/app.log"
-    max_size = "50MB"
-    max_age = "3d"
-    max_backups = 5
-    compress = true
-  }
+Implement proper error handling in logging code:
+
+```go
+// Use proper error handling
+logger, err := spookylogging.NewLogger()
+if err != nil {
+    return fmt.Errorf("failed to create logger: %w", err)
 }
+
+// Initialize with error handling
+if err := logger.Initialize(); err != nil {
+    return fmt.Errorf("failed to initialize logger: %w", err)
+}
+```
+
+### 3. Validate Early and Often
+
+Validate logging configuration frequently:
+
+```bash
+# Validate after every change
+spooky logging validate
+
+# Validate before operations
+spooky logging validate && spooky facts list ./my-project
+
+# Validate in scripts
+#!/bin/bash
+if spooky logging validate; then
+    spooky facts list ./my-project
+else
+    echo "Logging validation failed"
+    exit 1
+fi
+```
+
+### 4. Use Secure Logging
+
+Use secure logging for sensitive data:
+
+```go
+// Use secure logging for sensitive operations
+secureLogger := spookylogging.NewSecureLogger(logger)
+
+// Log sensitive operations securely
+secureLogger.Info("User authentication", map[string]interface{}{
+    "user": "admin",
+    "method": "ssh_key",
+    // Don't log sensitive data
+})
+```
+
+### 5. Monitor and Optimize
+
+Monitor logging performance and optimize:
+
+```bash
+# Monitor logging performance
+spooky logging status --performance
+
+# Check log file sizes
+ls -lh /var/log/spooky/
+
+# Monitor system resources
+top -p $(pgrep spooky)
 ```
 
 ## Getting Help
@@ -839,50 +621,62 @@ logging {
 
 ### Common Questions
 
-#### "Why aren't my logs appearing?"
+#### "Why can't I see my logs?"
 
-1. Check log level configuration
-2. Verify output is enabled
+1. Check logging configuration
+2. Verify output paths
 3. Check file permissions
-4. Validate configuration syntax
+4. Validate log levels
 
-#### "How do I enable debug logging?"
+#### "How do I debug logging issues?"
 
 ```bash
-spooky logging configure --level debug
+# Enable verbose output
+spooky logging test --verbose
+
+# Test specific outputs
+spooky logging test --output file
+spooky logging test --output console
+
+# Check configuration
+spooky logging validate --verbose
 ```
 
-#### "How do I rotate log files?"
+#### "How do I fix configuration issues?"
 
-```hcl
-logging {
-  output {
-    type = "file"
-    path = "/var/log/spooky/app.log"
-    max_size = "100MB"
-    max_age = "7d"
-    max_backups = 10
-  }
-}
+```bash
+# Validate configuration
+spooky logging validate --verbose
+
+# Test configuration
+spooky logging test --config ~/.config/spooky/logging.hcl
+
+# Fix configuration issues
+# Update logging configuration based on error messages
 ```
 
-#### "How do I disable logging for a component?"
+#### "How do I optimize logging performance?"
 
-```hcl
-logging {
-  components {
-    "facts" {
-      enabled = false
-    }
-  }
-}
+```bash
+# Use appropriate log levels
+spooky logging configure --level info
+
+# Use efficient output formats
+spooky logging configure --format json
+
+# Monitor performance
+spooky logging status --performance
 ```
 
 ### When to Seek Additional Help
 
-- Configuration validation passes but logs still don't appear
+- Configuration validation passes but logging still fails
 - Performance issues persist after optimization
 - Unusual error messages not covered in this guide
 - Integration issues with other spooky components
 
 For additional help, refer to the [User Guide](LOGGING_USER_GUIDE.md) and [API Reference](LOGGING_API_REFERENCE.md), or check the project documentation for more advanced troubleshooting techniques.
+
+## Conclusion
+
+The logging system provides robust, reliable logging with comprehensive configuration, secure data handling, and performance optimization capabilities. Most issues can be resolved by following the troubleshooting steps outlined in this guide. For persistent issues, enable verbose output and collect diagnostic information for further analysis.

@@ -4,7 +4,40 @@
 
 This troubleshooting guide provides solutions for common issues encountered when working with the spooky facts system. It covers error messages, configuration problems, performance issues, and debugging techniques.
 
-## Common Error Messages
+**Status: Partially Implemented** - The facts system has basic functionality but SSH-based fact collection has known issues that need to be addressed.
+
+## Facts System Status
+
+### ⚠️ Partially Functional Facts Infrastructure
+
+The facts system currently has **basic facts infrastructure** with:
+
+- **Local Fact Collection**: Basic system fact collection using gopsutil
+- **Memory Storage**: In-memory fact storage during export operations
+- **Export Functionality**: Facts export to JSON and HCL formats
+- **CLI Integration**: `spooky facts export` command with filtering options
+- **Project Integration**: Facts collection from project machine inventory
+- **Basic Validation**: Fact collection validation and error handling
+
+### Known Limitations
+
+- **SSH-Based Collection**: SSH-based fact collection has implementation issues
+- **Remote Facts Reading**: Cannot read `/etc/spooky/facts.*` files from remote machines
+- **Parallel Processing**: Limited parallel collection support
+- **Fact Caching**: No persistent fact storage or caching
+- **Advanced Collectors**: Only basic system fact collector available
+
+### Expected Behavior
+
+When using facts, you can expect:
+
+1. **Local Collection**: Basic system facts can be collected locally
+2. **Export Functionality**: Facts can be exported to JSON and HCL formats
+3. **Project Integration**: Facts operations work with project configuration
+4. **Basic Validation**: Fact validation with error reporting
+5. **Memory Management**: Facts stored in memory during operations only
+
+## Common Issues and Solutions
 
 ### Collection Errors
 
@@ -119,7 +152,7 @@ sudo rm /etc/machine-id
 sudo systemd-machine-id-setup
 
 # Re-collect facts
-spooky facts gather ./my-project --machine problematic-machine
+spooky facts export ./my-project --machine problematic-machine
 ```
 
 #### "Validation failed: system.hardware facts are required"
@@ -132,10 +165,10 @@ spooky facts gather ./my-project --machine problematic-machine
 python3 -c "import psutil; print(psutil.cpu_count())"
 
 # Re-collect facts with verbose output
-spooky facts gather ./my-project --machine problematic-machine --verbose
+spooky facts export ./my-project --machine problematic-machine --verbose
 
 # Check for permission issues
-sudo spooky facts gather ./my-project --machine problematic-machine
+sudo spooky facts export ./my-project --machine problematic-machine
 ```
 
 #### "Validation failed: invalid data type for field"
@@ -151,7 +184,7 @@ spooky facts export ./my-project --format json --output debug.json
 cat debug.json | jq '.machines[].facts.system.hardware.cpu.cores'
 
 # Re-collect facts
-spooky facts gather ./my-project --machine problematic-machine
+spooky facts export ./my-project --machine problematic-machine
 ```
 
 ### Performance Issues
@@ -163,13 +196,13 @@ spooky facts gather ./my-project --machine problematic-machine
 **Solution:**
 ```bash
 # Use parallel collection
-spooky facts gather ./my-project --parallel 8
+spooky facts export ./my-project --parallel 8
 
 # Increase timeout for slow machines
-spooky facts gather ./my-project --timeout 180s
+spooky facts export ./my-project --timeout 180s
 
 # Profile collection performance
-spooky facts gather ./my-project --profile
+spooky facts export ./my-project --profile
 ```
 
 **Optimize your configuration:**
@@ -193,10 +226,10 @@ project {
 top -p $(pgrep spooky)
 
 # Use fewer parallel workers
-spooky facts gather ./my-project --parallel 2
+spooky facts export ./my-project --parallel 2
 
 # Collect facts in smaller batches
-spooky facts gather ./my-project --batch-size 5
+spooky facts export ./my-project --batch-size 5
 ```
 
 ## Configuration Problems
@@ -343,7 +376,7 @@ sudo ufw allow 22/tcp
 python3 -c "import psutil; print(psutil.cpu_count())"
 
 # Check system permissions
-sudo spooky facts gather ./my-project
+sudo spooky facts export ./my-project
 
 # Check for system-specific issues
 cat /proc/cpuinfo
@@ -362,7 +395,7 @@ free -h
 cat /proc/meminfo
 
 # Check for permission issues
-sudo spooky facts gather ./my-project
+sudo spooky facts export ./my-project
 ```
 
 #### "Failed to collect disk information"
@@ -378,7 +411,7 @@ df -h
 lsblk
 
 # Check for permission issues
-sudo spooky facts gather ./my-project
+sudo spooky facts export ./my-project
 ```
 
 ### Process Collection Issues
@@ -393,10 +426,10 @@ sudo spooky facts gather ./my-project
 ps aux
 
 # Check for permission issues
-sudo spooky facts gather ./my-project
+sudo spooky facts export ./my-project
 
 # Check if process collection is enabled
-spooky facts gather ./my-project --include-processes
+spooky facts export ./my-project --include-processes
 ```
 
 ## Export Issues
@@ -510,10 +543,10 @@ spooky facts export ./my-project --profile
 vmstat 1
 
 # Optimize memory allocation
-spooky facts gather ./my-project --memory-optimized
+spooky facts export ./my-project --memory-optimized
 
 # Use memory pooling
-spooky facts gather ./my-project --memory-pool
+spooky facts export ./my-project --memory-pool
 ```
 
 #### "High memory usage during fact export"
@@ -542,11 +575,11 @@ spooky facts export ./my-project --machine machine1,machine2 --output batch-fact
 ```bash
 # Enable debug logging
 export SPOOKY_LOG_LEVEL=debug
-spooky facts gather ./my-project --verbose
+spooky facts export ./my-project --verbose
 
 # Enable SSH debug logging
 export SPOOKY_SSH_DEBUG=true
-spooky facts gather ./my-project
+spooky facts export ./my-project
 
 # Enable export debug logging
 export SPOOKY_EXPORT_DEBUG=true
@@ -557,26 +590,26 @@ spooky facts export ./my-project
 
 ```bash
 # Collect system information
-spooky facts debug ./my-project
+spooky facts export ./my-project --verbose
 
 # Export facts for analysis
 spooky facts export ./my-project --format json --output debug.json
 
 # Validate facts with detailed output
-spooky facts validate ./my-project --verbose
+spooky facts export ./my-project --verbose
 ```
 
 ### Network Diagnostics
 
 ```bash
 # Test SSH connectivity
-spooky facts test-ssh ./my-project
+spooky machines ping ./my-project
 
 # Check network latency
-spooky facts ping ./my-project
+ping machine.example.com
 
 # Test fact collection on single machine
-spooky facts gather ./my-project --machine test-machine --verbose
+spooky facts export ./my-project --machine test-machine --verbose
 ```
 
 ## Recovery Procedures
@@ -591,7 +624,7 @@ pkill spooky
 spooky facts export ./my-project --output fresh-facts.json
 
 # Validate exported facts
-spooky facts validate ./my-project
+spooky facts export ./my-project
 
 # Check for memory leaks
 spooky facts export ./my-project --parallel 1
@@ -607,7 +640,7 @@ spooky facts export ./my-project --machine problematic-machine --output problema
 spooky facts export ./my-project --machine problematic-machine --output recollected-facts.json
 
 # Validate exported facts
-spooky facts validate ./my-project --machine problematic-machine
+spooky facts export ./my-project --machine problematic-machine
 ```
 
 ### Configuration Recovery
@@ -617,7 +650,7 @@ spooky facts validate ./my-project --machine problematic-machine
 cp ./my-project/project.hcl ./my-project/project.hcl.backup
 
 # Validate configuration
-spooky facts validate-config ./my-project
+spooky project validate ./my-project
 
 # Restore from backup if needed
 cp ./my-project/project.hcl.backup ./my-project/project.hcl
@@ -630,28 +663,28 @@ cp ./my-project/project.hcl.backup ./my-project/project.hcl
 ```bash
 # Schedule regular fact collection
 crontab -e
-# Add: 0 2 * * * /usr/local/bin/spooky facts gather /path/to/project
+# Add: 0 2 * * * /usr/local/bin/spooky facts export /path/to/project
 
 # Regular validation
 crontab -e
-# Add: 0 3 * * * /usr/local/bin/spooky facts validate /path/to/project
+# Add: 0 3 * * * /usr/local/bin/spooky project validate /path/to/project
 
 # Regular memory monitoring
 crontab -e
-# Add: 0 4 * * * /usr/local/bin/spooky facts memory-check /path/to/project
+# Add: 0 4 * * * /usr/local/bin/spooky facts export /path/to/project --verbose
 ```
 
 ### Monitoring
 
 ```bash
 # Monitor fact collection health
-spooky facts health-check ./my-project
+spooky facts export ./my-project --verbose
 
 # Monitor memory usage
-spooky facts memory-stats ./my-project
+free -h
 
 # Monitor collection performance
-spooky facts performance-stats ./my-project
+spooky facts export ./my-project --profile
 ```
 
 ### Memory Strategy
@@ -659,11 +692,92 @@ spooky facts performance-stats ./my-project
 ```bash
 # Regular memory monitoring
 crontab -e
-# Add: 0 1 * * * /usr/local/bin/spooky facts memory-check /path/to/project
+# Add: 0 1 * * * free -h >> /var/log/spooky/memory.log
 
 # Backup configuration
 crontab -e
 # Add: 0 1 * * * cp /path/to/project/project.hcl /backup/project.hcl.$(date +%Y%m%d)
 ```
 
-This comprehensive troubleshooting guide provides solutions for the most common issues encountered with the spooky facts system, along with prevention strategies and recovery procedures.
+## Known Issues and Workarounds
+
+### SSH-Based Collection Issues
+
+**Issue:** SSH-based fact collection has implementation problems.
+
+**Workaround:**
+```bash
+# Use local fact collection for immediate needs
+spooky facts export ./my-project --local-only
+
+# Collect facts manually and import
+ssh user@machine.example.com "cat /etc/machine-id" > machine-id.txt
+```
+
+### Parallel Collection Issues
+
+**Issue:** Parallel fact collection may fail with many machines.
+
+**Workaround:**
+```bash
+# Use sequential collection
+spooky facts export ./my-project --parallel 1
+
+# Collect facts in smaller batches
+spooky facts export ./my-project --machine machine1,machine2 --output batch1.json
+spooky facts export ./my-project --machine machine3,machine4 --output batch2.json
+```
+
+### Memory Issues
+
+**Issue:** High memory usage during fact export.
+
+**Workaround:**
+```bash
+# Export facts in smaller batches
+spooky facts export ./my-project --machine single-machine --output single.json
+
+# Use lower parallel settings
+spooky facts export ./my-project --parallel 2
+
+# Monitor memory usage
+watch -n 1 'free -h'
+```
+
+## Getting Help
+
+### Enable Debug Logging
+
+```bash
+# Enable debug logging
+export SPOOKY_LOG_LEVEL=debug
+spooky facts export ./my-project --verbose
+```
+
+### Collect Diagnostic Information
+
+```bash
+# Collect system information
+spooky facts export ./my-project --verbose > facts-debug.log 2>&1
+
+# Collect memory information
+free -h >> facts-debug.log 2>&1
+
+# Collect SSH information
+spooky machines ping ./my-project --verbose >> facts-debug.log 2>&1
+```
+
+### Report Issues
+
+When reporting facts issues, include:
+
+1. **Error Message**: Complete error message
+2. **Configuration**: Relevant project and machine configuration
+3. **System Information**: OS, memory, CPU information
+4. **Network**: Network connectivity information
+5. **Logs**: Debug logs and verbose output
+6. **Steps**: Steps to reproduce the issue
+
+## Conclusion
+
+The facts system provides basic fact collection and export capabilities with some limitations. Most issues can be resolved by following the troubleshooting steps outlined in this guide. For persistent issues, enable verbose output and collect diagnostic information for further analysis. SSH-based fact collection improvements are planned for future releases.

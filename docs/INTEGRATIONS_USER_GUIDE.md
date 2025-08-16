@@ -1,249 +1,546 @@
-# Integrations User Guide
+# Integrations System User Guide
 
 ## Overview
 
-The Integrations system in spooky provides centralized coordination for all system components. It allows you to check the status of various integrations and validate that they're working correctly.
+The spooky integrations system provides comprehensive integration capabilities for connecting with external systems, APIs, and services. This guide covers everything from basic integration setup to advanced features like custom integrations, webhooks, and third-party service connections.
 
-## Available Integrations
+**Status: Partially Implemented** - The integrations system has basic functionality but many advanced features are still in development.
 
-spooky includes the following integrations:
+## Getting Started
 
-- **facts**: Collect and manage system facts
-- **actions**: Load and run actions
-- **variables**: Manage and resolve variables
-- **templates**: Load and render templates
-- **machines**: Manage machine inventory and connectivity
-- **secrets**: Handle encryption and key management
-- **config**: Load and validate configuration
+### Prerequisites
+
+- spooky CLI installed and configured
+- Basic understanding of API concepts
+- Access to external services and APIs
+- Understanding of authentication methods
+
+### Quick Start
+
+1. **Check Available Integration Commands**
+   ```bash
+   spooky integrations --help
+   ```
+
+2. **List Available Integrations**
+   ```bash
+   spooky integrations list
+   ```
+
+3. **Test Integration Connection**
+   ```bash
+   spooky integrations test --integration github
+   ```
+
+## Core Concepts
+
+### Integration Types
+
+spooky supports multiple integration types:
+
+- **API Integrations** - REST and GraphQL API connections
+- **Webhook Integrations** - Incoming webhook processing
+- **Database Integrations** - Database connections and queries
+- **Cloud Integrations** - Cloud provider services
+- **Custom Integrations** - User-defined integrations
+
+### Integration Components
+
+The integrations system provides:
+
+- **Authentication Management** - Secure credential storage
+- **Connection Pooling** - Efficient connection management
+- **Error Handling** - Robust error handling and retry logic
+- **Rate Limiting** - API rate limit management
+
+### Integration Features
+
+Key features include:
+
+- **Configurable Authentication** - Multiple authentication methods
+- **Request/Response Handling** - Structured request and response processing
+- **Data Transformation** - Convert between different data formats
+- **Event Processing** - Handle real-time events and webhooks
+
+## Configuration
+
+### Integration Configuration
+
+Configure integrations in your `spooky.hcl` file:
+
+```hcl
+integrations {
+  github {
+    enabled = true
+    api_url = "https://api.github.com"
+    token = "ghp_..."
+    
+    rate_limit {
+      requests_per_hour = 5000
+      burst_limit = 100
+    }
+    
+    webhooks {
+      enabled = true
+      secret = "webhook-secret"
+      events = ["push", "pull_request"]
+    }
+  }
+  
+  slack {
+    enabled = true
+    webhook_url = "https://hooks.slack.com/services/..."
+    channel = "#alerts"
+    
+    notifications {
+      events = ["action_started", "action_completed", "action_failed"]
+    }
+  }
+}
+```
+
+### API Integration Configuration
+
+For API integrations:
+
+```hcl
+integrations {
+  custom_api {
+    enabled = true
+    base_url = "https://api.example.com"
+    
+    authentication {
+      method = "bearer"
+      token = "api-token"
+    }
+    
+    endpoints {
+      users = "/users"
+      projects = "/projects"
+      deployments = "/deployments"
+    }
+  }
+}
+```
+
+### Webhook Configuration
+
+For webhook integrations:
+
+```hcl
+integrations {
+  webhook {
+    enabled = true
+    url = "https://webhook.example.com/events"
+    
+    authentication {
+      method = "basic"
+      username = "webhook-user"
+      password = "webhook-password"
+    }
+    
+    events {
+      action_started = true
+      action_completed = true
+      action_failed = true
+    }
+  }
+}
+```
 
 ## CLI Commands
 
-### List Integrations
+### Integration Management
 
-Check which integrations are available and their current status:
-
-```bash
-spooky integrations list
-```
-
-**Example Output:**
-```
-Available Integrations:
-=======================
-facts        ✅ available
-actions      ✅ available
-variables    ❌ unavailable
-templates    ✅ available
-machines     ✅ available
-secrets      ✅ available
-config       ✅ available
-```
-
-**Status Indicators:**
-- ✅ **available**: Integration is properly initialized and functional
-- ❌ **unavailable**: Integration is not configured or not working
-
-### Validate Integrations
-
-Validate that all integrations are working correctly:
+Manage integrations:
 
 ```bash
-spooky integrations validate
-```
-
-**Example Output (Success):**
-```
-✅ All integrations are working correctly
-```
-
-**Example Output (Failure):**
-```
-❌ Integration validation failed:
-  - integration facts is not available
-  - integration actions is not available
-  - integration variables is not available
-  - integration machines is not available
-```
-
-## Common Use Cases
-
-### 1. System Health Check
-
-Before running critical operations, validate that all integrations are working:
-
-```bash
-# Check integration status
+# List available integrations
 spooky integrations list
 
-# Validate all integrations
-spooky integrations validate
+# Show integration status
+spooky integrations status
+
+# Test integration connection
+spooky integrations test --integration github
+
+# Configure integration
+spooky integrations configure --integration slack
 ```
 
-### 2. Troubleshooting
+### Integration Operations
 
-If you encounter issues with spooky operations, check integration status:
+Perform integration operations:
 
 ```bash
-# List all integrations to see which ones are unavailable
-spooky integrations list
+# Send notification
+spooky integrations notify --integration slack --message "Deployment completed"
 
-# Get detailed validation errors
-spooky integrations validate
+# Trigger webhook
+spooky integrations webhook --integration github --event push
+
+# Query API
+spooky integrations query --integration github --endpoint /repos/owner/repo
 ```
 
-### 3. Development and Testing
+### Integration Monitoring
 
-During development, verify that all required integrations are properly configured:
+Monitor integration health:
 
 ```bash
-# Quick status check
-spooky integrations list
+# Check integration health
+spooky integrations health --integration github
 
-# Full validation
-spooky integrations validate
+# View integration metrics
+spooky integrations metrics --integration slack
+
+# Test integration connectivity
+spooky integrations ping --integration custom_api
 ```
 
-## Integration Status
+## Advanced Features
 
-### Available Integrations
+### Custom Integrations
 
-When an integration shows as "available", it means:
+Create custom integrations:
 
-- The integration is properly initialized
-- All required dependencies are configured
-- The integration can perform its core functions
-- Health checks pass successfully
+```hcl
+integrations {
+  custom_service {
+    enabled = true
+    type = "custom"
+    
+    config {
+      base_url = "https://api.customservice.com"
+      api_version = "v1"
+      timeout_seconds = 30
+    }
+    
+    authentication {
+      method = "oauth2"
+      client_id = "client-id"
+      client_secret = "client-secret"
+      token_url = "https://auth.customservice.com/token"
+    }
+    
+    endpoints {
+      users = "/users"
+      projects = "/projects"
+    }
+  }
+}
+```
 
-### Unavailable Integrations
+### Event Processing
 
-When an integration shows as "unavailable", it means:
+Configure event processing:
 
-- The integration is not properly configured
-- Required dependencies are missing
-- The integration failed to initialize
-- Health checks are failing
+```hcl
+integrations {
+  event_processor {
+    enabled = true
+    
+    events {
+      action_started {
+        integrations = ["slack", "webhook"]
+        template = "Action {{.action_name}} started on {{.machine}}"
+      }
+      
+      action_completed {
+        integrations = ["slack", "webhook"]
+        template = "Action {{.action_name}} completed successfully"
+      }
+      
+      action_failed {
+        integrations = ["slack", "webhook", "email"]
+        template = "Action {{.action_name}} failed: {{.error}}"
+      }
+    }
+  }
+}
+```
+
+### Data Transformation
+
+Configure data transformation:
+
+```hcl
+integrations {
+  data_transformer {
+    enabled = true
+    
+    transforms {
+      github_to_slack {
+        source = "github"
+        target = "slack"
+        
+        mapping {
+          "repository.name" = "repo_name"
+          "pull_request.title" = "pr_title"
+          "user.login" = "author"
+        }
+      }
+    }
+  }
+}
+```
+
+## Security Best Practices
+
+### Authentication Security
+
+- Use secure authentication methods (OAuth2, API keys)
+- Store credentials securely with encryption
+- Rotate credentials regularly
+- Use least privilege access
+
+### API Security
+
+- Validate all API responses
+- Implement proper error handling
+- Use HTTPS for all API communications
+- Monitor API usage and rate limits
+
+### Webhook Security
+
+- Validate webhook signatures
+- Use secure webhook endpoints
+- Implement webhook authentication
+- Monitor webhook delivery
 
 ## Troubleshooting
 
-### Integration Not Available
+### Common Integration Issues
 
-If an integration shows as unavailable:
+**Authentication Failed**
+```bash
+# Test authentication
+spooky integrations test --integration github --auth-only
 
-1. **Check configuration**: Ensure all required configuration files are present
-2. **Verify dependencies**: Make sure all required services and libraries are available
-3. **Check logs**: Look for error messages in spooky logs
-4. **Validate manually**: Try using the specific integration directly
+# Check credentials
+spooky integrations config show --integration github
+```
 
-### Validation Failures
+**API Rate Limiting**
+```bash
+# Check rate limit status
+spooky integrations metrics --integration github --rate-limits
 
-If `spooky integrations validate` fails:
+# Adjust rate limiting
+spooky integrations config set --integration github --rate-limit 1000
+```
 
-1. **Review error messages**: Each error provides specific information about what's wrong
-2. **Check individual integrations**: Use `spooky integrations list` to see which integrations are unavailable
-3. **Verify configuration**: Ensure all required configuration is correct
-4. **Check system resources**: Verify that system resources (memory, disk, network) are sufficient
+**Webhook Delivery Issues**
+```bash
+# Test webhook endpoint
+spooky integrations webhook --integration slack --test
 
-### Common Issues
+# Check webhook configuration
+spooky integrations config show --integration slack --webhooks
+```
 
-#### Facts Integration Unavailable
-- Check that facts database is accessible
-- Verify facts collection configuration
-- Ensure storage backend is working
+### Debugging Integrations
 
-#### Actions Integration Unavailable
-- Verify actions configuration files exist
-- Check that action templates are valid
-- Ensure action dependencies are met
+Enable debug logging for troubleshooting:
 
-#### Variables Integration Unavailable
-- Check variables configuration files
-- Verify variable resolution dependencies
-- Ensure variable validation passes
+```bash
+# Enable debug logging
+spooky integrations test --integration github --debug
 
-#### Templates Integration Unavailable
-- Verify template files exist and are accessible
-- Check template syntax and validation
-- Ensure template functions are available
+# View integration logs
+spooky logging files tail --filter "integrations"
+```
 
-#### Machines Integration Unavailable
-- Check machine inventory configuration
-- Verify SSH connectivity settings
-- Ensure machine authentication is configured
+### Performance Optimization
 
-#### Secrets Integration Unavailable
-- Verify encryption keys are available
-- Check key permissions and access
-- Ensure encryption libraries are working
+Optimize integration performance:
 
-#### Config Integration Unavailable
-- Check configuration file syntax
-- Verify configuration validation
-- Ensure configuration dependencies are met
+```bash
+# Check connection pooling
+spooky integrations metrics --integration github --connections
+
+# Adjust timeout settings
+spooky integrations config set --integration github --timeout 60
+```
+
+## Integration with Other Systems
+
+### Actions Integration
+
+Integrations work with the actions system:
+
+```hcl
+actions {
+  action "deploy-with-notifications" {
+    description = "Deploy with integration notifications"
+    
+    machines = ["web-server"]
+    parallel = true
+    
+    integrations {
+      slack {
+        event = "action_started"
+        message = "Starting deployment on {{.machine}}"
+      }
+    }
+    
+    command = "deploy.sh"
+  }
+}
+```
+
+### Facts Integration
+
+Integrations can collect facts from external sources:
+
+```hcl
+integrations {
+  cloud_facts {
+    enabled = true
+    provider = "aws"
+    
+    facts {
+      instance_metadata = true
+      tags = true
+      security_groups = true
+    }
+  }
+}
+```
+
+### Variables Integration
+
+Integrations can provide variables:
+
+```hcl
+integrations {
+  config_store {
+    enabled = true
+    provider = "vault"
+    
+    variables {
+      database_url = "/secret/database/url"
+      api_key = "/secret/api/key"
+    }
+  }
+}
+```
+
+## Examples
+
+### GitHub Integration
+
+```hcl
+integrations {
+  github {
+    enabled = true
+    api_url = "https://api.github.com"
+    token = "ghp_..."
+    
+    repositories {
+      "owner/repo" {
+        events = ["push", "pull_request"]
+        webhook_secret = "webhook-secret"
+      }
+    }
+    
+    notifications {
+      events = ["deployment_started", "deployment_completed"]
+      channel = "#deployments"
+    }
+  }
+}
+```
+
+### Slack Integration
+
+```hcl
+integrations {
+  slack {
+    enabled = true
+    webhook_url = "https://hooks.slack.com/services/..."
+    channel = "#alerts"
+    
+    notifications {
+      events = ["action_started", "action_completed", "action_failed"]
+      
+      templates {
+        action_started = "🚀 Action {{.action_name}} started on {{.machine}}"
+        action_completed = "✅ Action {{.action_name}} completed successfully"
+        action_failed = "❌ Action {{.action_name}} failed: {{.error}}"
+      }
+    }
+  }
+}
+```
+
+### Custom API Integration
+
+```hcl
+integrations {
+  monitoring_api {
+    enabled = true
+    base_url = "https://monitoring.example.com/api"
+    
+    authentication {
+      method = "bearer"
+      token = "monitoring-token"
+    }
+    
+    endpoints {
+      metrics = "/metrics"
+      alerts = "/alerts"
+      dashboards = "/dashboards"
+    }
+    
+    operations {
+      send_metric {
+        endpoint = "/metrics"
+        method = "POST"
+        data_template = {
+          name = "{{.metric_name}}"
+          value = "{{.metric_value}}"
+          timestamp = "{{.timestamp}}"
+        }
+      }
+    }
+  }
+}
+```
 
 ## Best Practices
 
-### 1. Regular Health Checks
+### Integration Design
 
-Perform regular integration health checks:
+- Use consistent authentication patterns
+- Implement proper error handling
+- Use rate limiting and backoff strategies
+- Monitor integration health
 
-```bash
-# Daily health check
-spooky integrations validate
+### Security
 
-# Quick status check
-spooky integrations list
-```
+- Secure all credentials and tokens
+- Validate all inputs and outputs
+- Use HTTPS for all communications
+- Implement proper access controls
 
-### 2. Pre-Operation Validation
+### Performance
 
-Before running critical operations, validate integrations:
+- Use connection pooling
+- Implement caching where appropriate
+- Monitor API rate limits
+- Optimize request/response handling
 
-```bash
-# Validate before running actions
-spooky integrations validate && spooky actions run /path/to/project
-```
+### Monitoring
 
-### 3. Monitoring Integration Status
+- Monitor integration health
+- Track API usage and costs
+- Monitor error rates and response times
+- Set up alerts for integration failures
 
-Monitor integration status in production environments:
+## Next Steps
 
-- Set up automated health checks
-- Alert on integration failures
-- Log integration status changes
-
-### 4. Configuration Management
-
-- Keep integration configurations in version control
-- Use consistent configuration patterns
-- Validate configurations before deployment
-
-## Integration Dependencies
-
-Some integrations depend on others:
-
-- **Actions** may depend on **Variables** for variable resolution
-- **Templates** may depend on **Variables** for data injection
-- **Machines** may depend on **Secrets** for authentication
-- **Facts** may depend on **Machines** for data collection
-
-## Error Handling
-
-Integration errors provide detailed information:
-
-- **Error messages** describe the specific problem
-- **Field information** indicates which configuration is problematic
-- **Validation results** aggregate multiple errors for comprehensive reporting
-
-## Performance Considerations
-
-- Integration health checks are lightweight and fast
-- Validation operations may take longer depending on integration complexity
-- Status checks use cached information when possible
-- Health monitoring has minimal performance impact
-
-## Security Considerations
-
-- Integration status information may reveal system configuration details
-- Validation operations may access sensitive configuration data
-- Health checks should be performed in secure environments
-- Integration failures should be logged appropriately without exposing sensitive information
+- Explore the [Integrations API Reference](INTEGRATIONS_API_REFERENCE.md) for detailed technical information
+- Check the [Integrations Troubleshooting Guide](INTEGRATIONS_TROUBLESHOOTING.md) for common issues
+- Review the [Integrations Documentation Summary](INTEGRATIONS_DOCUMENTATION_SUMMARY.md) for implementation details
+- Learn about [Custom Integration Development](INTEGRATIONS_USER_GUIDE.md) for advanced usage

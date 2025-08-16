@@ -321,40 +321,34 @@ Error: connection pool at capacity (10)
 
 ```bash
 # Enable verbose SSH output
-spooky ssh connect example.com \
-  --user admin \
-  --key ~/.ssh/id_ed25519 \
-  --verbose
+spooky machines ping ./my-project --verbose
 
-# Enable verbose key validation
-spooky ssh validate-key ~/.ssh/id_ed25519 --verbose
+# Enable debug logging
+export SPOOKY_LOG_LEVEL=debug
+spooky machines ping ./my-project
 ```
 
 ### Test SSH Configuration
 
 ```bash
-# Test SSH configuration
-spooky ssh config test --verbose
+# Test machine connectivity
+spooky machines ping ./my-project
 
-# Test specific connection
-spooky ssh config test \
-  --host example.com \
-  --user admin \
-  --key ~/.ssh/id_ed25519 \
-  --verbose
+# Test specific machine
+spooky machines ping ./my-project --machines example.com
 ```
 
 ### Validate SSH Keys
 
 ```bash
-# Validate key type and format
-spooky ssh validate-key ~/.ssh/id_ed25519
+# Test SSH connectivity manually
+ssh -i ~/.ssh/id_ed25519 admin@example.com "echo 'SSH working'"
 
-# Generate key fingerprint
-spooky ssh fingerprint ~/.ssh/id_ed25519
+# Check SSH key permissions
+ls -la ~/.ssh/id_ed25519*
 
-# Validate certificate
-spooky ssh validate-key ~/.ssh/id_ed25519-cert.pub
+# Validate key format
+ssh-keygen -l -f ~/.ssh/id_ed25519
 ```
 
 ## Integration Issues
@@ -406,10 +400,7 @@ Error: failed to run action on example.com: SSH command execution failed
 
 2. Test command manually:
    ```bash
-   spooky ssh run example.com \
-     --user admin \
-     --key ~/.ssh/id_ed25519 \
-     --command "echo 'test'"
+   ssh -i ~/.ssh/id_ed25519 admin@example.com "echo 'test'"
    ```
 
 3. Check action configuration:
@@ -527,17 +518,17 @@ spooky actions run ./my-project --parallel true --max-concurrent 5
 ```bash
 # Enable debug logging
 export SPOOKY_LOG_LEVEL=debug
-spooky ssh connect example.com --user admin --key ~/.ssh/id_ed25519
+spooky machines ping ./my-project
 ```
 
 ### Collect Diagnostic Information
 
 ```bash
 # Collect system information
-spooky ssh config test --verbose > ssh-debug.log 2>&1
+spooky machines ping ./my-project --verbose > ssh-debug.log 2>&1
 
 # Collect key validation information
-spooky ssh validate-key ~/.ssh/id_ed25519 --verbose >> ssh-debug.log 2>&1
+ssh-keygen -l -f ~/.ssh/id_ed25519 >> ssh-debug.log 2>&1
 ```
 
 ### Report Issues

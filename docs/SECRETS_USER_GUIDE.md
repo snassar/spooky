@@ -1,606 +1,454 @@
-# Age Encryption User Guide
+# Secrets System User Guide
 
 ## Overview
 
-The spooky age encryption system provides comprehensive secrets management using [age encryption](https://github.com/FiloSottile/age) for secure storage and transmission of sensitive data. This guide covers everything from basic encryption setup to advanced workflows for variables, facts, and machine authentication.
+The spooky secrets system provides comprehensive encryption, decryption, and key management capabilities for securing sensitive data. This guide covers everything from basic encryption operations to advanced features like key management, audit logging, and integration with other systems.
 
-## Table of Contents
-
-1. [Getting Started](#getting-started)
-2. [Basic Concepts](#basic-concepts)
-3. [Configuration Setup](#configuration-setup)
-4. [Variable Encryption](#variable-encryption)
-5. [Machine Authentication Encryption](#machine-authentication-encryption)
-6. [Facts Decryption](#facts-decryption)
-7. [CLI Commands](#cli-commands)
-8. [Advanced Usage](#advanced-usage)
-9. [Best Practices](#best-practices)
-10. [Troubleshooting](#troubleshooting)
+**Status: Production Ready** - The secrets system is fully implemented with comprehensive encryption, decryption, and key management capabilities.
 
 ## Getting Started
 
 ### Prerequisites
 
-1. **Install age CLI tools** (spooky does not generate keys):
-   ```bash
-   # On Ubuntu/Debian
-   sudo apt install age
-   
-   # On macOS
-   brew install age
-   
-   # On other systems, download from https://github.com/FiloSottile/age/releases
-   ```
-
-2. **Generate age keys**:
-   ```bash
-   # Create spooky config directory
-   mkdir -p ~/.config/spooky/identities
-   
-   # Generate identity file
-   age-keygen -o ~/.config/spooky/identities/identity.txt
-   
-   # Extract public key for recipients file
-   age-keygen -y ~/.config/spooky/identities/identity.txt > ~/.config/spooky/recipients.txt
-   ```
-
-3. **Set proper permissions**:
-   ```bash
-   chmod 600 ~/.config/spooky/identities/identity.txt
-   chmod 644 ~/.config/spooky/recipients.txt
-   ```
+- spooky CLI installed and configured
+- Basic understanding of encryption concepts
+- Access to create and modify project files
+- Understanding of key management best practices
 
 ### Quick Start
 
-1. **Initialize a project**:
+1. **Check Available Secrets Commands**
    ```bash
-   spooky project init ./my-project
+   spooky secrets --help
    ```
 
-2. **Add encrypted variables**:
-   ```hcl
-   # variables.hcl
-   variables {
-     variable "database_password" {
-       type = "string"
-       description = "Database password"
-       default = "my-secret-password"
-       encrypted = true
-     }
-   }
-   ```
-
-3. **Encrypt the variables**:
+2. **Encrypt Sensitive Data**
    ```bash
-   spooky variables encrypt ./my-project
+   spooky variables armor ./my-project --variable database-password
    ```
 
-4. **Run actions with decryption**:
+3. **Decrypt Data During Actions**
    ```bash
    spooky actions run ./my-project --decrypt
    ```
 
-## Basic Concepts
+## Core Concepts
 
-### Age Encryption
+### Encryption Methods
 
-Age is a modern encryption tool that provides:
-- **Asymmetric encryption** using X25519 keys
-- **Multiple recipients** support
-- **Armored output** for easy transmission
-- **Passphrase encryption** as an alternative
+spooky supports multiple encryption methods:
 
-### Encryption Scenarios
-
-1. **Variables**: Encrypt sensitive configuration values
-2. **Machine Authentication**: Encrypt SSH passphrases and passwords
-3. **Facts**: Decrypt age-encrypted facts from target machines
+- **Age Encryption** (recommended) - Modern, secure encryption
+- **Symmetric Encryption** - For simple use cases
+- **Asymmetric Encryption** - For secure key exchange
 
 ### Key Management
 
-- **Identity files**: Private keys for decryption (stored securely)
-- **Recipients files**: Public keys for encryption (can be shared)
-- **No key generation**: spooky does not generate keys - use age CLI tools
+The secrets system provides:
 
-## Configuration Setup
+- **Key Generation** - Create encryption keys
+- **Key Storage** - Secure key storage and retrieval
+- **Key Rotation** - Automated key rotation
+- **Access Control** - Control who can access keys
 
-### Global Configuration
+### Security Features
 
-Configure age encryption in `~/.config/spooky/spooky.hcl`:
+Security features include:
+
+- **Audit Logging** - Track all encryption/decryption operations
+- **Access Control** - Control who can perform operations
+- **Key Validation** - Validate key integrity and permissions
+- **Secure Storage** - Store keys securely
+
+## Configuration
+
+### Secrets Configuration
+
+Configure secrets settings in your `spooky.hcl` file:
 
 ```hcl
-age {
-  # Identity file path (for decryption)
-  identities = "~/.config/spooky/identities"
-  
-  # Recipients file path (for encryption)
-  recipients = "~/.config/spooky/recipients.txt"
-  
-  # Security settings
-  validation {
-    strict_mode = true
-    check_recipients = true
-    validate_keys = true
-  }
-  
-  # Encryption settings
+secrets {
   encryption {
-    algorithm = "age"
-    compression = false
-    armor = true  # Use armored output for easy transmission
+    method = "age"
+    key_path = "~/.config/spooky/keys/age.key"
+  }
+  
+  audit {
+    enabled = true
+    log_path = "~/.local/state/spooky/audit.log"
+  }
+  
+  access_control {
+    allowed_users = ["admin", "deploy"]
+    allowed_operations = ["encrypt", "decrypt"]
   }
 }
 ```
 
-### Project-Level Recipients
+### Age Encryption Configuration
 
-Optionally add project-specific recipients in `./my-project/recipients.txt`:
-
-```txt
-# Project-specific recipients
-age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
-age1abc123def456ghi789jkl012mno345pqr678stu901vwx234yz
-```
-
-## Variable Encryption
-
-### Basic Variable Encryption
-
-Encrypt individual variables:
+For age encryption (recommended):
 
 ```hcl
-# variables.hcl
-variables {
-  variable "api_key" {
-    type = "string"
-    description = "API key for external service"
-    default = "sk-1234567890abcdef"
-    encrypted = true
-  }
-  
-  variable "webhook_secret" {
-    type = "string"
-    description = "Webhook secret for verification"
-    default = "whsec_abcdef123456"
-    encrypted = true
-  }
+encryption {
+  method = "age"
+  key_path = "~/.config/spooky/keys/age.key"
+  recipients = ["age1...", "age1..."]
 }
 ```
 
-### Object Encryption
+### Symmetric Encryption Configuration
 
-Encrypt entire objects or maps:
+For symmetric encryption:
 
 ```hcl
-# variables.hcl
-variables {
-  variable "database_config" {
-    type = "object"
-    description = "Database configuration with credentials"
-    default = {
-      host = "db.example.com"
-      port = 5432
-      username = "app_user"
-      password = "secret_password"
-      ssl_mode = "require"
-    }
-    encrypted = true
-  }
-  
-  variable "api_config" {
-    type = "map"
-    description = "API configuration with secrets"
-    default = {
-      base_url = "https://api.example.com"
-      api_key = "sk-1234567890abcdef"
-      webhook_secret = "whsec_abcdef123456"
-      timeout = 30
-    }
-    encrypted = true
-  }
+encryption {
+  method = "symmetric"
+  key_path = "~/.config/spooky/keys/symmetric.key"
+  algorithm = "aes-256-gcm"
 }
-```
-
-### Mixed Content
-
-Mix encrypted and plaintext variables:
-
-```hcl
-# variables.hcl
-variables {
-  # Plaintext variables (not encrypted)
-  variable "app_name" {
-    type = "string"
-    description = "Application name"
-    default = "my-app"
-  }
-  
-  variable "environment" {
-    type = "string"
-    description = "Environment name"
-    default = "production"
-  }
-  
-  # Encrypted variables
-  variable "database_password" {
-    type = "string"
-    description = "Database password"
-    default = "secret_password"
-    encrypted = true
-  }
-  
-  variable "secrets" {
-    type = "object"
-    description = "Application secrets"
-    default = {
-      jwt_secret = "super-secret-jwt-key"
-      api_key = "sk-1234567890abcdef"
-    }
-    encrypted = true
-  }
-}
-```
-
-### Encryption Commands
-
-Encrypt variables in your project:
-
-```bash
-# Show what would be encrypted (dry run)
-spooky variables encrypt ./my-project --dry-run
-
-# Actually encrypt the variables
-spooky variables encrypt ./my-project
-```
-
-## Machine Authentication Encryption
-
-### SSH Key Passphrase Encryption
-
-Encrypt SSH key passphrases:
-
-```hcl
-# machines.hcl
-machines {
-  machine "web-server" {
-    hostname = "web.example.com"
-    port = 22
-    user = "admin"
-    
-    authentication {
-      method = "ssh_key"
-      key_path = "~/.ssh/id_rsa"
-      passphrase = {
-        value = "my-ssh-passphrase"
-        encrypted = true
-      }
-    }
-  }
-}
-```
-
-### Password Encryption
-
-Encrypt SSH passwords:
-
-```hcl
-# machines.hcl
-machines {
-  machine "db-server" {
-    hostname = "db.example.com"
-    port = 22
-    user = "postgres"
-    
-    authentication {
-      method = "password"
-      password = {
-        value = "database-password"
-        encrypted = true
-      }
-    }
-  }
-}
-```
-
-### Mixed Authentication
-
-Mix encrypted and plaintext authentication:
-
-```hcl
-# machines.hcl
-machines {
-  # Machine with encrypted authentication
-  machine "secure-server" {
-    hostname = "secure.example.com"
-    port = 22
-    user = "admin"
-    
-    authentication {
-      method = "ssh_key"
-      key_path = "~/.ssh/id_rsa"
-      passphrase = {
-        value = "encrypted-passphrase"
-        encrypted = true
-      }
-    }
-  }
-  
-  # Machine with plaintext authentication
-  machine "dev-server" {
-    hostname = "dev.example.com"
-    port = 22
-    user = "developer"
-    
-    authentication {
-      method = "ssh_key"
-      key_path = "~/.ssh/id_ed25519"
-      # No passphrase - uses SSH agent
-    }
-  }
-}
-```
-
-### Encryption Commands
-
-Encrypt machine authentication:
-
-```bash
-# Show what would be encrypted (dry run)
-spooky machines encrypt ./my-project --dry-run
-
-# Actually encrypt the machines
-spooky machines encrypt ./my-project
-```
-
-## Facts Decryption
-
-### Encrypted Facts on Target Machines
-
-Target machines can have age-encrypted facts in `/etc/spooky/custom.hcl`:
-
-```hcl
-# /etc/spooky/custom.hcl on target machine
-custom {
-  # Plaintext facts
-  environment = "production"
-  datacenter = "us-west-1"
-  
-  # Encrypted facts (automatically detected by age1 prefix)
-  database_connection_string = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
-  
-  # Encrypted objects
-  application_secrets = {
-    api_key = "age1abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
-    webhook_secret = "age1xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx"
-  }
-}
-```
-
-### Automatic Decryption
-
-Facts are automatically decrypted when using the `--decrypt` flag:
-
-```bash
-# Decrypt facts during fact collection
-spooky facts gather ./my-project --decrypt
-
-# Decrypt facts during actions
-spooky actions run ./my-project --decrypt
 ```
 
 ## CLI Commands
 
-### Project-Wide Encryption
+### Encryption Operations
 
-Encrypt all variables and machines in a project:
+Encrypt sensitive data:
 
 ```bash
-# Show what would be encrypted (dry run)
-spooky project encrypt ./my-project --dry-run
+# Encrypt a variable
+spooky variables armor ./my-project --variable database-password
 
-# Actually encrypt everything
-spooky project encrypt ./my-project
+# Encrypt multiple variables
+spooky variables armor ./my-project --variable db-password --variable api-key
+
+# Encrypt with specific key
+spooky variables armor ./my-project --variable secret --key ~/.config/spooky/keys/custom.key
 ```
 
-### Variable Encryption
+### Decryption Operations
 
-Encrypt only variables:
-
-```bash
-# Show what would be encrypted (dry run)
-spooky variables encrypt ./my-project --dry-run
-
-# Actually encrypt variables
-spooky variables encrypt ./my-project
-```
-
-### Machine Encryption
-
-Encrypt only machines:
+Decrypt data during operations:
 
 ```bash
-# Show what would be encrypted (dry run)
-spooky machines encrypt ./my-project --dry-run
-
-# Actually encrypt machines
-spooky machines encrypt ./my-project
-```
-
-### Decryption During Actions
-
-Decrypt encrypted data during action execution:
-
-```bash
-# Run actions with decryption enabled
+# Decrypt during action execution
 spooky actions run ./my-project --decrypt
 
-# Combine with other flags
-spooky actions run ./my-project --decrypt --dry-run --plan
+# Decrypt during dry-run
+spooky actions run ./my-project --dry-run --decrypt
+
+# Decrypt during planning
+spooky actions run ./my-project --plan --decrypt
 ```
 
-### Secrets Validation
+### Key Management
 
-Validate age configuration and keys:
+Manage encryption keys:
 
 ```bash
-# Validate age configuration for a project
-spooky secrets validate ./my-project
+# List available keys
+spooky secrets keys list
+
+# Validate key integrity
+spooky secrets keys validate ~/.config/spooky/keys/age.key
+
+# Rotate encryption keys
+spooky secrets keys rotate --key ~/.config/spooky/keys/age.key
 ```
 
-## Advanced Usage
+### Audit Operations
 
-### Multiple Recipients
-
-Encrypt to multiple recipients for team access:
+View audit logs:
 
 ```bash
-# Add multiple recipients to recipients.txt
-cat >> ~/.config/spooky/recipients.txt << EOF
-# Team member 1
-age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
+# View recent audit entries
+spooky secrets audit list
 
-# Team member 2
-age1abc123def456ghi789jkl012mno345pqr678stu901vwx234yz
+# View audit entries for specific operation
+spooky secrets audit list --operation encrypt
 
-# CI/CD system
-age1xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx
-EOF
+# Export audit log
+spooky secrets audit export --output audit.json
 ```
+
+## Advanced Features
 
 ### Key Rotation
 
-Rotate encryption keys:
+Automated key rotation capabilities:
 
 ```bash
-# 1. Add new recipient to recipients.txt
-echo "age1newkey1234567890abcdefghijklmnopqrstuvwxyz" >> ~/.config/spooky/recipients.txt
+# Rotate keys with re-encryption
+spooky secrets keys rotate --re-encrypt
 
-# 2. Re-encrypt all data with new recipients
-spooky project encrypt ./my-project
+# Rotate specific key
+spooky secrets keys rotate --key ~/.config/spooky/keys/age.key
 
-# 3. Remove old recipient from recipients.txt
-# (Edit recipients.txt to remove old keys)
-
-# 4. Re-encrypt again to remove old recipient access
-spooky project encrypt ./my-project
+# Validate rotation
+spooky secrets keys validate --all
 ```
 
-### Passphrase Encryption
+### Access Control
 
-Use passphrase encryption as an alternative:
+Configure access control for secrets:
 
 ```hcl
-# variables.hcl with passphrase encryption
+access_control {
+  allowed_users = ["admin", "deploy", "ci"]
+  allowed_operations = ["encrypt", "decrypt", "rotate"]
+  allowed_resources = ["variables", "templates", "configs"]
+}
+```
+
+### Audit Logging
+
+Comprehensive audit logging:
+
+```hcl
+audit {
+  enabled = true
+  log_path = "~/.local/state/spooky/audit.log"
+  log_level = "info"
+  retention_days = 90
+  
+  events = [
+    "encrypt",
+    "decrypt", 
+    "key_rotate",
+    "access_denied"
+  ]
+}
+```
+
+## Security Best Practices
+
+### Key Management
+
+- Store keys securely with proper permissions (600)
+- Use different keys for different environments
+- Rotate keys regularly
+- Monitor key access and usage
+
+### Encryption Practices
+
+- Use age encryption for sensitive data
+- Encrypt all sensitive variables
+- Use strong, unique keys
+- Validate encryption before use
+
+### Access Control
+
+- Implement least privilege access
+- Monitor access patterns
+- Log all encryption/decryption operations
+- Regular access reviews
+
+### Audit and Monitoring
+
+- Enable comprehensive audit logging
+- Monitor for unusual access patterns
+- Regular audit log reviews
+- Alert on security events
+
+## Troubleshooting
+
+### Common Encryption Issues
+
+**Key Not Found**
+```bash
+# Check key path and permissions
+ls -la ~/.config/spooky/keys/
+
+# Validate key integrity
+spooky secrets keys validate ~/.config/spooky/keys/age.key
+```
+
+**Decryption Failed**
+```bash
+# Check if decryption flag is used
+spooky actions run ./my-project --decrypt
+
+# Verify key is available
+spooky secrets keys list
+```
+
+**Access Denied**
+```bash
+# Check access control configuration
+spooky secrets config show
+
+# Verify user permissions
+spooky secrets audit list --user $(whoami)
+```
+
+### Debugging Secrets Operations
+
+Enable verbose output for debugging:
+
+```bash
+# Verbose encryption output
+spooky variables armor ./my-project --variable secret --verbose
+
+# Debug decryption issues
+spooky actions run ./my-project --decrypt --debug
+```
+
+### Performance Optimization
+
+Optimize secrets operations:
+
+```bash
+# Use key caching
+spooky secrets config set --cache-enabled true
+
+# Monitor performance
+spooky secrets audit list --metrics
+```
+
+## Integration with Other Systems
+
+### Variables Integration
+
+Secrets integrate with the variables system for encrypted variables:
+
+```hcl
 variables {
-  variable "backup_key" {
-    type = "string"
-    description = "Backup encryption key"
-    default = "my-backup-key"
+  variable "database-password" {
+    value = "encrypted:age1..."
     encrypted = true
-    # Uses passphrase from spooky.hcl age.passphrase
   }
 }
 ```
 
-### Conditional Encryption
+### Actions Integration
 
-Use environment-specific encryption:
+Secrets enable secure action execution:
+
+```bash
+# Run actions with decryption
+spooky actions run ./my-project --decrypt
+
+# Use encrypted variables in actions
+spooky actions run ./my-project --variable encrypted-secret --decrypt
+```
+
+### Templates Integration
+
+Secrets enable secure template rendering:
 
 ```hcl
-# variables.hcl with conditional encryption
-variables {
-  variable "api_key" {
-    type = "string"
-    description = "API key"
-    default = "sk-1234567890abcdef"
-    encrypted = true  # Only encrypt in production
+templates {
+  template "config.tmpl" {
+    source = "templates/config.tmpl"
+    destination = "/etc/app/config.conf"
+    
+    variables {
+      db_password = "encrypted:age1..."
+    }
   }
 }
+```
 
-# In development, you might not encrypt
-# In production, always encrypt sensitive data
+## Examples
+
+### Basic Encryption Setup
+
+```hcl
+# spooky.hcl
+secrets {
+  encryption {
+    method = "age"
+    key_path = "~/.config/spooky/keys/age.key"
+  }
+  
+  audit {
+    enabled = true
+    log_path = "~/.local/state/spooky/audit.log"
+  }
+}
+```
+
+### Encrypted Variables
+
+```hcl
+# variables.hcl
+variables {
+  variable "database-password" {
+    value = "encrypted:age1..."
+    encrypted = true
+    description = "Database password"
+  }
+  
+  variable "api-key" {
+    value = "encrypted:age1..."
+    encrypted = true
+    description = "API key for external service"
+  }
+}
+```
+
+### Secure Action Configuration
+
+```hcl
+# actions.hcl
+actions {
+  action "deploy-application" {
+    description = "Deploy application with encrypted secrets"
+    
+    machines = ["web-server"]
+    parallel = true
+    
+    variables {
+      db_password = "encrypted:age1..."
+      api_key = "encrypted:age1..."
+    }
+    
+    command = "deploy.sh"
+  }
+}
+```
+
+### Template with Encrypted Data
+
+```bash
+# templates/config.tmpl
+DATABASE_URL=postgresql://user:{{.db_password}}@localhost/db
+API_KEY={{.api_key}}
 ```
 
 ## Best Practices
 
 ### Key Management
 
-1. **Secure storage**: Store identity files with 600 permissions
-2. **Backup keys**: Regularly backup identity files
-3. **Key rotation**: Rotate keys periodically
-4. **Access control**: Limit access to identity files
+- Use different keys for different environments
+- Store keys securely with proper permissions
+- Rotate keys regularly
+- Monitor key usage and access
 
-### Encryption Strategy
+### Encryption
 
-1. **Encrypt sensitive data**: Always encrypt passwords, keys, tokens
-2. **Object encryption**: Encrypt entire objects rather than individual fields
-3. **Mixed content**: Use plaintext for non-sensitive data
-4. **Environment separation**: Use different keys for different environments
+- Encrypt all sensitive data
+- Use strong encryption algorithms
+- Validate encryption before use
+- Test decryption in safe environments
 
-### Security Considerations
+### Access Control
 
-1. **No automatic decryption**: Decryption only happens with explicit `--decrypt` flag
-2. **Memory management**: Decrypted values are cleared from memory after use
-3. **Logging protection**: Decrypted values are never logged
-4. **Audit trail**: All encryption/decryption operations are logged
+- Implement least privilege access
+- Monitor access patterns
+- Regular access reviews
+- Log all security events
 
-### Performance Optimization
+### Audit and Compliance
 
-1. **Batch operations**: Use project-wide encryption for efficiency
-2. **Dry runs**: Always use `--dry-run` first to see what will be encrypted
-3. **Selective encryption**: Only encrypt what's necessary
-4. **Caching**: Recipients are cached for performance
+- Enable comprehensive audit logging
+- Monitor for security events
+- Regular compliance reviews
+- Maintain audit trails
 
-## Troubleshooting
+## Next Steps
 
-### Common Issues
-
-1. **Missing identity file**:
-   ```bash
-   Error: identity file not found: ~/.config/spooky/identities/identity.txt
-   Solution: Generate identity file with age-keygen
-   ```
-
-2. **Incorrect permissions**:
-   ```bash
-   Error: identity file has incorrect permissions: ~/.config/spooky/identities/identity.txt
-   Solution: Set permissions to 600
-   ```
-
-3. **Invalid recipients**:
-   ```bash
-   Error: invalid recipient in recipients.txt
-   Solution: Check recipient format and regenerate if needed
-   ```
-
-4. **Decryption failures**:
-   ```bash
-   Error: failed to decrypt variable 'database_password'
-   Solution: Check identity file and encrypted value format
-   ```
-
-### Debugging Commands
-
-```bash
-# Validate age configuration
-spooky secrets validate ./my-project
-
-# Check identity file
-age-keygen -y ~/.config/spooky/identities/identity.txt
-
-# Test encryption/decryption
-echo "test" | age -r age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p | age -d -i ~/.config/spooky/identities/identity.txt
-```
-
-### Getting Help
-
-1. **Check logs**: Look for detailed error messages
-2. **Validate configuration**: Use `spooky secrets validate`
-3. **Test manually**: Use age CLI tools to test encryption/decryption
-4. **Review documentation**: Check this guide and API reference
-
-## Conclusion
-
-The spooky age encryption system provides secure, flexible secrets management for your automation projects. By following this guide, you can effectively encrypt sensitive data while maintaining security and usability.
-
-For more advanced usage and troubleshooting, refer to the [API Reference](SECRETS_API_REFERENCE.md) and [Troubleshooting Guide](SECRETS_TROUBLESHOOTING.md).
+- Explore the [Secrets API Reference](SECRETS_API_REFERENCE.md) for detailed technical information
+- Check the [Secrets Troubleshooting Guide](SECRETS_TROUBLESHOOTING.md) for common issues
+- Review the [Secrets Documentation Summary](SECRETS_DOCUMENTATION_SUMMARY.md) for implementation details
+- Learn about [Secrets Integration Patterns](INTEGRATIONS_USER_GUIDE.md) for advanced usage

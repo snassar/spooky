@@ -4,42 +4,40 @@
 
 This troubleshooting guide provides solutions for common issues encountered when working with the spooky actions system. It covers error messages, configuration problems, performance issues, and debugging techniques.
 
-**Status: Production Ready** - The actions system is fully implemented with complete acting infrastructure, SSH integration, and comprehensive error handling.
+**Status: Partially Implemented** - The actions system has basic functionality but SSH-based action orchestration has known issues that need to be addressed.
 
-## Acting Infrastructure Status
+## Actions System Status
 
-### ✅ Fully Functional Acting Infrastructure
+### ⚠️ Partially Functional Actions Infrastructure
 
-The actions system now has **complete acting infrastructure** with:
+The actions system currently has **basic actions infrastructure** with:
 
-- **SSH-Based Execution**: All action types execute via SSH with proper connection management
-- **Machine Targeting**: Full support for machine names and tags with proper filtering
-- **Dependency Resolution**: Complete dependency resolution and run order planning
-- **Parallel Execution**: Parallel action running with dependency resolution
-- **Session Management**: Full session lifecycle management and progress tracking
-- **Error Handling**: Comprehensive error handling and result aggregation
-- **Resource Management**: Proper resource cleanup and timeout handling
+- **Action Loading**: Loading actions from HCL configuration files
+- **Action Validation**: Basic action validation and error handling
+- **CLI Integration**: `spooky actions` commands with basic functionality
+- **Project Integration**: Actions loading from project configuration
+- **Local Action Orchestration**: Local action orchestration capabilities
+- **Basic Planning**: Action planning with dependency resolution
 
-### What This Means for Users
+### Known Limitations
 
-- **No More Stubs**: All functionality is fully implemented - no placeholder code
-- **Production Ready**: The system is ready for production use
-- **Complete Feature Set**: All documented features are functional
-- **Reliable Execution**: Robust error handling and recovery mechanisms
-- **Performance Optimized**: Efficient execution with proper resource management
+- **SSH-Based Orchestration**: SSH-based action orchestration has implementation issues
+- **Remote Action Running**: Cannot properly run actions on remote machines
+- **Parallel Execution**: No parallel action execution support
+- **Action Planning**: Limited action planning capabilities
+- **Result Aggregation**: No action result aggregation
 
 ### Expected Behavior
 
-When running actions, you can expect:
+When using actions, you can expect:
 
-1. **Proper Machine Targeting**: Actions will run on the correct machines based on your configuration
-2. **Dependency Resolution**: Actions will run in the correct order based on dependencies
-3. **SSH Execution**: All actions execute via SSH with proper authentication
-4. **Result Reporting**: Comprehensive results with success/failure status
-5. **Error Recovery**: Proper error handling with detailed error messages
-6. **Resource Cleanup**: Automatic cleanup of SSH connections and resources
+1. **Action Loading**: Actions can be loaded from HCL configuration files
+2. **Action Validation**: Basic action validation with error reporting
+3. **CLI Integration**: Actions commands work with project configuration
+4. **Local Orchestration**: Local action orchestration capabilities
+5. **Basic Planning**: Action planning with dependency resolution
 
-## Common Error Messages
+## Common Issues and Solutions
 
 ### Action Loading Errors
 
@@ -57,10 +55,11 @@ ls -la ./actions/
 
 # Create basic actions file
 cat > actions.hcl << 'EOF'
-action "test-action" {
-  type = "command"
-  command = "echo 'Hello World'"
-  machines = ["test-machine"]
+actions {
+  action "test-action" {
+    command = "echo 'Hello World'"
+    machines = ["test-machine"]
+  }
 }
 EOF
 ```
@@ -97,16 +96,12 @@ cat -n actions.hcl | grep -E "(missing|unexpected|invalid)"
 
 **Example of correct syntax:**
 ```hcl
-action "restart-nginx" {
-  type = "service_control"
-  description = "Restart nginx service"
-  
-  service_control {
-    service = "nginx"
-    action = "restart"
+actions {
+  action "restart-nginx" {
+    command = "sudo systemctl restart nginx"
+    description = "Restart nginx service"
+    machines = ["web-server"]
   }
-  
-  machines = ["web-server"]
 }
 ```
 
@@ -121,18 +116,18 @@ spooky actions validate ./my-project --verbose
 
 # Check required fields
 # - name: Action name is required
-# - type: Action type is required
+# - command: Command to run is required
 # - machines or tags: Targeting is required
 ```
 
 **Check your action configuration:**
 ```hcl
-action "valid-action" {
-  name = "valid-action"           # Required
-  type = "command"                # Required
-  command = "echo 'test'"         # Required for command type
-  
-  machines = ["web-server"]       # Required (machines or tags)
+actions {
+  action "valid-action" {
+    name = "valid-action"           # Required
+    command = "echo 'test'"         # Required
+    machines = ["web-server"]       # Required (machines or tags)
+  }
 }
 ```
 
@@ -148,19 +143,20 @@ action "valid-action" {
 spooky actions validate ./my-project --verbose
 
 # Valid action types:
-# - command
-# - script
-# - template_deploy
-# - file_copy
-# - service_control
+# - command (basic shell commands)
+# - script (script files)
+# - template_deploy (template deployment)
+# - file_copy (file copying)
+# - service_control (service management)
 ```
 
 **Fix the action type:**
 ```hcl
-action "fix-action" {
-  type = "command"  # Use valid action type
-  command = "echo 'test'"
-  machines = ["web-server"]
+actions {
+  action "fix-action" {
+    command = "echo 'test'"  # Use valid action type
+    machines = ["web-server"]
+  }
 }
 ```
 
@@ -180,32 +176,32 @@ spooky actions validate ./my-project --verbose
 **Fix circular dependencies:**
 ```hcl
 # ❌ WRONG - Circular dependency
-action "action1" {
-  type = "command"
-  command = "echo 'action1'"
-  dependencies = ["action2"]
-  machines = ["web-server"]
-}
+actions {
+  action "action1" {
+    command = "echo 'action1'"
+    dependencies = ["action2"]
+    machines = ["web-server"]
+  }
 
-action "action2" {
-  type = "command"
-  command = "echo 'action2'"
-  dependencies = ["action1"]  # Creates circular dependency
-  machines = ["web-server"]
+  action "action2" {
+    command = "echo 'action2'"
+    dependencies = ["action1"]  # Creates circular dependency
+    machines = ["web-server"]
+  }
 }
 
 # ✅ CORRECT - No circular dependency
-action "action1" {
-  type = "command"
-  command = "echo 'action1'"
-  machines = ["web-server"]
-}
+actions {
+  action "action1" {
+    command = "echo 'action1'"
+    machines = ["web-server"]
+  }
 
-action "action2" {
-  type = "command"
-  command = "echo 'action2'"
-  dependencies = ["action1"]  # action1 must complete first
-  machines = ["web-server"]
+  action "action2" {
+    command = "echo 'action2'"
+    dependencies = ["action1"]  # action1 must complete first
+    machines = ["web-server"]
+  }
 }
 ```
 
@@ -293,13 +289,14 @@ spooky actions run ./my-project --action test-action --sudo
 
 **Check your command configuration:**
 ```hcl
-action "test-command" {
-  type = "command"
-  command = "echo 'Hello World'"  # Use simple commands first
-  
-  machines = ["web-server"]
-  sudo = false  # Only use sudo if necessary
-  timeout = 300
+actions {
+  action "test-command" {
+    command = "echo 'Hello World'"  # Use simple commands first
+    
+    machines = ["web-server"]
+    sudo = false  # Only use sudo if necessary
+    timeout = 300
+  }
 }
 ```
 
@@ -321,18 +318,15 @@ ssh user@machine.example.com "sudo systemctl restart nginx"
 
 **Check your service configuration:**
 ```hcl
-action "restart-nginx" {
-  type = "service_control"
-  
-  service_control {
-    service = "nginx"           # Verify service name
-    action = "restart"          # Valid actions: start, stop, restart, reload, enable, disable, status
-    systemd = true              # Use systemd (default)
-    timeout = 30                # Service operation timeout
+actions {
+  action "restart-nginx" {
+    command = "sudo systemctl restart nginx"
+    description = "Restart nginx service"
+    
+    machines = ["web-server"]
+    sudo = true  # Service control usually requires sudo
+    timeout = 30
   }
-  
-  machines = ["web-server"]
-  sudo = true  # Service control usually requires sudo
 }
 ```
 
@@ -356,17 +350,17 @@ spooky actions validate ./my-project --verbose
 **Check your dependencies:**
 ```hcl
 # ✅ CORRECT - Valid dependency
-action "deploy-app" {
-  type = "command"
-  command = "echo 'deploying app'"
-  dependencies = ["prepare-database"]  # This action must exist
-  machines = ["app-server"]
-}
+actions {
+  action "deploy-app" {
+    command = "echo 'deploying app'"
+    dependencies = ["prepare-database"]  # This action must exist
+    machines = ["app-server"]
+  }
 
-action "prepare-database" {
-  type = "command"
-  command = "echo 'preparing database'"
-  machines = ["db-server"]
+  action "prepare-database" {
+    command = "echo 'preparing database'"
+    machines = ["db-server"]
+  }
 }
 ```
 
@@ -386,39 +380,38 @@ spooky actions validate ./my-project --verbose
 **Fix circular dependencies by restructuring:**
 ```hcl
 # ❌ WRONG - Circular dependency
-action "action1" {
-  type = "command"
-  command = "echo 'action1'"
-  dependencies = ["action2"]
-  machines = ["web-server"]
-}
+actions {
+  action "action1" {
+    command = "echo 'action1'"
+    dependencies = ["action2"]
+    machines = ["web-server"]
+  }
 
-action "action2" {
-  type = "command"
-  command = "echo 'action2'"
-  dependencies = ["action1"]  # Creates circular dependency
-  machines = ["web-server"]
+  action "action2" {
+    command = "echo 'action2'"
+    dependencies = ["action1"]  # Creates circular dependency
+    machines = ["web-server"]
+  }
 }
 
 # ✅ CORRECT - Sequential running
-action "action1" {
-  type = "command"
-  command = "echo 'action1'"
-  machines = ["web-server"]
-}
+actions {
+  action "action1" {
+    command = "echo 'action1'"
+    machines = ["web-server"]
+  }
 
-action "action2" {
-  type = "command"
-  command = "echo 'action2'"
-  dependencies = ["action1"]  # action1 must complete first
-  machines = ["web-server"]
-}
+  action "action2" {
+    command = "echo 'action2'"
+    dependencies = ["action1"]  # action1 must complete first
+    machines = ["web-server"]
+  }
 
-action "action3" {
-  type = "command"
-  command = "echo 'action3'"
-  dependencies = ["action2"]  # action2 must complete first
-  machines = ["web-server"]
+  action "action3" {
+    command = "echo 'action3'"
+    dependencies = ["action2"]  # action2 must complete first
+    machines = ["web-server"]
+  }
 }
 ```
 
@@ -433,11 +426,12 @@ action "action3" {
 **Solution:**
 ```hcl
 # ✅ CORRECT - All required fields present
-action "valid-action" {
-  name = "valid-action"           # Required
-  type = "command"                # Required
-  command = "echo 'test'"         # Required for command type
-  machines = ["web-server"]       # Required (machines or tags)
+actions {
+  action "valid-action" {
+    name = "valid-action"           # Required
+    command = "echo 'test'"         # Required
+    machines = ["web-server"]       # Required (machines or tags)
+  }
 }
 ```
 
@@ -448,43 +442,21 @@ action "valid-action" {
 **Solution:**
 ```hcl
 # Supported action types:
-action "command-action" {
-  type = "command"                # Run shell commands
-  command = "echo 'test'"
-  machines = ["web-server"]
-}
-
-action "script-action" {
-  type = "script"                 # Run script files
-  script = "files/test.sh"
-  machines = ["web-server"]
-}
-
-action "template-action" {
-  type = "template_deploy"        # Deploy template files
-  template {
-    source = "templates/test.conf.tmpl"
-    destination = "/etc/test.conf"
+actions {
+  action "command-action" {
+    command = "echo 'test'"         # Run shell commands
+    machines = ["web-server"]
   }
-  machines = ["web-server"]
-}
 
-action "file-action" {
-  type = "file_copy"              # Copy files
-  file_copy {
-    source = "files/test.txt"
-    destination = "/tmp/test.txt"
+  action "script-action" {
+    command = "bash /path/to/script.sh"  # Run script files
+    machines = ["web-server"]
   }
-  machines = ["web-server"]
-}
 
-action "service-action" {
-  type = "service_control"        # Control services
-  service_control {
-    service = "nginx"
-    action = "restart"
+  action "service-action" {
+    command = "sudo systemctl restart nginx"  # Control services
+    machines = ["web-server"]
   }
-  machines = ["web-server"]
 }
 ```
 
@@ -508,24 +480,27 @@ cat machines.hcl
 **Check your machine targeting:**
 ```hcl
 # ✅ CORRECT - Target by machine names
-action "web-action" {
-  type = "command"
-  command = "echo 'web action'"
-  machines = ["web-server", "web-server-2"]  # Must exist in machines.hcl
+actions {
+  action "web-action" {
+    command = "echo 'web action'"
+    machines = ["web-server", "web-server-2"]  # Must exist in machines.hcl
+  }
 }
 
 # ✅ CORRECT - Target by tags
-action "prod-action" {
-  type = "command"
-  command = "echo 'production action'"
-  tags = ["environment=production", "role=web"]  # Machines must have these tags
+actions {
+  action "prod-action" {
+    command = "echo 'production action'"
+    machines = ["web-server"]  # Machines must have these tags
+  }
 }
 
 # ✅ CORRECT - Target all machines
-action "all-action" {
-  type = "command"
-  command = "echo 'all machines'"
-  # No machines or tags specified = target all machines
+actions {
+  action "all-action" {
+    command = "echo 'all machines'"
+    machines = ["web-server"]  # Target specific machines
+  }
 }
 ```
 
@@ -551,18 +526,13 @@ EOF
 
 **Check your template configuration:**
 ```hcl
-action "deploy-config" {
-  type = "template_deploy"
-  
-  template {
-    source = "templates/test.conf.tmpl"      # File must exist
-    destination = "/etc/test.conf"
-    permissions = "0644"
-    owner = "root"
-    group = "root"
+actions {
+  action "deploy-config" {
+    command = "cp /tmp/test.conf /etc/test.conf"
+    description = "Deploy configuration file"
+    
+    machines = ["web-server"]
   }
-  
-  machines = ["web-server"]
 }
 ```
 
@@ -588,12 +558,13 @@ chmod +x files/test.sh
 
 **Check your script configuration:**
 ```hcl
-action "run-script" {
-  type = "script"
-  script = "files/test.sh"  # File must exist in files/ or templates/
-  
-  machines = ["web-server"]
-  working_directory = "/tmp"
+actions {
+  action "run-script" {
+    command = "bash files/test.sh"  # File must exist in files/ or templates/
+    
+    machines = ["web-server"]
+    working_directory = "/tmp"
+  }
 }
 ```
 
@@ -605,7 +576,7 @@ action "run-script" {
 
 **Solution:**
 ```bash
-# Use parallel running
+# Use parallel running (if supported)
 spooky actions run ./my-project --parallel 4
 
 # Increase timeout
@@ -617,14 +588,13 @@ spooky actions run ./my-project --verbose
 
 **Optimize your action configuration:**
 ```hcl
-action "optimized-action" {
-  type = "command"
-  command = "echo 'optimized'"
-  
-  machines = ["web-server", "web-server-2", "web-server-3"]
-  parallel = true              # Run in parallel
-  timeout = 300                # Set appropriate timeout
-  max_concurrent = 4           # Limit concurrent runs
+actions {
+  action "optimized-action" {
+    command = "echo 'optimized'"
+    
+    machines = ["web-server", "web-server-2", "web-server-3"]
+    timeout = 300                # Set appropriate timeout
+  }
 }
 ```
 
@@ -645,16 +615,12 @@ top -p $(pgrep spooky)
 
 **Set resource limits:**
 ```hcl
-action "resource-limited" {
-  type = "command"
-  command = "resource-intensive-command"
-  
-  machines = ["web-server"]
-  
-  resource_limits {
-    memory_mb = 1024           # Limit memory usage
-    cpu_percent = 50           # Limit CPU usage
-    disk_mb = 512              # Limit disk usage
+actions {
+  action "resource-limited" {
+    command = "resource-intensive-command"
+    
+    machines = ["web-server"]
+    timeout = 300  # Set timeout to limit resource usage
   }
 }
 ```
@@ -688,12 +654,6 @@ machines {
     authentication {
       method = "ssh_key"
       key_path = "~/.ssh/id_rsa"
-    }
-    
-    # Add connection options
-    connection {
-      timeout = 30
-      retries = 3
     }
   }
 }
@@ -919,6 +879,48 @@ git commit -m "Update action configuration"
 tar -czf project-backup-$(date +%Y%m%d).tar.gz ./
 ```
 
+## Known Issues and Workarounds
+
+### SSH-Based Orchestration Issues
+
+**Issue:** SSH-based action orchestration has implementation problems.
+
+**Workaround:**
+```bash
+# Use local action running for immediate needs
+spooky actions run ./my-project --local-only
+
+# Run actions manually on remote machines
+ssh user@machine.example.com "your-command"
+```
+
+### Parallel Execution Issues
+
+**Issue:** Parallel action execution may fail with many machines.
+
+**Workaround:**
+```bash
+# Use sequential execution
+spooky actions run ./my-project --parallel 1
+
+# Run actions in smaller batches
+spooky actions run ./my-project --machine machine1,machine2
+spooky actions run ./my-project --machine machine3,machine4
+```
+
+### Action Planning Issues
+
+**Issue:** Action planning may not work correctly with complex dependencies.
+
+**Workaround:**
+```bash
+# Use simple action dependencies
+# Avoid complex dependency chains
+
+# Test planning mode
+spooky actions run ./my-project --plan --verbose
+```
+
 ## Best Practices for Troubleshooting
 
 ### 1. Start Simple
@@ -927,21 +929,20 @@ Begin with simple actions and add complexity gradually:
 
 ```hcl
 # Start with simple command
-action "test-simple" {
-  type = "command"
-  command = "echo 'Hello World'"
-  machines = ["web-server"]
+actions {
+  action "test-simple" {
+    command = "echo 'Hello World'"
+    machines = ["web-server"]
+  }
 }
 
 # Then add complexity
-action "test-complex" {
-  type = "service_control"
-  service_control {
-    service = "nginx"
-    action = "restart"
+actions {
+  action "test-complex" {
+    command = "sudo systemctl restart nginx"
+    machines = ["web-server"]
+    dependencies = ["test-simple"]
   }
-  machines = ["web-server"]
-  dependencies = ["test-simple"]
 }
 ```
 
@@ -951,20 +952,19 @@ Use clear, descriptive action names:
 
 ```hcl
 # ✅ GOOD - Descriptive names
-action "restart-nginx-service" {
-  type = "service_control"
-  service_control {
-    service = "nginx"
-    action = "restart"
+actions {
+  action "restart-nginx-service" {
+    command = "sudo systemctl restart nginx"
+    machines = ["web-server"]
   }
-  machines = ["web-server"]
 }
 
 # ❌ BAD - Unclear names
-action "action1" {
-  type = "command"
-  command = "systemctl restart nginx"
-  machines = ["web-server"]
+actions {
+  action "action1" {
+    command = "systemctl restart nginx"
+    machines = ["web-server"]
+  }
 }
 ```
 
@@ -994,15 +994,14 @@ fi
 Implement proper error handling in actions:
 
 ```hcl
-action "robust-action" {
-  type = "command"
-  command = "your-command || exit 1"
-  
-  machines = ["web-server"]
-  retries = 3
-  retry_delay = 10
-  timeout = 300
-  allow_failure = false
+actions {
+  action "robust-action" {
+    command = "your-command || exit 1"
+    
+    machines = ["web-server"]
+    timeout = 300
+    allow_failure = false
+  }
 }
 ```
 
@@ -1067,7 +1066,7 @@ spooky actions validate ./my-project --verbose
 #### "How do I optimize action performance?"
 
 ```bash
-# Use parallel running
+# Use parallel running (if supported)
 spooky actions run ./my-project --parallel 4
 
 # Set resource limits
@@ -1084,4 +1083,6 @@ spooky actions run ./my-project --parallel 4
 
 For additional help, refer to the [User Guide](ACTIONS_USER_GUIDE.md) and [API Reference](ACTIONS_API_REFERENCE.md), or check the project documentation for more advanced troubleshooting techniques.
 
-This comprehensive troubleshooting guide provides solutions for the most common issues encountered with the spooky actions system, along with prevention strategies and recovery procedures.
+## Conclusion
+
+The actions system provides basic action management and orchestration capabilities with some limitations. Most issues can be resolved by following the troubleshooting steps outlined in this guide. For persistent issues, enable verbose output and collect diagnostic information for further analysis. SSH-based action orchestration improvements are planned for future releases.

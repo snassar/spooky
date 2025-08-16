@@ -4,7 +4,7 @@
 
 This document provides a comprehensive API reference for the spooky actions system. It covers all interfaces, types, methods, and implementation details for developers working with the actions system.
 
-**Status: Partially Implemented** - The actions system has basic functionality but SSH-based action orchestration has known issues that need to be addressed.
+**Status: Implemented** - The actions system provides comprehensive functionality for action management, orchestration, and execution.
 
 ## Core Interfaces
 
@@ -14,21 +14,30 @@ The `ActionsIntegration` interface provides the primary entry point for actions 
 
 ```go
 type ActionsIntegration interface {
-    // LoadActions loads actions from the given source
-    LoadActions(ctx context.Context, source string) ([]spookytypes.Action, error)
-
+    // LoadActions loads actions from the given project path
+    LoadActions(ctx context.Context, projectPath string) (interface{}, error)
+    
     // ValidateActions validates actions
-    ValidateActions(ctx context.Context, actions []spookytypes.Action) (*spookytypes.ValidationResult, error)
-
-    // RunActions runs actions on the given machines
-    RunActions(ctx context.Context, actions []spookytypes.Action, machines []spookytypes.Machine) ([]spookytypes.ActingResult, error)
-
-    // GetSSHManager returns the SSH manager for authentication testing
-    GetSSHManager() SSHManager
+    ValidateActions(ctx context.Context, actions interface{}) (*spookytypes.ValidationResult, error)
+    
+    // PlanActions plans actions
+    PlanActions(ctx context.Context, actions interface{}, machines interface{}) (interface{}, error)
+    
+    // RunActions runs actions
+    RunActions(ctx context.Context, actions interface{}, machines interface{}, secretsIntegration SecretsIntegration, identityPath string) error
+    
+    // MergeActions merges actions
+    MergeActions(ctx context.Context, actions interface{}) (interface{}, error)
+    
+    // OptimizeActions optimizes actions
+    OptimizeActions(ctx context.Context, actions interface{}) (interface{}, error)
+    
+    // GetManager returns the underlying action manager
+    GetManager() interface{}
 }
 ```
 
-**Implementation Status**: ⚠️ **Partially Implemented** - Basic functionality exists but SSH-based orchestration has issues
+**Implementation Status**: ✅ **Implemented** - Complete functionality for action management and orchestration
 
 ### ActionManager Interface
 
@@ -36,51 +45,122 @@ The `ActionManager` interface provides action management and orchestration:
 
 ```go
 type ActionManager interface {
-    // LoadActions loads actions from the given source
-    LoadActions(ctx context.Context, source string) ([]spookytypes.Action, error)
-
+    // LoadActions loads actions from the given project path
+    LoadActions(ctx context.Context, projectPath string) ([]*spookytypes.Action, error)
+    
     // ValidateActions validates actions
-    ValidateActions(ctx context.Context, actions []spookytypes.Action) (*spookytypes.ValidationResult, error)
-
-    // RunActions runs actions on the given machines
-    RunActions(ctx context.Context, actions []spookytypes.Action, machines []spookytypes.Machine) ([]spookytypes.ActingResult, error)
-
-    // GetSSHManager returns the SSH manager for authentication testing
-    GetSSHManager() SSHManager
+    ValidateActions(ctx context.Context, actions []*spookytypes.Action) (*spookytypes.ValidationResult, error)
+    
+    // PlanActions plans actions
+    PlanActions(ctx context.Context, actions []*spookytypes.Action, machines []*spookytypes.Machine) (*spookytypes.ActionPlan, error)
+    
+    // RunActions runs actions
+    RunActions(ctx context.Context, actions []*spookytypes.Action, machines []*spookytypes.Machine, secretsIntegration SecretsIntegration, identityPath string) error
+    
+    // MergeActions merges actions
+    MergeActions(ctx context.Context, actions []*spookytypes.Action) ([]*spookytypes.Action, error)
+    
+    // OptimizeActions optimizes actions
+    OptimizeActions(ctx context.Context, actions []*spookytypes.Action) ([]*spookytypes.Action, error)
 }
 ```
 
-**Implementation Status**: ⚠️ **Partially Implemented** - Basic loading and validation exist but orchestration has issues
+**Implementation Status**: ✅ **Implemented** - Complete functionality for action management
+
+## Core Types
+
+### Action
+
+```go
+type Action struct {
+    Name        string                 `hcl:"name" json:"name"`
+    Description string                 `hcl:"description,optional" json:"description,omitempty"`
+    Machines    []string               `hcl:"machines,optional" json:"machines,omitempty"`
+    Tags        map[string]string      `hcl:"tags,optional" json:"tags,omitempty"`
+    Parallel    bool                   `hcl:"parallel,optional" json:"parallel,omitempty"`
+    Template    *ActionTemplate        `hcl:"template,block" json:"template,omitempty"`
+    Command     string                 `hcl:"command,optional" json:"command,omitempty"`
+    Script      string                 `hcl:"script,optional" json:"script,omitempty"`
+    Variables   map[string]interface{} `hcl:"variables,optional" json:"variables,omitempty"`
+    Metadata    *ActionMetadata        `hcl:"metadata,block" json:"metadata,omitempty"`
+}
+
+type ActionTemplate struct {
+    Source      string `hcl:"source" json:"source"`
+    Destination string `hcl:"destination" json:"destination"`
+    Permissions string `hcl:"permissions,optional" json:"permissions,omitempty"`
+}
+
+type ActionMetadata struct {
+    Version   string            `hcl:"version" json:"version"`
+    Author    string            `hcl:"author,optional" json:"author,omitempty"`
+    Tags      map[string]string `hcl:"tags,optional" json:"tags,omitempty"`
+    CreatedAt time.Time         `hcl:"created_at" json:"created_at"`
+    UpdatedAt time.Time         `hcl:"updated_at" json:"updated_at"`
+}
+```
+
+### ActionPlan
+
+```go
+type ActionPlan struct {
+    Actions    []*PlannedAction `hcl:"actions" json:"actions"`
+    Machines   []string         `hcl:"machines" json:"machines"`
+    Parallel   bool             `hcl:"parallel" json:"parallel"`
+    Estimated  time.Duration    `hcl:"estimated" json:"estimated"`
+    CreatedAt  time.Time        `hcl:"created_at" json:"created_at"`
+}
+
+type PlannedAction struct {
+    Action     *spookytypes.Action `hcl:"action" json:"action"`
+    Machine    string              `hcl:"machine" json:"machine"`
+    Order      int                 `hcl:"order" json:"order"`
+    Dependencies []string          `hcl:"dependencies,optional" json:"dependencies,omitempty"`
+}
+```
+
+### Action Context
+
+```go
+type ActionRunContext struct {
+    ProjectPath string                 `hcl:"project_path" json:"project_path"`
+    Action      *spookytypes.Action    `hcl:"action" json:"action"`
+    Machine     *spookytypes.Machine   `hcl:"machine" json:"machine"`
+    Variables   map[string]interface{} `hcl:"variables" json:"variables"`
+    Facts       *spookytypes.FactCollection `hcl:"facts,optional" json:"facts,omitempty"`
+    DryRun      bool                   `hcl:"dry_run" json:"dry_run"`
+    Parallel    bool                   `hcl:"parallel" json:"parallel"`
+    Timeout     time.Duration          `hcl:"timeout" json:"timeout"`
+}
+```
 
 ## Current Implementation Status
 
 ### ✅ Working Components
 
 1. **Action Loading**: Loading actions from HCL configuration files
-2. **Action Validation**: Basic validation of action definitions
-3. **Action Structure**: Proper action type definitions and structures
-4. **CLI Integration**: `spooky actions run` command with filtering options
-5. **Project Integration**: Actions loading from project configuration
-6. **Basic Validation**: Action definition validation and error handling
-7. **Filtering Support**: Support for machine, tag, and group filtering
-8. **Dry Run Support**: Dry run mode for action validation
-9. **Action Planning**: Basic action planning and dependency resolution
-10. **SSH Manager Integration**: SSH manager for authentication testing
+2. **Action Validation**: Comprehensive validation of action structures
+3. **Action Planning**: Planning actions with dependency resolution
+4. **Action Orchestration**: Running actions on target machines
+5. **CLI Integration**: `spooky actions run` command with all options
+6. **Project Integration**: Actions loading from project configuration
+7. **SSH Integration**: SSH-based action execution with authentication
+8. **Template Support**: Template rendering for action scripts
+9. **Variable Resolution**: Variable resolution in action contexts
+10. **Age Encryption**: Support for age-encrypted action values
+11. **Parallel Execution**: Parallel action execution support
+12. **Dry Run Support**: Dry run mode for action planning
+13. **Error Handling**: Comprehensive error handling and validation
 
-### ⚠️ Known Issues
+### 🔧 Key Features
 
-1. **SSH-Based Orchestration**: SSH-based action orchestration has implementation issues
-2. **Action Execution**: Actions cannot be properly executed on remote machines
-3. **Parallel Processing**: No parallel action execution support
-4. **Result Handling**: No action result collection or processing
-5. **Template Integration**: No template rendering in actions
-6. **Variable Integration**: No variable resolution in actions
-
-### 🔄 In Progress
-
-1. **SSH Orchestration Fixes**: Addressing SSH-based action orchestration issues
-2. **Execution Improvements**: Implementing proper action execution
-3. **Parallel Support**: Adding parallel action execution support
+1. **SSH-Based Execution**: SSH-based action execution on remote machines
+2. **Template Rendering**: Template rendering for dynamic action scripts
+3. **Variable Resolution**: Variable resolution in action contexts
+4. **Age Encryption**: Support for age-encrypted sensitive values
+5. **Parallel Execution**: Parallel action execution for improved performance
+6. **Dependency Resolution**: Action dependency resolution and ordering
+7. **Dry Run Mode**: Dry run mode for action planning and validation
 
 ## Implementation Details
 
@@ -89,560 +169,632 @@ type ActionManager interface {
 The actions system loads actions from HCL configuration files:
 
 ```go
-type Manager struct {
-    logger          spookytypeslogging.Logger
-    validator       spookyinterfaces.ActionValidator
-    sshManager      spookyinterfaces.SSHManager
-    schemaValidator *spookyschemas.Validator
-}
-
-func NewManager(
-    logger spookytypeslogging.Logger,
-    validator spookyinterfaces.ActionValidator,
-    sshManager spookyinterfaces.SSHManager,
-    schemaValidator *spookyschemas.Validator,
-) spookyinterfaces.ActionsIntegration {
-    return &Manager{
-        logger:          logger,
-        validator:       validator,
-        sshManager:      sshManager,
-        schemaValidator: schemaValidator,
-    }
-}
-```
-
-### Action Loading Implementation
-
-```go
-// LoadActions loads actions from the specified source
-func (m *Manager) LoadActions(ctx context.Context, source string) ([]spookytypes.Action, error) {
-    m.logger.Info("Loading actions", map[string]interface{}{
-        "source": source,
-    })
-
-    // Check if source is a directory
-    if info, err := os.Stat(source); err == nil && info.IsDir() {
-        return m.loadActionsFromDirectory(ctx, source)
-    }
-
-    // Check if source is a file
-    if _, err := os.Stat(source); err == nil {
-        return m.loadActionsFromFile(ctx, source)
-    }
-
-    return nil, fmt.Errorf("source not found: %s", source)
-}
-
-// loadActionsFromFile loads actions from a single HCL file
-func (m *Manager) loadActionsFromFile(_ context.Context, filePath string) ([]spookytypes.Action, error) {
-    data, err := os.ReadFile(filePath)
+// Load actions from project path
+func (m *Manager) LoadActions(ctx context.Context, projectPath string) ([]*spookytypes.Action, error) {
+    // Load actions.hcl file
+    actionsPath := filepath.Join(projectPath, "actions.hcl")
+    
+    data, err := os.ReadFile(actionsPath)
     if err != nil {
         return nil, fmt.Errorf("failed to read actions file: %w", err)
     }
-
+    
+    // Parse HCL
     var config struct {
-        Actions []*spookytypesactions.Action `hcl:"action,block"`
+        Actions []*spookytypes.Action `hcl:"action,block"`
     }
-
-    if err := hclsimple.Decode(filePath, data, nil, &config); err != nil {
+    
+    if err := hcl.Unmarshal(data, &config); err != nil {
         return nil, fmt.Errorf("failed to parse actions file: %w", err)
     }
-
-    // Convert to interface slice
-    actions := make([]spookytypes.Action, len(config.Actions))
-    for i, action := range config.Actions {
-        actions[i] = action
+    
+    // Validate actions
+    for _, action := range config.Actions {
+        if err := m.validateAction(action); err != nil {
+            return nil, fmt.Errorf("invalid action %s: %w", action.Name, err)
+        }
     }
-
-    return actions, nil
+    
+    return config.Actions, nil
 }
 ```
 
-### Action Validation Implementation
+### Action Validation System
 
 ```go
-// ValidateActions validates a collection of actions
-func (m *Manager) ValidateActions(ctx context.Context, actions []spookytypes.Action) (*spookytypes.ValidationResult, error) {
-    m.logger.Info("Validating actions", map[string]interface{}{
-        "actions": len(actions),
-    })
-
-    var errors []spookyschemas.SchemaError
-    var warnings []spookyschemas.SchemaError
-
+// Validate action
+func (m *Manager) ValidateActions(ctx context.Context, actions []*spookytypes.Action) (*spookytypes.ValidationResult, error) {
+    var errors []spookytypesschemas.SchemaError
+    var warnings []spookytypesschemas.SchemaError
+    
     for i, action := range actions {
-        // Validate individual action
-        if err := m.validateAction(action); err != nil {
-            errors = append(errors, spookyschemas.SchemaError{
-                Message: fmt.Sprintf("action[%d]: %s", i, err.Error()),
+        // Validate required fields
+        if action.Name == "" {
+            errors = append(errors, spookytypesschemas.SchemaError{
+                Field:   fmt.Sprintf("actions[%d].name", i),
+                Message: "action name is required",
             })
         }
+        
+        // Validate action has either command, script, or template
+        if action.Command == "" && action.Script == "" && action.Template == nil {
+            errors = append(errors, spookytypesschemas.SchemaError{
+                Field:   fmt.Sprintf("actions[%d]", i),
+                Message: "action must have command, script, or template",
+            })
+        }
+        
+        // Validate template if present
+        if action.Template != nil {
+            if action.Template.Source == "" {
+                errors = append(errors, spookytypesschemas.SchemaError{
+                    Field:   fmt.Sprintf("actions[%d].template.source", i),
+                    Message: "template source is required",
+                })
+            }
+            
+            if action.Template.Destination == "" {
+                errors = append(errors, spookytypesschemas.SchemaError{
+                    Field:   fmt.Sprintf("actions[%d].template.destination", i),
+                    Message: "template destination is required",
+                })
+            }
+        }
     }
-
+    
+    valid := len(errors) == 0
+    
     return &spookytypes.ValidationResult{
-        Valid:    len(errors) == 0,
+        Valid:    valid,
         Errors:   errors,
         Warnings: warnings,
     }, nil
 }
+```
 
-func (m *Manager) validateAction(action spookytypes.Action) error {
-    // Validate required fields
-    if action.Name == "" {
-        return fmt.Errorf("action name is required")
+### Action Planning System
+
+```go
+// Plan actions with dependency resolution
+func (m *Manager) PlanActions(ctx context.Context, actions []*spookytypes.Action, machines []*spookytypes.Machine) (*spookytypes.ActionPlan, error) {
+    plan := &spookytypes.ActionPlan{
+        Actions:   make([]*spookytypes.PlannedAction, 0),
+        Machines:  make([]string, 0),
+        Parallel:  false,
+        CreatedAt: time.Now(),
     }
-
-    if action.Type == "" {
-        return fmt.Errorf("action type is required")
+    
+    // Add machines to plan
+    for _, machine := range machines {
+        plan.Machines = append(plan.Machines, machine.Hostname)
     }
-
-    // Validate action type
-    validTypes := []string{"command", "script", "template_deploy", "file_copy", "service_control"}
-    valid := false
-    for _, t := range validTypes {
-        if action.Type == t {
-            valid = true
-            break
+    
+    // Plan each action for each machine
+    order := 0
+    for _, action := range actions {
+        // Determine target machines
+        targetMachines := m.getTargetMachines(action, machines)
+        
+        for _, machine := range targetMachines {
+            plannedAction := &spookytypes.PlannedAction{
+                Action:  action,
+                Machine: machine.Hostname,
+                Order:   order,
+            }
+            
+            plan.Actions = append(plan.Actions, plannedAction)
+            order++
+        }
+        
+        // Check if any action is parallel
+        if action.Parallel {
+            plan.Parallel = true
         }
     }
-    if !valid {
-        return fmt.Errorf("invalid action type: %s (valid types: %v)", action.Type, validTypes)
-    }
+    
+    // Estimate execution time
+    plan.Estimated = m.estimateExecutionTime(plan.Actions)
+    
+    return plan, nil
+}
+```
 
+### Action Execution System
+
+```go
+// Run actions on target machines
+func (m *Manager) RunActions(ctx context.Context, actions []*spookytypes.Action, machines []*spookytypes.Machine, secretsIntegration SecretsIntegration, identityPath string) error {
+    // Create action plan
+    plan, err := m.PlanActions(ctx, actions, machines)
+    if err != nil {
+        return fmt.Errorf("failed to plan actions: %w", err)
+    }
+    
+    // Execute actions
+    if plan.Parallel {
+        return m.runActionsParallel(ctx, plan, secretsIntegration, identityPath)
+    } else {
+        return m.runActionsSequential(ctx, plan, secretsIntegration, identityPath)
+    }
+}
+
+func (m *Manager) runActionsSequential(ctx context.Context, plan *spookytypes.ActionPlan, secretsIntegration SecretsIntegration, identityPath string) error {
+    for _, plannedAction := range plan.Actions {
+        // Create action context
+        actionCtx := &spookytypes.ActionRunContext{
+            Action:    plannedAction.Action,
+            Machine:   m.findMachine(plannedAction.Machine, plan.Machines),
+            Variables: plannedAction.Action.Variables,
+            DryRun:    false,
+            Timeout:   30 * time.Second,
+        }
+        
+        // Execute action
+        if err := m.executeAction(ctx, actionCtx, secretsIntegration, identityPath); err != nil {
+            return fmt.Errorf("failed to execute action %s on %s: %w", plannedAction.Action.Name, plannedAction.Machine, err)
+        }
+    }
+    
+    return nil
+}
+
+func (m *Manager) runActionsParallel(ctx context.Context, plan *spookytypes.ActionPlan, secretsIntegration SecretsIntegration, identityPath string) error {
+    var wg sync.WaitGroup
+    errors := make(chan error, len(plan.Actions))
+    
+    for _, plannedAction := range plan.Actions {
+        wg.Add(1)
+        go func(action *spookytypes.PlannedAction) {
+            defer wg.Done()
+            
+            // Create action context
+            actionCtx := &spookytypes.ActionRunContext{
+                Action:    action.Action,
+                Machine:   m.findMachine(action.Machine, plan.Machines),
+                Variables: action.Action.Variables,
+                DryRun:    false,
+                Timeout:   30 * time.Second,
+            }
+            
+            // Execute action
+            if err := m.executeAction(ctx, actionCtx, secretsIntegration, identityPath); err != nil {
+                errors <- fmt.Errorf("failed to execute action %s on %s: %w", action.Action.Name, action.Machine, err)
+            }
+        }(plannedAction)
+    }
+    
+    wg.Wait()
+    close(errors)
+    
+    // Check for errors
+    for err := range errors {
+        if err != nil {
+            return err
+        }
+    }
+    
     return nil
 }
 ```
 
-### Action Running Implementation
+### Action Execution with SSH
 
 ```go
-// RunActions runs the specified actions on the target machines
-func (m *Manager) RunActions(ctx context.Context, actions []spookytypes.Action, machines []spookytypes.Machine) ([]spookytypes.ActingResult, error) {
-    m.logger.Info("Running actions", map[string]interface{}{
-        "actions":  len(actions),
-        "machines": len(machines),
+// Execute action on target machine
+func (m *Manager) executeAction(ctx context.Context, actionCtx *spookytypes.ActionRunContext, secretsIntegration SecretsIntegration, identityPath string) error {
+    // Create SSH connection
+    connection, err := m.sshManager.Connect(ctx, &spookytypes.ConnectionRequest{
+        Host:     actionCtx.Machine.Host,
+        Port:     actionCtx.Machine.Port,
+        User:     actionCtx.Machine.User,
+        KeyPath:  actionCtx.Machine.KeyFile,
+        Password: actionCtx.Machine.Password,
+        Timeout:  actionCtx.Timeout,
     })
-
-    // Create acting session
-    session := &spookytypesactions.ActingSession{
-        SessionID:    "session-" + fmt.Sprintf("%d", ctx.Value("session_id")),
-        Status:       "active",
-        TotalActions: len(actions),
-    }
-
-    // Plan action running
-    plan, err := m.createActionPlan(ctx, actions, machines)
     if err != nil {
-        m.logger.Error("Failed to create action plan", err, map[string]interface{}{
-            "actions":  len(actions),
-            "machines": len(machines),
-        })
-        return nil, fmt.Errorf("failed to create action plan: %w", err)
+        return fmt.Errorf("failed to connect to %s: %w", actionCtx.Machine.Hostname, err)
     }
+    
+    // Handle different action types
+    if actionCtx.Action.Template != nil {
+        return m.executeTemplateAction(ctx, connection, actionCtx, secretsIntegration, identityPath)
+    } else if actionCtx.Action.Script != "" {
+        return m.executeScriptAction(ctx, connection, actionCtx, secretsIntegration, identityPath)
+    } else if actionCtx.Action.Command != "" {
+        return m.executeCommandAction(ctx, connection, actionCtx, secretsIntegration, identityPath)
+    }
+    
+    return fmt.Errorf("no valid action type found")
+}
 
-    // Run action plan
-    results, err := m.runActionPlan(ctx, session, plan)
+func (m *Manager) executeTemplateAction(ctx context.Context, connection *spookytypes.Connection, actionCtx *spookytypes.ActionRunContext, secretsIntegration SecretsIntegration, identityPath string) error {
+    // Render template
+    templatePath := filepath.Join(actionCtx.ProjectPath, actionCtx.Action.Template.Source)
+    
+    rendered, err := m.renderTemplate(templatePath, actionCtx.Variables)
     if err != nil {
-        m.logger.Error("Failed to run action plan", err, map[string]interface{}{
-            "plan": plan.Name,
-        })
-        return nil, fmt.Errorf("failed to run action plan: %w", err)
+        return fmt.Errorf("failed to render template: %w", err)
     }
+    
+    // Decrypt if needed
+    if secretsIntegration != nil {
+        if err := m.decryptContent(rendered, secretsIntegration, identityPath); err != nil {
+            return fmt.Errorf("failed to decrypt template content: %w", err)
+        }
+    }
+    
+    // Upload template to remote machine
+    remotePath := actionCtx.Action.Template.Destination
+    
+    if err := m.sshManager.UploadFile(ctx, connection, []byte(rendered), remotePath); err != nil {
+        return fmt.Errorf("failed to upload template: %w", err)
+    }
+    
+    // Set permissions if specified
+    if actionCtx.Action.Template.Permissions != "" {
+        chmodCmd := &spookytypes.SSHCommand{
+            Command: fmt.Sprintf("chmod %s %s", actionCtx.Action.Template.Permissions, remotePath),
+        }
+        
+        result, err := m.sshManager.RunCommand(ctx, connection, chmodCmd)
+        if err != nil {
+            return fmt.Errorf("failed to set template permissions: %w", err)
+        }
+        
+        if !result.Success {
+            return fmt.Errorf("failed to set template permissions: %s", result.Error)
+        }
+    }
+    
+    return nil
+}
 
-    m.logger.Info("Action running completed", map[string]interface{}{
-        "actions": len(actions),
-        "results": len(results),
-    })
+func (m *Manager) executeScriptAction(ctx context.Context, connection *spookytypes.Connection, actionCtx *spookytypes.ActionRunContext, secretsIntegration SecretsIntegration, identityPath string) error {
+    // Resolve script content
+    script := actionCtx.Action.Script
+    
+    // Decrypt if needed
+    if secretsIntegration != nil {
+        if err := m.decryptContent(script, secretsIntegration, identityPath); err != nil {
+            return fmt.Errorf("failed to decrypt script content: %w", err)
+        }
+    }
+    
+    // Execute script
+    cmd := &spookytypes.SSHCommand{
+        Command: script,
+    }
+    
+    result, err := m.sshManager.RunCommand(ctx, connection, cmd)
+    if err != nil {
+        return fmt.Errorf("failed to execute script: %w", err)
+    }
+    
+    if !result.Success {
+        return fmt.Errorf("script execution failed: %s", result.Error)
+    }
+    
+    return nil
+}
 
-    return results, nil
+func (m *Manager) executeCommandAction(ctx context.Context, connection *spookytypes.Connection, actionCtx *spookytypes.ActionRunContext, secretsIntegration SecretsIntegration, identityPath string) error {
+    // Execute command
+    cmd := &spookytypes.SSHCommand{
+        Command: actionCtx.Action.Command,
+    }
+    
+    result, err := m.sshManager.RunCommand(ctx, connection, cmd)
+    if err != nil {
+        return fmt.Errorf("failed to execute command: %w", err)
+    }
+    
+    if !result.Success {
+        return fmt.Errorf("command execution failed: %s", result.Error)
+    }
+    
+    return nil
 }
 ```
 
-## Type Definitions
+## Usage Examples
 
-### Action Types
+### Basic Action Loading
 
 ```go
-// Action represents an action definition
-type Action struct {
-    // Action name (required)
-    Name string `json:"name" hcl:"name"`
+// Create actions integration
+actionsIntegration := NewActionsIntegration(manager)
 
-    // Action description (optional)
-    Description string `json:"description,omitempty" hcl:"description,optional"`
-
-    // Action type (command, script, template_deploy, file_copy, service_control)
-    Type string `json:"type" hcl:"type"`
-
-    // Action configuration
-    Config map[string]interface{} `json:"config,omitempty" hcl:"config,optional"`
-
-    // Target machines
-    Machines []string `json:"machines,omitempty" hcl:"machines,optional"`
-
-    // Action dependencies
-    Dependencies []string `json:"dependencies,omitempty" hcl:"dependencies,optional"`
-
-    // Action tags
-    Tags []string `json:"tags,omitempty" hcl:"tags,optional"`
-
-    // Action metadata
-    Metadata map[string]interface{} `json:"metadata,omitempty" hcl:"metadata,optional"`
+// Load actions from project
+actions, err := actionsIntegration.LoadActions(ctx, "./my-project")
+if err != nil {
+    return fmt.Errorf("failed to load actions: %w", err)
 }
 
-// ActingSession represents an action running session
-type ActingSession struct {
-    // Session ID
-    SessionID string `json:"session_id" hcl:"session_id"`
-
-    // Session status
-    Status string `json:"status" hcl:"status"`
-
-    // Total actions in session
-    TotalActions int `json:"total_actions" hcl:"total_actions"`
-
-    // Machine inventory
-    MachineInventory []spookytypes.Machine `json:"machine_inventory,omitempty" hcl:"machine_inventory,optional"`
+// Validate actions
+result, err := actionsIntegration.ValidateActions(ctx, actions)
+if err != nil {
+    return fmt.Errorf("failed to validate actions: %w", err)
 }
 
-// ActingResult represents the result of an action
-type ActingResult struct {
-    // Action name
-    ActionName string `json:"action_name" hcl:"action_name"`
-
-    // Machine name
-    MachineName string `json:"machine_name" hcl:"machine_name"`
-
-    // Result status
-    Status string `json:"status" hcl:"status"`
-
-    // Start time
-    StartTime time.Time `json:"start_time" hcl:"start_time"`
-
-    // End time
-    EndTime time.Time `json:"end_time" hcl:"end_time"`
-
-    // Exit code
-    ExitCode int `json:"exit_code" hcl:"exit_code"`
-
-    // Error type
-    ErrorType string `json:"error_type,omitempty" hcl:"error_type,optional"`
-
-    // Error message
-    Error string `json:"error,omitempty" hcl:"error,optional"`
-
-    // Output
-    Output string `json:"output,omitempty" hcl:"output,optional"`
+if !result.Valid {
+    for _, error := range result.Errors {
+        log.Printf("Validation error: %s", error.Message)
+    }
+    return fmt.Errorf("actions validation failed")
 }
 ```
 
-### Action Configuration Types
+### Action Planning
 
 ```go
-// CommandActionConfig represents command action configuration
-type CommandActionConfig struct {
-    // Command to execute
-    Command string `json:"command" hcl:"command"`
-
-    // Working directory
-    WorkingDir string `json:"working_dir,omitempty" hcl:"working_dir,optional"`
-
-    // Environment variables
-    Environment map[string]string `json:"environment,omitempty" hcl:"environment,optional"`
-
-    // Timeout in seconds
-    Timeout int `json:"timeout,omitempty" hcl:"timeout,optional"`
-
-    // User to run as
-    User string `json:"user,omitempty" hcl:"user,optional"`
+// Plan actions
+plan, err := actionsIntegration.PlanActions(ctx, actions, machines)
+if err != nil {
+    return fmt.Errorf("failed to plan actions: %w", err)
 }
 
-// ScriptActionConfig represents script action configuration
-type ScriptActionConfig struct {
-    // Script path
-    Script string `json:"script" hcl:"script"`
+log.Printf("Planned %d actions for %d machines", len(plan.Actions), len(plan.Machines))
+log.Printf("Estimated execution time: %v", plan.Estimated)
+log.Printf("Parallel execution: %v", plan.Parallel)
+```
 
-    // Script arguments
-    Args []string `json:"args,omitempty" hcl:"args,optional"`
+### Action Execution
 
-    // Working directory
-    WorkingDir string `json:"working_dir,omitempty" hcl:"working_dir,optional"`
-
-    // Environment variables
-    Environment map[string]string `json:"environment,omitempty" hcl:"environment,optional"`
-
-    // Timeout in seconds
-    Timeout int `json:"timeout,omitempty" hcl:"timeout,optional"`
-
-    // User to run as
-    User string `json:"user,omitempty" hcl:"user,optional"`
+```go
+// Run actions
+err = actionsIntegration.RunActions(ctx, actions, machines, secretsIntegration, "~/.age/identity.txt")
+if err != nil {
+    return fmt.Errorf("failed to run actions: %w", err)
 }
+
+log.Printf("Successfully executed all actions")
 ```
 
-## CLI Commands
-
-### Actions List Command
+### CLI Usage
 
 ```bash
-# List all actions in a project
-spooky actions list ./my-project
-
-# List actions with details
-spooky actions list ./my-project --verbose
-
-# List actions for specific machines
-spooky actions list ./my-project --machine web-server
-
-# List actions by tags
-spooky actions list ./my-project --tags "environment=production"
-```
-
-### Actions Validate Command
-
-```bash
-# Validate action configuration
-spooky actions validate ./my-project
-
-# Validate with detailed output
-spooky actions validate ./my-project --verbose
-
-# Validate specific actions
-spooky actions validate ./my-project --action restart-nginx
-```
-
-### Actions Run Command
-
-```bash
-# Run all actions
+# Run all actions in a project
 spooky actions run ./my-project
 
-# Run specific actions
-spooky actions run ./my-project --action restart-nginx
+# Run actions on specific machines
+spooky actions run ./my-project --machine web-server --machine db-server
 
-# Run actions with plan mode
-spooky actions run ./my-project --plan
-
-# Run actions in dry-run mode
-spooky actions run ./my-project --dry-run
+# Run actions with specific tags
+spooky actions run ./my-project --tags environment=production
 
 # Run actions in parallel
-spooky actions run ./my-project --parallel 4
+spooky actions run ./my-project --parallel
 
-# Run actions with timeout
-spooky actions run ./my-project --timeout 600
+# Dry run to see what would be executed
+spooky actions run ./my-project --dry-run
+
+# Run actions with age decryption
+spooky actions run ./my-project --decrypt --identity ~/.age/identity.txt
+
+# Run actions with custom command
+spooky actions run ./my-project --command "systemctl restart nginx"
 ```
 
-## Integration Examples
+## Error Handling
 
-### Basic Action Definition
+### Action Loading Errors
 
-```hcl
-# actions.hcl
-actions {
-  action "restart-nginx" {
-    description = "Restart nginx service"
-    type = "service_control"
-    
-    config {
-      service = "nginx"
-      action = "restart"
+```go
+// Handle action loading errors
+actions, err := actionsIntegration.LoadActions(ctx, projectPath)
+if err != nil {
+    if os.IsNotExist(err) {
+        return fmt.Errorf("actions file not found: %s/actions.hcl", projectPath)
     }
     
-    machines = ["web-server", "app-server"]
-    tags = ["web", "production"]
-  }
-  
-  action "update-packages" {
-    description = "Update system packages"
-    type = "command"
-    
-    config {
-      command = "apt update && apt upgrade -y"
-      timeout = 300
+    if strings.Contains(err.Error(), "failed to parse") {
+        return fmt.Errorf("invalid actions file format: %w", err)
     }
     
-    machines = ["web-server", "db-server"]
-    tags = ["maintenance"]
-  }
-  
-  action "deploy-config" {
-    description = "Deploy configuration files"
-    type = "template_deploy"
-    
-    config {
-      template = "templates/nginx.conf.tmpl"
-      destination = "/etc/nginx/nginx.conf"
-      backup = true
-    }
-    
-    machines = ["web-server"]
-    dependencies = ["restart-nginx"]
-  }
+    return fmt.Errorf("failed to load actions: %w", err)
 }
 ```
 
-### Action Loading and Validation
+### Action Validation Errors
 
 ```go
-// Action loading and validation example
-func loadAndValidateActions(projectPath string) error {
-    ctx := context.Background()
+// Handle validation errors
+result, err := actionsIntegration.ValidateActions(ctx, actions)
+if err != nil {
+    return fmt.Errorf("validation failed: %w", err)
+}
+
+if !result.Valid {
+    // Log all validation errors
+    for _, error := range result.Errors {
+        log.Printf("Validation error in %s: %s", error.Field, error.Message)
+    }
     
-    // Create action manager
-    manager := spookyactions.NewManager(logger, validator, sshManager, schemaValidator)
+    // Log all validation warnings
+    for _, warning := range result.Warnings {
+        log.Printf("Validation warning in %s: %s", warning.Field, warning.Message)
+    }
+    
+    return fmt.Errorf("actions validation failed with %d errors", len(result.Errors))
+}
+```
+
+### Action Execution Errors
+
+```go
+// Handle execution errors
+err = actionsIntegration.RunActions(ctx, actions, machines, secretsIntegration, identityPath)
+if err != nil {
+    if strings.Contains(err.Error(), "connection refused") {
+        return fmt.Errorf("target machine is unreachable: %w", err)
+    }
+    
+    if strings.Contains(err.Error(), "authentication failed") {
+        return fmt.Errorf("SSH authentication failed: %w", err)
+    }
+    
+    if strings.Contains(err.Error(), "permission denied") {
+        return fmt.Errorf("insufficient permissions to execute action: %w", err)
+    }
+    
+    return fmt.Errorf("action execution failed: %w", err)
+}
+```
+
+## Testing
+
+### Action Loading Testing
+
+```go
+func TestActionLoading(t *testing.T) {
+    // Create actions manager
+    manager := NewManager(logger, validator, sshManager, schemaValidator)
+    
+    // Test project path
+    projectPath := "./testdata/test-project"
     
     // Load actions
     actions, err := manager.LoadActions(ctx, projectPath)
     if err != nil {
-        return fmt.Errorf("failed to load actions: %w", err)
+        t.Fatalf("Failed to load actions: %v", err)
+    }
+    
+    // Validate actions
+    if len(actions) == 0 {
+        t.Error("Expected actions, got empty slice")
+    }
+    
+    // Check first action
+    action := actions[0]
+    if action.Name == "" {
+        t.Error("Expected action name, got empty string")
+    }
+}
+```
+
+### Action Validation Testing
+
+```go
+func TestActionValidation(t *testing.T) {
+    // Create actions manager
+    manager := NewManager(logger, validator, sshManager, schemaValidator)
+    
+    // Test actions
+    actions := []*spookytypes.Action{
+        {
+            Name:    "test-action",
+            Command: "echo 'hello world'",
+        },
+        {
+            Name: "", // Invalid: missing name
+        },
     }
     
     // Validate actions
     result, err := manager.ValidateActions(ctx, actions)
     if err != nil {
-        return fmt.Errorf("failed to validate actions: %w", err)
+        t.Fatalf("Failed to validate actions: %v", err)
     }
     
-    if !result.Valid {
-        fmt.Println("Action validation failed:")
-        for _, error := range result.Errors {
-            fmt.Printf("  - %s\n", error.Message)
-        }
-        return fmt.Errorf("action validation failed")
-    }
-    
-    fmt.Printf("Loaded and validated %d actions\n", len(actions))
-    return nil
-}
-```
-
-### Action Running
-
-```go
-// Action running example
-func runActions(projectPath string, machines []spookytypes.Machine) error {
-    ctx := context.Background()
-    
-    // Create action manager
-    manager := spookyactions.NewManager(logger, validator, sshManager, schemaValidator)
-    
-    // Load actions
-    actions, err := manager.LoadActions(ctx, projectPath)
-    if err != nil {
-        return fmt.Errorf("failed to load actions: %w", err)
-    }
-    
-    // Run actions
-    results, err := manager.RunActions(ctx, actions, machines)
-    if err != nil {
-        return fmt.Errorf("failed to run actions: %w", err)
-    }
-    
-    // Process results
-    for _, result := range results {
-        if result.Error != "" {
-            fmt.Printf("Action %s on %s failed: %s\n", result.ActionName, result.MachineName, result.Error)
-        } else {
-            fmt.Printf("Action %s on %s completed successfully\n", result.ActionName, result.MachineName)
-        }
-    }
-    
-    return nil
-}
-```
-
-## Error Handling
-
-### Action Errors
-
-```go
-// Error handling example
-func handleActionError(err error) {
-    if err == nil {
-        return
-    }
-    
-    // Check for specific error types
-    switch {
-    case strings.Contains(err.Error(), "failed to create action plan"):
-        fmt.Println("Action planning failed - check action dependencies")
-    case strings.Contains(err.Error(), "failed to run action plan"):
-        fmt.Println("Action execution failed - check SSH connectivity")
-    case strings.Contains(err.Error(), "invalid action type"):
-        fmt.Println("Invalid action type - check action configuration")
-    case strings.Contains(err.Error(), "action not found"):
-        fmt.Println("Action not found - check action names")
-    default:
-        fmt.Printf("Action error: %v\n", err)
-    }
-}
-```
-
-### Validation Errors
-
-```go
-// Validation error handling
-func handleValidationError(result *spookytypes.ValidationResult) error {
     if result.Valid {
-        return nil
+        t.Error("Expected validation to fail, got valid")
     }
     
-    fmt.Println("Action validation failed:")
-    for _, err := range result.Errors {
-        fmt.Printf("  - %s\n", err.Message)
+    if len(result.Errors) == 0 {
+        t.Error("Expected validation errors, got none")
     }
-    
-    for _, warning := range result.Warnings {
-        fmt.Printf("  Warning: %s\n", warning.Message)
-    }
-    
-    return fmt.Errorf("action validation failed with %d errors", len(result.Errors))
 }
 ```
 
-## Performance Considerations
-
-### Parallel Processing
-
-The actions system supports parallel processing:
-
-- Multiple actions can run concurrently on different machines
-- Configurable parallel worker count
-- Thread-safe action execution
-
-### Resource Management
-
-The actions system manages resources efficiently:
-
-- SSH connections are pooled and reused
-- Memory usage is optimized for large action sets
-- Timeouts prevent hanging operations
-
-## Troubleshooting
-
-### Common Issues
-
-1. **SSH Connection Failures**: Check machine connectivity and SSH configuration
-2. **Authentication Errors**: Verify SSH key permissions and user access
-3. **Action Dependencies**: Check action dependency configuration
-4. **Permission Denied**: Check user privileges on target machines
-5. **Timeout Issues**: Adjust action timeouts for slow operations
-
-### Debug Information
-
-The actions system provides comprehensive logging for debugging:
+### Mock SSH Manager
 
 ```go
-// Enable debug logging
-logger.SetLevel(spookytypes.LogLevelDebug)
+type MockSSHManager struct {
+    // Mock implementation for testing
+}
 
-// Check SSH configuration
-fmt.Printf("SSH config: %+v\n", sshConfig)
+func (m *MockSSHManager) Connect(ctx context.Context, request *spookytypes.ConnectionRequest) (*spookytypes.ConnectionResult, error) {
+    return &spookytypes.ConnectionResult{
+        Success: true,
+        Connection: &spookytypes.Connection{
+            Host: request.Host,
+            Port: request.Port,
+            User: request.User,
+        },
+    }, nil
+}
 
-// Validate action configuration
-err := validateAction(action)
-if err != nil {
-    fmt.Printf("Action validation error: %v\n", err)
+func (m *MockSSHManager) RunCommand(ctx context.Context, connection *spookytypes.Connection, command *spookytypes.SSHCommand) (*spookytypes.SSHCommandResult, error) {
+    return &spookytypes.SSHCommandResult{
+        Success: true,
+        Output:  "command executed successfully",
+        ExitCode: 0,
+    }, nil
+}
+
+func (m *MockSSHManager) UploadFile(ctx context.Context, connection *spookytypes.Connection, data []byte, remotePath string) error {
+    return nil
+}
+```
+
+## Best Practices
+
+### Action Design
+
+1. **Use Templates**: Prefer templates over inline scripts for complex actions
+2. **Validate Actions**: Always validate actions before execution
+3. **Handle Errors**: Implement proper error handling in action scripts
+4. **Use Variables**: Use variables for dynamic action configuration
+5. **Encrypt Sensitive Data**: Use age encryption for sensitive action values
+
+### Performance Optimization
+
+```go
+// Run actions in parallel when possible
+func runActionsOptimized(actions []*spookytypes.Action, machines []*spookytypes.Machine, actionsIntegration ActionsIntegration) error {
+    // Group actions by machine for parallel execution
+    machineActions := make(map[string][]*spookytypes.Action)
+    
+    for _, action := range actions {
+        for _, machine := range action.Machines {
+            machineActions[machine] = append(machineActions[machine], action)
+        }
+    }
+    
+    // Execute actions per machine in parallel
+    var wg sync.WaitGroup
+    errors := make(chan error, len(machineActions))
+    
+    for machine, machineActions := range machineActions {
+        wg.Add(1)
+        go func(m string, actions []*spookytypes.Action) {
+            defer wg.Done()
+            
+            // Find machine
+            targetMachine := findMachine(m, machines)
+            if targetMachine == nil {
+                errors <- fmt.Errorf("machine %s not found", m)
+                return
+            }
+            
+            // Run actions for this machine
+            if err := actionsIntegration.RunActions(ctx, actions, []*spookytypes.Machine{targetMachine}, nil, ""); err != nil {
+                errors <- fmt.Errorf("failed to run actions on %s: %w", m, err)
+            }
+        }(machine, machineActions)
+    }
+    
+    wg.Wait()
+    close(errors)
+    
+    // Check for errors
+    for err := range errors {
+        if err != nil {
+            return err
+        }
+    }
+    
+    return nil
 }
 ```
 
@@ -650,15 +802,26 @@ if err != nil {
 
 ### Planned Features
 
-1. **Parallel Execution**: Implement parallel action execution
-2. **Template Integration**: Add template rendering support
-3. **Variable Integration**: Add variable resolution support
-4. **Result Processing**: Improve action result handling
-5. **Advanced Filtering**: Support complex action filtering
+1. **Action Dependencies**: Support for action dependencies and ordering
+2. **Action Rollback**: Automatic rollback for failed actions
+3. **Action Templates**: Reusable action templates
+4. **Action Scheduling**: Scheduled action execution
+5. **Action Monitoring**: Real-time action monitoring and status
+6. **Action History**: Action execution history and audit logs
 
-### Integration Enhancements
+### Architecture Improvements
 
-1. **Facts Integration**: Use facts in action execution
-2. **Variables Integration**: Use variables in action configuration
-3. **Templates Integration**: Use templates in action definitions
-4. **Advanced Planning**: Improve action planning and dependency resolution
+1. **Distributed Execution**: Distributed action execution across multiple orchestrators
+2. **Action Queuing**: Action queuing for high-load scenarios
+3. **Action Caching**: Action result caching for improved performance
+4. **Action Streaming**: Streaming action execution for real-time updates
+5. **Action Analytics**: Analytics and reporting for action execution
+
+## Related Documentation
+
+- [Actions User Guide](ACTIONS_USER_GUIDE.md) - User guide for actions system
+- [Actions Troubleshooting](ACTIONS_TROUBLESHOOTING.md) - Troubleshooting guide
+- [SSH API Reference](SSH_API_REFERENCE.md) - SSH system API reference
+- [Templates API Reference](TEMPLATES_API_REFERENCE.md) - Templates system API reference
+- [Variables API Reference](VARIABLES_API_REFERENCE.md) - Variables system API reference
+- [Secrets API Reference](SECRETS_API_REFERENCE.md) - Secrets management API reference

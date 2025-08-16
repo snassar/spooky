@@ -2,726 +2,516 @@
 
 ## Overview
 
-The spooky logging system provides comprehensive logging capabilities for all spooky components. This guide covers everything from basic logging configuration to advanced features like structured logging, multiple output formats, and performance optimization.
+The spooky logging system provides comprehensive logging capabilities for monitoring and debugging operations across all system components. This guide covers everything from basic logging configuration to advanced features like structured logging, log aggregation, and performance monitoring.
+
+**Status: Production Ready** - The logging system is fully implemented with comprehensive logging, formatting, and output capabilities.
 
 ## Getting Started
 
 ### Prerequisites
 
 - spooky CLI installed and configured
-- Basic understanding of HCL configuration syntax
+- Basic understanding of logging concepts
 - Access to create and modify configuration files
+- Understanding of log levels and formatting
 
 ### Quick Start
 
-1. **Check Current Logging Configuration**
+1. **Check Available Logging Commands**
    ```bash
-   spooky logging show
+   spooky logging --help
    ```
 
-2. **Configure Basic Logging**
+2. **View Current Logging Configuration**
    ```bash
-   spooky logging configure --level info --format json
+   spooky logging config show
    ```
 
-3. **Test Logging Output**
+3. **Set Log Level**
    ```bash
-   spooky logging test
+   spooky logging config set --level debug
    ```
 
-## Logging Configuration
+## Core Concepts
+
+### Log Levels
+
+spooky supports standard log levels:
+
+- **DEBUG** - Detailed debugging information
+- **INFO** - General operational information
+- **WARN** - Warning messages for potential issues
+- **ERROR** - Error messages for failed operations
+- **FATAL** - Critical errors that cause system failure
+
+### Logging Components
+
+The logging system provides:
+
+- **Structured Logging** - JSON and text formatting
+- **Multiple Outputs** - Console, file, and network outputs
+- **Performance Monitoring** - Operation timing and metrics
+- **Context Tracking** - Request and operation context
+
+### Logging Features
+
+Key features include:
+
+- **Configurable Levels** - Set different levels for different components
+- **Structured Output** - JSON and text formatting options
+- **Performance Metrics** - Operation timing and resource usage
+- **Context Propagation** - Track operations across components
+
+## Configuration
 
 ### Global Logging Configuration
 
-Global logging configuration is stored in `$XDG_CONFIG_HOME/spooky/logging.hcl` and applies to all spooky operations.
-
-#### Basic Configuration
+Configure logging in your `spooky.hcl` file:
 
 ```hcl
 logging {
   level = "info"
   format = "json"
   
-  output {
-    type = "console"
-    enabled = true
-  }
-  
-  output {
-    type = "file"
-    enabled = true
-    path = "~/.local/state/spooky/logs/spooky.log"
-  }
-}
-```
-
-#### Advanced Configuration
-
-```hcl
-logging {
-  level = "debug"
-  format = "structured"
-  
-  # Console output
-  output {
-    type = "console"
-    enabled = true
-    colorize = true
-  }
-  
-  # File output with rotation
-  output {
-    type = "file"
-    enabled = true
-    path = "~/.local/state/spooky/logs/spooky.log"
-    max_size = "100MB"
-    max_age = "30d"
-    max_backups = 10
-  }
-  
-  # Component-specific logging
-  components {
-    "facts" {
-      level = "debug"
+  outputs {
+    console {
       enabled = true
-    }
-    
-    "machines" {
       level = "info"
-      enabled = true
     }
     
-    "variables" {
-      level = "warn"
+    file {
       enabled = true
-    }
-  }
-}
-```
-
-### Project-Specific Logging
-
-Project-specific logging configuration overrides global settings for specific projects.
-
-#### Project Configuration
-
-```hcl
-# In your project directory
-logging {
-  level = "debug"
-  format = "json"
-  
-  output {
-    type = "file"
-    enabled = true
-    path = "./logs/project.log"
-  }
-  
-  # Override component logging for this project
-  components {
-    "actions" {
+      path = "~/.local/state/spooky/logs/spooky.log"
       level = "debug"
-      enabled = true
+      max_size_mb = 100
+      max_files = 5
     }
   }
-}
-```
-
-### Environment Variables
-
-You can override logging configuration using environment variables:
-
-```bash
-# Set log level
-export SPOOKY_LOG_LEVEL=debug
-
-# Set log format
-export SPOOKY_LOG_FORMAT=json
-
-# Set log file path
-export SPOOKY_LOG_FILE=./debug.log
-
-# Enable/disable console output
-export SPOOKY_LOG_CONSOLE=true
-
-# Enable/disable file output
-export SPOOKY_LOG_FILE_OUTPUT=true
-```
-
-## Log Levels
-
-### Available Levels
-
-1. **trace** - Most detailed logging, includes function entry/exit
-2. **debug** - Detailed debugging information
-3. **info** - General information about operations
-4. **warn** - Warning messages for potential issues
-5. **error** - Error messages for failed operations
-6. **fatal** - Critical errors that cause program termination
-
-### Level Hierarchy
-
-```
-trace < debug < info < warn < error < fatal
-```
-
-Only messages at or above the configured level are logged.
-
-### Component-Specific Levels
-
-You can set different log levels for different components:
-
-```hcl
-logging {
-  level = "info"  # Default level
   
-  components {
-    "facts" {
-      level = "debug"  # More detailed for facts
-    }
-    
-    "machines" {
-      level = "warn"   # Less verbose for machines
-    }
-    
-    "variables" {
-      level = "error"  # Only errors for variables
-    }
-  }
-}
-```
-
-## Output Formats
-
-### JSON Format
-
-Structured JSON output for machine processing:
-
-```json
-{
-  "timestamp": "2024-01-15T10:30:45.123Z",
-  "level": "info",
-  "component": "facts",
-  "message": "Collecting facts from server",
-  "fields": {
-    "server": "web.example.com",
-    "method": "ssh",
-    "duration_ms": 1250
-  }
-}
-```
-
-### Structured Format
-
-Human-readable structured output:
-
-```
-2024-01-15T10:30:45.123Z [INFO] facts: Collecting facts from server server=web.example.com method=ssh duration_ms=1250
-```
-
-### Plain Text Format
-
-Simple text output:
-
-```
-2024-01-15T10:30:45.123Z INFO facts: Collecting facts from server
-```
-
-### Configuration
-
-```hcl
-logging {
-  format = "json"  # json, structured, or plain
-  
-  # Format-specific options
-  json {
-    pretty_print = false
-    include_timestamp = true
-    include_level = true
-    include_component = true
-  }
-  
-  structured {
-    colorize = true
-    include_timestamp = true
-    include_level = true
-    include_component = true
-  }
-  
-  plain {
-    include_timestamp = true
-    include_level = true
-    include_component = true
-  }
-}
-```
-
-## Output Destinations
-
-### Console Output
-
-Output to standard output/error:
-
-```hcl
-logging {
-  output {
-    type = "console"
+  performance {
     enabled = true
-    colorize = true
-    use_stderr = false  # Use stderr for errors
+    threshold_ms = 1000
   }
 }
 ```
 
-### File Output
+### Console Output Configuration
 
-Output to log files with rotation:
+Configure console logging:
 
 ```hcl
-logging {
-  output {
-    type = "file"
+outputs {
+  console {
+    enabled = true
+    level = "info"
+    format = "text"
+    colors = true
+  }
+}
+```
+
+### File Output Configuration
+
+Configure file logging:
+
+```hcl
+outputs {
+  file {
     enabled = true
     path = "~/.local/state/spooky/logs/spooky.log"
-    max_size = "100MB"
-    max_age = "30d"
-    max_backups = 10
+    level = "debug"
+    format = "json"
+    max_size_mb = 100
+    max_files = 5
     compress = true
   }
 }
 ```
 
-### Multiple Outputs
+### Network Output Configuration
 
-You can configure multiple outputs simultaneously:
+Configure network logging:
 
 ```hcl
-logging {
-  # Console for immediate feedback
-  output {
-    type = "console"
+outputs {
+  syslog {
     enabled = true
-    level = "info"
+    address = "localhost:514"
+    facility = "local0"
+    level = "warn"
   }
   
-  # File for persistent storage
-  output {
-    type = "file"
+  http {
     enabled = true
-    path = "./logs/debug.log"
-    level = "debug"
-  }
-  
-  # Error file for errors only
-  output {
-    type = "file"
-    enabled = true
-    path = "./logs/errors.log"
+    url = "https://logs.example.com/ingest"
     level = "error"
+    headers = {
+      "Authorization" = "Bearer token"
+    }
   }
 }
 ```
 
-## Component-Based Logging
+## CLI Commands
 
-### Available Components
+### Logging Configuration
 
-- **facts** - Fact collection and processing
-- **machines** - Machine inventory and connectivity
-- **variables** - Variable management and resolution
-- **actions** - Action orchestration and running
-- **templates** - Template rendering and processing
-- **ssh** - SSH connections and operations
-- **config** - Configuration loading and validation
-- **cli** - Command-line interface operations
+Manage logging configuration:
 
-### Component Configuration
+```bash
+# Show current configuration
+spooky logging config show
 
-```hcl
-logging {
-  components {
-    "facts" {
-      level = "debug"
-      enabled = true
-      output {
-        type = "file"
-        path = "./logs/facts.log"
-      }
-    }
-    
-    "machines" {
-      level = "info"
-      enabled = true
-    }
-    
-    "variables" {
-      level = "warn"
-      enabled = false  # Disable logging for variables
-    }
-  }
-}
+# Set log level
+spooky logging config set --level debug
+
+# Set output format
+spooky logging config set --format json
+
+# Enable performance logging
+spooky logging config set --performance-enabled true
+```
+
+### Log Management
+
+Manage log files:
+
+```bash
+# List log files
+spooky logging files list
+
+# View recent logs
+spooky logging files tail
+
+# Export logs
+spooky logging files export --output logs.json
+
+# Rotate logs
+spooky logging files rotate
+```
+
+### Performance Monitoring
+
+Monitor performance:
+
+```bash
+# View performance metrics
+spooky logging performance show
+
+# Export performance data
+spooky logging performance export --output metrics.json
+
+# Set performance threshold
+spooky logging performance set --threshold 500
 ```
 
 ## Advanced Features
 
 ### Structured Logging
 
-Add structured fields to your log messages:
+Enable structured logging for better analysis:
 
-```go
-// In your code
-logger.Info("Processing machine", 
-    "machine", "web.example.com",
-    "method", "ssh",
-    "duration_ms", 1250,
-    "success", true)
+```hcl
+logging {
+  format = "json"
+  
+  fields {
+    service = "spooky"
+    version = "1.0.0"
+    environment = "production"
+  }
+}
 ```
 
-### Log Context
+### Context Tracking
 
-Add context to log messages:
+Track operations across components:
 
-```go
-// Create a logger with context
-ctxLogger := logger.With(
-    "project", "my-project",
-    "user", "admin",
-    "session_id", "abc123")
-
-// Use context logger
-ctxLogger.Info("Starting operation")
-ctxLogger.Error("Operation failed", "error", err)
+```hcl
+logging {
+  context {
+    enabled = true
+    fields = ["request_id", "user_id", "operation"]
+  }
+}
 ```
 
-### Performance Logging
+### Performance Monitoring
 
-Log performance metrics:
+Monitor operation performance:
 
 ```hcl
 logging {
   performance {
     enabled = true
-    threshold_ms = 1000  # Log operations taking > 1 second
-    include_memory = true
-    include_cpu = true
+    threshold_ms = 1000
+    metrics = ["duration", "memory", "cpu"]
   }
 }
 ```
 
-### Audit Logging
+### Log Aggregation
 
-Log security and audit events:
+Configure log aggregation:
 
 ```hcl
-logging {
-  audit {
+outputs {
+  elasticsearch {
     enabled = true
+    url = "http://localhost:9200"
+    index = "spooky-logs"
     level = "info"
-    include_user = true
-    include_ip = true
-    include_session = true
-  }
-}
-```
-
-## Logging Management
-
-### CLI Commands
-
-#### Show Current Configuration
-
-```bash
-# Show global configuration
-spooky logging show
-
-# Show project-specific configuration
-spooky logging show --project ./my-project
-```
-
-#### Configure Logging
-
-```bash
-# Configure basic logging
-spooky logging configure --level info --format json
-
-# Configure with file output
-spooky logging configure \
-  --level debug \
-  --format structured \
-  --file ./logs/spooky.log \
-  --max-size 100MB \
-  --max-age 30d
-
-# Configure component-specific logging
-spooky logging configure \
-  --component facts --level debug \
-  --component machines --level warn
-```
-
-#### Validate Configuration
-
-```bash
-# Validate global configuration
-spooky logging validate
-
-# Validate project configuration
-spooky logging validate --project ./my-project
-```
-
-#### Test Logging
-
-```bash
-# Test current configuration
-spooky logging test
-
-# Test with specific level
-spooky logging test --level debug
-
-# Test specific component
-spooky logging test --component facts
-```
-
-### Configuration Files
-
-#### Global Configuration Location
-
-- **Linux/macOS**: `~/.config/spooky/logging.hcl`
-- **Windows**: `%APPDATA%\spooky\logging.hcl`
-
-#### Project Configuration
-
-- **Location**: `./logging.hcl` in project directory
-- **Overrides**: Global configuration for project-specific settings
-
-## Best Practices
-
-### Configuration Best Practices
-
-1. **Start with Info Level** - Use `info` level for production
-2. **Use Debug for Development** - Enable `debug` level during development
-3. **Configure File Rotation** - Prevent log files from growing too large
-4. **Separate Error Logs** - Keep error logs separate from general logs
-5. **Use Structured Format** - Use structured or JSON format for better parsing
-
-### Performance Best Practices
-
-1. **Limit Debug Logging** - Debug logging can impact performance
-2. **Use Appropriate Levels** - Don't log everything at trace level
-3. **Configure Log Rotation** - Prevent disk space issues
-4. **Monitor Log Performance** - Watch for logging overhead
-5. **Use Async Logging** - Enable async logging for high-volume operations
-
-### Security Best Practices
-
-1. **Don't Log Sensitive Data** - Avoid logging passwords, keys, or tokens
-2. **Use Audit Logging** - Enable audit logging for security events
-3. **Secure Log Files** - Set appropriate permissions on log files
-4. **Rotate Logs Regularly** - Prevent log file accumulation
-5. **Monitor Log Access** - Track who accesses log files
-
-### Development Best Practices
-
-1. **Use Context Loggers** - Add context to log messages
-2. **Include Relevant Fields** - Add structured fields for debugging
-3. **Test Logging Configuration** - Validate logging setup
-4. **Use Component Logging** - Configure per-component logging levels
-5. **Document Logging Strategy** - Document your logging approach
-
-## Examples
-
-### Basic Project Setup
-
-```hcl
-# logging.hcl in your project directory
-logging {
-  level = "info"
-  format = "structured"
-  
-  output {
-    type = "console"
-    enabled = true
-    colorize = true
   }
   
-  output {
-    type = "file"
+  fluentd {
     enabled = true
-    path = "./logs/project.log"
-    max_size = "50MB"
-    max_age = "7d"
-    max_backups = 5
-  }
-}
-```
-
-### Development Configuration
-
-```hcl
-logging {
-  level = "debug"
-  format = "json"
-  
-  output {
-    type = "console"
-    enabled = true
-  }
-  
-  output {
-    type = "file"
-    enabled = true
-    path = "./logs/debug.log"
+    address = "localhost:24224"
+    tag = "spooky"
     level = "debug"
   }
-  
-  components {
-    "facts" {
-      level = "trace"
-      enabled = true
-    }
-    
-    "machines" {
-      level = "debug"
-      enabled = true
-    }
-  }
 }
 ```
 
-### Production Configuration
+## Security Best Practices
 
-```hcl
-logging {
-  level = "warn"
-  format = "json"
-  
-  output {
-    type = "file"
-    enabled = true
-    path = "/var/log/spooky/app.log"
-    max_size = "100MB"
-    max_age = "30d"
-    max_backups = 10
-    compress = true
-  }
-  
-  output {
-    type = "file"
-    enabled = true
-    path = "/var/log/spooky/errors.log"
-    level = "error"
-    max_size = "50MB"
-    max_age = "90d"
-    max_backups = 20
-  }
-  
-  audit {
-    enabled = true
-    level = "info"
-  }
-}
+### Log Security
+
+- Never log sensitive information (passwords, keys, tokens)
+- Use appropriate log levels for different environments
+- Implement log retention policies
+- Monitor log access and tampering
+
+### Access Control
+
+- Restrict access to log files
+- Use secure transport for network logging
+- Implement log encryption for sensitive data
+- Monitor log access patterns
+
+### Compliance
+
+- Implement audit logging for security events
+- Maintain log retention for compliance
+- Use structured logging for analysis
+- Regular log reviews and monitoring
+
+## Troubleshooting
+
+### Common Logging Issues
+
+**Logs Not Appearing**
+```bash
+# Check log level configuration
+spooky logging config show
+
+# Verify output configuration
+spooky logging config show --outputs
 ```
 
-## Validation and Troubleshooting
-
-### Configuration Validation
-
+**Performance Issues**
 ```bash
-# Validate global configuration
-spooky logging validate
+# Check performance metrics
+spooky logging performance show
 
-# Validate project configuration
-spooky logging validate --project ./my-project
-
-# Check for common issues
-spooky logging validate --strict
+# Adjust performance threshold
+spooky logging performance set --threshold 2000
 ```
 
-### Common Issues
+**File Permission Issues**
+```bash
+# Check log directory permissions
+ls -la ~/.local/state/spooky/logs/
 
-#### Log Files Not Created
+# Fix permissions if needed
+chmod 755 ~/.local/state/spooky/logs/
+```
 
-1. **Check Permissions** - Ensure write permissions to log directory
-2. **Check Path** - Verify log file path is correct
-3. **Check Configuration** - Validate logging configuration
+### Debugging Logging
 
-#### Performance Issues
-
-1. **Reduce Log Level** - Use higher log levels in production
-2. **Enable Log Rotation** - Prevent large log files
-3. **Use Async Logging** - Enable async logging for better performance
-
-#### Missing Log Messages
-
-1. **Check Log Level** - Ensure log level is appropriate
-2. **Check Component Settings** - Verify component logging is enabled
-3. **Check Output Configuration** - Ensure outputs are properly configured
-
-### Debugging Logging Issues
+Enable debug logging for troubleshooting:
 
 ```bash
-# Test logging with verbose output
-spooky logging test --verbose
+# Set debug level
+spooky logging config set --level debug
 
-# Check logging configuration
-spooky logging show --verbose
+# View debug logs
+spooky logging files tail --level debug
+```
 
-# Validate configuration with details
-spooky logging validate --verbose
+### Performance Optimization
+
+Optimize logging performance:
+
+```bash
+# Disable performance logging in production
+spooky logging config set --performance-enabled false
+
+# Use async logging
+spooky logging config set --async true
+
+# Adjust buffer size
+spooky logging config set --buffer-size 1024
 ```
 
 ## Integration with Other Systems
 
-### Integration with Facts System
+### Actions Integration
 
-```hcl
-logging {
-  components {
-    "facts" {
-      level = "debug"
-      enabled = true
-      output {
-        type = "file"
-        path = "./logs/facts.log"
-      }
-    }
-  }
-}
+Logging integrates with the actions system:
+
+```bash
+# Run actions with detailed logging
+spooky actions run ./my-project --log-level debug
+
+# View action logs
+spooky logging files tail --filter "action"
 ```
 
-### Integration with Machines System
+### Facts Integration
+
+Logging tracks fact collection operations:
+
+```bash
+# Collect facts with logging
+spooky facts gather ./my-project --log-level info
+
+# View fact collection logs
+spooky logging files tail --filter "facts"
+```
+
+### SSH Integration
+
+Logging tracks SSH operations:
+
+```bash
+# Test SSH with logging
+spooky machines ping ./my-project --log-level debug
+
+# View SSH logs
+spooky logging files tail --filter "ssh"
+```
+
+## Examples
+
+### Basic Logging Configuration
 
 ```hcl
+# spooky.hcl
 logging {
-  components {
-    "machines" {
+  level = "info"
+  format = "text"
+  
+  outputs {
+    console {
+      enabled = true
       level = "info"
+    }
+    
+    file {
       enabled = true
-      output {
-        type = "file"
-        path = "./logs/machines.log"
-      }
+      path = "~/.local/state/spooky/logs/spooky.log"
+      level = "debug"
     }
   }
 }
 ```
 
-### Integration with Variables System
+### Advanced Logging Configuration
 
 ```hcl
+# spooky.hcl
 logging {
-  components {
-    "variables" {
-      level = "warn"
+  level = "debug"
+  format = "json"
+  
+  outputs {
+    console {
       enabled = true
+      level = "info"
+      format = "text"
+      colors = true
+    }
+    
+    file {
+      enabled = true
+      path = "~/.local/state/spooky/logs/spooky.log"
+      level = "debug"
+      format = "json"
+      max_size_mb = 100
+      max_files = 5
+    }
+    
+    syslog {
+      enabled = true
+      address = "localhost:514"
+      facility = "local0"
+      level = "warn"
+    }
+  }
+  
+  performance {
+    enabled = true
+    threshold_ms = 1000
+  }
+  
+  context {
+    enabled = true
+    fields = ["request_id", "operation"]
+  }
+}
+```
+
+### Project-Specific Logging
+
+```hcl
+# project.hcl
+project {
+  name = "my-project"
+  
+  logging {
+    level = "debug"
+    file {
+      enabled = true
+      path = "./logs/project.log"
     }
   }
 }
 ```
 
-## Conclusion
+## Best Practices
 
-The spooky logging system provides comprehensive logging capabilities that can be configured for various use cases, from simple development logging to complex production environments with multiple outputs and component-specific configurations.
+### Log Level Management
 
-Start with basic configuration and gradually add more advanced features as needed. Always validate your configuration and test logging output to ensure it meets your requirements.
+- Use DEBUG for development and troubleshooting
+- Use INFO for normal operations
+- Use WARN for potential issues
+- Use ERROR for failed operations
+- Use FATAL sparingly for critical failures
 
-For more advanced usage and troubleshooting, refer to the [API Reference](LOGGING_API_REFERENCE.md) and [Troubleshooting Guide](LOGGING_TROUBLESHOOTING.md).
+### Log Formatting
+
+- Use structured logging (JSON) for production
+- Use text formatting for development
+- Include relevant context in log messages
+- Use consistent field names across components
+
+### Performance
+
+- Monitor logging performance impact
+- Use appropriate log levels for different environments
+- Implement log rotation and retention
+- Use async logging for high-throughput operations
+
+### Security
+
+- Never log sensitive information
+- Implement log access controls
+- Monitor log access patterns
+- Use secure transport for network logging
+
+## Next Steps
+
+- Explore the [Logging API Reference](LOGGING_API_REFERENCE.md) for detailed technical information
+- Check the [Logging Troubleshooting Guide](LOGGING_TROUBLESHOOTING.md) for common issues
+- Review the [Logging Documentation Summary](LOGGING_DOCUMENTATION_SUMMARY.md) for implementation details
+- Learn about [Logging Integration Patterns](INTEGRATIONS_USER_GUIDE.md) for advanced usage

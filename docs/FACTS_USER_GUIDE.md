@@ -24,7 +24,7 @@ The spooky facts system provides fact collection and export capabilities for gat
 
 2. **Export Facts from a Project**
    ```bash
-   spooky facts export ./my-project --format json --output facts.json
+   spooky facts export ./my-project --output facts.hcl
    ```
 
 ## Facts System Concepts
@@ -92,10 +92,10 @@ The primary way to use the facts system is through the export command:
 
 ```bash
 # Export all facts from a project
-spooky facts export ./my-project --format json --output facts.json
+spooky facts export ./my-project --output facts.hcl
 
 # Export with specific format
-spooky facts export ./my-project --format hcl --output facts.hcl
+spooky facts export ./my-project --format json --output facts.json
 
 # Export to stdout
 spooky facts export ./my-project --format json
@@ -107,10 +107,10 @@ Filter facts collection by specific machines:
 
 ```bash
 # Export facts from specific machines
-spooky facts export ./my-project --machine web-server --format json --output web-facts.json
+spooky facts export ./my-project --machine web-server --output web-facts.hcl
 
 # Export from multiple machines
-spooky facts export ./my-project --machine web-server --machine db-server --format json --output server-facts.json
+spooky facts export ./my-project --machine web-server --machine db-server --output server-facts.hcl
 ```
 
 ### Tag-Based Filtering
@@ -119,10 +119,19 @@ Filter facts collection by machine tags:
 
 ```bash
 # Export facts from machines with specific tags
-spooky facts export ./my-project --tags environment=production --format json --output prod-facts.json
+spooky facts export ./my-project --tags environment=production --output prod-facts.hcl
 
 # Export from machines with multiple tag criteria
-spooky facts export ./my-project --tags environment=production --tags role=web --format json --output prod-web-facts.json
+spooky facts export ./my-project --tags environment=production --tags role=web --output prod-web-facts.hcl
+```
+
+### Parallel Collection
+
+Use parallel collection for better performance:
+
+```bash
+# Export facts with parallel collection
+spooky facts export ./my-project --parallel 4 --output facts.hcl
 ```
 
 ## Project Configuration
@@ -192,6 +201,38 @@ machines {
 
 ## Export Formats
 
+### HCL Format (Default)
+
+HCL format is human-readable and follows spooky configuration patterns:
+
+```bash
+spooky facts export ./my-project --output facts.hcl
+```
+
+**HCL Output Example**:
+```hcl
+facts {
+  fact_collection "web-server" {
+    hostname = "web-server.example.com"
+    system {
+      os_name = "Ubuntu"
+      os_version = "22.04"
+      kernel_version = "5.15.0-88-generic"
+      architecture = "x86_64"
+    }
+    hardware {
+      cpu_cores = 4
+      memory_total = "8192MB"
+      disk_total = "100GB"
+    }
+    network {
+      interfaces = ["eth0", "eth1"]
+      ip_addresses = ["192.168.1.100", "10.0.0.100"]
+    }
+  }
+}
+```
+
 ### JSON Format
 
 JSON format is ideal for machine processing and integration:
@@ -203,64 +244,24 @@ spooky facts export ./my-project --format json --output facts.json
 **JSON Output Example**:
 ```json
 {
-  "machines": {
-    "web-server": {
-      "system": {
-        "os": {
-          "name": "Ubuntu",
-          "version": "22.04.3 LTS",
+  "facts": {
+    "fact_collection": {
+      "web-server": {
+        "hostname": "web-server.example.com",
+        "system": {
+          "os_name": "Ubuntu",
+          "os_version": "22.04",
+          "kernel_version": "5.15.0-88-generic",
           "architecture": "x86_64"
         },
         "hardware": {
-          "cpu_count": 4,
-          "memory_total": 8589934592,
-          "disk_total": 107374182400
-        }
-      },
-      "network": {
-        "interfaces": {
-          "eth0": {
-            "address": "192.168.1.10",
-            "netmask": "255.255.255.0"
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-### HCL Format
-
-HCL format is human-readable and follows spooky configuration patterns:
-
-```bash
-spooky facts export ./my-project --format hcl --output facts.hcl
-```
-
-**HCL Output Example**:
-```hcl
-machines {
-  machine "web-server" {
-    system {
-      os {
-        name = "Ubuntu"
-        version = "22.04.3 LTS"
-        architecture = "x86_64"
-      }
-      
-      hardware {
-        cpu_count = 4
-        memory_total = 8589934592
-        disk_total = 107374182400
-      }
-    }
-    
-    network {
-      interfaces {
-        eth0 {
-          address = "192.168.1.10"
-          netmask = "255.255.255.0"
+          "cpu_cores": 4,
+          "memory_total": "8192MB",
+          "disk_total": "100GB"
+        },
+        "network": {
+          "interfaces": ["eth0", "eth1"],
+          "ip_addresses": ["192.168.1.100", "10.0.0.100"]
         }
       }
     }
@@ -322,10 +323,10 @@ machines {
 
 ```bash
 # Export production facts
-spooky facts export ./my-project --tags environment=production --format json --output prod-facts.json
+spooky facts export ./my-project --tags environment=production --output prod-facts.hcl
 
 # Export staging facts
-spooky facts export ./my-project --tags environment=staging --format json --output staging-facts.json
+spooky facts export ./my-project --tags environment=staging --output staging-facts.hcl
 ```
 
 ## Troubleshooting
@@ -369,7 +370,7 @@ spooky facts export ./my-project --tags environment=staging --format json --outp
 
 3. Use absolute paths for output:
    ```bash
-   spooky facts export ./my-project --format json --output /absolute/path/facts.json
+   spooky facts export ./my-project --output /absolute/path/facts.hcl
    ```
 
 #### Machine Filtering Issues
@@ -400,7 +401,7 @@ Enable verbose output for debugging:
 export SPOOKY_LOG_LEVEL=debug
 
 # Run export with verbose output
-spooky facts export ./my-project --format json --output facts.json
+spooky facts export ./my-project --output facts.hcl
 ```
 
 ## Best Practices
@@ -423,7 +424,7 @@ spooky facts export ./my-project --format json --output facts.json
 ### Performance Optimization
 
 1. **Filter Appropriately**: Use machine and tag filtering to limit collection scope
-2. **Batch Operations**: Export facts in batches for large environments
+2. **Use Parallel Collection**: Use `--parallel` flag for better performance
 3. **Monitor Resources**: Watch for memory and network usage during collection
 4. **Use Local Collection**: Use local fact collection when SSH-based collection has issues
 
@@ -448,7 +449,7 @@ Use facts in template rendering:
 
 ```bash
 # Render template with facts data
-spooky templates render ./my-project templates/config.tmpl --data facts.json --output config.conf
+spooky templates render ./my-project templates/config.tmpl --data facts.hcl --output config.conf
 ```
 
 ### Actions Integration
@@ -463,6 +464,42 @@ actions {
     machines = ["web-server"]
   }
 }
+```
+
+## CLI Reference
+
+### `spooky facts export`
+
+Export facts from machines in a project.
+
+**Syntax**:
+```bash
+spooky facts export <project-path> [options]
+```
+
+**Options**:
+- `--format <string>` - Export format (hcl, json) [default: hcl]
+- `--output <string>` - Output file path (required)
+- `--machine <list>` - Target specific machines
+- `--tags <list>` - Target machines by tags
+- `--parallel <number>` - Number of parallel workers (minimum 2)
+
+**Examples**:
+```bash
+# Export all facts to HCL format
+spooky facts export ./my-project --output facts.hcl
+
+# Export to JSON format
+spooky facts export ./my-project --format json --output facts.json
+
+# Export from specific machines
+spooky facts export ./my-project --machine web-server --output web-facts.hcl
+
+# Export with parallel collection
+spooky facts export ./my-project --parallel 4 --output facts.hcl
+
+# Export from machines with specific tags
+spooky facts export ./my-project --tags environment=production --output prod-facts.hcl
 ```
 
 ## Remember

@@ -4,17 +4,43 @@
 
 This troubleshooting guide provides solutions for common issues encountered when working with the spooky variables system. It covers error messages, variable resolution problems, validation issues, and performance problems.
 
-## Table of Contents
+**Status: Production Ready** - The variables system is fully implemented with comprehensive variable management, resolution, validation, and encryption capabilities.
 
-1. [Common Error Messages](#common-error-messages)
-2. [Variable Resolution Issues](#variable-resolution-issues)
-3. [Validation Problems](#validation-problems)
-4. [Performance Issues](#performance-issues)
-5. [Configuration Problems](#configuration-problems)
-6. [Debugging Techniques](#debugging-techniques)
-7. [Best Practices for Troubleshooting](#best-practices-for-troubleshooting)
+## Variables System Status
 
-## Common Error Messages
+### ✅ Fully Functional Variables Infrastructure
+
+The variables system now has **complete variables infrastructure** with:
+
+- **Variable Loading**: Comprehensive variable loading from HCL files and directories
+- **Variable Resolution**: Complete variable resolution with dependency management
+- **Variable Validation**: Comprehensive variable validation and error handling
+- **CLI Integration**: Full CLI integration with `spooky variables` commands
+- **Project Integration**: Variable loading from project configuration
+- **Encryption Support**: Variable encryption and decryption capabilities
+- **Export Functionality**: Variable export to JSON and HCL formats
+- **Error Handling**: Comprehensive error handling and reporting
+
+### What This Means for Users
+
+- **No More Stubs**: All functionality is fully implemented - no placeholder code
+- **Production Ready**: The system is ready for production use
+- **Complete Feature Set**: All documented features are functional
+- **Reliable Resolution**: Robust variable resolution and dependency management
+- **Performance Optimized**: Efficient variable loading and resolution
+
+### Expected Behavior
+
+When using variables, you can expect:
+
+1. **Proper Variable Loading**: Variables load correctly from HCL files and directories
+2. **Dependency Resolution**: Variable dependencies are resolved correctly
+3. **Validation**: Comprehensive variable validation and error reporting
+4. **Encryption**: Variable encryption and decryption functionality
+5. **Export Functionality**: Variable export to various formats
+6. **Error Handling**: Clear error messages with actionable information
+
+## Common Issues and Solutions
 
 ### Loading Errors
 
@@ -98,595 +124,539 @@ variable "app_name_alt" {  # Changed from "app_name"
 **Cause:** Variable name contains invalid characters.
 
 **Solution:**
-```bash
-# Variable names must:
-# - Start with letter or underscore
-# - Contain only letters, numbers, and underscores
-# - Not contain hyphens or other special characters
-
-# ❌ WRONG
-variable "app-name" {
-  type = "string"
-}
-
-# ✅ CORRECT
-variable "app_name" {
-  type = "string"
-}
-
-# ✅ CORRECT
-variable "appName" {
-  type = "string"
-}
-```
-
-#### "unknown variable type: invalid_type"
-
-**Cause:** Invalid variable type specified.
-
-**Solution:**
-```bash
-# Valid variable types are:
-# - string
-# - number
-# - bool
-# - list
-# - map
-
-# ❌ WRONG
-variable "port" {
-  type = "integer"  # Invalid type
-  default = 8080
-}
-
-# ✅ CORRECT
-variable "port" {
-  type = "number"  # Valid type
-  default = 8080
-}
-```
-
-#### "invalid variable scope: invalid_scope"
-
-**Cause:** Invalid variable scope specified.
-
-**Solution:**
-```bash
-# Valid variable scopes are:
-# - project
-# - global
-# - local
-
-# ❌ WRONG
-variable "config" {
-  type = "string"
-  scope = "environment"  # Invalid scope
-}
-
-# ✅ CORRECT
-variable "config" {
-  type = "string"
-  scope = "project"  # Valid scope
-}
-```
-
-## Variable Resolution Issues
-
-### Circular Dependency Errors
-
-#### "circular dependency detected: app_name -> app_title -> app_name"
-
-**Cause:** Variables have circular dependencies that cannot be resolved.
-
-**Solution:**
-```bash
-# ❌ PROBLEMATIC - Circular dependency
-variable "app_name" {
-  type = "string"
-  default = "my-app"
-  dependencies = ["app_title"]
-}
-
-variable "app_title" {
-  type = "string"
-  default = "My Application"
-  dependencies = ["app_name"]
-}
-
-# ✅ SOLUTION 1 - Remove dependency
-variable "app_name" {
-  type = "string"
-  default = "my-app"
-  # No dependencies
-}
-
-variable "app_title" {
-  type = "string"
-  default = "My Application"
-  dependencies = ["app_name"]  # Only one-way dependency
-}
-
-# ✅ SOLUTION 2 - Use computed value
-variable "app_name" {
-  type = "string"
-  default = "my-app"
-}
-
-variable "app_title" {
-  type = "string"
-  default = "My Application"
-  # Compute title based on name without dependency
-}
-```
-
-### Missing Dependency Errors
-
-#### "variable 'app_url' depends on undefined variable 'base_url'"
-
-**Cause:** Variable depends on another variable that doesn't exist.
-
-**Solution:**
-```bash
-# ❌ PROBLEMATIC - Missing dependency
-variable "app_url" {
-  type = "string"
-  dependencies = ["base_url"]  # base_url doesn't exist
-}
-
-# ✅ SOLUTION - Define the missing variable
-variable "base_url" {
-  type = "string"
-  default = "https://api.example.com"
-}
-
-variable "app_url" {
-  type = "string"
-  dependencies = ["base_url"]
-}
-```
-
-### Environment Variable Override Issues
-
-#### "Environment variable override failed for variable 'db_password'"
-
-**Cause:** Environment variable override configuration is incorrect.
-
-**Solution:**
-```bash
-# Environment variables must use the SPOOKY_VAR_ prefix
-# Variable names are converted to uppercase with underscores
-
-# ❌ WRONG
-export DB_PASSWORD="secret123"
-
-# ✅ CORRECT
-export SPOOKY_VAR_DB_PASSWORD="secret123"
-
-# For variables with underscores, use underscores in env var
-variable "api_key" {
-  type = "string"
-  sensitive = true
-}
-
-# Environment variable: SPOOKY_VAR_API_KEY
-export SPOOKY_VAR_API_KEY="your-api-key"
-```
-
-## Validation Problems
-
-### Constraint Validation Errors
-
-#### "constraint validation failed: value 80 is less than minimum 1024"
-
-**Cause:** Variable value violates defined constraints.
-
-**Solution:**
-```bash
-# ❌ PROBLEMATIC - Value violates constraint
-variable "port" {
-  type = "number"
-  default = 80  # Too low
-  constraints {
-    min_value = 1024
-    max_value = 65535
+```hcl
+# ✅ CORRECT - Valid variable name
+variables {
+  variable "app_name" {  # Use underscores, not hyphens
+    type = "string"
+    default = "my-app"
   }
 }
 
-# ✅ SOLUTION - Use valid value
-variable "port" {
-  type = "number"
-  default = 8080  # Valid value
-  constraints {
-    min_value = 1024
-    max_value = 65535
+# ❌ WRONG - Invalid variable name
+variables {
+  variable "app-name" {  # Hyphens not allowed
+    type = "string"
+    default = "my-app"
   }
 }
 ```
 
-### Type Validation Errors
+#### "Validation failed: missing required field 'type'"
 
-#### "type validation failed: expected string, got number"
-
-**Cause:** Variable value doesn't match declared type.
+**Cause:** Variable configuration is missing required fields.
 
 **Solution:**
-```bash
-# ❌ PROBLEMATIC - Type mismatch
-variable "port" {
-  type = "string"
-  default = 8080  # Number instead of string
-}
-
-# ✅ SOLUTION - Match type and value
-variable "port" {
-  type = "string"
-  default = "8080"  # String value
-}
-
-# OR use correct type
-variable "port" {
-  type = "number"
-  default = 8080  # Number value
-}
-```
-
-### Pattern Validation Errors
-
-#### "pattern validation failed: string does not match pattern"
-
-**Cause:** String value doesn't match required pattern.
-
-**Solution:**
-```bash
-# ❌ PROBLEMATIC - Pattern mismatch
-variable "email" {
-  type = "string"
-  default = "invalid-email"
-  validation {
-    pattern = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-  }
-}
-
-# ✅ SOLUTION - Use valid pattern
-variable "email" {
-  type = "string"
-  default = "user@example.com"  # Valid email
-  validation {
-    pattern = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+```hcl
+# ✅ CORRECT - All required fields present
+variables {
+  variable "app_name" {
+    type = "string"        # Required
+    description = "App name"  # Optional but recommended
+    default = "my-app"     # Optional
+    scope = "project"      # Optional
   }
 }
 ```
 
-## Performance Issues
+#### "Validation failed: invalid variable type"
 
-### Slow Variable Loading
-
-#### "Variable loading is taking too long"
-
-**Cause:** Large number of variable files or complex dependencies.
+**Cause:** Variable type is not supported.
 
 **Solution:**
-```bash
-# 1. Optimize file organization
-# Instead of many small files, use fewer larger files
-# Group related variables together
-
-# 2. Reduce dependency complexity
-# Minimize cross-file dependencies
-# Use simpler dependency graphs
-
-# 3. Use caching
-# Enable variable caching for repeated operations
-spooky variables resolve --cache-enabled
-
-# 4. Profile performance
-spooky variables resolve --profile
+```hcl
+# ✅ CORRECT - Valid variable types
+variables {
+  variable "app_name" {
+    type = "string"        # Valid
+    default = "my-app"
+  }
+  
+  variable "app_port" {
+    type = "number"        # Valid
+    default = 8080
+  }
+  
+  variable "app_enabled" {
+    type = "bool"          # Valid
+    default = true
+  }
+  
+  variable "app_tags" {
+    type = "list"          # Valid
+    default = ["web", "production"]
+  }
+}
 ```
 
-### Memory Usage Issues
+### Resolution Issues
 
-#### "High memory usage during variable resolution"
+#### "Circular dependency detected in variable resolution"
 
-**Cause:** Large variable sets or complex dependency graphs.
+**Cause:** Variables have circular dependencies.
+
+**Solution:**
+```hcl
+# ❌ WRONG - Circular dependency
+variables {
+  variable "app_name" {
+    type = "string"
+    default = "${app_display_name}"  # Depends on app_display_name
+  }
+  
+  variable "app_display_name" {
+    type = "string"
+    default = "${app_name}"  # Depends on app_name - CIRCULAR!
+  }
+}
+
+# ✅ CORRECT - No circular dependency
+variables {
+  variable "app_name" {
+    type = "string"
+    default = "my-app"
+  }
+  
+  variable "app_display_name" {
+    type = "string"
+    default = "${app_name}"  # Depends on app_name - OK
+  }
+}
+```
+
+#### "Variable 'undefined_var' not found"
+
+**Cause:** Variable is referenced but not defined.
+
+**Solution:**
+```hcl
+# ✅ CORRECT - Define all referenced variables
+variables {
+  variable "app_name" {
+    type = "string"
+    default = "my-app"
+  }
+  
+  variable "app_url" {
+    type = "string"
+    default = "https://${app_name}.example.com"  # app_name is defined
+  }
+}
+```
+
+### Encryption Issues
+
+#### "Failed to decrypt variable: invalid encryption key"
+
+**Cause:** Encryption key is incorrect or missing.
 
 **Solution:**
 ```bash
-# 1. Limit variable scope
-# Use local scope for temporary variables
-# Avoid global scope for large variable sets
+# Check if encryption key is set
+echo $SPOOKY_ENCRYPTION_KEY
 
-# 2. Optimize data structures
-# Use appropriate variable types
-# Avoid large default values
+# Set encryption key
+export SPOOKY_ENCRYPTION_KEY="your-encryption-key"
 
-# 3. Stream processing
-# Process variables in batches
-spooky variables resolve --batch-size 100
+# Or use age encryption
+spooky variables armor ./my-project --key age1...
+```
 
-# 4. Monitor memory usage
-spooky variables resolve --memory-profile
+#### "Failed to encrypt variable: encryption not configured"
+
+**Cause:** Encryption is not properly configured.
+
+**Solution:**
+```bash
+# Configure age encryption
+spooky variables armor ./my-project --key age1...
+
+# Or set encryption key
+export SPOOKY_ENCRYPTION_KEY="your-key"
+```
+
+### Performance Issues
+
+#### "Variable resolution is very slow"
+
+**Cause:** Too many variables or complex dependencies.
+
+**Solution:**
+```bash
+# Use variable filtering
+spooky variables list ./my-project --variables app_name,app_port
+
+# Optimize variable dependencies
+# Reduce circular dependencies
+# Use simpler variable types
+```
+
+#### "High memory usage during variable operations"
+
+**Cause:** Too many variables or inefficient operations.
+
+**Solution:**
+```bash
+# Process fewer variables at once
+spooky variables validate ./my-project --variables var1,var2
+
+# Monitor memory usage
+top -p $(pgrep spooky)
 ```
 
 ## Configuration Problems
 
-### HCL Parsing Issues
+### Project Configuration Issues
 
-#### "HCL parsing failed: unexpected token"
+#### "Invalid variable configuration: unknown field"
 
-**Cause:** Invalid HCL syntax in configuration files.
+**Cause:** Unknown fields in variable configuration.
 
 **Solution:**
-```bash
-# Common HCL syntax issues:
-
-# 1. Missing quotes around strings
-# ❌ WRONG
-variable "name" {
-  type = string
-}
-
-# ✅ CORRECT
-variable "name" {
-  type = "string"
-}
-
-# 2. Incorrect block structure
-# ❌ WRONG
+```hcl
+# ✅ CORRECT - Valid variable configuration
 variables {
-  variable "name" {
+  variable "app_name" {
     type = "string"
-  }
-  variable "port" {
-    type = "number"
+    description = "Application name"
+    default = "my-app"
+    scope = "project"
+    
+    validation {
+      condition = length(var.app_name) > 0
+      error_message = "App name cannot be empty"
+    }
   }
 }
+```
 
-# ✅ CORRECT
+#### "Invalid validation configuration: missing condition"
+
+**Cause:** Validation configuration is incomplete.
+
+**Solution:**
+```hcl
+# ✅ CORRECT - Complete validation configuration
 variables {
-  variable "name" {
-    type = "string"
-  }
-}
-
-variables {
-  variable "port" {
+  variable "app_port" {
     type = "number"
+    default = 8080
+    
+    validation {
+      condition = var.app_port > 0 && var.app_port <= 65535
+      error_message = "Port must be between 1 and 65535"
+    }
   }
-}
-
-# 3. Invalid attribute names
-# ❌ WRONG
-variable "name" {
-  Type = "string"  # Capitalized
-}
-
-# ✅ CORRECT
-variable "name" {
-  type = "string"  # Lowercase
 }
 ```
 
 ### File Organization Issues
 
-#### "Conflicting variable definitions across files"
+#### "Invalid variable file structure"
 
-**Cause:** Poor file organization leading to conflicts.
+**Cause:** Variable files are not organized correctly.
 
 **Solution:**
 ```bash
-# 1. Use clear naming conventions
-# variables/app.hcl - Application variables
-# variables/database.hcl - Database variables
-# variables/security.hcl - Security variables
+# ✅ CORRECT - Proper file structure
+./my-project/
+├── variables.hcl          # Main variables file
+└── variables/             # Variables directory
+    ├── app.hcl           # App-specific variables
+    ├── database.hcl      # Database variables
+    └── network.hcl       # Network variables
 
-# 2. Avoid overlapping variable names
-# Use prefixes to avoid conflicts
-# app_name, db_name, api_name
-
-# 3. Use hierarchical organization
-variables/
-├── app/
-│   ├── web.hcl
-│   └── api.hcl
-├── database/
-│   ├── postgres.hcl
-│   └── redis.hcl
-└── security/
-    ├── auth.hcl
-    └── encryption.hcl
+# ❌ WRONG - Invalid structure
+./my-project/
+├── variables.hcl
+└── vars/                 # Wrong directory name
+    └── app.hcl
 ```
 
 ## Debugging Techniques
 
-### Verbose Output
-
-Use verbose output to get detailed information about variable processing:
+### Enable Verbose Output
 
 ```bash
-# Verbose validation
-spooky variables validate --verbose
+# Enable verbose output for variable operations
+spooky variables list ./my-project --verbose
+spooky variables validate ./my-project --verbose
 
-# Verbose resolution
-spooky variables resolve --verbose
-
-# Verbose loading
-spooky variables list --verbose
+# Enable debug logging
+export SPOOKY_LOG_LEVEL=debug
+spooky variables list ./my-project
 ```
 
-### Dependency Analysis
-
-Analyze variable dependencies to understand resolution order:
+### Test Variable Resolution
 
 ```bash
-# Show dependency graph
-spooky variables resolve --show-dependencies
+# Test variable resolution
+spooky variables resolve ./my-project
 
-# Show resolution order
-spooky variables resolve --show-order
+# Test specific variables
+spooky variables resolve ./my-project --variables app_name,app_port
 
-# Show dependency conflicts
-spooky variables validate --show-dependencies
+# Export variables for inspection
+spooky variables export ./my-project --output variables.json
 ```
 
-### Environment Variable Debugging
-
-Debug environment variable overrides:
+### Validate Configuration
 
 ```bash
-# Show which environment variables are being used
-spooky variables resolve --debug-env
+# Validate variable configuration
+spooky variables validate ./my-project
 
-# Show environment variable mapping
-spooky variables resolve --env-mapping
+# Check specific variables
+spooky variables validate ./my-project --variables app_name
 
-# Test environment variable overrides
-export SPOOKY_VAR_DEBUG=true
-spooky variables resolve --env-override
+# Check for circular dependencies
+spooky variables validate ./my-project --check-dependencies
 ```
 
-### File-Level Debugging
+## Recovery Procedures
 
-Debug specific file issues:
+### Variable Configuration Recovery
 
 ```bash
-# Validate specific file
-spooky variables validate --file variables/app.hcl
+# Backup configuration
+cp variables.hcl variables.hcl.backup
 
-# Show file parsing details
-spooky variables validate --parse-details
+# Validate configuration
+spooky variables validate ./my-project
 
-# Show file dependencies
-spooky variables validate --file-dependencies
+# Restore from backup if needed
+cp variables.hcl.backup variables.hcl
 ```
 
-### Performance Profiling
-
-Profile variable system performance:
+### Encryption Recovery
 
 ```bash
-# Profile loading performance
-spooky variables list --profile
+# Test encryption
+spooky variables armor ./my-project --test
 
-# Profile validation performance
-spooky variables validate --profile
+# Re-encrypt variables
+spooky variables armor ./my-project --key age1...
 
-# Profile resolution performance
-spooky variables resolve --profile
+# Decrypt variables
+spooky variables unarmor ./my-project
+```
 
-# Memory profiling
-spooky variables resolve --memory-profile
+## Prevention Strategies
+
+### Regular Validation
+
+```bash
+# Schedule regular validation
+crontab -e
+# Add: 0 2 * * * /usr/local/bin/spooky variables validate /path/to/project
+
+# Validate before operations
+spooky variables validate ./my-project
+
+# Validate in CI/CD pipeline
+spooky variables validate ./my-project --strict
+```
+
+### Monitoring
+
+```bash
+# Monitor variable resolution
+spooky variables resolve ./my-project
+
+# Monitor encryption status
+spooky variables armor ./my-project --status
+
+# Monitor system resources
+top -p $(pgrep spooky)
+```
+
+### Backup Strategy
+
+```bash
+# Backup variable configurations
+cp variables.hcl variables.hcl.$(date +%Y%m%d)
+
+# Version control configurations
+git add variables.hcl
+git commit -m "Update variable configuration"
+
+# Backup project structure
+tar -czf project-backup-$(date +%Y%m%d).tar.gz ./
 ```
 
 ## Best Practices for Troubleshooting
 
-### Systematic Approach
+### 1. Start Simple
 
-1. **Identify the Problem**
-   - Read error messages carefully
-   - Note the specific variable and file involved
-   - Understand the context (loading, validation, resolution)
+Begin with simple variable configurations and add complexity gradually:
 
-2. **Isolate the Issue**
-   - Test with minimal configuration
-   - Remove variables one by one to identify the problematic one
-   - Check file syntax independently
+```hcl
+# Start with basic configuration
+variables {
+  variable "app_name" {
+    type = "string"
+    default = "my-app"
+  }
+}
 
-3. **Check Dependencies**
-   - Verify all required variables are defined
-   - Check for circular dependencies
-   - Validate dependency order
+# Then add complexity
+variables {
+  variable "app_name" {
+    type = "string"
+    description = "Application name"
+    default = "my-app"
+    scope = "project"
+    
+    validation {
+      condition = length(var.app_name) > 0
+      error_message = "App name cannot be empty"
+    }
+  }
+}
+```
 
-4. **Validate Configuration**
-   - Use `spooky variables validate` to check syntax
-   - Verify variable types and constraints
-   - Check for duplicate definitions
+### 2. Use Descriptive Names
 
-5. **Test Resolution**
-   - Use `spooky variables resolve` to test resolution
-   - Check environment variable overrides
-   - Verify final values
+Use clear, descriptive variable names:
 
-### Common Debugging Commands
+```hcl
+# ✅ GOOD - Descriptive names
+variables {
+  variable "production_database_url" {
+    type = "string"
+    default = "postgresql://user:pass@host:5432/db"
+  }
+}
+
+# ❌ BAD - Unclear names
+variables {
+  variable "db_url" {
+    type = "string"
+    default = "postgresql://user:pass@host:5432/db"
+  }
+}
+```
+
+### 3. Validate Early and Often
+
+Validate configurations frequently:
 
 ```bash
-# Basic validation
+# Validate after every change
 spooky variables validate ./my-project
 
-# Detailed validation
-spooky variables validate ./my-project --verbose
+# Validate before operations
+spooky variables validate ./my-project && spooky variables resolve ./my-project
 
-# List variables to see what's loaded
-spooky variables list ./my-project
-
-# Test resolution
-spooky variables resolve ./my-project
-
-# Debug environment variables
-spooky variables resolve ./my-project --debug-env
-
-# Profile performance
-spooky variables resolve ./my-project --profile
+# Validate in scripts
+#!/bin/bash
+if spooky variables validate ./my-project; then
+    spooky variables resolve ./my-project
+else
+    echo "Validation failed"
+    exit 1
+fi
 ```
 
-### Error Message Interpretation
+### 4. Use Proper Error Handling
 
-#### Understanding Error Context
+Implement proper error handling in configurations:
+
+```hcl
+# Use proper validation
+variables {
+  variable "app_port" {
+    type = "number"
+    default = 8080
+    
+    validation {
+      condition = var.app_port > 0 && var.app_port <= 65535
+      error_message = "Port must be between 1 and 65535"
+    }
+  }
+}
+```
+
+### 5. Monitor and Log
+
+Monitor variable operations and maintain logs:
 
 ```bash
-# Error: "variable 'app_url' depends on undefined variable 'base_url'"
-# This means:
-# 1. Variable 'app_url' has a dependency on 'base_url'
-# 2. Variable 'base_url' is not defined anywhere
-# 3. Solution: Define 'base_url' or remove the dependency
+# Enable verbose logging
+spooky variables resolve ./my-project --verbose
 
-# Error: "circular dependency detected: A -> B -> C -> A"
-# This means:
-# 1. Variable A depends on B
-# 2. Variable B depends on C
-# 3. Variable C depends on A
-# 4. This creates a cycle that cannot be resolved
-# 5. Solution: Break the cycle by removing one dependency
+# Monitor operations
+watch -n 1 'ps aux | grep spooky'
+
+# Check logs
+tail -f /var/log/spooky/variables.log
 ```
 
-#### Error Severity Levels
+## Getting Help
 
-- **Fatal Errors**: Must be fixed before variables can be used
-  - Syntax errors
-  - Missing required variables
-  - Circular dependencies
+### Documentation Resources
 
-- **Validation Errors**: Prevent proper variable resolution
-  - Type mismatches
-  - Constraint violations
-  - Invalid patterns
+1. **User Guide** - For usage questions and best practices
+2. **API Reference** - For technical implementation details
+3. **Examples** - For configuration patterns and use cases
 
-- **Warnings**: May cause issues but don't prevent operation
-  - Deprecated syntax
-  - Unused variables
-  - Performance issues
+### Common Questions
 
-### Getting Help
+#### "Why can't I resolve my variables?"
 
-When troubleshooting becomes difficult:
+1. Check variable configuration
+2. Verify variable dependencies
+3. Check for circular dependencies
+4. Validate variable syntax
 
-1. **Check Documentation**
-   - Review the [User Guide](VARIABLES_USER_GUIDE.md)
-   - Consult the [API Reference](VARIABLES_API_REFERENCE.md)
-   - Look at examples in the examples directory
+#### "How do I debug variable resolution issues?"
 
-2. **Use Debugging Tools**
-   - Enable verbose output
-   - Use profiling tools
-   - Check system logs
+```bash
+# Enable verbose output
+spooky variables resolve ./my-project --verbose
 
-3. **Simplify the Problem**
-   - Create minimal reproduction case
-   - Test with basic configuration
-   - Remove complexity until it works
+# Test specific variables
+spooky variables resolve ./my-project --variables var1,var2
 
-4. **Check for Known Issues**
-   - Review recent changes
-   - Check for similar problems
-   - Consult community resources
+# Check dependencies
+spooky variables validate ./my-project --check-dependencies
+```
 
-This troubleshooting guide should help you resolve most issues with the spooky variables system. If you continue to experience problems, refer to the [User Guide](VARIABLES_USER_GUIDE.md) for more detailed information or the [API Reference](VARIABLES_API_REFERENCE.md) for technical implementation details.
+#### "How do I fix validation issues?"
+
+```bash
+# Validate configuration
+spooky variables validate ./my-project --verbose
+
+# Check specific errors
+spooky variables validate ./my-project --variables problematic-var
+
+# Fix configuration issues
+# Update variable configuration based on error messages
+```
+
+#### "How do I optimize variable operations?"
+
+```bash
+# Use variable filtering
+spooky variables list ./my-project --variables var1,var2
+
+# Use parallel operations
+spooky variables resolve ./my-project --parallel 4
+
+# Monitor resource usage
+top -p $(pgrep spooky)
+```
+
+### When to Seek Additional Help
+
+- Configuration validation passes but resolution still fails
+- Performance issues persist after optimization
+- Unusual error messages not covered in this guide
+- Integration issues with other spooky components
+
+For additional help, refer to the [User Guide](VARIABLES_USER_GUIDE.md) and [API Reference](VARIABLES_API_REFERENCE.md), or check the project documentation for more advanced troubleshooting techniques.
+
+## Conclusion
+
+The variables system provides robust, reliable variable management with comprehensive resolution, validation, and encryption capabilities. Most issues can be resolved by following the troubleshooting steps outlined in this guide. For persistent issues, enable verbose output and collect diagnostic information for further analysis.

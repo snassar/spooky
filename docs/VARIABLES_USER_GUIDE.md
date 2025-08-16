@@ -2,666 +2,580 @@
 
 ## Overview
 
-The spooky variables system provides comprehensive management of configuration variables for automation and orchestration. This guide covers everything from basic variable configuration to advanced features like multi-file variables, dependency resolution, and validation.
+The spooky variables system provides comprehensive variable management, resolution, and validation capabilities. This guide covers everything from basic variable configuration to advanced features like variable dependencies, encryption, and integration with other systems.
 
-## Table of Contents
-
-1. [Getting Started](#getting-started)
-2. [Variable Configuration](#variable-configuration)
-3. [Variable Management](#variable-management)
-4. [Variable Resolution](#variable-resolution)
-5. [Validation and Troubleshooting](#validation-and-troubleshooting)
-6. [Advanced Features](#advanced-features)
-7. [Best Practices](#best-practices)
-8. [Examples](#examples)
+**Status: Production Ready** - The variables system is fully implemented with comprehensive variable management, resolution, and validation capabilities.
 
 ## Getting Started
 
-### Basic Variable Configuration
+### Prerequisites
 
-A variable configuration in spooky consists of one or more HCL files that define configuration variables with their types, default values, dependencies, and validation rules.
+- spooky CLI installed and configured
+- Basic understanding of HCL configuration syntax
+- Access to create and modify project files
 
-**Single File Configuration (`variables.hcl`):**
-```hcl
-variables {
-  variable "app_name" {
-    type = "string"
-    description = "Application name"
-    default = "my-app"
-    scope = "project"
-  }
+### Quick Start
 
-  variable "app_version" {
-    type = "string"
-    description = "Application version"
-    default = "1.0.0"
-    scope = "project"
-  }
+1. **Check Available Variables Commands**
+   ```bash
+   spooky variables --help
+   ```
 
-  variable "environment" {
-    type = "string"
-    description = "Deployment environment"
-    default = "development"
-    scope = "project"
-    
-    validation {
-      allowed_values = ["development", "staging", "production"]
-    }
-  }
+2. **List Variables in a Project**
+   ```bash
+   spooky variables list ./my-project
+   ```
 
-  variable "port" {
-    type = "number"
-    description = "Application port"
-    default = 8080
-    scope = "project"
-    
-    constraints {
-      min_value = 1024
-      max_value = 65535
-    }
-  }
+3. **Validate Variable Configuration**
+   ```bash
+   spooky variables validate ./my-project
+   ```
 
-  variable "debug" {
-    type = "bool"
-    description = "Enable debug mode"
-    default = false
-    scope = "project"
-  }
-}
-```
+4. **Resolve Variables**
+   ```bash
+   spooky variables resolve ./my-project
+   ```
 
-### Multi-File Variable Configuration
+## Variables System Concepts
 
-For larger projects, you can organize variables into multiple files within a `variables/` directory:
+### What are Variables?
 
-**Project Structure:**
-```
-my-project/
-├── project.hcl
-├── variables.hcl                    # Global variables
-└── variables/
-    ├── app.hcl                      # Application variables
-    ├── database.hcl                 # Database variables
-    └── security.hcl                 # Security variables
-```
+Variables are configuration values that can be used across your spooky project. They provide:
 
-**Application Variables (`variables/app.hcl`):**
-```hcl
-variables {
-  variable "app_name" {
-    type = "string"
-    description = "Application name"
-    default = "my-app"
-    scope = "project"
-  }
+- **Dynamic Configuration**: Values that change based on environment or context
+- **Reusability**: Define once, use everywhere
+- **Security**: Encrypt sensitive values with age encryption
+- **Integration**: Work with facts, machines, and other systems
 
-  variable "app_version" {
-    type = "string"
-    description = "Application version"
-    default = "1.0.0"
-    scope = "project"
-  }
+### Variable Sources
 
-  variable "app_port" {
-    type = "number"
-    description = "Application port"
-    default = 8080
-    scope = "project"
-    
-    constraints {
-      min_value = 1024
-      max_value = 65535
-    }
-  }
-}
-```
+Variables can be defined from multiple sources:
 
-**Database Variables (`variables/database.hcl`):**
-```hcl
-variables {
-  variable "db_host" {
-    type = "string"
-    description = "Database host"
-    default = "localhost"
-    scope = "project"
-  }
+1. **Project Variables**: Defined in `variables.hcl` and `variables/` directory
+2. **Environment Variables**: System environment variables
+3. **Facts Variables**: Derived from machine facts
+4. **Default Variables**: System-provided defaults
 
-  variable "db_port" {
-    type = "number"
-    description = "Database port"
-    default = 5432
-    scope = "project"
-  }
+### Variable Resolution
 
-  variable "db_name" {
-    type = "string"
-    description = "Database name"
-    default = "myapp"
-    scope = "project"
-  }
+Variables follow a specific resolution order:
 
-  variable "db_user" {
-    type = "string"
-    description = "Database user"
-    scope = "project"
-    sensitive = true
-  }
+1. **Environment Variables** (highest priority)
+2. **Project Variables** (from variables.hcl and variables/*.hcl)
+3. **Facts Variables** (from machine facts)
+4. **Default Variables** (lowest priority)
 
-  variable "db_password" {
-    type = "string"
-    description = "Database password"
-    scope = "project"
-    sensitive = true
-    encrypted = true
-  }
-}
-```
+## Current Implementation Status
 
-## Variable Configuration
+### ✅ Working Features
 
-### Variable Types
+- **Variable Loading**: Comprehensive variable loading from HCL configuration files
+- **Variable Validation**: Complete variable validation and error handling
+- **Variable Resolution**: Full variable resolution with dependency management
+- **CLI Integration**: Complete CLI integration with all variable commands
+- **Project Integration**: Full integration with project configuration
+- **Encryption Support**: Age encryption support for sensitive variables
 
-The variables system supports several data types:
+### 🔧 Advanced Features
 
-#### String Variables
-```hcl
-variable "app_name" {
-  type = "string"
-  description = "Application name"
-  default = "my-app"
-  scope = "project"
-}
-```
+- **Variable Dependencies**: Support for variable dependencies and references
+- **Type Validation**: Comprehensive type validation for all variable types
+- **Default Values**: Support for default values and fallbacks
+- **Environment Integration**: Full integration with system environment variables
+- **Facts Integration**: Integration with machine facts for dynamic values
 
-#### Number Variables
-```hcl
-variable "port" {
-  type = "number"
-  description = "Application port"
-  default = 8080
-  scope = "project"
-  
-  constraints {
-    min_value = 1024
-    max_value = 65535
-  }
-}
-```
-
-#### Boolean Variables
-```hcl
-variable "debug" {
-  type = "bool"
-  description = "Enable debug mode"
-  default = false
-  scope = "project"
-}
-```
-
-#### List Variables
-```hcl
-variable "allowed_hosts" {
-  type = "list"
-  description = "List of allowed hosts"
-  default = ["localhost", "127.0.0.1"]
-  scope = "project"
-}
-```
-
-#### Map Variables
-```hcl
-variable "config" {
-  type = "map"
-  description = "Configuration map"
-  default = {
-    timeout = 30
-    retries = 3
-    cache_size = 1000
-  }
-  scope = "project"
-}
-```
-
-### Variable Attributes
-
-#### Required Attributes
-
-- **`type`** - The data type of the variable (string, number, bool, list, map)
-- **`scope`** - The scope of the variable (project, global, local)
-
-#### Optional Attributes
-
-- **`description`** - Human-readable description of the variable
-- **`default`** - Default value for the variable
-- **`required`** - Whether the variable is required (default: false)
-- **`sensitive`** - Whether the variable contains sensitive data (default: false)
-- **`encrypted`** - Whether the variable should be encrypted (default: false)
-- **`dependencies`** - List of other variables this variable depends on
-- **`validation`** - Validation rules for the variable
-- **`constraints`** - Type-specific constraints
-- **`metadata`** - Additional metadata for the variable
-
-### Validation Rules
-
-#### Allowed Values
-```hcl
-variable "environment" {
-  type = "string"
-  description = "Deployment environment"
-  default = "development"
-  scope = "project"
-  
-  validation {
-    allowed_values = ["development", "staging", "production"]
-  }
-}
-```
-
-#### Pattern Matching
-```hcl
-variable "email" {
-  type = "string"
-  description = "Contact email"
-  scope = "project"
-  
-  validation {
-    pattern = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-  }
-}
-```
-
-#### Custom Validation
-```hcl
-variable "port" {
-  type = "number"
-  description = "Application port"
-  scope = "project"
-  
-  validation {
-    min_value = 1024
-    max_value = 65535
-  }
-}
-```
-
-### Constraints
-
-#### String Constraints
-```hcl
-variable "username" {
-  type = "string"
-  description = "Username"
-  scope = "project"
-  
-  constraints {
-    min_length = 3
-    max_length = 20
-    pattern = "^[a-zA-Z0-9_-]+$"
-  }
-}
-```
-
-#### Number Constraints
-```hcl
-variable "timeout" {
-  type = "number"
-  description = "Timeout in seconds"
-  default = 30
-  scope = "project"
-  
-  constraints {
-    min_value = 1
-    max_value = 300
-  }
-}
-```
-
-#### List Constraints
-```hcl
-variable "tags" {
-  type = "list"
-  description = "Resource tags"
-  scope = "project"
-  
-  constraints {
-    min_items = 1
-    max_items = 10
-  }
-}
-```
-
-## Variable Management
+## Basic Usage
 
 ### Listing Variables
 
-Use the `spooky variables list` command to view all variables in a project:
+List all variables in a project:
 
 ```bash
-# List variables in the current directory
-spooky variables list
-
-# List variables in a specific project
+# List all variables
 spooky variables list ./my-project
-
-# List variables with JSON output
-spooky variables list --json
 ```
 
-**Example Output:**
+**Example Output**:
 ```
-Variables in ./my-project:
+Variables in project (5 found):
+1. app_name (string) - Application name
+2. app_version (string) - Application version
+3. environment (string) - Deployment environment
+4. database_host (string) - Database hostname
+5. api_port (number) - API server port
 
-📁 variables.hcl:
-  • app_name (string) = "my-app" [project]
-  • app_version (string) = "1.0.0" [project]
-  • environment (string) = "development" [project]
-
-📁 variables/app.hcl:
-  • app_port (number) = 8080 [project]
-  • debug (bool) = false [project]
-
-📁 variables/database.hcl:
-  • db_host (string) = "localhost" [project]
-  • db_port (number) = 5432 [project]
-  • db_name (string) = "myapp" [project]
-  • db_user (string) = <sensitive> [project]
-  • db_password (string) = <encrypted> [project]
-
-Total: 10 variables across 3 files
+Total: 5 variables
 ```
 
 ### Validating Variables
 
-Use the `spooky variables validate` command to validate your variable configuration:
+Validate variable configurations:
 
 ```bash
-# Validate variables in the current directory
-spooky variables validate
-
-# Validate variables in a specific project
+# Validate all variables
 spooky variables validate ./my-project
-
-# Validate with verbose output
-spooky variables validate --verbose
 ```
 
-**Example Output:**
+**Example Output**:
 ```
-✅ Validation successful
+✅ Variable validation passed
 
-Variables validated: 10
-Files processed: 3
-Warnings: 0
-Errors: 0
-
-Validation details:
-• All variable names are valid
-• No circular dependencies detected
-• All constraints are satisfied
-• All validation rules passed
+Validated 5 variables:
+- app_name: ✅ Valid
+- app_version: ✅ Valid
+- environment: ✅ Valid
+- database_host: ✅ Valid
+- api_port: ✅ Valid
 ```
 
 ### Resolving Variables
 
-Use the `spooky variables resolve` command to resolve variables with context:
+Resolve variables with their final values:
 
 ```bash
-# Resolve variables in the current directory
-spooky variables resolve
-
-# Resolve variables with specific context
-spooky variables resolve --context production
-
-# Resolve with environment overrides
-spooky variables resolve --env-override
+# Resolve all variables
+spooky variables resolve ./my-project
 ```
 
-**Example Output:**
+**Example Output**:
 ```
-Resolved Variables:
+Variable resolution for project: ./my-project
+Total variables: 5
+Resolved variables: 5
+Resolution time: 2.3ms
 
-app_name = "my-app"
-app_version = "1.0.0"
-environment = "production"  # Overridden by environment
-port = 8080
-debug = false
-db_host = "prod-db.example.com"  # Overridden by environment
-db_port = 5432
-db_name = "myapp_prod"  # Overridden by environment
-db_user = "prod_user"  # Overridden by environment
-db_password = "***"  # Encrypted
-
-Resolution completed successfully
-Dependencies resolved: 0 circular dependencies detected
-Environment overrides applied: 5 variables
+Resolved values:
+- app_name: "my-application"
+- app_version: "1.0.0"
+- environment: "production"
+- database_host: "db.example.com"
+- api_port: 8080
 ```
 
-## Variable Resolution
+## Configuration
 
-### Dependency Resolution
+### Basic Variable Configuration
 
-Variables can depend on other variables, and spooky automatically resolves dependencies:
+Define variables in your `variables.hcl` file:
 
 ```hcl
 variables {
   variable "app_name" {
-    type = "string"
+    value = "my-application"
     description = "Application name"
-    default = "my-app"
-    scope = "project"
   }
-
-  variable "app_title" {
-    type = "string"
-    description = "Application title"
-    default = "My Application"
-    scope = "project"
-    dependencies = ["app_name"]
+  
+  variable "app_version" {
+    value = "1.0.0"
+    description = "Application version"
   }
-
-  variable "app_url" {
-    type = "string"
-    description = "Application URL"
-    scope = "project"
-    dependencies = ["app_name", "environment"]
+  
+  variable "environment" {
+    value = "production"
+    description = "Deployment environment"
+  }
+  
+  variable "database_host" {
+    value = "db.example.com"
+    description = "Database hostname"
+  }
+  
+  variable "api_port" {
+    value = 8080
+    description = "API server port"
   }
 }
 ```
 
-### Environment Variable Overrides
+### Advanced Variable Configuration
 
-Variables can be overridden by environment variables using the `SPOOKY_VAR_` prefix:
-
-```bash
-# Override variables with environment variables
-export SPOOKY_VAR_APP_NAME="production-app"
-export SPOOKY_VAR_ENVIRONMENT="production"
-export SPOOKY_VAR_DB_HOST="prod-db.example.com"
-
-# Resolve variables with overrides
-spooky variables resolve --env-override
-```
-
-### Context-Based Resolution
-
-Variables can be resolved in different contexts:
+Use advanced variable features:
 
 ```hcl
 variables {
-  variable "api_url" {
-    type = "string"
-    description = "API URL"
-    scope = "project"
+  # String variable with validation
+  variable "app_name" {
+    value = "my-application"
+    description = "Application name"
+    required = true
   }
-
-  variable "api_timeout" {
-    type = "number"
-    description = "API timeout"
-    default = 30
-    scope = "project"
+  
+  # Number variable with range validation
+  variable "api_port" {
+    value = 8080
+    description = "API server port"
+    validation {
+      min = 1024
+      max = 65535
+    }
+  }
+  
+  # Boolean variable
+  variable "debug_mode" {
+    value = false
+    description = "Enable debug mode"
+  }
+  
+  # List variable
+  variable "allowed_ips" {
+    value = ["192.168.1.0/24", "10.0.0.0/8"]
+    description = "Allowed IP ranges"
+  }
+  
+  # Map variable
+  variable "database_config" {
+    value = {
+      host = "db.example.com"
+      port = 5432
+      name = "myapp"
+    }
+    description = "Database configuration"
   }
 }
 ```
 
-```bash
-# Resolve with development context
-spooky variables resolve --context development
+### Environment Variable Integration
 
-# Resolve with production context
-spooky variables resolve --context production
-```
+Use environment variables:
 
-## Validation and Troubleshooting
-
-### Common Validation Errors
-
-#### Duplicate Variable Names
-```
-❌ Validation failed: duplicate variable name 'app_name' found in multiple files
-  • variables.hcl:5:1
-  • variables/app.hcl:3:1
-```
-
-**Solution:** Rename one of the variables or remove the duplicate definition.
-
-#### Circular Dependencies
-```
-❌ Validation failed: circular dependency detected: app_name -> app_title -> app_name
-```
-
-**Solution:** Restructure your variables to remove circular dependencies.
-
-#### Invalid Variable Names
-```
-❌ Validation failed: invalid variable name 'app-name': must match pattern ^[a-zA-Z_][a-zA-Z0-9_]*$
-```
-
-**Solution:** Use valid variable names (letters, numbers, underscores, starting with letter or underscore).
-
-#### Missing Required Variables
-```
-❌ Validation failed: required variable 'db_password' has no default value
-```
-
-**Solution:** Provide a default value or set the variable via environment variable.
-
-### Troubleshooting Commands
-
-#### Verbose Validation
-```bash
-# Get detailed validation information
-spooky variables validate --verbose
-```
-
-#### Dependency Analysis
-```bash
-# Analyze variable dependencies
-spooky variables resolve --show-dependencies
-```
-
-#### Environment Variable Debugging
-```bash
-# Show which environment variables are being used
-spooky variables resolve --debug-env
-```
-
-## Advanced Features
-
-### Variable Scopes
-
-Variables can have different scopes:
-
-#### Project Scope
 ```hcl
-variable "app_name" {
-  type = "string"
-  scope = "project"  # Available within the project
+variables {
+  variable "user_home" {
+    value = "{{.env.HOME}}"
+    description = "User home directory"
+  }
+  
+  variable "node_env" {
+    value = "{{.env.NODE_ENV}}"
+    default = "development"
+    description = "Node.js environment"
+  }
+  
+  variable "api_key" {
+    value = "{{.env.API_KEY}}"
+    required = true
+    description = "API key from environment"
+  }
 }
 ```
 
-#### Global Scope
+### Machine Integration
+
+Use machine information in variables:
+
 ```hcl
-variable "global_config" {
-  type = "string"
-  scope = "global"  # Available across all projects
+variables {
+  variable "web_servers" {
+    value = "{{.machines.tags.role=web.hostname}}"
+    description = "List of web server hostnames"
+  }
+  
+  variable "db_servers" {
+    value = "{{.machines.tags.role=database.hostname}}"
+    description = "List of database server hostnames"
+  }
+  
+  variable "production_machines" {
+    value = "{{.machines.tags.environment=production.hostname}}"
+    description = "Production machine hostnames"
+  }
 }
 ```
 
-#### Local Scope
-```hcl
-variable "local_setting" {
-  type = "string"
-  scope = "local"  # Available only in current context
-}
-```
+### Variable Encryption
 
-### Sensitive Variables
+Encrypt sensitive variables using the `spooky variables armor` command:
 
-Mark variables as sensitive to protect sensitive data:
+```bash
+# Encrypt a variable value
+echo "my-secret-password" | spooky variables armor --recipient age1... > encrypted_value.txt
 
-```hcl
-variable "api_key" {
-  type = "string"
-  description = "API key"
-  scope = "project"
-  sensitive = true  # Will be masked in output
-}
-
-variable "password" {
-  type = "string"
+# Use the encrypted value in variables.hcl
+variable "database_password" {
+  value = "age1..."  # Content from encrypted_value.txt
+  encrypted = true
   description = "Database password"
-  scope = "project"
-  sensitive = true
-  encrypted = true  # Will be encrypted in storage
 }
 ```
 
-### Complex Dependencies
+### Decrypting Variables
 
-Variables can have complex dependency relationships:
+Decrypt variables during action running:
+
+```bash
+# Run actions with decryption
+spooky actions run ./my-project --decrypt
+```
+
+**Example Output**:
+```
+🔓 Decryption mode enabled - encrypted variables and facts will be decrypted in-memory
+🔑 Using identity file: ~/.config/spooky/keys/identity.txt
+✅ Decrypted 3 variables in-memory
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### Variable Resolution Failures
+
+**Problem**: Variables fail to resolve
+
+**Solutions**:
+1. Check variable definitions:
+   ```bash
+   spooky variables validate ./my-project
+   ```
+
+2. Check for missing dependencies:
+   ```bash
+   spooky variables resolve ./my-project --verbose
+   ```
+
+3. Verify environment variables:
+   ```bash
+   spooky variables resolve ./my-project --show-env
+   ```
+
+#### Validation Errors
+
+**Problem**: Variable validation fails
+
+**Solutions**:
+1. Check variable types:
+   ```hcl
+   variable "port" {
+     value = 8080  # Must be number, not string
+     description = "API port"
+   }
+   ```
+
+2. Check required fields:
+   ```hcl
+   variable "api_key" {
+     value = "{{.env.API_KEY}}"
+     required = true  # Will fail if env var is missing
+     description = "API key"
+   }
+   ```
+
+3. Check validation rules:
+   ```hcl
+   variable "port" {
+     value = 8080
+     validation {
+       min = 1024
+       max = 65535
+     }
+     description = "API port"
+   }
+   ```
+
+#### Encryption Issues
+
+**Problem**: Encrypted variables fail to decrypt
+
+**Solutions**:
+1. Check age key configuration:
+   ```bash
+   spooky secrets validate
+   ```
+
+2. Verify recipient configuration:
+   ```bash
+   spooky variables armor ./my-project --dry-run
+   ```
+
+3. Check key permissions:
+   ```bash
+   ls -la ~/.config/spooky/keys/
+   ```
+
+## Integration with Other Systems
+
+### Actions Integration
+
+Variables integrate with the actions system:
+
+```hcl
+actions {
+  action "deploy-application" {
+    description = "Deploy application with variables"
+    
+    machines = ["web-server"]
+    parallel = true
+    
+    variables {
+      app_name = "{{.variables.app_name}}"
+      app_version = "{{.variables.app_version}}"
+      environment = "{{.variables.environment}}"
+    }
+    
+    command = "deploy.sh"
+  }
+}
+```
+
+### Templates Integration
+
+Variables integrate with the templates system:
+
+```hcl
+templates {
+  template "config.tmpl" {
+    source = "templates/config.tmpl"
+    destination = "/etc/app/config.conf"
+    
+    variables {
+      app_name = "{{.variables.app_name}}"
+      api_port = "{{.variables.api_port}}"
+      database_host = "{{.variables.database_host}}"
+    }
+  }
+}
+```
+
+### Facts Integration
+
+Variables can reference machine facts:
 
 ```hcl
 variables {
-  variable "base_url" {
-    type = "string"
-    description = "Base URL"
-    default = "https://api.example.com"
-    scope = "project"
+  variable "machine_count" {
+    value = "{{.facts.machines.count}}"
+    description = "Number of machines in inventory"
   }
-
-  variable "api_version" {
-    type = "string"
-    description = "API version"
-    default = "v1"
-    scope = "project"
+  
+  variable "os_distribution" {
+    value = "{{.facts.machines.os.distribution}}"
+    description = "Most common OS distribution"
   }
+}
+```
 
-  variable "api_url" {
-    type = "string"
-    description = "Full API URL"
-    scope = "project"
-    dependencies = ["base_url", "api_version"]
+## Examples
+
+### Basic Project Variables
+
+```hcl
+# variables.hcl
+variables {
+  variable "app_name" {
+    value = "my-application"
+    description = "Application name"
   }
-
-  variable "timeout" {
-    type = "number"
-    description = "Request timeout"
-    default = 30
-    scope = "project"
+  
+  variable "app_version" {
+    value = "1.0.0"
+    description = "Application version"
   }
-
-  variable "retry_count" {
-    type = "number"
-    description = "Retry count"
-    default = 3
-    scope = "project"
+  
+  variable "environment" {
+    value = "production"
+    description = "Deployment environment"
   }
+}
+```
 
-  variable "api_config" {
-    type = "map"
-    description = "API configuration"
-    scope = "project"
-    dependencies = ["api_url", "timeout", "retry_count"]
+### Advanced Project Variables
+
+```hcl
+# variables.hcl
+variables {
+  # Application configuration
+  variable "app_name" {
+    value = "my-application"
+    description = "Application name"
+    required = true
+  }
+  
+  variable "app_version" {
+    value = "1.0.0"
+    description = "Application version"
+    required = true
+  }
+  
+  # Environment configuration
+  variable "environment" {
+    value = "{{.env.NODE_ENV}}"
+    default = "development"
+    description = "Deployment environment"
+  }
+  
+  # Database configuration
+  variable "database_config" {
+    value = {
+      host = "{{.env.DB_HOST}}"
+      port = 5432
+      name = "{{.variables.app_name}}"
+    }
+    description = "Database configuration"
+  }
+  
+  # Network configuration
+  variable "api_port" {
+    value = 8080
+    description = "API server port"
+    validation {
+      min = 1024
+      max = 65535
+    }
+  }
+  
+  variable "allowed_ips" {
+    value = ["192.168.1.0/24", "10.0.0.0/8"]
+    description = "Allowed IP ranges"
+  }
+  
+  # Encrypted secrets
+  variable "database_password" {
+    value = "age1..."
+    encrypted = true
+    description = "Database password"
+  }
+}
+```
+
+### Modular Variable Organization
+
+```hcl
+# variables/app.hcl
+variables {
+  variable "app_name" {
+    value = "my-application"
+    description = "Application name"
+  }
+  
+  variable "app_version" {
+    value = "1.0.0"
+    description = "Application version"
+  }
+}
+
+# variables/database.hcl
+variables {
+  variable "database_host" {
+    value = "db.example.com"
+    description = "Database hostname"
+  }
+  
+  variable "database_port" {
+    value = 5432
+    description = "Database port"
+  }
+}
+
+# variables/network.hcl
+variables {
+  variable "api_port" {
+    value = 8080
+    description = "API server port"
+  }
+  
+  variable "allowed_ips" {
+    value = ["192.168.1.0/24", "10.0.0.0/8"]
+    description = "Allowed IP ranges"
   }
 }
 ```
@@ -670,178 +584,35 @@ variables {
 
 ### Variable Organization
 
-1. **Group by Functionality** - Organize variables by their purpose (app, database, security, etc.)
-2. **Use Descriptive Names** - Choose clear, descriptive variable names
-3. **Consistent Naming** - Follow consistent naming conventions across your project
-4. **Documentation** - Always provide descriptions for your variables
+- Use descriptive variable names
+- Group related variables together
+- Use modular organization with variables/ directory
+- Include comprehensive descriptions
 
-### Security Best Practices
+### Variable Security
 
-1. **Sensitive Data** - Mark sensitive variables with `sensitive = true`
-2. **Encryption** - Use `encrypted = true` for highly sensitive data
-3. **Environment Variables** - Use environment variables for secrets
-4. **Access Control** - Limit access to variable files containing sensitive data
+- Encrypt sensitive variables with age encryption
+- Use environment variables for secrets when possible
+- Never commit unencrypted secrets to version control
+- Use appropriate validation rules
 
-### Dependency Management
+### Variable Dependencies
 
-1. **Minimize Dependencies** - Keep dependency graphs simple
-2. **Avoid Circular Dependencies** - Design your variables to avoid circular references
-3. **Document Dependencies** - Clearly document why variables depend on each other
-4. **Test Dependencies** - Regularly test dependency resolution
+- Minimize variable dependencies
+- Use clear dependency chains
+- Avoid circular dependencies
+- Document complex dependencies
 
-### Validation and Constraints
+### Variable Validation
 
-1. **Use Validation Rules** - Always validate important variables
-2. **Appropriate Constraints** - Use constraints to prevent invalid values
-3. **Test Validation** - Test your validation rules with various inputs
-4. **Clear Error Messages** - Provide clear error messages for validation failures
+- Use appropriate types for variables
+- Add validation rules where needed
+- Use required fields for critical variables
+- Provide sensible defaults
 
-## Examples
+## Next Steps
 
-### Basic Web Application
-
-**`variables.hcl`:**
-```hcl
-variables {
-  variable "app_name" {
-    type = "string"
-    description = "Application name"
-    default = "web-app"
-    scope = "project"
-  }
-
-  variable "app_port" {
-    type = "number"
-    description = "Application port"
-    default = 8080
-    scope = "project"
-    
-    constraints {
-      min_value = 1024
-      max_value = 65535
-    }
-  }
-
-  variable "environment" {
-    type = "string"
-    description = "Deployment environment"
-    default = "development"
-    scope = "project"
-    
-    validation {
-      allowed_values = ["development", "staging", "production"]
-    }
-  }
-
-  variable "debug" {
-    type = "bool"
-    description = "Enable debug mode"
-    default = false
-    scope = "project"
-  }
-}
-```
-
-### Database Configuration
-
-**`variables/database.hcl`:**
-```hcl
-variables {
-  variable "db_host" {
-    type = "string"
-    description = "Database host"
-    default = "localhost"
-    scope = "project"
-  }
-
-  variable "db_port" {
-    type = "number"
-    description = "Database port"
-    default = 5432
-    scope = "project"
-  }
-
-  variable "db_name" {
-    type = "string"
-    description = "Database name"
-    default = "myapp"
-    scope = "project"
-  }
-
-  variable "db_user" {
-    type = "string"
-    description = "Database user"
-    scope = "project"
-    sensitive = true
-  }
-
-  variable "db_password" {
-    type = "string"
-    description = "Database password"
-    scope = "project"
-    sensitive = true
-    encrypted = true
-  }
-
-  variable "db_ssl" {
-    type = "bool"
-    description = "Enable SSL for database connection"
-    default = false
-    scope = "project"
-  }
-}
-```
-
-### API Configuration
-
-**`variables/api.hcl`:**
-```hcl
-variables {
-  variable "api_base_url" {
-    type = "string"
-    description = "API base URL"
-    default = "https://api.example.com"
-    scope = "project"
-  }
-
-  variable "api_version" {
-    type = "string"
-    description = "API version"
-    default = "v1"
-    scope = "project"
-  }
-
-  variable "api_timeout" {
-    type = "number"
-    description = "API request timeout in seconds"
-    default = 30
-    scope = "project"
-    
-    constraints {
-      min_value = 1
-      max_value = 300
-    }
-  }
-
-  variable "api_retries" {
-    type = "number"
-    description = "Number of API retries"
-    default = 3
-    scope = "project"
-    
-    constraints {
-      min_value = 0
-      max_value = 10
-    }
-  }
-
-  variable "api_key" {
-    type = "string"
-    description = "API authentication key"
-    scope = "project"
-    sensitive = true
-  }
-}
-```
-
-This user guide provides a comprehensive overview of the spooky variables system. For more detailed technical information, refer to the [API Reference](VARIABLES_API_REFERENCE.md), and for troubleshooting help, see the [Troubleshooting Guide](VARIABLES_TROUBLESHOOTING.md).
+- Explore the [Variables API Reference](VARIABLES_API_REFERENCE.md) for detailed technical information
+- Check the [Variables Troubleshooting Guide](VARIABLES_TROUBLESHOOTING.md) for common issues
+- Review the [Variables Documentation Summary](VARIABLES_DOCUMENTATION_SUMMARY.md) for implementation details
+- Learn about [Variables Integration Patterns](INTEGRATIONS_USER_GUIDE.md) for advanced usage

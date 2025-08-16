@@ -4,6 +4,8 @@
 
 The spooky actions system provides comprehensive action orchestration capabilities for running commands, scripts, templates, and service controls on remote machines. This guide covers everything from basic action configuration to advanced features like dependency management, parallel running, and service control.
 
+**Status: Partially Implemented** - The actions system has basic functionality but SSH-based action orchestration has known issues that need to be addressed.
+
 ## Getting Started
 
 ### Prerequisites
@@ -66,167 +68,208 @@ The action run process follows these steps:
 3. **Machine Targeting** - Determine target machines based on configuration
 4. **Run Planning** - Create run plan with `--plan` flag
 5. **Action Running** - Run actions on target machines via SSH
-6. **Result Collection** - Collect and report run results
+6. **Result Collection** - Collect and aggregate results from all machines
+7. **Error Handling** - Handle failures and provide detailed error reporting
+
+## Current Implementation Status
+
+### ✅ Working Features
+
+- **Basic Action Loading**: Action loading from HCL configuration files
+- **Action Validation**: Basic action validation and error handling
+- **CLI Integration**: `spooky actions` commands with basic functionality
+- **Project Integration**: Actions loading from project configuration
+- **Local Action Orchestration**: Local action orchestration capabilities
+
+### ⚠️ Known Issues
+
+- **SSH-Based Orchestration**: SSH-based action orchestration has implementation issues
+- **Remote Action Running**: Cannot properly run actions on remote machines
+- **Parallel Execution**: No parallel action execution support
+- **Action Planning**: Limited action planning capabilities
+- **Result Aggregation**: No action result aggregation
+
+### 🔧 Current Workarounds
+
+- **Local Running**: Use local action running for immediate needs
+- **Manual Execution**: Run actions manually on remote machines if needed
+- **Filtered Running**: Use machine filtering to limit running scope
+- **Monitor Updates**: Watch for improvements to SSH-based orchestration
 
 ## Basic Usage
 
-### Creating Actions
+### Listing Actions
 
-Actions are defined in HCL configuration files. You can use either a single `actions.hcl` file or multiple files in an `actions/` directory.
+List all available actions in a project:
 
-#### Single File Configuration
+```bash
+# List all actions
+spooky actions list ./my-project
+```
+
+**Example Output**:
+```
+Available actions (3 found):
+1. update-system - Update system packages
+2. deploy-app - Deploy application
+3. restart-services - Restart system services
+```
+
+### Validating Actions
+
+Validate action configurations before running:
+
+```bash
+# Validate all actions
+spooky actions validate ./my-project
+```
+
+**Example Output**:
+```
+✅ All actions are valid
+```
+
+### Running Actions
+
+Run actions on target machines:
+
+```bash
+# Run all actions
+spooky actions run ./my-project
+
+# Run with dry-run mode
+spooky actions run ./my-project --dry-run
+
+# Run with plan mode
+spooky actions run ./my-project --plan
+
+# Run with parallel execution
+spooky actions run ./my-project --parallel 4
+```
+
+### Machine Targeting
+
+Target specific machines for action running:
+
+```bash
+# Run actions on specific machines
+spooky actions run ./my-project --machine web-server
+
+# Run on multiple machines
+spooky actions run ./my-project --machine web-server --machine db-server
+
+# Run on machines with specific tags
+spooky actions run ./my-project --tags environment=production
+
+# Run with complex filtering
+spooky actions run ./my-project --filter "environment=production AND role=web"
+```
+
+## Project Configuration
+
+### Basic Action Configuration
+
+Create actions in your project:
 
 ```hcl
 # actions.hcl
-action "restart-nginx" {
-  type = "service_control"
-  description = "Restart nginx service"
-  
-  service_control {
-    service = "nginx"
-    action = "restart"
-    wait_for_status = "active"
+actions {
+  action "update-system" {
+    description = "Update system packages"
+    type = "command"
+    
+    command = "apt update && apt upgrade -y"
+    
+    machines = ["web-server", "db-server"]
+    
+    tags = ["maintenance"]
   }
   
-  machines = ["web-server-1", "web-server-2"]
-  tags = ["web", "production"]
-}
-
-action "deploy-config" {
-  type = "template_deploy"
-  description = "Deploy application configuration"
-  
-  template {
-    source = "templates/app.conf.tmpl"
-    destination = "/etc/app/app.conf"
-    permissions = "0644"
-    owner = "app"
-    group = "app"
+  action "deploy-app" {
+    description = "Deploy application"
+    type = "script"
+    
+    script {
+      source = "scripts/deploy.sh"
+      arguments = ["--version", "1.2.3"]
+    }
+    
+    machines = ["web-server"]
+    
+    dependencies = ["update-system"]
   }
   
-  machines = ["app-server"]
-  dependencies = ["restart-nginx"]
-}
-```
-
-#### Directory Configuration
-
-```bash
-my-project/
-├── actions.hcl              # Main actions file
-└── actions/                 # Additional action files
-    ├── web-actions.hcl      # Web server actions
-    ├── db-actions.hcl       # Database actions
-    └── deploy-actions.hcl   # Deployment actions
-```
-
-### Action Configuration
-
-#### Basic Action Structure
-
-```hcl
-action "action-name" {
-  type = "command"                    # Required: action type
-  description = "Action description"  # Optional: human-readable description
-  
-  # Action-specific configuration
-  command = "echo 'Hello World'"
-  
-  # Targeting configuration
-  machines = ["machine1", "machine2"]  # Target specific machines
-  tags = ["web", "production"]         # Target machines by tags
-  
-  # Run configuration
-  parallel = false                     # Run sequentially (default)
-  timeout = 300                        # Timeout in seconds
-  retries = 3                          # Number of retries
-  retry_delay = 10                     # Delay between retries
-  
-  # Dependencies
-  dependencies = ["other-action"]      # Actions that must complete first
-  
-  # Environment and context
-  environment = {
-    NODE_ENV = "production"
-    DEBUG = "false"
+  action "restart-services" {
+    description = "Restart system services"
+    type = "service_control"
+    
+    service_control {
+      service = "nginx"
+      action = "restart"
+    }
+    
+    machines = ["web-server"]
+    
+    dependencies = ["deploy-app"]
   }
-  
-  working_directory = "/opt/app"
-  user = "app"
-  sudo = false
 }
 ```
+
+### Action Types Configuration
 
 #### Command Actions
 
 Run shell commands on remote machines:
 
 ```hcl
-action "check-disk-space" {
+action "check-disk" {
   type = "command"
-  description = "Check available disk space"
   
-  command = "df -h /"
-  
-  machines = ["web-server", "db-server"]
-  parallel = true
-}
-
-action "update-packages" {
-  type = "command"
-  description = "Update system packages"
-  
-  command = "apt update && apt upgrade -y"
+  command = "df -h"
   
   machines = ["web-server"]
-  sudo = true
-  timeout = 600
+  
+  timeout = 30
+  retries = 3
 }
 ```
 
 #### Script Actions
 
-Run script files with optional template processing:
+Run script files with template support:
 
 ```hcl
-action "backup-database" {
+action "deploy-config" {
   type = "script"
-  description = "Create database backup"
   
-  script = "files/backup-db.sh"
-  
-  variables = {
-    backup_dir = "/backups"
-    db_name = "myapp"
-    retention_days = "7"
+  script {
+    source = "scripts/deploy-config.sh"
+    arguments = ["--env", "production"]
+    environment = {
+      APP_VERSION = "1.2.3"
+      ENVIRONMENT = "production"
+    }
   }
   
-  machines = ["db-server"]
-  working_directory = "/opt/scripts"
+  machines = ["web-server"]
 }
 ```
 
 #### Template Deploy Actions
 
-Deploy template files with variable substitution:
+Deploy rendered templates to remote machines:
 
 ```hcl
 action "deploy-nginx-config" {
   type = "template_deploy"
-  description = "Deploy nginx configuration"
   
   template {
     source = "templates/nginx.conf.tmpl"
     destination = "/etc/nginx/nginx.conf"
     permissions = "0644"
-    owner = "root"
-    group = "root"
-    validate = true
-    backup = true
   }
   
   machines = ["web-server"]
-  dependencies = ["restart-nginx"]
 }
 ```
 
@@ -235,17 +278,13 @@ action "deploy-nginx-config" {
 Copy files between machines:
 
 ```hcl
-action "deploy-certificates" {
+action "copy-ssl-cert" {
   type = "file_copy"
-  description = "Deploy SSL certificates"
   
   file_copy {
-    source = "files/certs/ssl.crt"
-    destination = "/etc/ssl/certs/app.crt"
+    source = "certs/ssl.crt"
+    destination = "/etc/ssl/certs/ssl.crt"
     permissions = "0644"
-    owner = "root"
-    group = "root"
-    backup = true
   }
   
   machines = ["web-server"]
@@ -257,498 +296,303 @@ action "deploy-certificates" {
 Control system services:
 
 ```hcl
-action "restart-application" {
+action "restart-nginx" {
   type = "service_control"
-  description = "Restart application service"
   
   service_control {
-    service = "myapp"
+    service = "nginx"
     action = "restart"
-    systemd = true
-    timeout = 30
-    wait_for_status = "active"
-    wait_timeout = 60
   }
   
-  machines = ["app-server"]
+  machines = ["web-server"]
 }
 ```
 
-### Action Targeting
+### Advanced Configuration
 
-#### Machine Targeting
+#### Dependencies
 
-Target specific machines by name:
-
-```hcl
-action "web-deploy" {
-  type = "command"
-  command = "echo 'Deploying to web servers'"
-  
-  machines = ["web-1", "web-2", "web-3"]
-}
-```
-
-#### Tag-Based Targeting
-
-Target machines by tags:
+Define action dependencies for proper run order:
 
 ```hcl
-action "prod-deploy" {
-  type = "command"
-  command = "echo 'Deploying to production'"
-  
-  tags = ["environment=production", "role=web"]
-}
-```
-
-#### Combined Targeting
-
-Combine machine names and tags:
-
-```hcl
-action "full-deploy" {
-  type = "command"
-  command = "echo 'Full deployment'"
-  
-  machines = ["web-1", "web-2"]
-  tags = ["environment=production"]
-}
-```
-
-### Action Dependencies
-
-Define dependencies between actions:
-
-```hcl
-action "prepare-database" {
-  type = "command"
-  command = "echo 'Preparing database'"
-  machines = ["db-server"]
-}
-
-action "deploy-application" {
-  type = "command"
-  command = "echo 'Deploying application'"
-  machines = ["app-server"]
-  dependencies = ["prepare-database"]  # Must complete first
-}
-
-action "update-load-balancer" {
-  type = "command"
-  command = "echo 'Updating load balancer'"
-  machines = ["lb-server"]
-  dependencies = ["deploy-application"]  # Must complete first
-}
-```
-
-## Advanced Usage
-
-### Parallel Running
-
-Run actions in parallel across machines:
-
-```hcl
-action "parallel-update" {
-  type = "command"
-  command = "apt update"
-  
-  machines = ["web-1", "web-2", "web-3", "web-4"]
-  parallel = true  # Run on all machines simultaneously
-  max_concurrent = 4  # Limit concurrent runs
-}
-```
-
-### Retry Logic
-
-Configure retry behavior for unreliable operations:
-
-```hcl
-action "unreliable-operation" {
-  type = "command"
-  command = "curl -f https://api.example.com/health"
-  
-  machines = ["app-server"]
-  retries = 5
-  retry_delay = 30  # Wait 30 seconds between retries
-  timeout = 60
-}
-```
-
-### Environment Variables
-
-Set environment variables for action running:
-
-```hcl
-action "deploy-with-env" {
+action "deploy-app" {
   type = "script"
-  script = "files/deploy.sh"
   
-  environment = {
-    NODE_ENV = "production"
-    DEBUG = "false"
-    API_URL = "https://api.production.com"
-    DB_HOST = "db.production.com"
+  script {
+    source = "scripts/deploy.sh"
   }
   
-  machines = ["app-server"]
+  machines = ["web-server"]
+  
+  dependencies = ["update-system", "deploy-config"]
 }
 ```
 
-### Resource Limits
+#### Parallel Execution
 
-Set resource limits for action running:
+Configure parallel execution for actions:
 
 ```hcl
-action "resource-intensive" {
+action "update-all-servers" {
   type = "command"
-  command = "build-application"
+  
+  command = "apt update && apt upgrade -y"
+  
+  machines = ["web-server", "db-server", "cache-server"]
+  
+  parallel = true
+  max_concurrent = 3
+}
+```
+
+#### Resource Limits
+
+Set resource limits for actions:
+
+```hcl
+action "heavy-process" {
+  type = "script"
+  
+  script {
+    source = "scripts/heavy-process.sh"
+  }
+  
+  machines = ["web-server"]
   
   resource_limits {
-    memory_mb = 2048
+    memory_mb = 1024
     cpu_percent = 50
-    disk_mb = 1024
+    timeout_seconds = 300
   }
-  
-  machines = ["build-server"]
 }
+```
+
+#### Error Handling
+
+Configure error handling behavior:
+
+```hcl
+action "critical-update" {
+  type = "command"
+  
+  command = "critical-system-update"
+  
+  machines = ["web-server"]
+  
+  allow_failure = false
+  stop_on_failure = true
+  retries = 3
+  retry_delay = 30
+}
+```
+
+## Running Modes
+
+### Normal Running
+
+Run actions normally on target machines:
+
+```bash
+spooky actions run ./my-project
 ```
 
 ### Dry Run Mode
 
-Test actions without actually running them:
+Simulate running without making changes:
 
 ```bash
-# Show what would be run
 spooky actions run ./my-project --dry-run
+```
 
-# Show run plan
+**Example Output**:
+```
+🔍 Dry run mode - no changes will be made
+
+Would run the following actions:
+1. update-system on web-server, db-server
+2. deploy-app on web-server
+3. restart-services on web-server
+
+Total: 3 actions across 2 machines
+```
+
+### Plan Mode
+
+Show running plan without running:
+
+```bash
 spooky actions run ./my-project --plan
 ```
 
-## CLI Commands
+**Example Output**:
+```
+📋 Running Plan:
 
-### List Actions
+Phase 1: update-system
+  - web-server: apt update && apt upgrade -y
+  - db-server: apt update && apt upgrade -y
 
-```bash
-# List all actions in a project
-spooky actions list ./my-project
+Phase 2: deploy-app (depends on: update-system)
+  - web-server: scripts/deploy.sh --version 1.2.3
 
-# List actions with details
-spooky actions list ./my-project --verbose
+Phase 3: restart-services (depends on: deploy-app)
+  - web-server: systemctl restart nginx
 
-# List actions for specific machines
-spooky actions list ./my-project --machine web-server
-
-# List actions by tags
-spooky actions list ./my-project --tags "environment=production"
+Dependencies resolved: ✅
+Target machines: web-server, db-server
+Estimated time: 5-10 minutes
 ```
 
-### Validate Actions
+### Parallel Running
+
+Run actions in parallel for better performance:
 
 ```bash
-# Validate action configuration
-spooky actions validate ./my-project
-
-# Validate with detailed output
-spooky actions validate ./my-project --verbose
-
-# Validate specific actions
-spooky actions validate ./my-project --action restart-nginx
-```
-
-### Run Actions
-
-```bash
-# Run all actions
-spooky actions run ./my-project
-
-# Run specific actions
-spooky actions run ./my-project --action restart-nginx
-
-# Run actions with plan mode
-spooky actions run ./my-project --plan
-
-# Run actions in dry-run mode
-spooky actions run ./my-project --dry-run
-
-# Run actions in parallel
 spooky actions run ./my-project --parallel 4
-
-# Run actions with timeout
-spooky actions run ./my-project --timeout 600
 ```
 
-### Command Options
+## Machine Targeting
 
-Common options across actions commands:
+### Machine Names
 
-- `--action`: Target specific action
-- `--machine`: Target specific machine
-- `--tags`: Filter by tags
-- `--parallel`: Number of parallel workers
-- `--timeout`: Action timeout in seconds
-- `--verbose`: Verbose output
-- `--plan`: Show run plan without running
-- `--dry-run`: Simulate running without making changes
+Target specific machines by name:
 
-## Best Practices
+```bash
+# Single machine
+spooky actions run ./my-project --machine web-server
 
-### Action Design
-
-1. **Use Descriptive Names** - Choose clear, descriptive action names
-2. **Add Descriptions** - Include human-readable descriptions
-3. **Group Related Actions** - Use dependencies to group related operations
-4. **Use Tags for Organization** - Use tags to organize actions by purpose
-5. **Keep Actions Focused** - Each action should have a single, clear purpose
-
-### Configuration Management
-
-1. **Use Template Variables** - Use variables for configuration values
-2. **Validate Templates** - Enable template validation for critical files
-3. **Use Backup Options** - Enable backups for file operations
-4. **Set Appropriate Permissions** - Use correct file permissions and ownership
-5. **Use Working Directories** - Set appropriate working directories
-
-### Error Handling
-
-1. **Configure Retries** - Use retries for unreliable operations
-2. **Set Timeouts** - Use appropriate timeouts for long-running operations
-3. **Handle Dependencies** - Use dependencies to ensure proper order
-4. **Validate Before Running** - Always validate actions before running
-5. **Use Dry Run Mode** - Test actions with dry-run mode first
-
-### Performance Optimization
-
-1. **Use Parallel Running** - Enable parallel running when possible
-2. **Limit Concurrent Operations** - Use max_concurrent to prevent overload
-3. **Optimize Dependencies** - Minimize unnecessary dependencies
-4. **Use Resource Limits** - Set appropriate resource limits
-5. **Monitor Running** - Monitor action run performance
-
-### Security Considerations
-
-1. **Use Sudo Sparingly** - Only use sudo when necessary
-2. **Set File Permissions** - Use appropriate file permissions
-3. **Validate Input** - Validate all input and configuration
-4. **Use Secure Connections** - Ensure SSH connections are secure
-5. **Audit Actions** - Regularly audit action configurations
-
-## Examples
-
-### Web Application Deployment
-
-```hcl
-# actions.hcl
-action "stop-application" {
-  type = "service_control"
-  description = "Stop application service"
-  
-  service_control {
-    service = "myapp"
-    action = "stop"
-  }
-  
-  machines = ["app-server"]
-}
-
-action "backup-database" {
-  type = "script"
-  description = "Create database backup"
-  
-  script = "files/backup-db.sh"
-  variables = {
-    backup_dir = "/backups"
-    db_name = "myapp"
-  }
-  
-  machines = ["db-server"]
-}
-
-action "deploy-application" {
-  type = "template_deploy"
-  description = "Deploy application files"
-  
-  template {
-    source = "templates/app.conf.tmpl"
-    destination = "/etc/myapp/app.conf"
-    permissions = "0644"
-    owner = "myapp"
-    group = "myapp"
-    backup = true
-  }
-  
-  machines = ["app-server"]
-  dependencies = ["stop-application", "backup-database"]
-}
-
-action "start-application" {
-  type = "service_control"
-  description = "Start application service"
-  
-  service_control {
-    service = "myapp"
-    action = "start"
-    wait_for_status = "active"
-  }
-  
-  machines = ["app-server"]
-  dependencies = ["deploy-application"]
-}
-
-action "update-load-balancer" {
-  type = "command"
-  description = "Update load balancer configuration"
-  
-  command = "systemctl reload haproxy"
-  
-  machines = ["lb-server"]
-  dependencies = ["start-application"]
-}
+# Multiple machines
+spooky actions run ./my-project --machine web-server --machine db-server
 ```
 
-### Infrastructure Maintenance
+### Tag-Based Targeting
 
-```hcl
-action "update-packages" {
-  type = "command"
-  description = "Update system packages"
-  
-  command = "apt update && apt upgrade -y"
-  
-  machines = ["web-server", "app-server", "db-server"]
-  parallel = true
-  sudo = true
-  timeout = 600
-}
+Target machines using tags:
 
-action "restart-services" {
-  type = "service_control"
-  description = "Restart critical services"
-  
-  service_control {
-    service = "nginx"
-    action = "restart"
-    wait_for_status = "active"
-  }
-  
-  machines = ["web-server"]
-  dependencies = ["update-packages"]
-}
+```bash
+# Single tag
+spooky actions run ./my-project --tags environment=production
 
-action "cleanup-logs" {
-  type = "command"
-  description = "Clean up old log files"
-  
-  command = "find /var/log -name '*.log' -mtime +30 -delete"
-  
-  machines = ["web-server", "app-server", "db-server"]
-  parallel = true
-  sudo = true
-}
+# Multiple tags (AND logic)
+spooky actions run ./my-project --tags environment=production --tags role=web
+
+# Multiple tag values (OR logic)
+spooky actions run ./my-project --tags environment=production --tags environment=staging
 ```
 
-### Monitoring and Health Checks
+### Complex Filtering
 
-```hcl
-action "check-disk-space" {
-  type = "command"
-  description = "Check available disk space"
-  
-  command = "df -h"
-  
-  machines = ["web-server", "app-server", "db-server"]
-  parallel = true
-}
+Use complex filter expressions:
 
-action "check-service-status" {
-  type = "service_control"
-  description = "Check service status"
-  
-  service_control {
-    service = "nginx"
-    action = "status"
-  }
-  
-  machines = ["web-server"]
-}
+```bash
+# Environment and role filter
+spooky actions run ./my-project --filter "environment=production AND role=web"
 
-action "check-application-health" {
-  type = "command"
-  description = "Check application health endpoint"
-  
-  command = "curl -f http://localhost:8080/health"
-  
-  machines = ["app-server"]
-  retries = 3
-  retry_delay = 10
-}
+# Multiple conditions
+spooky actions run ./my-project --filter "environment=production AND (role=web OR role=api)"
+
+# Pattern matching
+spooky actions run ./my-project --filter "hostname LIKE 'web-%'"
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-#### Action Validation Failures
+#### SSH Connection Failures
+
+**Problem**: SSH connections fail during action running
+
+**Solutions**:
+1. Verify SSH connectivity manually:
+   ```bash
+   ssh admin@web.example.com
+   ```
+
+2. Check SSH key permissions:
+   ```bash
+   chmod 600 ~/.ssh/id_ed25519
+   ```
+
+3. Verify machine inventory configuration:
+   ```bash
+   spooky machines validate ./my-project
+   ```
+
+#### Action Validation Errors
+
+**Problem**: Actions fail validation
+
+**Solutions**:
+1. Check action configuration syntax:
+   ```bash
+   spooky actions validate ./my-project
+   ```
+
+2. Verify required fields are present:
+   ```hcl
+   action "my-action" {
+     name = "my-action"        # Required
+     type = "command"          # Required
+     command = "echo hello"    # Required for command type
+     machines = ["web-server"] # Required
+   }
+   ```
+
+3. Check for circular dependencies:
+   ```bash
+   spooky actions validate ./my-project --check-dependencies
+   ```
+
+#### Dependency Resolution Issues
+
+**Problem**: Action dependencies cannot be resolved
+
+**Solutions**:
+1. Check dependency names match action names exactly
+2. Verify no circular dependencies exist
+3. Use plan mode to see dependency resolution:
+   ```bash
+   spooky actions run ./my-project --plan
+   ```
+
+### Debugging
+
+Enable verbose output for debugging:
 
 ```bash
-# Check action configuration
-spooky actions validate ./my-project --verbose
+# Enable debug logging
+export SPOOKY_LOG_LEVEL=debug
 
-# Check for syntax errors
-spooky actions validate ./my-project --strict
-```
-
-#### Run Failures
-
-```bash
-# Check SSH connectivity
-spooky machines ping ./my-project
-
-# Test specific action
-spooky actions run ./my-project --action test-action --verbose
-
-# Check action dependencies
-spooky actions run ./my-project --plan
-```
-
-#### Performance Issues
-
-```bash
-# Reduce parallel workers
-spooky actions run ./my-project --parallel 2
-
-# Increase timeout
-spooky actions run ./my-project --timeout 1200
-
-# Use dry-run to test
+# Run with verbose output
 spooky actions run ./my-project --dry-run
 ```
 
-### Debug Information
+## Best Practices
 
-When troubleshooting action issues, enable verbose output:
+### Action Design
 
-```bash
-# Enable verbose output
-spooky actions run ./my-project --verbose
+1. **Use Descriptive Names**: Choose clear, descriptive action names
+2. **Add Descriptions**: Include descriptions for complex actions
+3. **Group Related Actions**: Use tags to group related actions
+4. **Set Appropriate Timeouts**: Configure timeouts based on action complexity
+5. **Handle Errors Gracefully**: Use retries and error handling appropriately
 
-# Check action plan
-spooky actions run ./my-project --plan --verbose
+### Security Considerations
 
-# Validate with details
-spooky actions validate ./my-project --verbose
-```
+1. **SSH Key Management**: Use dedicated SSH keys for action running
+2. **Key Permissions**: Ensure SSH keys have correct permissions (600)
+3. **Network Security**: Use VPN or secure networks for action running
+4. **Sensitive Commands**: Be careful with commands that handle sensitive data
+
+### Performance Optimization
+
+1. **Use Parallel Running**: Use parallel execution for independent actions
+2. **Optimize Dependencies**: Minimize unnecessary dependencies
+3. **Target Appropriately**: Use machine filtering to limit scope
+4. **Monitor Resources**: Watch for resource usage during running
 
 ## Integration with Other Systems
-
-### Project Integration
-
-Actions integrate with the project system:
-
-- **Machine Inventory**: Uses machines.hcl for target identification
-- **Project Structure**: Follows project directory structure
-- **Configuration**: Uses project-specific configuration
 
 ### Variables Integration
 
@@ -786,49 +630,84 @@ action "os-specific-command" {
 }
 ```
 
-## Current Implementation Status
+## CLI Reference
 
-### ✅ Fully Implemented Features
+### `spooky actions list`
 
-- **Complete Acting Infrastructure**: Fully functional action orchestration with SSH-based execution
-- **All Action Types**: Command, script, template deploy, file copy, service control - all fully implemented
-- **Action Configuration**: HCL-based configuration with comprehensive validation
-- **Dependency Management**: Complete action dependency resolution and run order planning
-- **Machine Targeting**: Full support for machine names and tags with proper filtering
-- **Parallel Running**: Parallel action running across machines with dependency resolution
-- **CLI Integration**: Complete CLI command set with all features functional
-- **Validation**: Comprehensive action configuration validation with detailed error reporting
-- **Planning Mode**: Run planning with `--plan` flag showing dependency resolution
-- **Dry Run Mode**: Simulation mode with `--dry-run` flag for safe testing
-- **SSH Integration**: Complete SSH-based execution for all action types
-- **Error Handling**: Comprehensive error handling and result aggregation
-- **Session Management**: Full session lifecycle management and progress tracking
-- **Resource Monitoring**: Resource usage tracking and timeout handling
-- **Retry Logic**: Automatic retry with configurable retry policies
+List available actions in a project.
 
-### 🎯 Production Ready
+**Syntax**:
+```bash
+spooky actions list <project-path>
+```
 
-The actions system is now **production-ready** with:
-- **100% Functional Acting Infrastructure**: No more stubs or placeholders
-- **Complete SSH Integration**: All action types execute via SSH
-- **Robust Error Handling**: Comprehensive error recovery and reporting
-- **Performance Optimized**: Efficient execution with proper resource management
-- **Type Safe**: All interface contracts satisfied with proper validation
+**Examples**:
+```bash
+# List all actions
+spooky actions list ./my-project
+```
 
-### 📋 Future Enhancements
+### `spooky actions validate`
 
-- **Action History**: Track action run history and analytics
-- **Rollback Support**: Automatic rollback capabilities for failed deployments
-- **Advanced Scheduling**: Time-based action scheduling and cron-like functionality
-- **Action Metrics**: Enhanced performance metrics and monitoring dashboards
-- **Web Interface**: Web-based action management interface
-- **Advanced Scripting**: Enhanced script running with better debugging tools
-- **Template Functions**: Additional template functions and helpers
+Validate actions in a project.
 
-## Conclusion
+**Syntax**:
+```bash
+spooky actions validate <project-path>
+```
 
-The spooky actions system provides comprehensive action orchestration capabilities for managing remote machine operations. The system is designed to be flexible, reliable, and easy to use while supporting complex deployment scenarios.
+**Examples**:
+```bash
+# Validate all actions
+spooky actions validate ./my-project
+```
 
-Start with simple actions and gradually build more complex workflows. Always validate your configurations and use dry-run mode to test before actual running.
+### `spooky actions run`
 
-For more advanced usage and troubleshooting, refer to the [API Reference](ACTIONS_API_REFERENCE.md) and [Troubleshooting Guide](ACTIONS_TROUBLESHOOTING.md).
+Run actions on machines.
+
+**Syntax**:
+```bash
+spooky actions run <project-path> [options]
+```
+
+**Options**:
+- `--machine <list>` - Target specific machines
+- `--tags <list>` - Target machines by tags
+- `--filter <query>` - Use complex filter query
+- `--parallel <number>` - Number of parallel workers (minimum 2)
+- `--dry-run` - Simulate running without making changes
+- `--plan` - Show running plan without running
+- `--decrypt` - Decrypt encrypted variables and facts in-memory for debugging
+
+**Examples**:
+```bash
+# Run all actions
+spooky actions run ./my-project
+
+# Run with dry-run mode
+spooky actions run ./my-project --dry-run
+
+# Run with plan mode
+spooky actions run ./my-project --plan
+
+# Run with parallel execution
+spooky actions run ./my-project --parallel 4
+
+# Run on specific machines
+spooky actions run ./my-project --machine web-server
+
+# Run with decryption
+spooky actions run ./my-project --decrypt
+```
+
+## Remember
+
+**Good actions system usage enables:**
+- Efficient automation of machine operations
+- Consistent deployment and configuration
+- Scalable infrastructure management
+- Integration with other spooky systems
+- Reliable and repeatable operations
+
+**Always be aware of current SSH-based orchestration limitations and use appropriate workarounds until these issues are resolved.**
