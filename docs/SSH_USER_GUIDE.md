@@ -1,71 +1,50 @@
-# SSH System User Guide
+# SSH User Guide
 
 ## Overview
 
-The spooky SSH system provides comprehensive SSH connectivity, authentication, and acting capabilities for remote machine operations. This guide covers everything from basic SSH configuration to advanced features like connection pooling, authentication methods, and acting operations.
+The SSH system in spooky provides comprehensive functionality for SSH connections, authentication, command execution, and file transfer operations. This guide covers how to configure and use SSH features effectively.
 
-**Status: Production Ready** - The SSH system is fully implemented with comprehensive connectivity, authentication, and acting capabilities.
+**Status: Fully Implemented** - All SSH functionality is implemented and ready for production use.
 
-## Getting Started
+## Quick Start
 
-### Prerequisites
+### Basic SSH Configuration
 
-- spooky CLI installed and configured
-- SSH access to target machines
-- Basic understanding of SSH authentication methods
-- Access to create and modify project files
-
-### Quick Start
-
-1. **Check Available SSH Commands**
+1. **Configure SSH keys**:
    ```bash
-   spooky ssh --help
+   # Generate Ed25519 key (recommended)
+   ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "your-email@example.com"
+   
+   # Or generate RSA 4096-bit key
+   ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -C "your-email@example.com"
    ```
 
-2. **Test SSH Connectivity to a Machine**
+2. **Set proper permissions**:
    ```bash
-   spooky machines ping ./my-project --machine web-server
+   chmod 600 ~/.ssh/id_ed25519
+   chmod 644 ~/.ssh/id_ed25519.pub
    ```
 
-3. **Connect to a Machine via SSH**
+3. **Add public key to remote servers**:
    ```bash
-   spooky machines connect ./my-project --machine web-server
+   ssh-copy-id -i ~/.ssh/id_ed25519.pub user@hostname
    ```
 
-## Core Concepts
+### Test SSH Connectivity
 
-### SSH Authentication Methods
+```bash
+# Test SSH connectivity to machines
+spooky machines ping my-project
 
-spooky supports multiple SSH authentication methods:
-
-- **SSH Key Authentication** (recommended)
-- **Password Authentication** (for testing only)
-- **Certificate-based Authentication**
-- **Multi-factor Authentication**
-
-### Connection Management
-
-The SSH system provides:
-
-- **Connection Pooling** - Reuse connections for efficiency
-- **Connection Limits** - Prevent resource exhaustion
-- **Timeout Management** - Handle network issues gracefully
-- **Health Monitoring** - Track connection status
-
-### Acting Operations
-
-SSH acting operations include:
-
-- **Command Execution** - Run commands on remote machines
-- **File Transfer** - Upload and download files
-- **Script Execution** - Run scripts with proper environment
-- **Service Control** - Start, stop, and manage services
+# Test specific machine
+spooky machines ping my-project --machine web-server
+```
 
 ## Configuration
 
-### Machine SSH Configuration
+### Machine Configuration
 
-Configure SSH settings in your `machines.hcl` file:
+Configure SSH settings in your machine inventory:
 
 ```hcl
 machines {
@@ -76,269 +55,720 @@ machines {
     
     authentication {
       method = "ssh_key"
-      key_path = "~/.ssh/id_rsa"
+      key_path = "~/.ssh/id_ed25519"
+      passphrase = "optional_passphrase"
     }
     
-    connection {
-      timeout_seconds = 30
-      retry_attempts = 3
-      keepalive_seconds = 60
+    ssh {
+      timeout = "30s"
+      keepalive = "60s"
+      host_key_validation = true
     }
     
-    tags = ["web", "production"]
+    tags = {
+      environment = "production"
+      role = "web"
+    }
+  }
+  
+  machine "db-server" {
+    hostname = "db.example.com"
+    port = 22
+    user = "dbadmin"
+    
+    authentication {
+      method = "password"
+      password = "secure_password"
+    }
+    
+    ssh {
+      timeout = "60s"
+      keepalive = "120s"
+      host_key_validation = false  # Development only
+    }
+    
+    tags = {
+      environment = "production"
+      role = "database"
+    }
   }
 }
 ```
 
-### SSH Key Configuration
+### SSH Client Configuration
 
-For SSH key authentication:
+Configure global SSH settings:
+
+```hcl
+ssh {
+  default_port = 22
+  default_timeout = "30s"
+  max_connections = 10
+  max_retry_attempts = 3
+  retry_delay = "5s"
+  idle_timeout = "300s"
+  known_hosts_path = "~/.ssh/known_hosts"
+  strict_host_key_check = true
+  allow_insecure_hosts = false
+}
+```
+
+## Authentication Methods
+
+### SSH Key Authentication (Recommended)
+
+SSH key authentication is the most secure and recommended method:
 
 ```hcl
 authentication {
   method = "ssh_key"
-  key_path = "~/.ssh/id_rsa"
-  passphrase = "your-passphrase"  # Optional
+  key_path = "~/.ssh/id_ed25519"
+  passphrase = "optional_passphrase"
 }
 ```
 
+**Supported Key Types**:
+- **Ed25519**: Recommended for most use cases
+- **RSA 4096-bit**: For compatibility with older systems
+
+**Key Requirements**:
+- Private key permissions: 600 (`-rw-------`)
+- Public key permissions: 644 (`-rw-r--r--`)
+- Key size: RSA keys must be at least 4096 bits
+
 ### Password Authentication
 
-For password authentication (testing only):
+Password authentication is supported but less secure:
 
 ```hcl
 authentication {
   method = "password"
-  password = "your-password"
+  password = "user_password"
 }
 ```
 
-### Certificate Authentication
+**Security Considerations**:
+- Passwords are stored in plain text in configuration
+- Use SSH keys when possible
+- Consider using environment variables for passwords
 
-For certificate-based authentication:
+### SSH Agent Authentication
+
+Use SSH agent for key management:
 
 ```hcl
 authentication {
-  method = "certificate"
-  certificate_path = "~/.ssh/user-cert.pub"
-  key_path = "~/.ssh/id_rsa"
+  method = "agent"
 }
 ```
 
-## CLI Commands
-
-### SSH Connectivity Testing
-
-Test SSH connectivity to machines:
-
+**Setup**:
 ```bash
-# Test connectivity to all machines
-spooky machines ping ./my-project
+# Start SSH agent
+eval $(ssh-agent)
 
-# Test specific machine
-spooky machines ping ./my-project --machine web-server
-
-# Test machines by tags
-spooky machines ping ./my-project --tags production
-
-# Test with custom timeout
-spooky machines ping ./my-project --timeout 60
+# Add key to agent
+ssh-add ~/.ssh/id_ed25519
 ```
 
-### SSH Connection Management
-
-Connect to machines via SSH:
-
-```bash
-# Connect to specific machine
-spooky machines connect ./my-project --machine web-server
-
-# Connect with custom user
-spooky machines connect ./my-project --machine web-server --user admin
-
-# Connect with custom port
-spooky machines connect ./my-project --machine web-server --port 2222
-```
-
-### SSH Acting Operations
-
-Run actions that use SSH:
-
-```bash
-# Run actions on machines
-spooky actions run ./my-project --machine web-server
-
-# Run with parallel execution
-spooky actions run ./my-project --parallel 4
-
-# Run with dry-run mode
-spooky actions run ./my-project --dry-run
-
-# Run with decryption
-spooky actions run ./my-project --decrypt
-```
-
-## Advanced Features
+## Connection Management
 
 ### Connection Pooling
 
-The SSH system automatically manages connection pooling:
-
-- **Reuse Connections** - Maintain connections for efficiency
-- **Connection Limits** - Prevent resource exhaustion
-- **Health Checks** - Monitor connection status
-- **Automatic Cleanup** - Close idle connections
-
-### Timeout Management
-
-Configure timeouts for different operations:
+The SSH system uses connection pooling for improved performance:
 
 ```hcl
-connection {
-  timeout_seconds = 30        # Connection timeout
-  command_timeout_seconds = 60 # Command execution timeout
-  keepalive_seconds = 60      # Keepalive interval
+ssh {
+  max_connections = 10      # Maximum concurrent connections
+  idle_timeout = "300s"     # Close idle connections after 5 minutes
+  keepalive = "60s"         # Send keepalive every 60 seconds
 }
 ```
 
-### Retry Logic
+**Benefits**:
+- Reuse connections for multiple operations
+- Reduce connection establishment overhead
+- Improve performance for parallel operations
 
-Configure retry behavior for failed operations:
+### Connection Health Monitoring
+
+The system automatically monitors connection health:
+
+- **Health Checks**: Regular health checks for active connections
+- **Automatic Cleanup**: Clean up stale or unhealthy connections
+- **Retry Logic**: Automatic retry for failed connections
+
+### Timeout Configuration
+
+Configure appropriate timeouts for your environment:
 
 ```hcl
-connection {
-  retry_attempts = 3
-  retry_delay_seconds = 5
-  backoff_multiplier = 2.0
+ssh {
+  default_timeout = "30s"   # Connection timeout
+  command_timeout = "60s"   # Command execution timeout
+  transfer_timeout = "300s" # File transfer timeout
 }
 ```
 
-### Health Monitoring
+## Command Execution
 
-Monitor SSH connection health:
+### Basic Command Execution
 
-```bash
-# Check connection status
-spooky machines ping ./my-project --verbose
+Execute commands on remote machines through actions:
 
-# Monitor connection metrics
-spooky machines ping ./my-project --metrics
+```hcl
+actions {
+  action "check-system-status" {
+    description = "Check system status on all machines"
+    
+    machines = ["web-server", "db-server"]
+    parallel = true
+    
+    command {
+      command = "systemctl status"
+      timeout = 30
+    }
+  }
+  
+  action "update-packages" {
+    description = "Update system packages"
+    
+    machines = ["web-server"]
+    
+    command {
+      command = "apt update && apt upgrade -y"
+      timeout = 300
+      working_dir = "/tmp"
+      environment = {
+        DEBIAN_FRONTEND = "noninteractive"
+      }
+    }
+  }
+}
+```
+
+### Command with Stdin Input
+
+Execute commands with standard input:
+
+```hcl
+actions {
+  action "create-user" {
+    description = "Create new user account"
+    
+    machines = ["web-server"]
+    
+    command {
+      command = "adduser --gecos '' newuser"
+      stdin = "password\npassword\n"  # Provide password twice
+      timeout = 60
+    }
+  }
+}
+```
+
+### Environment Variables
+
+Set environment variables for commands:
+
+```hcl
+actions {
+  action "deploy-application" {
+    description = "Deploy application with environment variables"
+    
+    machines = ["web-server"]
+    
+    command {
+      command = "./deploy.sh"
+      working_dir = "/opt/app"
+      environment = {
+        NODE_ENV = "production"
+        DATABASE_URL = "postgresql://user:pass@localhost/db"
+        API_KEY = "secret-key"
+      }
+      timeout = 120
+    }
+  }
+}
+```
+
+## File Transfer
+
+### SFTP File Transfer
+
+Transfer files using SFTP (recommended):
+
+```hcl
+actions {
+  action "deploy-config" {
+    description = "Deploy configuration files"
+    
+    machines = ["web-server"]
+    
+    file_copy {
+      source = "config/nginx.conf"
+      destination = "/etc/nginx/nginx.conf"
+      permissions = "0644"
+      verify = true
+    }
+  }
+  
+  action "backup-logs" {
+    description = "Backup log files from remote server"
+    
+    machines = ["web-server"]
+    
+    file_copy {
+      source = "/var/log/nginx/access.log"
+      destination = "backups/nginx-access.log"
+      direction = "download"
+      verify = true
+    }
+  }
+}
+```
+
+### SCP File Transfer
+
+Transfer files using SCP:
+
+```hcl
+actions {
+  action "upload-script" {
+    description = "Upload script file using SCP"
+    
+    machines = ["web-server"]
+    
+    file_copy {
+      source = "scripts/deploy.sh"
+      destination = "/tmp/deploy.sh"
+      mode = "scp"
+      permissions = "0755"
+    }
+  }
+}
+```
+
+### Directory Transfer
+
+Transfer entire directories:
+
+```hcl
+actions {
+  action "deploy-application" {
+    description = "Deploy entire application directory"
+    
+    machines = ["web-server"]
+    
+    file_copy {
+      source = "app/"
+      destination = "/opt/app/"
+      recursive = true
+      permissions = "0755"
+      exclude = ["*.tmp", "*.log"]
+    }
+  }
+}
+```
+
+## Service Management
+
+### Service Control Actions
+
+Control system services:
+
+```hcl
+actions {
+  action "restart-nginx" {
+    description = "Restart nginx service"
+    
+    machines = ["web-server"]
+    
+    service_control {
+      service = "nginx"
+      action = "restart"
+      timeout = 60
+    }
+  }
+  
+  action "stop-services" {
+    description = "Stop all application services"
+    
+    machines = ["web-server", "db-server"]
+    parallel = true
+    
+    service_control {
+      service = "app"
+      action = "stop"
+      timeout = 30
+    }
+  }
+}
+```
+
+**Supported Service Actions**:
+- `start`: Start a service
+- `stop`: Stop a service
+- `restart`: Restart a service
+- `reload`: Reload service configuration
+- `status`: Check service status
+- `enable`: Enable service at boot
+- `disable`: Disable service at boot
+
+## Template Deployment
+
+### Template-Based File Deployment
+
+Deploy files with template rendering:
+
+```hcl
+actions {
+  action "deploy-config-template" {
+    description = "Deploy configuration from template"
+    
+    machines = ["web-server"]
+    
+    template_deploy {
+      source = "templates/nginx.conf.tmpl"
+      destination = "/etc/nginx/nginx.conf"
+      permissions = "0644"
+      variables = {
+        server_name = "example.com"
+        port = 80
+        ssl_enabled = true
+      }
+    }
+  }
+}
+```
+
+### Template with Machine Facts
+
+Use machine facts in templates:
+
+```hcl
+actions {
+  action "deploy-host-config" {
+    description = "Deploy host-specific configuration"
+    
+    machines = ["web-server", "db-server"]
+    parallel = true
+    
+    template_deploy {
+      source = "templates/hosts.tmpl"
+      destination = "/etc/hosts"
+      permissions = "0644"
+      variables = {
+        hostname = "{{.Machine.Hostname}}"
+        ip_address = "{{.Machine.Host}}"
+        environment = "{{.Machine.Tags.environment}}"
+      }
+    }
+  }
+}
+```
+
+## Parallel Operations
+
+### Parallel Command Execution
+
+Execute commands in parallel across multiple machines:
+
+```hcl
+actions {
+  action "parallel-update" {
+    description = "Update packages on all machines in parallel"
+    
+    machines = ["web-server", "db-server", "app-server"]
+    parallel = true
+    max_concurrent = 3
+    
+    command {
+      command = "apt update && apt upgrade -y"
+      timeout = 300
+    }
+  }
+}
+```
+
+### Parallel File Transfer
+
+Transfer files in parallel:
+
+```hcl
+actions {
+  action "parallel-deploy" {
+    description = "Deploy application to all machines in parallel"
+    
+    machines = ["web-server", "db-server", "app-server"]
+    parallel = true
+    max_concurrent = 2
+    
+    file_copy {
+      source = "app/"
+      destination = "/opt/app/"
+      recursive = true
+      permissions = "0755"
+    }
+  }
+}
+```
+
+## Error Handling
+
+### Command Error Handling
+
+Handle command execution errors:
+
+```hcl
+actions {
+  action "safe-update" {
+    description = "Safe system update with error handling"
+    
+    machines = ["web-server"]
+    
+    command {
+      command = "apt update && apt upgrade -y"
+      timeout = 300
+      continue_on_error = true  # Continue even if this command fails
+    }
+    
+    command {
+      command = "systemctl restart nginx"
+      timeout = 60
+      depends_on = ["safe-update"]  # Only run if previous command succeeds
+    }
+  }
+}
+```
+
+### File Transfer Error Handling
+
+Handle file transfer errors:
+
+```hcl
+actions {
+  action "backup-with-retry" {
+    description = "Backup files with retry logic"
+    
+    machines = ["web-server"]
+    
+    file_copy {
+      source = "/var/log/nginx/access.log"
+      destination = "backups/nginx-access.log"
+      direction = "download"
+      verify = true
+      retry_attempts = 3
+      retry_delay = "5s"
+    }
+  }
+}
 ```
 
 ## Security Best Practices
 
 ### SSH Key Management
 
-- Use Ed25519 or RSA 4096-bit keys
-- Set proper file permissions (600)
-- Use passphrases for additional security
-- Rotate keys regularly
+1. **Use strong keys**:
+   ```bash
+   # Generate Ed25519 key (recommended)
+   ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "your-email@example.com"
+   
+   # Or RSA 4096-bit key
+   ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -C "your-email@example.com"
+   ```
 
-### Authentication Security
+2. **Set proper permissions**:
+   ```bash
+   chmod 600 ~/.ssh/id_ed25519
+   chmod 644 ~/.ssh/id_ed25519.pub
+   ```
 
-- Prefer SSH key authentication over passwords
-- Use certificate-based authentication for large deployments
-- Implement multi-factor authentication where possible
-- Monitor authentication attempts
+3. **Use passphrases**:
+   ```bash
+   ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "your-email@example.com"
+   # Enter a strong passphrase when prompted
+   ```
+
+### Host Key Validation
+
+Enable host key validation for security:
+
+```hcl
+ssh {
+  strict_host_key_check = true
+  known_hosts_path = "~/.ssh/known_hosts"
+}
+```
+
+**Add host keys**:
+```bash
+# Add host key to known_hosts
+ssh-keyscan -H web.example.com >> ~/.ssh/known_hosts
+```
 
 ### Network Security
 
-- Use SSH over secure networks
-- Implement firewall rules for SSH access
-- Use non-standard SSH ports when possible
-- Monitor SSH access logs
+1. **Use non-standard SSH ports** (if configured):
+   ```hcl
+   machine "web-server" {
+     hostname = "web.example.com"
+     port = 2222  # Non-standard SSH port
+     user = "admin"
+   }
+   ```
 
-## Troubleshooting
+2. **Use VPN or private networks** for sensitive operations
+3. **Limit SSH access** to specific IP addresses
+4. **Monitor SSH logs** for suspicious activity
 
-### Common SSH Issues
+## Performance Optimization
 
-**Connection Refused**
-```bash
-# Check if SSH service is running
-spooky machines ping ./my-project --machine web-server --verbose
+### Connection Pooling
+
+Optimize connection performance:
+
+```hcl
+ssh {
+  max_connections = 20      # Increase for high-concurrency operations
+  idle_timeout = "600s"     # Keep connections alive longer
+  keepalive = "30s"         # More frequent keepalive
+}
 ```
 
-**Authentication Failed**
-```bash
-# Verify SSH key permissions
-ls -la ~/.ssh/id_rsa
+### Parallel Operations
 
-# Test SSH key manually
-ssh -i ~/.ssh/id_rsa user@hostname
-```
-
-**Timeout Issues**
-```bash
-# Increase timeout for slow connections
-spooky machines ping ./my-project --timeout 120
-```
-
-### Debugging SSH Connections
-
-Enable verbose output for debugging:
-
-```bash
-# Verbose SSH output
-spooky machines ping ./my-project --verbose
-
-# Debug connection issues
-spooky machines connect ./my-project --machine web-server --debug
-```
-
-### Performance Optimization
-
-Optimize SSH performance:
-
-```bash
-# Use connection pooling
-spooky actions run ./my-project --parallel 4
-
-# Monitor connection metrics
-spooky machines ping ./my-project --metrics
-```
-
-## Integration with Other Systems
-
-### Actions Integration
-
-SSH integrates with the actions system for remote execution:
+Use parallel operations for better performance:
 
 ```hcl
 actions {
-  action "update-system" {
-    description = "Update system packages"
+  action "mass-update" {
+    description = "Update all machines in parallel"
     
-    machines = ["web-server"]
+    machines = ["web-server", "db-server", "app-server", "cache-server"]
     parallel = true
+    max_concurrent = 4      # Limit concurrent operations
     
-    command = "sudo apt update && sudo apt upgrade -y"
+    command {
+      command = "apt update && apt upgrade -y"
+      timeout = 300
+    }
   }
 }
 ```
 
-### Facts Integration
+### File Transfer Optimization
 
-SSH enables fact collection from remote machines:
+Optimize file transfers:
 
-```bash
-# Collect facts via SSH
-spooky facts gather ./my-project --parallel 4
+```hcl
+actions {
+  action "fast-deploy" {
+    description = "Fast application deployment"
+    
+    machines = ["web-server"]
+    
+    file_copy {
+      source = "app/"
+      destination = "/opt/app/"
+      recursive = true
+      mode = "sftp"         # Use SFTP for better performance
+      compression = true    # Enable compression
+      buffer_size = 65536   # Larger buffer for faster transfers
+    }
+  }
+}
 ```
 
-### Variables Integration
+## Monitoring and Logging
 
-SSH enables variable collection from remote machines:
+### Enable Debug Logging
+
+Enable detailed SSH logging:
 
 ```bash
-# Collect variables via SSH
-spooky variables gather ./my-project --parallel 4
+# Set debug log level
+export SPOOKY_LOG_LEVEL=debug
+
+# Run commands with verbose output
+spooky actions run my-project --verbose
+```
+
+### Monitor Connection Performance
+
+Monitor SSH connection performance:
+
+```bash
+# Test connection performance
+time spooky machines ping my-project
+
+# Monitor connection pool usage
+spooky machines ping my-project --verbose
+```
+
+### Log Analysis
+
+Analyze SSH logs for troubleshooting:
+
+```bash
+# Check SSH connection logs
+grep "ssh" /var/log/auth.log
+
+# Check spooky SSH logs
+grep "SSH" spooky.log
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Authentication failures**:
+   ```bash
+   # Test SSH manually
+   ssh -i ~/.ssh/id_ed25519 user@hostname
+   
+   # Check key permissions
+   ls -la ~/.ssh/id_ed25519
+   ```
+
+2. **Connection timeouts**:
+   ```bash
+   # Test network connectivity
+   ping hostname
+   telnet hostname 22
+   ```
+
+3. **Host key issues**:
+   ```bash
+   # Add host key
+   ssh-keyscan -H hostname >> ~/.ssh/known_hosts
+   ```
+
+### Debug Commands
+
+```bash
+# Enable verbose SSH output
+ssh -v user@hostname
+
+# Test specific machine
+spooky machines ping my-project --machine web-server
+
+# Check machine configuration
+spooky machines list my-project --verbose
 ```
 
 ## Examples
 
-### Basic SSH Configuration
+### Complete Deployment Example
 
 ```hcl
+# Project configuration
+project {
+  name = "web-application"
+  description = "Web application deployment"
+}
+
+# Machine inventory
 machines {
   machine "web-server" {
     hostname = "web.example.com"
@@ -347,94 +777,145 @@ machines {
     
     authentication {
       method = "ssh_key"
-      key_path = "~/.ssh/id_rsa"
+      key_path = "~/.ssh/id_ed25519"
     }
     
-    tags = ["web", "production"]
+    tags = {
+      environment = "production"
+      role = "web"
+    }
   }
-}
-```
-
-### Advanced SSH Configuration
-
-```hcl
-machines {
-  machine "database-server" {
+  
+  machine "db-server" {
     hostname = "db.example.com"
-    port = 2222
+    port = 22
     user = "dbadmin"
     
     authentication {
-      method = "certificate"
-      certificate_path = "~/.ssh/db-cert.pub"
-      key_path = "~/.ssh/id_rsa"
+      method = "ssh_key"
+      key_path = "~/.ssh/id_ed25519"
     }
     
-    connection {
-      timeout_seconds = 60
-      retry_attempts = 5
-      keepalive_seconds = 30
+    tags = {
+      environment = "production"
+      role = "database"
     }
-    
-    tags = ["database", "production"]
   }
 }
-```
 
-### SSH Acting Example
-
-```hcl
+# Actions for deployment
 actions {
   action "deploy-application" {
     description = "Deploy web application"
     
     machines = ["web-server"]
-    parallel = true
     
-    template {
-      source = "templates/deploy.sh.tmpl"
-      destination = "/tmp/deploy.sh"
+    # Stop application
+    service_control {
+      service = "nginx"
+      action = "stop"
+      timeout = 30
+    }
+    
+    # Deploy files
+    file_copy {
+      source = "app/"
+      destination = "/opt/app/"
+      recursive = true
       permissions = "0755"
     }
     
-    command = "/tmp/deploy.sh"
+    # Deploy configuration
+    template_deploy {
+      source = "templates/nginx.conf.tmpl"
+      destination = "/etc/nginx/nginx.conf"
+      permissions = "0644"
+      variables = {
+        server_name = "example.com"
+        port = 80
+      }
+    }
+    
+    # Start application
+    service_control {
+      service = "nginx"
+      action = "start"
+      timeout = 30
+    }
+    
+    # Verify deployment
+    command {
+      command = "curl -f http://localhost/health"
+      timeout = 30
+    }
+  }
+  
+  action "backup-database" {
+    description = "Backup database"
+    
+    machines = ["db-server"]
+    
+    command {
+      command = "pg_dump myapp > /backup/myapp_$(date +%Y%m%d_%H%M%S).sql"
+      timeout = 300
+    }
+    
+    file_copy {
+      source = "/backup/"
+      destination = "backups/"
+      direction = "download"
+      recursive = true
+    }
   }
 }
 ```
 
-## Best Practices
+### Parallel Operations Example
 
-### SSH Configuration
+```hcl
+actions {
+  action "parallel-maintenance" {
+    description = "Perform maintenance on all servers"
+    
+    machines = ["web-server", "db-server", "app-server"]
+    parallel = true
+    max_concurrent = 3
+    
+    # Update packages
+    command {
+      command = "apt update && apt upgrade -y"
+      timeout = 300
+    }
+    
+    # Restart services
+    service_control {
+      service = "nginx"
+      action = "restart"
+      timeout = 60
+    }
+    
+    # Check system status
+    command {
+      command = "systemctl status"
+      timeout = 30
+    }
+  }
+}
+```
 
-- Use descriptive machine names
-- Group machines with tags
-- Configure appropriate timeouts
-- Use connection pooling for efficiency
+## Summary
 
-### Security
+The SSH system in spooky provides comprehensive functionality for secure, efficient, and reliable SSH operations. Key features include:
 
-- Use SSH key authentication
-- Set proper file permissions
-- Monitor authentication attempts
-- Implement access controls
+1. **Multiple Authentication Methods**: SSH keys, passwords, and agent authentication
+2. **Connection Pooling**: Efficient connection management and reuse
+3. **File Transfer**: SFTP and SCP file transfer with progress tracking
+4. **Command Execution**: Secure command execution with output capture
+5. **Service Management**: System service control and management
+6. **Template Deployment**: Template-based file deployment with variable substitution
+7. **Parallel Operations**: Parallel execution across multiple machines
+8. **Error Handling**: Comprehensive error handling and retry logic
+9. **Security Features**: Host key validation, key management, and security best practices
+10. **Performance Optimization**: Connection pooling, parallel operations, and transfer optimization
 
-### Performance
-
-- Use parallel execution for multiple machines
-- Configure appropriate connection limits
-- Monitor connection metrics
-- Optimize timeout settings
-
-### Monitoring
-
-- Monitor SSH connection health
-- Track authentication failures
-- Monitor performance metrics
-- Log SSH operations
-
-## Next Steps
-
-- Explore the [SSH API Reference](SSH_API_REFERENCE.md) for detailed technical information
-- Check the [SSH Troubleshooting Guide](SSH_TROUBLESHOOTING.md) for common issues
-- Review the [SSH Documentation Summary](SSH_DOCUMENTATION_SUMMARY.md) for implementation details
-- Learn about [SSH Integration Patterns](INTEGRATIONS_USER_GUIDE.md) for advanced usage
+The SSH system is production-ready and provides all necessary functionality for secure, efficient, and reliable SSH operations in the spooky automation platform.

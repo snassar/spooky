@@ -1,547 +1,555 @@
-# SSH System Troubleshooting Guide
+# SSH Troubleshooting Guide
 
 ## Overview
 
-This troubleshooting guide provides solutions for common issues encountered when working with the spooky SSH system. It covers error messages, configuration problems, performance issues, and debugging techniques.
+This guide provides comprehensive troubleshooting information for SSH-related issues in the spooky system. It covers common problems, diagnostic techniques, and solutions for SSH connections, authentication, and file transfer operations.
 
-**Status: Production Ready** - The SSH system is fully implemented with enhanced key support, SSH certificate support, and comprehensive error handling.
-
-## SSH System Status
-
-### ✅ Fully Functional SSH Infrastructure
-
-The SSH system now has **complete SSH infrastructure** with:
-
-- **Enhanced Key Support**: Full support for ED25519, ED25519-SK, and RSA 4096-bit keys
-- **SSH Certificate Support**: Complete certificate authentication with validation
-- **Connection Pooling**: Efficient connection management and reuse
-- **Key Validation**: Comprehensive key type and size validation
-- **Error Handling**: Detailed error messages and troubleshooting information
-- **Performance Optimization**: Connection pooling and retry mechanisms
-
-### What This Means for Users
-
-- **No More Stubs**: All functionality is fully implemented - no placeholder code
-- **Production Ready**: The system is ready for production use
-- **Complete Feature Set**: All documented features are functional
-- **Reliable Connections**: Robust error handling and recovery mechanisms
-- **Performance Optimized**: Efficient connection management with pooling
-
-### Expected Behavior
-
-When using SSH, you can expect:
-
-1. **Proper Key Validation**: Keys are validated for type and size requirements
-2. **Certificate Authentication**: SSH certificates work with proper validation
-3. **Connection Pooling**: Efficient connection reuse and management
-4. **Error Reporting**: Clear error messages with actionable information
-5. **Performance**: Optimized connection handling and retry logic
+**Status: Implemented** - The SSH system provides comprehensive functionality with robust error handling and diagnostic capabilities.
 
 ## Common Issues and Solutions
 
-### Key Validation Issues
+### Authentication Failures
 
-#### Issue: Unsupported Key Type
-**Error Message:**
-```
-Error: key validation failed for dsa: unsupported key type: ssh-dss. 
-Supported types: ed25519, ed25519-sk, rsa-4096
-```
+#### SSH Key Authentication Issues
 
-**Cause:** The SSH system only supports ED25519, ED25519-SK, and RSA 4096-bit keys.
+**Problem**: SSH key authentication fails with "Permission denied" or "Authentication failed"
 
-**Solution:**
-1. Generate a supported key type:
+**Diagnostic Steps**:
+1. **Check SSH key permissions**:
    ```bash
-   # Generate ED25519 key (recommended)
-   ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519 -C "your-email@example.com"
-   
-   # Generate RSA 4096-bit key
-   ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_4096 -C "your-email@example.com"
+   ls -la ~/.ssh/id_rsa
+   # Should show: -rw------- (600 permissions)
    ```
 
-2. Update machine configuration:
-   ```hcl
-   machines {
-     machine "server" {
-       host = "example.com"
-       user = "admin"
-       key_file = "~/.ssh/id_ed25519"  # Use supported key
-     }
-   }
-   ```
-
-#### Issue: RSA Key Size Too Small
-**Error Message:**
-```
-Error: key validation failed for rsa: RSA key size 2048 bits is less than minimum required 4096 bits
-```
-
-**Cause:** RSA keys must be at least 4096 bits for security.
-
-**Solution:**
-1. Generate new RSA key with 4096 bits:
+2. **Verify SSH key format**:
    ```bash
-   ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_4096 -C "your-email@example.com"
+   ssh-keygen -l -f ~/.ssh/id_rsa
+   # Should show key fingerprint
    ```
 
-2. Update machine configuration:
-   ```hcl
-   machines {
-     machine "server" {
-       host = "example.com"
-       user = "admin"
-       key_file = "~/.ssh/id_rsa_4096"  # Use 4096-bit key
-     }
-   }
+3. **Test SSH key manually**:
+   ```bash
+   ssh -i ~/.ssh/id_rsa user@hostname
    ```
 
-#### Issue: Key File Permissions
-**Error Message:**
-```
-Error: key file has too permissive permissions: -rw-r--r--
+**Solutions**:
+- **Fix permissions**: `chmod 600 ~/.ssh/id_rsa`
+- **Regenerate key**: Use Ed25519 or RSA 4096-bit keys
+- **Check passphrase**: Verify passphrase for encrypted keys
+- **Update authorized_keys**: Ensure public key is in remote `~/.ssh/authorized_keys`
+
+**Code Example**:
+```go
+// Validate SSH key before use
+func validateSSHKey(keyPath string) error {
+    info, err := os.Stat(keyPath)
+    if err != nil {
+        return fmt.Errorf("key file not found: %w", err)
+    }
+    
+    mode := info.Mode()
+    if mode&0077 != 0 {
+        return fmt.Errorf("key file has too permissive permissions: %v", mode)
+    }
+    
+    return nil
+}
 ```
 
-**Cause:** SSH private keys must have restrictive permissions (600).
+#### Password Authentication Issues
 
-**Solution:**
-```bash
-# Set correct permissions
-chmod 600 ~/.ssh/id_ed25519
-chmod 644 ~/.ssh/id_ed25519.pub
+**Problem**: Password authentication fails
 
-# Verify permissions
-ls -la ~/.ssh/id_ed25519*
-```
+**Diagnostic Steps**:
+1. **Check user credentials**:
+   ```bash
+   ssh user@hostname
+   # Test manual password authentication
+   ```
+
+2. **Verify SSH configuration**:
+   ```bash
+   # Check if password authentication is enabled
+   ssh -o PreferredAuthentications=password user@hostname
+   ```
+
+**Solutions**:
+- **Verify username**: Ensure correct username is specified
+- **Check password**: Verify password is correct
+- **Enable password auth**: Ensure `PasswordAuthentication yes` in SSH config
+- **Use SSH keys**: Prefer SSH key authentication over passwords
 
 ### Connection Issues
 
-#### Issue: Connection Timeout
-**Error Message:**
-```
-Error: connection timeout to example.com: dial tcp 192.168.1.100:22: i/o timeout
-```
+#### Connection Timeouts
 
-**Cause:** Network connectivity issues or firewall blocking.
+**Problem**: SSH connections timeout or hang
 
-**Solution:**
-1. Check network connectivity:
+**Diagnostic Steps**:
+1. **Test network connectivity**:
    ```bash
-   # Test basic connectivity
-   ping example.com
-   
-   # Test SSH port
-   telnet example.com 22
+   ping hostname
+   telnet hostname 22
    ```
 
-2. Check firewall settings:
+2. **Check SSH service**:
    ```bash
-   # Check local firewall
-   sudo ufw status
-   
-   # Check remote firewall (if accessible)
-   ssh admin@example.com "sudo iptables -L"
+   ssh -v user@hostname
+   # Verbose output shows connection details
    ```
 
-3. Increase timeout in configuration:
-   ```hcl
-   machines {
-     machine "server" {
-       host = "example.com"
-       user = "admin"
-       key_file = "~/.ssh/id_ed25519"
-       connection_timeout = 60  # Increase timeout
-     }
-   }
+3. **Test with different timeout**:
+   ```bash
+   ssh -o ConnectTimeout=10 user@hostname
    ```
 
-#### Issue: Authentication Failed
-**Error Message:**
-```
-Error: authentication failed for user admin on example.com: ssh: handshake failed
+**Solutions**:
+- **Increase timeout**: Set longer connection timeout in configuration
+- **Check firewall**: Verify port 22 is open
+- **Check SSH service**: Ensure SSH service is running on target
+- **Use different port**: If SSH is on non-standard port
+
+**Code Example**:
+```go
+// Configure connection timeout
+request := &spookytypes.ConnectionRequest{
+    Host:     "example.com",
+    Port:     22,
+    User:     "user",
+    KeyPath:  "~/.ssh/id_rsa",
+    Timeout:  60 * time.Second, // Increase timeout
+}
 ```
 
-**Cause:** Invalid credentials or key not authorized.
+#### Host Key Validation Issues
 
-**Solution:**
-1. Verify key is authorized on server:
+**Problem**: Host key verification fails
+
+**Diagnostic Steps**:
+1. **Check known_hosts**:
    ```bash
-   # Check if key is in authorized_keys
-   ssh admin@example.com "cat ~/.ssh/authorized_keys | grep $(cat ~/.ssh/id_ed25519.pub)"
+   ssh-keygen -F hostname
+   # Check if host key is in known_hosts
    ```
 
-2. Test with standard SSH:
+2. **Test host key manually**:
    ```bash
-   # Test manual SSH connection
-   ssh -i ~/.ssh/id_ed25519 admin@example.com
+   ssh -o StrictHostKeyChecking=no user@hostname
+   # Temporarily disable strict checking
    ```
 
-3. Check server SSH configuration:
+**Solutions**:
+- **Add host key**: `ssh-keyscan -H hostname >> ~/.ssh/known_hosts`
+- **Update host key**: Remove old key and add new one
+- **Disable strict checking**: Set `StrictHostKeyCheck: false` (development only)
+- **Use custom known_hosts**: Specify custom known_hosts file
+
+### File Transfer Issues
+
+#### SFTP Transfer Failures
+
+**Problem**: SFTP file transfers fail
+
+**Diagnostic Steps**:
+1. **Check file permissions**:
    ```bash
-   # Check SSH daemon configuration
-   ssh admin@example.com "sudo cat /etc/ssh/sshd_config | grep -E 'PubkeyAuthentication|AuthorizedKeysFile'"
+   ls -la /path/to/file
+   # Verify source file exists and is readable
    ```
 
-#### Issue: Host Key Verification Failed
-**Error Message:**
-```
-Error: host key verification failed for example.com
-```
-
-**Cause:** Host key mismatch or unknown host.
-
-**Solution:**
-1. Add host to known hosts:
+2. **Test SFTP manually**:
    ```bash
-   # Add host key to known_hosts
-   ssh-keyscan -H example.com >> ~/.ssh/known_hosts
+   sftp user@hostname
+   # Test manual SFTP connection
    ```
 
-2. Verify host key:
+3. **Check disk space**:
    ```bash
-   # Get host key fingerprint
-   ssh-keyscan -H example.com | ssh-keygen -lf -
-   
-   # Compare with expected fingerprint
+   df -h
+   # Check available disk space
    ```
 
-### Certificate Issues
+**Solutions**:
+- **Fix permissions**: Ensure proper file permissions
+- **Check disk space**: Ensure sufficient disk space
+- **Create directories**: Ensure remote directories exist
+- **Use SCP**: Try SCP instead of SFTP for problematic transfers
 
-#### Issue: Certificate Requires Private Key
-**Error Message:**
-```
-Error: certificate requires private key for authentication
-```
-
-**Cause:** SSH certificate provided without corresponding private key.
-
-**Solution:**
-1. Ensure both certificate and private key are configured:
-   ```hcl
-   machines {
-     machine "server" {
-       host = "example.com"
-       user = "admin"
-       key_file = "~/.ssh/id_ed25519"           # Private key required
-       certificate_path = "~/.ssh/id_ed25519-cert.pub"  # Certificate
-     }
-   }
-   ```
-
-2. Verify file existence:
-   ```bash
-   # Check files exist
-   ls -la ~/.ssh/id_ed25519*
-   ```
-
-#### Issue: Invalid Certificate Format
-**Error Message:**
-```
-Error: failed to parse SSH certificate: invalid format
+**Code Example**:
+```go
+// Validate file transfer request
+func validateTransferRequest(transfer *spookytypesssh.FileTransfer) error {
+    if transfer.LocalPath == "" {
+        return fmt.Errorf("local path is required")
+    }
+    
+    if transfer.RemotePath == "" {
+        return fmt.Errorf("remote path is required")
+    }
+    
+    // Check local file exists for upload
+    if transfer.Direction == spookytypesssh.TransferDirectionUpload {
+        if _, err := os.Stat(transfer.LocalPath); os.IsNotExist(err) {
+            return fmt.Errorf("local file does not exist: %s", transfer.LocalPath)
+        }
+    }
+    
+    return nil
+}
 ```
 
-**Cause:** Certificate file is not in valid SSH certificate format.
+#### SCP Transfer Failures
 
-**Solution:**
-1. Verify certificate format:
+**Problem**: SCP file transfers fail
+
+**Diagnostic Steps**:
+1. **Test SCP manually**:
    ```bash
-   # Check certificate format
-   cat ~/.ssh/id_ed25519-cert.pub
-   
-   # Should start with: ssh-ed25519-cert-v01@openssh.com
+   scp /local/file user@hostname:/remote/path
+   # Test manual SCP transfer
    ```
 
-2. Regenerate certificate if needed:
+2. **Check remote permissions**:
    ```bash
-   # Generate new certificate
-   ssh-keygen -s /path/to/ca_key -I "user-cert" -n "user" -V +1d ~/.ssh/id_ed25519.pub
+   ssh user@hostname "ls -la /remote/path"
+   # Check remote directory permissions
    ```
+
+**Solutions**:
+- **Fix remote permissions**: Ensure write permissions on remote directory
+- **Create remote directories**: Ensure remote directories exist
+- **Use SFTP**: Try SFTP instead of SCP for problematic transfers
+- **Check file size**: Ensure file size is within limits
+
+### Command Execution Issues
+
+#### Command Not Found
+
+**Problem**: Remote commands fail with "command not found"
+
+**Diagnostic Steps**:
+1. **Check command path**:
+   ```bash
+   ssh user@hostname "which command"
+   # Check if command exists
+   ```
+
+2. **Check PATH**:
+   ```bash
+   ssh user@hostname "echo \$PATH"
+   # Check PATH environment variable
+   ```
+
+**Solutions**:
+- **Use full path**: Specify full path to command
+- **Set PATH**: Set PATH environment variable in command
+- **Install command**: Ensure command is installed on remote system
+- **Use different shell**: Specify different shell if needed
+
+**Code Example**:
+```go
+// Execute command with full path
+command := &spookytypes.SSHCommand{
+    Command:       "/usr/bin/ls -la",
+    WorkingDir:    "/home/user",
+    Environment:   map[string]string{"PATH": "/usr/bin:/usr/local/bin"},
+    Timeout:       30 * time.Second,
+    CaptureOutput: true,
+}
+```
+
+#### Permission Denied
+
+**Problem**: Commands fail with "Permission denied"
+
+**Diagnostic Steps**:
+1. **Check user permissions**:
+   ```bash
+   ssh user@hostname "id"
+   # Check user ID and groups
+   ```
+
+2. **Test command manually**:
+   ```bash
+   ssh user@hostname "sudo -l"
+   # Check sudo permissions
+   ```
+
+**Solutions**:
+- **Use sudo**: Prefix commands with `sudo` if needed
+- **Fix permissions**: Ensure proper file/directory permissions
+- **Change user**: Use different user with appropriate permissions
+- **Configure sudo**: Configure sudo access for commands
 
 ### Performance Issues
 
-#### Issue: Slow Connection Establishment
-**Symptoms:** SSH connections take a long time to establish.
+#### Slow Connections
 
-**Cause:** Network latency or DNS resolution issues.
+**Problem**: SSH connections are slow
 
-**Solution:**
-1. Enable connection pooling:
-   ```hcl
-   machines {
-     machine "server" {
-       host = "example.com"
-       user = "admin"
-       key_file = "~/.ssh/id_ed25519"
-       max_connections = 10  # Enable connection pooling
-     }
-   }
-   ```
-
-2. Use IP addresses instead of hostnames:
-   ```hcl
-   machines {
-     machine "server" {
-       host = "192.168.1.100"  # Use IP instead of hostname
-       user = "admin"
-       key_file = "~/.ssh/id_ed25519"
-     }
-   }
-   ```
-
-#### Issue: Connection Pool Exhaustion
-**Error Message:**
-```
-Error: connection pool at capacity (10)
-```
-
-**Cause:** Too many concurrent connections.
-
-**Solution:**
-1. Increase pool size:
-   ```hcl
-   machines {
-     machine "server" {
-       host = "example.com"
-       user = "admin"
-       key_file = "~/.ssh/id_ed25519"
-       max_connections = 20  # Increase pool size
-     }
-   }
-   ```
-
-2. Reduce concurrent operations:
+**Diagnostic Steps**:
+1. **Test connection speed**:
    ```bash
-   # Run operations sequentially instead of parallel
-   spooky actions run ./my-project --parallel true
+   time ssh user@hostname "echo hello"
+   # Measure connection time
    ```
 
-## Debugging Commands
+2. **Check network latency**:
+   ```bash
+   ping -c 10 hostname
+   # Check network latency
+   ```
 
-### Enable Verbose Output
+**Solutions**:
+- **Use connection pooling**: Enable connection pooling for reuse
+- **Optimize network**: Check network configuration
+- **Use compression**: Enable SSH compression
+- **Use faster algorithms**: Configure faster SSH algorithms
 
+**Code Example**:
+```go
+// Configure connection pooling
+config := &spookytypes.ClientConfig{
+    MaxConnections:   10,
+    IdleTimeout:      300 * time.Second,
+    DefaultTimeout:   30 * time.Second,
+    MaxRetryAttempts: 3,
+    RetryDelay:       5 * time.Second,
+}
+```
+
+#### Slow File Transfers
+
+**Problem**: File transfers are slow
+
+**Diagnostic Steps**:
+1. **Check transfer speed**:
+   ```bash
+   scp -v /large/file user@hostname:/remote/path
+   # Verbose transfer shows progress
+   ```
+
+2. **Check network bandwidth**:
+   ```bash
+   iperf3 -c hostname
+   # Test network bandwidth
+   ```
+
+**Solutions**:
+- **Use compression**: Enable transfer compression
+- **Use parallel transfers**: Transfer multiple files in parallel
+- **Optimize buffer size**: Adjust transfer buffer size
+- **Use faster protocol**: Try different transfer protocols
+
+## Debugging Techniques
+
+### Enable Debug Logging
+
+**Enable verbose SSH logging**:
 ```bash
-# Enable verbose SSH output
-spooky machines ping ./my-project --verbose
-
-# Enable debug logging
 export SPOOKY_LOG_LEVEL=debug
-spooky machines ping ./my-project
+spooky machines ping my-project
 ```
 
-### Test SSH Configuration
-
+**Enable SSH debug output**:
 ```bash
-# Test machine connectivity
-spooky machines ping ./my-project
-
-# Test specific machine
-spooky machines ping ./my-project --machines example.com
+ssh -v user@hostname
+# Verbose SSH output
 ```
 
-### Validate SSH Keys
+### Connection Diagnostics
 
+**Test SSH connectivity step by step**:
 ```bash
-# Test SSH connectivity manually
-ssh -i ~/.ssh/id_ed25519 admin@example.com "echo 'SSH working'"
+# 1. Test DNS resolution
+nslookup hostname
 
-# Check SSH key permissions
-ls -la ~/.ssh/id_ed25519*
+# 2. Test network connectivity
+ping hostname
 
-# Validate key format
-ssh-keygen -l -f ~/.ssh/id_ed25519
+# 3. Test port connectivity
+telnet hostname 22
+
+# 4. Test SSH connection
+ssh -v user@hostname
+
+# 5. Test authentication
+ssh -i ~/.ssh/id_rsa user@hostname
 ```
 
-## Integration Issues
+### File Transfer Diagnostics
 
-### Facts System Integration
+**Test file transfer step by step**:
+```bash
+# 1. Test SFTP connection
+sftp user@hostname
 
-#### Issue: SSH-based Fact Collection Fails
-**Error Message:**
-```
-Error: failed to collect facts from example.com: SSH connection failed
-```
+# 2. Test SCP connection
+scp /test/file user@hostname:/tmp/
 
-**Cause:** SSH connection issues during fact collection.
+# 3. Test file permissions
+ssh user@hostname "ls -la /tmp/test/file"
 
-**Solution:**
-1. Test SSH connectivity first:
-   ```bash
-   spooky machines ping ./my-project --machines example.com
-   ```
-
-2. Verify machine configuration:
-   ```bash
-   spooky machines list ./my-project --verbose
-   ```
-
-3. Check facts collection with verbose output:
-   ```bash
-   spooky facts export ./my-project \
-     --machines example.com \
-     --format json \
-     --verbose
-   ```
-
-### Actions System Integration
-
-#### Issue: SSH Command Execution Fails
-**Error Message:**
-```
-Error: failed to run action on example.com: SSH command execution failed
+# 4. Test directory creation
+ssh user@hostname "mkdir -p /remote/path"
 ```
 
-**Cause:** SSH connection or command execution issues.
+## Error Messages and Solutions
 
-**Solution:**
-1. Test SSH connectivity:
-   ```bash
-   spooky machines ping ./my-project --machines example.com
-   ```
+### Common Error Messages
 
-2. Test command manually:
-   ```bash
-   ssh -i ~/.ssh/id_ed25519 admin@example.com "echo 'test'"
-   ```
+#### "Permission denied (publickey,password)"
+**Cause**: Authentication failed
+**Solution**: Check SSH key permissions, verify credentials, ensure public key is in authorized_keys
 
-3. Check action configuration:
-   ```bash
-   spooky actions validate ./my-project --verbose
-   ```
+#### "Connection timed out"
+**Cause**: Network connectivity issue
+**Solution**: Check network connectivity, firewall settings, SSH service status
 
-### Machines System Integration
+#### "Host key verification failed"
+**Cause**: Host key mismatch
+**Solution**: Update known_hosts file, verify host key, or temporarily disable strict checking
 
-#### Issue: Machine Connectivity Test Fails
-**Error Message:**
-```
-Error: machine connectivity test failed for example.com
-```
+#### "No such file or directory"
+**Cause**: File or directory not found
+**Solution**: Check file paths, create missing directories, verify file existence
 
-**Cause:** SSH connection issues during machine testing.
+#### "Disk quota exceeded"
+**Cause**: Insufficient disk space
+**Solution**: Free up disk space, check disk quotas, use different location
 
-**Solution:**
-1. Test basic connectivity:
-   ```bash
-   ping example.com
-   telnet example.com 22
-   ```
+### Error Code Reference
 
-2. Test SSH manually:
-   ```bash
-   ssh -i ~/.ssh/id_ed25519 admin@example.com "echo 'test'"
-   ```
+| Exit Code | Meaning | Solution |
+|-----------|---------|----------|
+| 0 | Success | No action needed |
+| 1 | General error | Check command syntax and permissions |
+| 2 | Misuse of shell builtins | Check command syntax |
+| 126 | Command not executable | Check file permissions |
+| 127 | Command not found | Install command or use full path |
+| 128+n | Signal n | Process terminated by signal |
 
-3. Check machine configuration:
-   ```bash
-   spooky machines list ./my-project --verbose
-   ```
+## Best Practices
 
-## Performance Optimization
+### Security Best Practices
 
-### Connection Pooling
+1. **Use SSH keys**: Prefer SSH key authentication over passwords
+2. **Validate host keys**: Always validate host keys for security
+3. **Secure key storage**: Store SSH keys with 600 permissions
+4. **Use strong keys**: Use Ed25519 or RSA 4096-bit keys
+5. **Rotate keys**: Regularly rotate SSH keys
 
-**Issue:** Poor performance with many machines.
+### Performance Best Practices
 
-**Solution:**
+1. **Use connection pooling**: Enable connection pooling for efficiency
+2. **Optimize timeouts**: Set appropriate timeouts for operations
+3. **Use compression**: Enable compression for slow connections
+4. **Parallel operations**: Use parallel operations when possible
+5. **Monitor performance**: Monitor connection and transfer performance
+
+### Troubleshooting Best Practices
+
+1. **Test manually first**: Always test SSH operations manually before automation
+2. **Use verbose logging**: Enable verbose logging for debugging
+3. **Check permissions**: Verify file and directory permissions
+4. **Test step by step**: Test each step of the process individually
+5. **Document solutions**: Document solutions for future reference
+
+## Configuration Examples
+
+### SSH Client Configuration
+
 ```hcl
-# Configure connection pooling
+# SSH client configuration
+ssh {
+  default_port = 22
+  default_timeout = "30s"
+  max_connections = 10
+  max_retry_attempts = 3
+  retry_delay = "5s"
+  idle_timeout = "300s"
+  known_hosts_path = "~/.ssh/known_hosts"
+  strict_host_key_check = true
+  allow_insecure_hosts = false
+}
+```
+
+### Machine Configuration
+
+```hcl
+# Machine configuration with SSH
 machines {
-  machine "server" {
-    host = "example.com"
+  machine "web-server" {
+    hostname = "web.example.com"
+    port = 22
     user = "admin"
-    key_file = "~/.ssh/id_ed25519"
-    max_connections = 20      # Increase pool size
-    connection_timeout = 30   # Optimize timeout
-    retry_attempts = 3        # Configure retries
+    
+    authentication {
+      method = "ssh_key"
+      key_path = "~/.ssh/id_rsa"
+      passphrase = "optional_passphrase"
+    }
+    
+    ssh {
+      timeout = "30s"
+      keepalive = "60s"
+      host_key_validation = true
+    }
   }
 }
 ```
 
-### Parallel Operations
+### File Transfer Configuration
 
-**Issue:** Slow execution across multiple machines.
-
-**Solution:**
-```bash
-# Use parallel execution
-spooky actions run ./my-project --parallel true
-
-# Limit concurrency if needed
-spooky actions run ./my-project --parallel true --max-concurrent 5
+```hcl
+# File transfer configuration
+file_transfer {
+  mode = "sftp"
+  verify = true
+  permissions = 0644
+  buffer_size = 32768
+  compression = true
+}
 ```
-
-## Security Considerations
-
-### Key Security
-
-1. **Key Permissions**: Ensure private keys have 600 permissions
-2. **Key Storage**: Store keys securely, not in version control
-3. **Key Rotation**: Regularly rotate SSH keys
-4. **Passphrase Protection**: Use passphrases for additional security
-
-### Certificate Security
-
-1. **Certificate Expiration**: Monitor certificate expiration dates
-2. **Private Key Security**: Keep private keys secure and separate
-3. **CA Management**: Secure certificate authority keys
-4. **Certificate Validation**: Validate certificates before use
-
-### Connection Security
-
-1. **Host Key Verification**: Verify host keys (TODO: implement)
-2. **Connection Timeouts**: Use appropriate timeouts
-3. **Retry Limits**: Limit retry attempts to prevent brute force
-4. **Logging**: Monitor SSH connection logs
-
-## Error Code Reference
-
-### SSH Error Types
-
-- **ConnectionError**: Network connectivity issues
-- **AuthenticationError**: Authentication failures
-- **KeyValidationError**: Key type or size issues
-- **CertificateError**: Certificate format or validation issues
-- **TimeoutError**: Connection or command timeouts
-- **PermissionError**: File permission issues
-
-### Common Error Codes
-
-- **ECONNREFUSED**: Connection refused by server
-- **ETIMEDOUT**: Connection timeout
-- **EHOSTUNREACH**: Host unreachable
-- **ENOTFOUND**: Host not found
-- **EACCES**: Permission denied
 
 ## Getting Help
 
-### Enable Debug Logging
-
-```bash
-# Enable debug logging
-export SPOOKY_LOG_LEVEL=debug
-spooky machines ping ./my-project
-```
-
-### Collect Diagnostic Information
-
-```bash
-# Collect system information
-spooky machines ping ./my-project --verbose > ssh-debug.log 2>&1
-
-# Collect key validation information
-ssh-keygen -l -f ~/.ssh/id_ed25519 >> ssh-debug.log 2>&1
-```
-
-### Report Issues
+### Debug Information
 
 When reporting SSH issues, include:
 
-1. **Error Message**: Complete error message
-2. **Configuration**: Relevant machine configuration
-3. **Key Type**: SSH key type and size
-4. **Network**: Network connectivity information
-5. **Logs**: Debug logs and verbose output
-6. **Steps**: Steps to reproduce the issue
+1. **Error messages**: Complete error messages and stack traces
+2. **Configuration**: Relevant configuration files
+3. **Environment**: Operating system, spooky version, SSH version
+4. **Steps to reproduce**: Detailed steps to reproduce the issue
+5. **Manual test results**: Results of manual SSH tests
 
-## Conclusion
+### Log Files
 
-The SSH system provides robust, secure connectivity with comprehensive error handling and debugging capabilities. Most issues can be resolved by following the troubleshooting steps outlined in this guide. For persistent issues, enable verbose output and collect diagnostic information for further analysis.
+Check these log locations for SSH-related information:
+
+- **spooky logs**: Application logs with SSH operations
+- **SSH logs**: System SSH logs (`/var/log/auth.log` on Linux)
+- **Debug logs**: Debug logs when `SPOOKY_LOG_LEVEL=debug` is set
+
+### Support Resources
+
+- **Documentation**: Check SSH API reference and user guide
+- **Examples**: Review SSH configuration examples
+- **Community**: Check community forums and issue trackers
+- **Debugging**: Use debugging techniques described in this guide
+
+## Summary
+
+The SSH system in spooky provides comprehensive functionality with robust error handling and diagnostic capabilities. This troubleshooting guide covers the most common issues and provides practical solutions for resolving SSH-related problems.
+
+Key points for effective troubleshooting:
+
+1. **Test manually first**: Always test SSH operations manually before automation
+2. **Check permissions**: Verify file, directory, and SSH key permissions
+3. **Use verbose logging**: Enable debug logging for detailed diagnostics
+4. **Follow security best practices**: Use SSH keys, validate host keys, secure key storage
+5. **Monitor performance**: Monitor connection and transfer performance
+6. **Document solutions**: Document solutions for future reference
+
+The SSH system is production-ready and provides all necessary functionality for secure, efficient, and reliable SSH operations in the spooky automation platform.
