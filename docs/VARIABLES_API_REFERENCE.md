@@ -4,1041 +4,682 @@
 
 This document provides a comprehensive API reference for the spooky variables system. It covers all interfaces, types, methods, and implementation details for developers working with the variables system.
 
-## Table of Contents
-
-1. [Core Interfaces](#core-interfaces)
-2. [Type Definitions](#type-definitions)
-3. [Implementation Details](#implementation-details)
-4. [Error Handling](#error-handling)
-5. [Validation Rules](#validation-rules)
-6. [CLI Integration](#cli-integration)
-7. [Examples](#examples)
+**Status: Partially Implemented** - The variables system has basic functionality but SSH-based variable collection has known issues that need to be addressed.
 
 ## Core Interfaces
 
-### VariablesIntegration
+### VariablesIntegration Interface
 
-The primary interface for variable management operations.
+The `VariablesIntegration` interface provides the primary entry point for variables operations:
 
 ```go
 type VariablesIntegration interface {
-    // LoadVariables loads variables from the given source
-    LoadVariables(ctx context.Context, source string) (map[string]*spookytypes.Variable, error)
+    // LoadVariables loads variables from the specified project path
+    LoadVariables(ctx context.Context, projectPath string) (map[string]interface{}, error)
     
-    // ValidateVariables validates variables
-    ValidateVariables(ctx context.Context, variables map[string]*spookytypes.Variable) (*spookytypes.ValidationResult, error)
+    // ValidateVariables validates variable definitions
+    ValidateVariables(ctx context.Context, variables map[string]interface{}) (*ValidationResult, error)
     
-    // ResolveVariables resolves variables with the given context
-    ResolveVariables(ctx context.Context, variables map[string]*spookytypes.Variable, context *spookytypes.VariableContext) (*spookytypes.VariableResolutionResult, error)
+    // ResolveVariables resolves variable dependencies and values
+    ResolveVariables(ctx context.Context, variables map[string]interface{}) (map[string]interface{}, error)
 }
 ```
 
-**Methods:**
+**Implementation Status**: ⚠️ **Partially Implemented** - Basic functionality exists but SSH-based collection has issues
 
-#### LoadVariables
-```go
-LoadVariables(ctx context.Context, source string) (map[string]*spookytypes.Variable, error)
-```
-Loads variables from a project directory, supporting both `variables.hcl` files and `variables/` directories.
+### VariableManager Interface
 
-**Parameters:**
-- `ctx`: Context for cancellation and timeouts
-- `source`: Project directory path
-
-**Returns:**
-- `map[string]*spookytypes.Variable`: Map of loaded variables by name
-- `error`: Error if loading fails
-
-**Behavior:**
-- Checks for `variables.hcl` file in the project root
-- Checks for `variables/` directory and loads all `.hcl` files
-- Combines variables from all sources
-- Performs duplicate detection and cross-file validation
-- Returns error if no variables found or validation fails
-
-#### ValidateVariables
-```go
-ValidateVariables(ctx context.Context, variables map[string]*spookytypes.Variable) (*spookytypes.ValidationResult, error)
-```
-Validates variable configurations and returns detailed validation results.
-
-**Parameters:**
-- `ctx`: Context for cancellation and timeouts
-- `variables`: Map of variables to validate
-
-**Returns:**
-- `*spookytypes.ValidationResult`: Validation results with errors and warnings
-- `error`: Error if validation process fails
-
-**Validation Rules:**
-- Required fields validation (name, type, scope)
-- Variable name format validation
-- Type consistency validation
-- Dependency validation and circular dependency detection
-- Constraint validation
-- Cross-file duplicate detection
-
-#### ResolveVariables
-```go
-ResolveVariables(ctx context.Context, variables map[string]*spookytypes.Variable, context *spookytypes.VariableContext) (*spookytypes.VariableResolutionResult, error)
-```
-Resolves variables with dependencies and context, applying environment overrides.
-
-**Parameters:**
-- `ctx`: Context for cancellation and timeouts
-- `variables`: Map of variables to resolve
-- `context`: Variable resolution context
-
-**Returns:**
-- `*spookytypes.VariableResolutionResult`: Resolution results with resolved values
-- `error`: Error if resolution fails
-
-**Resolution Process:**
-1. Dependency analysis and topological sorting
-2. Environment variable override application
-3. Default value resolution
-4. Type conversion and validation
-5. Circular dependency detection
-
-### VariableValidator
-
-Interface for variable validation operations.
+The `VariableManager` interface provides variable management and resolution:
 
 ```go
-type VariableValidator interface {
-    // ValidateVariables validates a collection of variables
-    ValidateVariables(ctx context.Context, variables map[string]*spookytypes.Variable) (*spookytypes.ValidationResult, error)
+type VariableManager interface {
+    // LoadVariables loads variables from project configuration
+    LoadVariables(ctx context.Context, projectPath string) (map[string]*spookytypesvariables.Variable, error)
     
-    // ValidateVariable validates a single variable
-    ValidateVariable(ctx context.Context, variable *spookytypes.Variable) (*spookytypes.ValidationResult, error)
-}
-```
-
-**Methods:**
-
-#### ValidateVariables
-```go
-ValidateVariables(ctx context.Context, variables map[string]*spookytypes.Variable) (*spookytypes.ValidationResult, error)
-```
-Validates a collection of variables with comprehensive validation rules.
-
-**Parameters:**
-- `ctx`: Context for cancellation and timeouts
-- `variables`: Map of variables to validate
-
-**Returns:**
-- `*spookytypes.ValidationResult`: Validation results with errors and warnings
-- `error`: Error if validation process fails
-
-**Validation Steps:**
-1. Individual variable validation
-2. Cross-variable validation (dependencies, duplicates)
-3. Circular dependency detection
-4. Constraint validation
-5. Type consistency validation
-
-#### ValidateVariable
-```go
-ValidateVariable(ctx context.Context, variable *spookytypes.Variable) (*spookytypes.ValidationResult, error)
-```
-Validates a single variable against all validation rules.
-
-**Parameters:**
-- `ctx`: Context for cancellation and timeouts
-- `variable`: Variable to validate
-
-**Returns:**
-- `*spookytypes.ValidationResult`: Validation results with errors and warnings
-- `error`: Error if validation process fails
-
-**Validation Rules:**
-- Name format validation
-- Type validation
-- Scope validation
-- Constraint validation
-- Validation rule compliance
-
-### VariableLoader
-
-Interface for variable loading operations.
-
-```go
-type VariableLoader interface {
-    // LoadVariablesFromFile loads variables from a file
-    LoadVariablesFromFile(ctx context.Context, filePath string) (map[string]*spookytypes.Variable, error)
+    // ValidateVariables validates variable definitions
+    ValidateVariables(ctx context.Context, variables map[string]*spookytypesvariables.Variable) (*ValidationResult, error)
     
-    // LoadVariablesFromDirectory loads variables from a directory
-    LoadVariablesFromDirectory(ctx context.Context, dirPath string) (map[string]*spookytypes.Variable, error)
+    // ResolveVariables resolves variable dependencies and values
+    ResolveVariables(ctx context.Context, variables map[string]*spookytypesvariables.Variable) (map[string]interface{}, error)
 }
 ```
 
-**Methods:**
+**Implementation Status**: ⚠️ **Partially Implemented** - Basic loading and validation exist but resolution has issues
 
-#### LoadVariablesFromFile
-```go
-LoadVariablesFromFile(ctx context.Context, filePath string) (map[string]*spookytypes.Variable, error)
-```
-Loads variables from a single HCL file.
+## Current Implementation Status
 
-**Parameters:**
-- `ctx`: Context for cancellation and timeouts
-- `filePath`: Path to the HCL file
+### ✅ Working Components
 
-**Returns:**
-- `map[string]*spookytypes.Variable`: Map of loaded variables by name
-- `error`: Error if loading fails
+1. **Variable Loading**: Loading variables from HCL configuration files
+2. **Variable Validation**: Basic validation of variable definitions
+3. **Variable Structure**: Proper variable type definitions and structures
+4. **CLI Integration**: `spooky variables list` command with filtering options
+5. **Project Integration**: Variables loading from project configuration
+6. **Basic Validation**: Variable definition validation and error handling
+7. **Filtering Support**: Support for variable name and type filtering
+8. **Export Support**: Variable export to JSON and HCL formats
 
-**Loading Process:**
-1. HCL file parsing
-2. Variable block extraction
-3. Attribute parsing and type conversion
-4. Validation block processing
-5. Constraint block processing
-6. Source file tracking
+### ⚠️ Known Issues
 
-#### LoadVariablesFromDirectory
-```go
-LoadVariablesFromDirectory(ctx context.Context, dirPath string) (map[string]*spookytypes.Variable, error)
-```
-Loads variables from all HCL files in a directory.
+1. **SSH-Based Collection**: SSH-based variable collection has implementation issues
+2. **Variable Resolution**: Variable dependency resolution has problems
+3. **Remote Variable Reading**: Cannot properly read variables from remote machines
+4. **Parallel Processing**: No parallel variable collection support
+5. **Import Functionality**: No variable import capabilities
+6. **Template Integration**: No template variable integration
 
-**Parameters:**
-- `ctx`: Context for cancellation and timeouts
-- `dirPath`: Path to the directory
+### 🔄 In Progress
 
-**Returns:**
-- `map[string]*spookytypes.Variable`: Map of loaded variables by name
-- `error`: Error if loading fails
-
-**Loading Process:**
-1. Directory traversal
-2. HCL file discovery
-3. Individual file loading
-4. Variable merging
-5. Duplicate detection
-6. Cross-file validation
-
-## Type Definitions
-
-### Core Variable Types
-
-#### Variable
-```go
-type Variable struct {
-    spookytypescommon.CompleteEntity
-
-    // Core variable properties
-    Name        string      `hcl:"name" json:"name"`
-    Type        VariableType `hcl:"type" json:"type"`
-    Description string      `hcl:"description,optional" json:"description,omitempty"`
-    Default     interface{} `hcl:"default,optional" json:"default,omitempty"`
-    Required    bool        `hcl:"required,optional" json:"required,omitempty"`
-    Sensitive   bool        `hcl:"sensitive,optional" json:"sensitive,omitempty"`
-    Encrypted   bool        `hcl:"encrypted,optional" json:"encrypted,omitempty"`
-    Scope       VariableScope `hcl:"scope,optional" json:"scope,omitempty"`
-
-    // Dependencies and validation
-    Dependencies []string           `hcl:"dependencies,optional" json:"dependencies,omitempty"`
-    Validation   *VariableValidation `hcl:"validation,block" json:"validation,omitempty"`
-    Constraints  *VariableConstraints `hcl:"constraints,block" json:"constraints,omitempty"`
-
-    // Metadata and source information
-    SourceFile string                 `hcl:"-" json:"source_file,omitempty"`
-    SourceLine int                    `hcl:"-" json:"source_line,omitempty"`
-    Metadata   map[string]interface{} `hcl:"metadata,optional" json:"metadata,omitempty"`
-
-    // Runtime state
-    ResolvedValue interface{} `hcl:"-" json:"resolved_value,omitempty"`
-    IsResolved    bool        `hcl:"-" json:"is_resolved,omitempty"`
-    ResolutionError string    `hcl:"-" json:"resolution_error,omitempty"`
-}
-```
-
-#### VariableType
-```go
-type VariableType string
-
-const (
-    VariableTypeString VariableType = "string"
-    VariableTypeNumber VariableType = "number"
-    VariableTypeBool   VariableType = "bool"
-    VariableTypeList   VariableType = "list"
-    VariableTypeMap    VariableType = "map"
-)
-```
-
-#### VariableScope
-```go
-type VariableScope string
-
-const (
-    VariableScopeProject VariableScope = "project"
-    VariableScopeGlobal  VariableScope = "global"
-    VariableScopeLocal   VariableScope = "local"
-)
-```
-
-### Validation Types
-
-#### VariableValidation
-```go
-type VariableValidation struct {
-    AllowedValues []interface{} `hcl:"allowed_values,optional" json:"allowed_values,omitempty"`
-    Pattern       *string       `hcl:"pattern,optional" json:"pattern,omitempty"`
-    MinValue      *float64      `hcl:"min_value,optional" json:"min_value,omitempty"`
-    MaxValue      *float64      `hcl:"max_value,optional" json:"max_value,omitempty"`
-    MinLength     *int          `hcl:"min_length,optional" json:"min_length,omitempty"`
-    MaxLength     *int          `hcl:"max_length,optional" json:"max_length,omitempty"`
-    MinItems      *int          `hcl:"min_items,optional" json:"min_items,omitempty"`
-    MaxItems      *int          `hcl:"max_items,optional" json:"max_items,omitempty"`
-}
-```
-
-#### VariableConstraints
-```go
-type VariableConstraints struct {
-    MinValue  *float64 `hcl:"min_value,optional" json:"min_value,omitempty"`
-    MaxValue  *float64 `hcl:"max_value,optional" json:"max_value,omitempty"`
-    MinLength *int     `hcl:"min_length,optional" json:"min_length,omitempty"`
-    MaxLength *int     `hcl:"max_length,optional" json:"max_length,omitempty"`
-    Pattern   *string  `hcl:"pattern,optional" json:"pattern,omitempty"`
-    MinItems  *int     `hcl:"min_items,optional" json:"min_items,omitempty"`
-    MaxItems  *int     `hcl:"max_items,optional" json:"max_items,omitempty"`
-}
-```
-
-### Context and Resolution Types
-
-#### VariableContext
-```go
-type VariableContext struct {
-    spookytypescommon.CompleteEntity
-
-    // Context information
-    ProjectPath string                 `json:"project_path"`
-    Environment string                 `json:"environment,omitempty"`
-    Overrides   map[string]interface{} `json:"overrides,omitempty"`
-    Metadata    map[string]interface{} `json:"metadata,omitempty"`
-
-    // Resolution settings
-    ApplyEnvironmentOverrides bool `json:"apply_environment_overrides"`
-    StrictMode                bool `json:"strict_mode"`
-    ValidateConstraints       bool `json:"validate_constraints"`
-}
-```
-
-#### VariableResolutionResult
-```go
-type VariableResolutionResult struct {
-    spookytypescommon.CompleteEntity
-
-    // Resolution results
-    ResolvedVariables map[string]*Variable `json:"resolved_variables"`
-    UnresolvedVariables []string           `json:"unresolved_variables,omitempty"`
-    ResolutionOrder    []string            `json:"resolution_order,omitempty"`
-
-    // Statistics
-    TotalVariables     int `json:"total_variables"`
-    ResolvedCount      int `json:"resolved_count"`
-    UnresolvedCount    int `json:"unresolved_count"`
-    OverrideCount      int `json:"override_count"`
-
-    // Errors and warnings
-    Errors   []VariableError   `json:"errors,omitempty"`
-    Warnings []VariableWarning `json:"warnings,omitempty"`
-}
-```
-
-### Error and Warning Types
-
-#### VariableError
-```go
-type VariableError struct {
-    spookytypescommon.ErrorDetails
-
-    Type        VariableErrorType `json:"type"`
-    VariableName string           `json:"variable_name,omitempty"`
-    Field       string            `json:"field,omitempty"`
-    Value       interface{}       `json:"value,omitempty"`
-    Expected    interface{}       `json:"expected,omitempty"`
-}
-```
-
-#### VariableErrorType
-```go
-type VariableErrorType string
-
-const (
-    VariableErrorTypeValidation      VariableErrorType = "validation"
-    VariableErrorTypeResolution      VariableErrorType = "resolution"
-    VariableErrorTypeDependency      VariableErrorType = "dependency"
-    VariableErrorTypeType            VariableErrorType = "type"
-    VariableErrorTypeConstraint      VariableErrorType = "constraint"
-    VariableErrorTypeCircular        VariableErrorType = "circular"
-    VariableErrorTypeDuplicate       VariableErrorType = "duplicate"
-    VariableErrorTypeRequired        VariableErrorType = "required"
-    VariableErrorTypeEnvironment     VariableErrorType = "environment"
-)
-```
-
-#### VariableWarning
-```go
-type VariableWarning struct {
-    spookytypescommon.ErrorDetails
-
-    Type        VariableWarningType `json:"type"`
-    VariableName string             `json:"variable_name,omitempty"`
-    Field       string              `json:"field,omitempty"`
-    Value       interface{}         `json:"value,omitempty"`
-    Suggestion  string              `json:"suggestion,omitempty"`
-}
-```
-
-#### VariableWarningType
-```go
-type VariableWarningType string
-
-const (
-    VariableWarningTypeDeprecated  VariableWarningType = "deprecated"
-    VariableWarningTypeUnused      VariableWarningType = "unused"
-    VariableWarningTypeDefault     VariableWarningType = "default"
-    VariableWarningTypeOverride    VariableWarningType = "override"
-    VariableWarningTypeConstraint  VariableWarningType = "constraint"
-)
-```
+1. **SSH Collection Fixes**: Addressing SSH-based variable collection issues
+2. **Resolution Improvements**: Implementing proper variable resolution
+3. **Collection Enhancements**: Improving variable collection reliability
 
 ## Implementation Details
 
-### LoadVariables Implementation
+### Variable Loading System
 
-The `LoadVariables` method in the `VariablesIntegration` interface orchestrates the loading process:
+The variables system loads variables from HCL configuration files:
 
 ```go
-func (m *Manager) LoadVariables(ctx context.Context, projectPath string) (map[string]*spookytypesvariables.Variable, error) {
-    m.logger.Info("Loading variables", "project_path", projectPath)
-    
+type VariableLoader struct {
+    logger spookylogging.Logger
+}
+
+func (l *VariableLoader) LoadVariables(ctx context.Context, projectPath string) (map[string]*spookytypesvariables.Variable, error) {
     variables := make(map[string]*spookytypesvariables.Variable)
     
-    // Load from variables.hcl if it exists
-    variablesHCLPath := filepath.Join(projectPath, "variables.hcl")
-    if _, err := os.Stat(variablesHCLPath); err == nil {
-        fileVariables, err := m.loader.LoadVariablesFromFile(ctx, variablesHCLPath)
-        if err != nil {
-            return nil, fmt.Errorf("failed to load variables.hcl: %w", err)
+    // Load variables.hcl file
+    variablesPath := filepath.Join(projectPath, "variables.hcl")
+    if data, err := os.ReadFile(variablesPath); err == nil {
+        if err := l.parseVariablesFile(data, variables); err != nil {
+            return nil, fmt.Errorf("failed to parse variables.hcl: %w", err)
         }
-        
-        // Merge variables
-        for name, variable := range fileVariables {
-            if existing, exists := variables[name]; exists {
-                return nil, fmt.Errorf("duplicate variable name '%s' found in variables.hcl and %s", name, existing.SourceFile)
+    }
+    
+    // Load variables from variables/ directory
+    variablesDir := filepath.Join(projectPath, "variables")
+    if entries, err := os.ReadDir(variablesDir); err == nil {
+        for _, entry := range entries {
+            if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".hcl") {
+                filePath := filepath.Join(variablesDir, entry.Name())
+                if data, err := os.ReadFile(filePath); err == nil {
+                    if err := l.parseVariablesFile(data, variables); err != nil {
+                        return nil, fmt.Errorf("failed to parse %s: %w", entry.Name(), err)
+                    }
+                }
             }
-            variables[name] = variable
         }
-        
-        m.logger.Debug("Loaded variables from variables.hcl", "count", len(fileVariables))
     }
     
-    // Load from variables/ directory if it exists
-    variablesDirPath := filepath.Join(projectPath, "variables")
-    if _, err := os.Stat(variablesDirPath); err == nil {
-        dirVariables, err := m.loader.LoadVariablesFromDirectory(ctx, variablesDirPath)
-        if err != nil {
-            return nil, fmt.Errorf("failed to load variables directory: %w", err)
-        }
-        
-        // Merge variables with duplicate detection
-        for name, variable := range dirVariables {
-            if existing, exists := variables[name]; exists {
-                return nil, fmt.Errorf("duplicate variable name '%s' found in %s and %s", name, variable.SourceFile, existing.SourceFile)
-            }
-            variables[name] = variable
-        }
-        
-        m.logger.Debug("Loaded variables from variables/ directory", "count", len(dirVariables))
-    }
-    
-    if len(variables) == 0 {
-        return nil, fmt.Errorf("no variables found in project")
-    }
-    
-    m.logger.Info("Variables loaded successfully", "total_count", len(variables))
     return variables, nil
 }
-```
 
-### ValidateVariables Implementation
-
-The `ValidateVariables` method performs comprehensive validation:
-
-```go
-func (m *Manager) ValidateVariables(ctx context.Context, variables map[string]*spookytypesvariables.Variable) (*spookytypes.ValidationResult, error) {
-    m.logger.Info("Validating variables", "count", len(variables))
-    
-    // Use the validator to perform validation
-    result, err := m.validator.ValidateVariables(ctx, variables)
-    if err != nil {
-        return nil, fmt.Errorf("validation failed: %w", err)
+func (l *VariableLoader) parseVariablesFile(data []byte, variables map[string]*spookytypesvariables.Variable) error {
+    var config struct {
+        Variables []*spookytypesvariables.Variable `hcl:"variable,block"`
     }
     
-    m.logger.Info("Variable validation completed", 
-        "total", len(variables),
-        "errors", len(result.Errors),
-        "warnings", len(result.Warnings))
+    if err := hcl.Unmarshal(data, &config); err != nil {
+        return fmt.Errorf("failed to parse HCL: %w", err)
+    }
     
-    return result, nil
+    for _, variable := range config.Variables {
+        if variable.Name == "" {
+            return fmt.Errorf("variable name is required")
+        }
+        
+        if _, exists := variables[variable.Name]; exists {
+            return fmt.Errorf("duplicate variable name: %s", variable.Name)
+        }
+        
+        variables[variable.Name] = variable
+    }
+    
+    return nil
 }
 ```
 
-### ResolveVariables Implementation
+**Supported Variable Sources:**
+- **Local Variables**: Variables defined in `variables.hcl` and `variables/*.hcl` files
+- **Environment Variables**: Variables from environment
+- **SSH Variables**: Variables collected from remote machines (has issues)
+- **Computed Variables**: Variables computed from other variables
 
-The `ResolveVariables` method handles dependency resolution and environment overrides:
+### Variable Validation System
+
+Variables are validated against schemas and business rules:
 
 ```go
-func (m *Manager) ResolveVariables(ctx context.Context, variables map[string]*spookytypesvariables.Variable, context *spookytypesvariables.VariableContext) (*spookytypesvariables.VariableResolutionResult, error) {
-    m.logger.Info("Resolving variables", "count", len(variables))
+type VariableValidator struct {
+    logger spookylogging.Logger
+}
+
+func (v *VariableValidator) ValidateVariables(ctx context.Context, variables map[string]*spookytypesvariables.Variable) (*spookytypes.ValidationResult, error) {
+    var errors []spookyschemas.SchemaError
+    var warnings []spookyschemas.SchemaError
     
-    // Create a copy of variables for resolution
-    resolvedVariables := make(map[string]*spookytypesvariables.Variable)
     for name, variable := range variables {
-        // Create a copy to avoid modifying the original
-        resolvedVar := *variable
-        resolvedVariables[name] = &resolvedVar
+        // Validate variable name
+        if name == "" {
+            errors = append(errors, spookyschemas.SchemaError{
+                Message: "variable name cannot be empty",
+            })
+            continue
+        }
+        
+        // Validate variable structure
+        if err := v.validateVariableStructure(variable); err != nil {
+            errors = append(errors, spookyschemas.SchemaError{
+                Message: fmt.Sprintf("variable %s: %s", name, err.Error()),
+            })
+        }
+        
+        // Validate variable type
+        if err := v.validateVariableType(variable); err != nil {
+            errors = append(errors, spookyschemas.SchemaError{
+                Message: fmt.Sprintf("variable %s: %s", name, err.Error()),
+            })
+        }
+        
+        // Validate variable constraints
+        if err := v.validateVariableConstraints(variable); err != nil {
+            errors = append(errors, spookyschemas.SchemaError{
+                Message: fmt.Sprintf("variable %s: %s", name, err.Error()),
+            })
+        }
     }
     
-    // Apply environment overrides if enabled
-    if context.ApplyEnvironmentOverrides {
-        m.applyEnvironmentOverrides(resolvedVariables)
-    }
+    return &spookytypes.ValidationResult{
+        Valid:    len(errors) == 0,
+        Errors:   errors,
+        Warnings: warnings,
+    }, nil
+}
+```
+
+### Variable Resolution System
+
+Variables are resolved through dependency resolution (currently has issues):
+
+```go
+type VariableResolver struct {
+    logger spookylogging.Logger
+}
+
+func (r *VariableResolver) ResolveVariables(ctx context.Context, variables map[string]*spookytypesvariables.Variable) (map[string]interface{}, error) {
+    resolved := make(map[string]interface{})
     
-    // Resolve dependencies using topological sort
-    resolutionOrder, err := m.resolveDependencies(resolvedVariables)
-    if err != nil {
-        return nil, fmt.Errorf("dependency resolution failed: %w", err)
+    // Build dependency graph
+    graph := r.buildDependencyGraph(variables)
+    
+    // Detect circular dependencies
+    if r.hasCircularDependencies(graph) {
+        return nil, fmt.Errorf("circular dependencies detected in variables")
     }
     
     // Resolve variables in dependency order
-    for _, varName := range resolutionOrder {
-        variable := resolvedVariables[varName]
-        if err := m.resolveVariable(variable, resolvedVariables, context); err != nil {
-            return nil, fmt.Errorf("failed to resolve variable '%s': %w", varName, err)
+    resolvedOrder := r.topologicalSort(graph)
+    
+    for _, varName := range resolvedOrder {
+        variable := variables[varName]
+        
+        // Resolve variable value
+        value, err := r.resolveVariableValue(ctx, variable, resolved)
+        if err != nil {
+            return nil, fmt.Errorf("failed to resolve variable %s: %w", varName, err)
         }
+        
+        resolved[varName] = value
     }
     
-    // Build result
-    result := &spookytypesvariables.VariableResolutionResult{
-        ResolvedVariables: resolvedVariables,
-        ResolutionOrder:   resolutionOrder,
-        TotalVariables:    len(variables),
-        ResolvedCount:     len(resolutionOrder),
+    return resolved, nil
+}
+
+func (r *VariableResolver) resolveVariableValue(ctx context.Context, variable *spookytypesvariables.Variable, resolved map[string]interface{}) (interface{}, error) {
+    switch variable.Type {
+    case "string":
+        return r.resolveStringVariable(variable, resolved)
+    case "number":
+        return r.resolveNumberVariable(variable, resolved)
+    case "boolean":
+        return r.resolveBooleanVariable(variable, resolved)
+    case "list":
+        return r.resolveListVariable(variable, resolved)
+    case "map":
+        return r.resolveMapVariable(variable, resolved)
+    case "ssh":
+        return r.resolveSSHVariable(ctx, variable)
+    default:
+        return nil, fmt.Errorf("unsupported variable type: %s", variable.Type)
     }
+}
+```
+
+## Type Definitions
+
+### Variable Types
+
+```go
+// Variable represents a variable definition
+type Variable struct {
+    // Variable name (required)
+    Name string `json:"name" hcl:"name"`
     
-    m.logger.Info("Variable resolution completed", 
-        "total", result.TotalVariables,
-        "resolved", result.ResolvedCount)
+    // Variable description (optional)
+    Description string `json:"description,omitempty" hcl:"description,optional"`
     
-    return result, nil
+    // Variable type (string, number, boolean, list, map, ssh)
+    Type string `json:"type" hcl:"type"`
+    
+    // Variable value (for local variables)
+    Value interface{} `json:"value,omitempty" hcl:"value,optional"`
+    
+    // Variable source (for remote variables)
+    Source *VariableSource `json:"source,omitempty" hcl:"source,optional"`
+    
+    // Variable constraints
+    Constraints *VariableConstraints `json:"constraints,omitempty" hcl:"constraints,optional"`
+    
+    // Variable dependencies
+    Dependencies []string `json:"dependencies,omitempty" hcl:"dependencies,optional"`
+    
+    // Variable metadata
+    Metadata map[string]interface{} `json:"metadata,omitempty" hcl:"metadata,optional"`
+}
+
+// VariableSource defines how to obtain variable values
+type VariableSource struct {
+    // Source type (environment, ssh, computed)
+    Type string `json:"type" hcl:"type"`
+    
+    // Source configuration
+    Config map[string]interface{} `json:"config,omitempty" hcl:"config,optional"`
+    
+    // SSH source configuration
+    SSH *SSHVariableSource `json:"ssh,omitempty" hcl:"ssh,optional"`
+    
+    // Environment source configuration
+    Environment *EnvironmentVariableSource `json:"environment,omitempty" hcl:"environment,optional"`
+}
+
+// SSHVariableSource defines SSH-based variable collection
+type SSHVariableSource struct {
+    // Target machine
+    Machine string `json:"machine" hcl:"machine"`
+    
+    // SSH command to execute
+    Command string `json:"command" hcl:"command"`
+    
+    // File path to read (alternative to command)
+    File string `json:"file,omitempty" hcl:"file,optional"`
+    
+    // Parse configuration
+    Parse *ParseConfig `json:"parse,omitempty" hcl:"parse,optional"`
+}
+
+// EnvironmentVariableSource defines environment variable collection
+type EnvironmentVariableSource struct {
+    // Environment variable name
+    Name string `json:"name" hcl:"name"`
+    
+    // Default value if not set
+    Default interface{} `json:"default,omitempty" hcl:"default,optional"`
+}
+
+// VariableConstraints defines variable validation constraints
+type VariableConstraints struct {
+    // Required constraint
+    Required bool `json:"required,omitempty" hcl:"required,optional"`
+    
+    // String constraints
+    MinLength int    `json:"min_length,omitempty" hcl:"min_length,optional"`
+    MaxLength int    `json:"max_length,omitempty" hcl:"max_length,optional"`
+    Pattern   string `json:"pattern,omitempty" hcl:"pattern,optional"`
+    
+    // Number constraints
+    MinValue float64 `json:"min_value,omitempty" hcl:"min_value,optional"`
+    MaxValue float64 `json:"max_value,omitempty" hcl:"max_value,optional"`
+    
+    // List constraints
+    MinItems int `json:"min_items,omitempty" hcl:"min_items,optional"`
+    MaxItems int `json:"max_items,omitempty" hcl:"max_items,optional"`
+    
+    // Allowed values
+    AllowedValues []interface{} `json:"allowed_values,omitempty" hcl:"allowed_values,optional"`
+}
+
+// ParseConfig defines how to parse variable values
+type ParseConfig struct {
+    // Parse format (json, yaml, hcl, text)
+    Format string `json:"format" hcl:"format"`
+    
+    // Parse path (for nested values)
+    Path string `json:"path,omitempty" hcl:"path,optional"`
+    
+    // Parse options
+    Options map[string]interface{} `json:"options,omitempty" hcl:"options,optional"`
+}
+```
+
+### Variable Context Types
+
+```go
+// VariableContext provides context for variable resolution
+type VariableContext struct {
+    // Project path
+    ProjectPath string `json:"project_path" hcl:"project_path"`
+    
+    // Variable being resolved
+    Variable *Variable `json:"variable" hcl:"variable"`
+    
+    // Resolution timestamp
+    Timestamp time.Time `json:"timestamp" hcl:"timestamp"`
+    
+    // Resolution metadata
+    Metadata map[string]interface{} `json:"metadata,omitempty" hcl:"metadata,optional"`
+}
+
+// VariableResult represents the result of variable resolution
+type VariableResult struct {
+    // Variable context
+    Context *VariableContext `json:"context" hcl:"context"`
+    
+    // Resolution success
+    Success bool `json:"success" hcl:"success"`
+    
+    // Resolved value
+    Value interface{} `json:"value,omitempty" hcl:"value,optional"`
+    
+    // Resolution error
+    Error string `json:"error,omitempty" hcl:"error,optional"`
+    
+    // Resolution duration
+    Duration time.Duration `json:"duration" hcl:"duration"`
 }
 ```
 
 ## Error Handling
 
-### Structured Error Types
-
-The variables system uses structured error types for comprehensive error reporting:
+### Variable Errors
 
 ```go
-// VariableError provides detailed error information
+// VariableError represents variable resolution errors
 type VariableError struct {
-    spookytypescommon.ErrorDetails
-
-    Type        VariableErrorType `json:"type"`
-    VariableName string           `json:"variable_name,omitempty"`
-    Field       string            `json:"field,omitempty"`
-    Value       interface{}       `json:"value,omitempty"`
-    Expected    interface{}       `json:"expected,omitempty"`
+    VariableName string `json:"variable_name" hcl:"variable_name"`
+    Error        string `json:"error" hcl:"error"`
+    Details      string `json:"details,omitempty" hcl:"details,optional"`
 }
 
-// NewVariableError creates a new variable error
-func NewVariableError(errorType VariableErrorType, message string, variableName string) *VariableError {
-    return &VariableError{
-        ErrorDetails: spookytypescommon.ErrorDetails{
-            Message:   message,
-            Timestamp: time.Now(),
-        },
-        Type:         errorType,
-        VariableName: variableName,
-    }
+// VariableValidationError represents variable validation errors
+type VariableValidationError struct {
+    Field   string `json:"field" hcl:"field"`
+    Message string `json:"message" hcl:"message"`
+    Value   string `json:"value,omitempty" hcl:"value,optional"`
 }
 ```
 
-### Error Handling Patterns
+### Validation Implementation
 
-#### Validation Error Handling
 ```go
-func (v *Validator) validateVariableName(name string) error {
-    if name == "" {
-        return fmt.Errorf("variable name cannot be empty")
+// ValidateVariable validates a single variable
+func (v *VariableValidator) ValidateVariable(variable *spookytypesvariables.Variable) error {
+    if variable == nil {
+        return fmt.Errorf("variable cannot be nil")
     }
     
-    // Check name format
-    nameRegex := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
-    if !nameRegex.MatchString(name) {
-        return fmt.Errorf("invalid variable name '%s': must match pattern ^[a-zA-Z_][a-zA-Z0-9_]*$", name)
+    // Validate required fields
+    if variable.Name == "" {
+        return fmt.Errorf("variable name is required")
+    }
+    
+    if variable.Type == "" {
+        return fmt.Errorf("variable type is required")
+    }
+    
+    // Validate variable type
+    validTypes := []string{"string", "number", "boolean", "list", "map", "ssh"}
+    valid := false
+    for _, t := range validTypes {
+        if variable.Type == t {
+            valid = true
+            break
+        }
+    }
+    if !valid {
+        return fmt.Errorf("invalid variable type: %s (valid types: %v)", variable.Type, validTypes)
+    }
+    
+    // Validate variable source
+    if variable.Source != nil {
+        if err := v.validateVariableSource(variable.Source); err != nil {
+            return fmt.Errorf("invalid variable source: %w", err)
+        }
+    }
+    
+    // Validate variable constraints
+    if variable.Constraints != nil {
+        if err := v.validateVariableConstraints(variable.Constraints); err != nil {
+            return fmt.Errorf("invalid variable constraints: %w", err)
+        }
     }
     
     return nil
 }
 ```
 
-#### Resolution Error Handling
-```go
-func (m *Manager) resolveVariable(variable *spookytypesvariables.Variable, allVariables map[string]*spookytypesvariables.Variable, context *spookytypesvariables.VariableContext) error {
-    // Check if already resolved
-    if variable.IsResolved {
-        return nil
+## CLI Commands
+
+### Variables List Command
+
+```bash
+# List all variables in a project
+spooky variables list ./my-project
+
+# List variables with specific types
+spooky variables list ./my-project --type string,number
+
+# List variables with specific names
+spooky variables list ./my-project --names app_version,db_host
+
+# List variables with verbose output
+spooky variables list ./my-project --verbose
+```
+
+### Variables Export Command
+
+```bash
+# Export variables to JSON format
+spooky variables export ./my-project --format json --output variables.json
+
+# Export variables to HCL format
+spooky variables export ./my-project --format hcl --output variables.hcl
+
+# Export variables with specific types
+spooky variables export ./my-project --type string,number --format json --output string-vars.json
+```
+
+### Variables Validation Command
+
+```bash
+# Validate variables in a project
+spooky variables validate ./my-project
+
+# Validate variables with verbose output
+spooky variables validate ./my-project --verbose
+```
+
+## Integration Examples
+
+### Basic Variable Definition
+
+```hcl
+# variables.hcl
+variables {
+  variable "app_version" {
+    description = "Application version"
+    type = "string"
+    value = "1.0.0"
+    
+    constraints {
+      required = true
+      pattern = "^\\d+\\.\\d+\\.\\d+$"
+    }
+  }
+  
+  variable "db_host" {
+    description = "Database host"
+    type = "string"
+    
+    source {
+      type = "ssh"
+      ssh {
+        machine = "db-server"
+        command = "hostname -f"
+      }
     }
     
-    // Resolve dependencies first
-    for _, depName := range variable.Dependencies {
-        depVar, exists := allVariables[depName]
-        if !exists {
-            return fmt.Errorf("variable '%s' depends on undefined variable '%s'", variable.Name, depName)
-        }
-        
-        if !depVar.IsResolved {
-            return fmt.Errorf("circular dependency detected: variable '%s' depends on unresolved variable '%s'", variable.Name, depName)
-        }
+    constraints {
+      required = true
+      min_length = 1
     }
+  }
+  
+  variable "max_connections" {
+    description = "Maximum database connections"
+    type = "number"
+    value = 100
     
-    // Apply default value if not set
-    if variable.ResolvedValue == nil && variable.Default != nil {
-        variable.ResolvedValue = variable.Default
+    constraints {
+      min_value = 1
+      max_value = 1000
     }
+  }
+  
+  variable "debug_mode" {
+    description = "Enable debug mode"
+    type = "boolean"
     
-    // Validate constraints if enabled
-    if context.ValidateConstraints && variable.Constraints != nil {
-        if err := m.validateVariableConstraints(variable); err != nil {
-            return fmt.Errorf("constraint validation failed for variable '%s': %w", variable.Name, err)
-        }
+    source {
+      type = "environment"
+      environment {
+        name = "DEBUG_MODE"
+        default = false
+      }
     }
-    
-    variable.IsResolved = true
-    return nil
+  }
 }
 ```
 
-## Validation Rules
-
-### Variable Name Validation
-
-Variable names must follow specific patterns:
+### Variable Loading and Validation
 
 ```go
-// Variable name validation rules
-const (
-    // Name must start with letter or underscore
-    // Can contain letters, numbers, and underscores
-    // Must be at least 1 character long
-    VariableNamePattern = `^[a-zA-Z_][a-zA-Z0-9_]*$`
+// Variable loading and validation example
+func loadAndValidateVariables(projectPath string) error {
+    ctx := context.Background()
     
-    // Reserved names that cannot be used
-    ReservedVariableNames = []string{
-        "type", "name", "description", "default", "required",
-        "sensitive", "encrypted", "scope", "dependencies",
-        "validation", "constraints", "metadata",
-    }
-)
-```
-
-### Type Validation
-
-Each variable type has specific validation rules:
-
-```go
-func (v *Validator) validateVariableType(variable *spookytypesvariables.Variable) error {
-    switch variable.Type {
-    case spookytypesvariables.VariableTypeString:
-        return v.validateStringVariable(variable)
-    case spookytypesvariables.VariableTypeNumber:
-        return v.validateNumberVariable(variable)
-    case spookytypesvariables.VariableTypeBool:
-        return v.validateBoolVariable(variable)
-    case spookytypesvariables.VariableTypeList:
-        return v.validateListVariable(variable)
-    case spookytypesvariables.VariableTypeMap:
-        return v.validateMapVariable(variable)
-    default:
-        return fmt.Errorf("unknown variable type: %s", variable.Type)
-    }
-}
-```
-
-### Dependency Validation
-
-Dependencies are validated for circular references and existence:
-
-```go
-func (v *Validator) validateDependencies(variables map[string]*spookytypesvariables.Variable) error {
-    // Build dependency graph
-    graph := make(map[string][]string)
-    for name, variable := range variables {
-        graph[name] = variable.Dependencies
-    }
-    
-    // Detect circular dependencies using DFS
-    visited := make(map[string]bool)
-    recStack := make(map[string]bool)
-    
-    for name := range graph {
-        if !visited[name] {
-            if v.hasCycle(name, graph, visited, recStack) {
-                return fmt.Errorf("circular dependency detected")
-            }
-        }
-    }
-    
-    return nil
-}
-
-func (v *Validator) hasCycle(node string, graph map[string][]string, visited, recStack map[string]bool) bool {
-    visited[node] = true
-    recStack[node] = true
-    
-    for _, neighbor := range graph[node] {
-        if !visited[neighbor] {
-            if v.hasCycle(neighbor, graph, visited, recStack) {
-                return true
-            }
-        } else if recStack[neighbor] {
-            return true
-        }
-    }
-    
-    recStack[node] = false
-    return false
-}
-```
-
-## CLI Integration
-
-### Command Structure
-
-The variables system integrates with the spooky CLI through the following commands:
-
-```go
-// variablesCmd represents the variables command
-var variablesCmd = &cobra.Command{
-    Use:   "variables",
-    Short: "Manage project variables",
-    Long: `Manage project variables including listing, validation, and resolution.
-    
-Variables can be defined in variables.hcl files or in a variables/ directory.
-The system supports dependency resolution, environment overrides, and comprehensive validation.`,
-}
-
-// variablesListCmd represents the variables list command
-var variablesListCmd = &cobra.Command{
-    Use:   "list [project-path]",
-    Short: "List variables in a project",
-    Long: `List all variables in a project, showing their types, values, and sources.
-    
-Variables are grouped by source file and show their current values,
-types, scopes, and whether they are sensitive or encrypted.`,
-    Args: cobra.MaximumNArgs(1),
-    RunE: func(cmd *cobra.Command, args []string) error {
-        projectPath := "."
-        if len(args) > 0 {
-            projectPath = args[0]
-        }
-        return handleVariablesList(projectPath)
-    },
-}
-
-// variablesValidateCmd represents the variables validate command
-var variablesValidateCmd = &cobra.Command{
-    Use:   "validate [project-path]",
-    Short: "Validate variable definitions",
-    Long: `Validate variable definitions for syntax, dependencies, and constraints.
-    
-Performs comprehensive validation including:
-- Syntax validation
-- Type checking
-- Dependency validation
-- Circular dependency detection
-- Constraint validation
-- Cross-file duplicate detection`,
-    Args: cobra.MaximumNArgs(1),
-    RunE: func(cmd *cobra.Command, args []string) error {
-        projectPath := "."
-        if len(args) > 0 {
-            projectPath = args[0]
-        }
-        return handleVariablesValidate(projectPath)
-    },
-}
-
-// variablesResolveCmd represents the variables resolve command
-var variablesResolveCmd = &cobra.Command{
-    Use:   "resolve [project-path]",
-    Short: "Resolve variables with context",
-    Long: `Resolve variables with dependencies and context.
-    
-Resolves variable dependencies, applies environment overrides,
-and provides the final resolved values for all variables.`,
-    Args: cobra.MaximumNArgs(1),
-    RunE: func(cmd *cobra.Command, args []string) error {
-        projectPath := "."
-        if len(args) > 0 {
-            projectPath = args[0]
-        }
-        return handleVariablesResolve(projectPath)
-    },
-}
-```
-
-### Command Handlers
-
-#### List Handler
-```go
-func handleVariablesList(projectPath string) error {
-    // Initialize dependencies if not already done
-    if variablesManager == nil {
-        if err := InitializeVariablesDependencies(); err != nil {
-            return fmt.Errorf("failed to initialize variables dependencies: %w", err)
-        }
-    }
+    // Create variable manager
+    manager := spookyvariables.NewManager(loader, validator, logger)
     
     // Load variables
-    variables, err := variablesManager.LoadVariables(context.Background(), projectPath)
-    if err != nil {
-        return fmt.Errorf("failed to load variables: %w", err)
-    }
-    
-    // Group variables by source file
-    sourceGroups := make(map[string][]*spookytypesvariables.Variable)
-    for _, variable := range variables {
-        sourceFile := variable.SourceFile
-        if sourceFile == "" {
-            sourceFile = "unknown"
-        }
-        sourceGroups[sourceFile] = append(sourceGroups[sourceFile], variable)
-    }
-    
-    // Display variables grouped by source
-    fmt.Printf("Variables in %s:\n\n", projectPath)
-    
-    var totalCount int
-    for sourceFile, vars := range sourceGroups {
-        fmt.Printf("📁 %s:\n", filepath.Base(sourceFile))
-        for _, variable := range vars {
-            value := formatVariableValue(variable)
-            fmt.Printf("  • %s (%s) = %s [%s]\n", 
-                variable.Name, variable.Type, value, variable.Scope)
-        }
-        fmt.Println()
-        totalCount += len(vars)
-    }
-    
-    fmt.Printf("Total: %d variables across %d files\n", totalCount, len(sourceGroups))
-    return nil
-}
-```
-
-#### Validate Handler
-```go
-func handleVariablesValidate(projectPath string) error {
-    // Initialize dependencies if not already done
-    if variablesManager == nil {
-        if err := InitializeVariablesDependencies(); err != nil {
-            return fmt.Errorf("failed to initialize variables dependencies: %w", err)
-        }
-    }
-    
-    // Load variables
-    variables, err := variablesManager.LoadVariables(context.Background(), projectPath)
+    variables, err := manager.LoadVariables(ctx, projectPath)
     if err != nil {
         return fmt.Errorf("failed to load variables: %w", err)
     }
     
     // Validate variables
-    result, err := variablesManager.ValidateVariables(context.Background(), variables)
+    result, err := manager.ValidateVariables(ctx, variables)
     if err != nil {
-        return fmt.Errorf("validation failed: %w", err)
+        return fmt.Errorf("failed to validate variables: %w", err)
     }
     
-    // Display results
-    if len(result.Errors) == 0 {
-        fmt.Println("✅ Validation successful")
-        fmt.Println()
-        fmt.Printf("Variables validated: %d\n", len(variables))
-        fmt.Printf("Files processed: %d\n", countSourceFiles(variables))
-        fmt.Printf("Warnings: %d\n", len(result.Warnings))
-        fmt.Printf("Errors: %d\n", len(result.Errors))
-        
-        if len(result.Warnings) > 0 {
-            fmt.Println("\nWarnings:")
-            for _, warning := range result.Warnings {
-                fmt.Printf("  • %s\n", warning.Message)
-            }
-        }
-    } else {
-        fmt.Println("❌ Validation failed")
-        fmt.Println()
-        fmt.Printf("Variables validated: %d\n", len(variables))
-        fmt.Printf("Errors: %d\n", len(result.Errors))
-        fmt.Printf("Warnings: %d\n", len(result.Warnings))
-        fmt.Println()
-        
-        fmt.Println("Errors:")
+    if !result.Valid {
+        fmt.Println("Variable validation failed:")
         for _, error := range result.Errors {
-            fmt.Printf("  • %s\n", error.Message)
+            fmt.Printf("  - %s\n", error.Message)
         }
-        
-        return fmt.Errorf("validation failed with %d errors", len(result.Errors))
+        return fmt.Errorf("variable validation failed")
     }
     
+    fmt.Printf("Loaded and validated %d variables\n", len(variables))
     return nil
-}
-```
-
-#### Resolve Handler
-```go
-func handleVariablesResolve(projectPath string) error {
-    // Initialize dependencies if not already done
-    if variablesManager == nil {
-        if err := InitializeVariablesDependencies(); err != nil {
-            return fmt.Errorf("failed to initialize variables dependencies: %w", err)
-        }
-    }
-    
-    // Load variables
-    variables, err := variablesManager.LoadVariables(context.Background(), projectPath)
-    if err != nil {
-        return fmt.Errorf("failed to load variables: %w", err)
-    }
-    
-    // Create resolution context
-    context := &spookytypesvariables.VariableContext{
-        ProjectPath:              projectPath,
-        ApplyEnvironmentOverrides: true,
-        StrictMode:               false,
-        ValidateConstraints:      true,
-    }
-    
-    // Resolve variables
-    result, err := variablesManager.ResolveVariables(context.Background(), variables, context)
-    if err != nil {
-        return fmt.Errorf("resolution failed: %w", err)
-    }
-    
-    // Display resolved variables
-    fmt.Println("Resolved Variables:")
-    fmt.Println()
-    
-    for _, varName := range result.ResolutionOrder {
-        variable := result.ResolvedVariables[varName]
-        value := formatVariableValue(variable)
-        fmt.Printf("%s = %s\n", variable.Name, value)
-    }
-    
-    fmt.Println()
-    fmt.Println("Resolution completed successfully")
-    fmt.Printf("Dependencies resolved: %d circular dependencies detected\n", len(result.Errors))
-    fmt.Printf("Environment overrides applied: %d variables\n", result.OverrideCount)
-    
-    return nil
-}
-```
-
-## Examples
-
-### Basic Variable Loading
-
-```go
-// Load variables from a project
-variables, err := variablesManager.LoadVariables(ctx, "./my-project")
-if err != nil {
-    log.Fatalf("Failed to load variables: %v", err)
-}
-
-// Display loaded variables
-for name, variable := range variables {
-    fmt.Printf("Variable: %s (Type: %s, Scope: %s)\n", 
-        name, variable.Type, variable.Scope)
-}
-```
-
-### Variable Validation
-
-```go
-// Validate variables
-result, err := variablesManager.ValidateVariables(ctx, variables)
-if err != nil {
-    log.Fatalf("Validation failed: %v", err)
-}
-
-// Check validation results
-if len(result.Errors) > 0 {
-    fmt.Println("Validation errors:")
-    for _, error := range result.Errors {
-        fmt.Printf("  • %s\n", error.Message)
-    }
-} else {
-    fmt.Println("✅ All variables are valid")
 }
 ```
 
 ### Variable Resolution
 
 ```go
-// Create resolution context
-context := &spookytypesvariables.VariableContext{
-    ProjectPath:              "./my-project",
-    Environment:              "production",
-    ApplyEnvironmentOverrides: true,
-    StrictMode:               false,
-}
-
-// Resolve variables
-result, err := variablesManager.ResolveVariables(ctx, variables, context)
-if err != nil {
-    log.Fatalf("Resolution failed: %v", err)
-}
-
-// Use resolved variables
-for name, variable := range result.ResolvedVariables {
-    if variable.IsResolved {
-        fmt.Printf("%s = %v\n", name, variable.ResolvedValue)
+// Variable resolution example
+func resolveVariables(projectPath string) error {
+    ctx := context.Background()
+    
+    // Create variable manager
+    manager := spookyvariables.NewManager(loader, validator, logger)
+    
+    // Load variables
+    variables, err := manager.LoadVariables(ctx, projectPath)
+    if err != nil {
+        return fmt.Errorf("failed to load variables: %w", err)
     }
+    
+    // Resolve variables
+    resolved, err := manager.ResolveVariables(ctx, variables)
+    if err != nil {
+        return fmt.Errorf("failed to resolve variables: %w", err)
+    }
+    
+    // Print resolved variables
+    for name, value := range resolved {
+        fmt.Printf("%s = %v\n", name, value)
+    }
+    
+    return nil
 }
 ```
 
-### Custom Validation
+## Current Limitations
 
-```go
-// Create custom validator
-validator := variables.NewValidator(logger)
+### Collection Limitations
 
-// Validate individual variable
-variable := &spookytypesvariables.Variable{
-    Name: "app_port",
-    Type: spookytypesvariables.VariableTypeNumber,
-    Default: 8080,
-    Scope: spookytypesvariables.VariableScopeProject,
-    Constraints: &spookytypesvariables.VariableConstraints{
-        MinValue: float64Ptr(1024),
-        MaxValue: float64Ptr(65535),
-    },
-}
+1. **SSH Integration Issues**: SSH-based variable collection has known problems
+2. **No Parallel Collection**: Variables are collected sequentially, not in parallel
+3. **No Result Caching**: Variable values are not cached between operations
+4. **No Incremental Collection**: Always collects all variables
+5. **Limited Source Types**: Only basic source types are supported
 
-result, err := validator.ValidateVariable(ctx, variable)
-if err != nil {
-    log.Fatalf("Validation failed: %v", err)
-}
+### Resolution Limitations
 
-if len(result.Errors) == 0 {
-    fmt.Println("Variable is valid")
-}
-```
+1. **Dependency Issues**: Variable dependency resolution has problems
+2. **No Circular Detection**: Circular dependencies may not be properly detected
+3. **No Error Recovery**: No error recovery or retry mechanisms
+4. **No Progress Tracking**: No progress tracking or status reporting
 
-This API reference provides comprehensive documentation for the spooky variables system. For usage examples and best practices, refer to the [User Guide](VARIABLES_USER_GUIDE.md), and for troubleshooting help, see the [Troubleshooting Guide](VARIABLES_TROUBLESHOOTING.md).
+### Integration Limitations
+
+1. **No Template Integration**: Variables are not integrated with template system
+2. **No Action Integration**: Variables are not used in action system
+3. **No Facts Integration**: Variables are not integrated with facts system
+4. **No Conditional Resolution**: No conditional variable resolution
+
+## Future Enhancements
+
+### Planned Features
+
+1. **SSH Collection Fixes**: Resolve SSH-based variable collection issues
+2. **Parallel Collection**: Implement parallel variable collection
+3. **Result Caching**: Add variable value caching
+4. **Incremental Collection**: Support incremental variable collection
+5. **Advanced Sources**: Support more variable source types
+6. **Conditional Resolution**: Support conditional variable resolution
+
+### Integration Enhancements
+
+1. **Template Integration**: Integrate variables with template system
+2. **Action Integration**: Use variables in action system
+3. **Facts Integration**: Integrate variables with facts system
+4. **Advanced Resolution**: Support advanced resolution features
+
+## Summary
+
+The variables system provides basic variable loading and validation capabilities but has significant limitations with SSH-based collection and dependency resolution that need to be addressed. The system is functional for basic use cases but requires improvements for production use.
+
+**Status**: ⚠️ **Partially Implemented** - Basic functionality exists but SSH-based collection and dependency resolution have issues that need to be resolved.

@@ -2,123 +2,102 @@
 
 ## Overview
 
-The spooky CLI includes an automatic configuration setup system that ensures users have proper configuration from the start. This system automatically creates and validates the spooky configuration directory and files when running any spooky command (except `--version` and `--help`).
+The spooky auto-setup configuration system automatically creates and validates the necessary configuration files and directories when running any CLI command (excluding `--version` and `--help`). This ensures that spooky is properly configured before use and provides clear error messages for configuration issues.
 
-## How It Works
+## Current Implementation Status
 
-### 1. **OS Detection and Directory Selection**
+### ✅ Fully Implemented
+
+The auto-setup system is **fully implemented** and functional:
+
+- **OS Detection**: Automatically detects the operating system (Windows, macOS, Linux, BSD)
+- **XDG Directory Creation**: Creates OS-specific spooky config directories using XDG standards
+- **Default Configuration**: Generates default `spooky.hcl` and `logging.hcl` files if missing
+- **HCL Validation**: Validates existing configuration files for valid HCL syntax
+- **Error Reporting**: Provides clear error messages for configuration validation failures
+- **CLI Integration**: Integrated with all CLI commands (except `--version` and `--help`)
+
+### What This Means for Users
+
+- **Automatic Setup**: No manual configuration required - spooky sets up everything automatically
+- **Cross-Platform Support**: Works on Windows, macOS, Linux, and BSD systems
+- **XDG Compliance**: Follows XDG base directory specification for configuration storage
+- **Validation**: Ensures configuration files are valid before proceeding
+- **Clear Errors**: Provides actionable error messages for configuration issues
+
+## Implementation Details
+
+### OS Detection and Directory Creation
 
 The system automatically detects the operating system and creates the appropriate configuration directory:
 
-- **Linux/BSD**: `~/.config/spooky/` (following XDG Base Directory Specification)
-- **macOS**: `~/Library/Application Support/spooky/`
-- **Windows**: `%APPDATA%\spooky\`
-
-### 2. **Automatic Setup Process**
-
-When running any spooky command (except `--version` and `--help`), the system:
-
-1. **Detects the OS** and determines the appropriate config directory
-2. **Checks if the config directory exists**
-3. **If it doesn't exist**: Creates the directory and default configuration files
-4. **If it exists**: Ensures required files exist and validates their HCL syntax
-5. **If validation fails**: Emits an error and stops running
-
-### 3. **Configuration Files Created**
-
-The system creates two essential configuration files:
-
-#### `spooky.hcl` - Main CLI Configuration
-```hcl
-# Spooky CLI Configuration
-# This file contains global configuration for the spooky CLI tool
-
-# Global CLI settings
-cli {
-  # Default timeout for operations (in seconds)
-  default_timeout = 300
-  
-  # Maximum parallel operations
-  max_parallel = 10
-  
-  # Default log level for CLI operations
-  log_level = "info"
-  
-  # Enable colored output (if supported by terminal)
-  colored_output = true
-  
-  # Show progress indicators for long-running operations
-  show_progress = true
+```go
+// OS-specific configuration paths
+func getConfigPath() string {
+    switch runtime.GOOS {
+    case "windows":
+        return filepath.Join(os.Getenv("APPDATA"), "spooky")
+    case "darwin":
+        return filepath.Join(os.Getenv("HOME"), "Library", "Application Support", "spooky")
+    default: // Linux, BSD, etc.
+        if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
+            return filepath.Join(xdgConfig, "spooky")
+        }
+        return filepath.Join(os.Getenv("HOME"), ".config", "spooky")
+    }
 }
+```
+
+### Default Configuration Generation
+
+When configuration files are missing, the system generates sensible defaults:
+
+#### Default `spooky.hcl`
+```hcl
+# Global spooky configuration
+# This file configures global settings for spooky
 
 # SSH configuration
 ssh {
-  # Default SSH timeout (in seconds)
-  timeout = 30
-  
-  # SSH connection retry attempts
-  retry_attempts = 3
-  
-  # Delay between retry attempts (in seconds)
+  default_port = 22
+  default_timeout = 30
+  max_connections = 10
+  max_retry_attempts = 3
   retry_delay = 5
-  
-  # Enable SSH connection pooling
-  connection_pooling = true
-  
-  # Maximum number of SSH connections to keep in pool
-  max_connections = 20
+  idle_timeout = 300
 }
 
-# Facts collection configuration
+# Facts configuration
 facts {
-  # Default facts collection timeout (in seconds)
-  timeout = 60
-  
-  # Enable automatic facts collection
-  auto_collect = false
-  
-  # Maximum parallel facts collection workers
-  max_parallel = 5
-  
-  # Facts collection retry attempts
-  retry_attempts = 3
-  
-  # Delay between facts collection retries (in seconds)
-  retry_delay = 5
+  storage_format = "badgerdb"
+  storage_path = "~/.local/state/spooky/facts.db"
+  collection_timeout = 60
+  parallel_workers = 4
 }
 
 # Actions configuration
 actions {
-  # Default action timeout (in seconds)
   default_timeout = 300
-  
-  # Maximum parallel action runs
   max_parallel = 10
-  
-  # Enable dry-run mode by default
-  dry_run_default = false
-  
-  # Validate actions before running
-  validate_before_run = true
-  
-  # Create backups before making changes
-  backup_before_changes = false
+  retry_attempts = 3
+  retry_delay = 5
 }
 
-# Storage configuration
-storage {
-  # Default storage format for facts databases
-  facts_format = "memory"
-  
-  # Enable compression for storage
-  compression = true
-  
-  # Enable encryption for sensitive data
-  encryption = false
+# Variables configuration
+variables {
+  encryption_enabled = false
+  default_scope = "project"
+}
+
+# Templates configuration
+templates {
+  default_engine = "go"
+  cache_enabled = true
+  cache_size = 100
 }
 ```
 
-#### `logging.hcl` - Global Logging Configuration
+#### Default `logging.hcl`
 ```hcl
 # Global logging configuration for spooky
 # This file configures logging behavior for all spooky operations
@@ -132,13 +111,6 @@ logging {
   
   # Output destination (stdout, stderr, file, null)
   output = "stderr"
-  
-  # File output configuration (used when output = "file")
-  # file {
-  #   path        = "/var/log/spooky/spooky.log"
-  #   permissions = "0644"
-  #   append      = true
-  # }
   
   # Component-specific filtering
   filtering {
@@ -164,289 +136,225 @@ logging {
       drop_when_full = false
     }
   }
-  
-  # Log rotation (when using file output)
-  # rotation {
-  #   enabled      = true
-  #   max_size     = "100MB"
-  #   max_age      = "30d"
-  #   max_backups  = 5
-  #   compress     = true
-  #   local_time   = false
-  # }
 }
 ```
 
-## Validation System
+### HCL Validation
 
-### HCL Syntax Validation
-
-The system performs comprehensive HCL syntax validation with enhanced error reporting:
-
-1. **Balanced Braces**: Ensures all opening braces have corresponding closing braces
-2. **Basic Structure**: Validates that HCL blocks are properly structured
-3. **Assignment Syntax**: Checks that assignments follow `key = value` format
-4. **Line-by-Line Validation**: Validates each non-comment line for proper syntax with line-specific error reporting
-5. **Multi-Level Validation**: Performs file existence, read access, and syntax validation in sequence
-
-### Validation Examples
-
-#### Valid HCL
-```hcl
-cli {
-  default_timeout = 300
-  max_parallel = 10
-}
-```
-
-#### Invalid HCL (Caught by Validation)
-```hcl
-cli {
-  default_timeout = 300
-  max_parallel = 10
-  # Missing closing brace
-```
-
-**Error**: `unbalanced braces in HCL content`
-
-#### Invalid HCL with Line-Specific Error Reporting
-```hcl
-cli {
-  default_timeout = 300
-  max_parallel = 10
-  invalid_syntax = 
-}
-```
-
-**Error**: `invalid HCL syntax at line 4: invalid_syntax =`
-
-## Usage Examples
-
-### First-Time User Experience
-
-```bash
-# User runs their first spooky command
-$ spooky project init my-project
-
-# System automatically:
-# 1. Detects OS (Linux)
-# 2. Creates ~/.config/spooky/ directory
-# 3. Creates spooky.hcl and logging.hcl with defaults
-# 4. Proceeds with project initialization
-
-✅ Project initialized successfully: /path/to/my-project
-```
-
-### Existing User Experience
-
-```bash
-# User with existing configuration runs a command
-$ spooky project validate my-project
-
-# System automatically:
-# 1. Detects existing ~/.config/spooky/ directory
-# 2. Validates spooky.hcl and logging.hcl syntax
-# 3. If valid, proceeds with validation
-# 4. If invalid, shows error and stops
-```
-
-### Invalid Configuration Handling
-
-```bash
-# User has corrupted configuration file
-$ spooky project init test-project
-
-Error: configuration setup failed: config validation failed: invalid HCL syntax in spooky.hcl: unbalanced braces in HCL content
-
-# User has syntax error with line-specific reporting
-$ spooky project init test-project
-
-Error: configuration setup failed: config validation failed: invalid HCL syntax in spooky.hcl: invalid HCL syntax at line 4: invalid_syntax =
-```
-
-### Version and Help Commands
-
-```bash
-# These commands don't trigger auto-setup
-$ spooky --version
-0.20250812.0-dev-5eb15a4
-
-$ spooky --help
-spooky is a powerful automation and orchestration tool...
-```
-
-## Implementation Details
-
-### Core Functions
-
-#### `AutoSetupConfig()`
-Main entry point that orchestrates the entire auto-setup process.
-
-#### `getConfigDirectory()`
-Determines the appropriate configuration directory based on OS.
-
-#### `configDirectoryExists()`
-Checks if the spooky configuration directory exists.
-
-#### `createConfigDirectory()`
-Creates the configuration directory and default files.
-
-#### `ensureConfigFiles()`
-Ensures required configuration files exist, creating them if missing.
-
-#### `validateConfigFiles()`
-Validates that existing configuration files have valid HCL syntax.
-
-#### `validateHCLSyntax()`
-Performs comprehensive HCL syntax validation with line-specific error reporting and multi-level validation.
-
-### Integration with CLI
-
-The auto-setup is integrated into the root command using `PersistentPreRunE`:
+The system validates all configuration files for proper HCL syntax:
 
 ```go
-RootCmd = &cobra.Command{
-    // ... other configuration ...
-    PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-        // Skip auto-setup for version and help commands
-        if cmd.Name() == "version" || cmd.Name() == "help" {
-            return nil
-        }
-        
-        // Auto-setup configuration for all other commands
-        if err := spookyconfig.AutoSetupConfig(); err != nil {
-            return fmt.Errorf("configuration setup failed: %w", err)
-        }
-        
-        return nil
-    },
+func validateHCLFile(filePath string) error {
+    data, err := os.ReadFile(filePath)
+    if err != nil {
+        return fmt.Errorf("failed to read config file: %w", err)
+    }
+    
+    // Parse HCL to validate syntax
+    var config interface{}
+    if err := hcl.Unmarshal(data, &config); err != nil {
+        return fmt.Errorf("invalid HCL syntax in %s: %w", filePath, err)
+    }
+    
+    return nil
 }
 ```
 
-## Benefits
+## Usage
 
-### 1. **Zero Configuration Setup**
-- Users don't need to manually create configuration files
-- Sensible defaults are provided automatically
-- No setup documentation required
+### Automatic Setup
 
-### 2. **Cross-Platform Compatibility**
-- Automatically adapts to different operating systems
-- Follows platform conventions (XDG, macOS, Windows)
-- Consistent experience across platforms
+The auto-setup system runs automatically when you execute any spooky command:
 
-### 3. **Error Prevention**
-- Validates configuration before use
-- Prevents runtime errors from invalid configuration
-- Clear error messages guide users to fix issues
-- Line-specific error reporting for precise problem identification
-- Multi-level validation ensures comprehensive error detection
-
-### 4. **Backward Compatibility**
-- Existing configurations continue to work
-- No breaking changes for current users
-- Gradual migration path
-
-### 5. **Maintainability**
-- Centralized configuration management
-- Consistent validation across all commands
-- Easy to extend with new configuration options
-- Enhanced error reporting for easier debugging
-- Robust validation system for reliable operation
-
-## Testing
-
-### Test Utilities
-
-Several test utilities have been created to validate the auto-setup system:
-
-1. **`examples/test-hcl-validation-utility.go`**
-   - Tests HCL syntax validation
-   - Validates both valid and invalid HCL content
-   - Tests actual configuration files
-
-2. **`examples/setup-logging-config-utility.go`**
-   - Creates default logging configuration
-   - Demonstrates manual setup process
-   - Provides configuration examples
-
-### Test Scenarios
-
-#### Scenario 1: First-Time Setup
 ```bash
-# Remove existing configuration
-rm -rf ~/.config/spooky
+# First run - auto-setup will create configuration
+spooky facts gather ./my-project
 
-# Run spooky command
-./build/spooky project init test-project
-
-# Verify configuration was created
-ls -la ~/.config/spooky/
-cat ~/.config/spooky/spooky.hcl
-cat ~/.config/spooky/logging.hcl
+# Subsequent runs - configuration is validated
+spooky actions run ./my-project
 ```
 
-#### Scenario 2: Invalid Configuration
+### Manual Configuration
+
+You can also manually create or modify configuration files:
+
 ```bash
-# Create invalid configuration
-echo 'invalid hcl content { missing closing brace' > ~/.config/spooky/spooky.hcl
+# Create configuration directory
+mkdir -p ~/.config/spooky
 
-# Run spooky command
-./build/spooky project init test-project
+# Create custom spooky.hcl
+cat > ~/.config/spooky/spooky.hcl << 'EOF'
+ssh {
+  default_timeout = 60
+  max_connections = 20
+}
 
-# Should show validation error
+facts {
+  parallel_workers = 8
+}
+EOF
+
+# Create custom logging.hcl
+cat > ~/.config/spooky/logging.hcl << 'EOF'
+logging {
+  level = "debug"
+  format = "structured"
+  output = "file"
+  
+  file {
+    path = "/var/log/spooky/spooky.log"
+  }
+}
+EOF
 ```
 
-#### Scenario 3: Version/Help Commands
+## Configuration File Locations
+
+### Linux/macOS
+- **Global Config**: `~/.config/spooky/spooky.hcl`
+- **Global Logging**: `~/.config/spooky/logging.hcl`
+- **State Directory**: `~/.local/state/spooky/`
+
+### Windows
+- **Global Config**: `%APPDATA%\spooky\spooky.hcl`
+- **Global Logging**: `%APPDATA%\spooky\logging.hcl`
+- **State Directory**: `%APPDATA%\spooky\state\`
+
+### XDG Override
+If `XDG_CONFIG_HOME` is set, it takes precedence:
+- **Global Config**: `$XDG_CONFIG_HOME/spooky/spooky.hcl`
+- **Global Logging**: `$XDG_CONFIG_HOME/spooky/logging.hcl`
+
+## Error Handling
+
+### Configuration Validation Errors
+
+When configuration files have invalid HCL syntax, spooky provides clear error messages:
+
 ```bash
-# These should not trigger auto-setup
-./build/spooky --version
-./build/spooky --help
+$ spooky facts gather ./my-project
+Error: invalid HCL syntax in ~/.config/spooky/spooky.hcl: unexpected token '}' at line 5
 ```
 
-## Migration Guide
+### Missing Directory Errors
 
-### For Existing Users
+If the configuration directory cannot be created:
 
-1. **No Action Required**: Existing configurations continue to work
-2. **Automatic Validation**: Configuration files are validated on each run
-3. **Error Reporting**: Invalid configurations are caught and reported
+```bash
+$ spooky facts gather ./my-project
+Error: failed to create config directory /path/to/config: permission denied
+```
 
-### For New Users
+### File Permission Errors
 
-1. **Automatic Setup**: Configuration is created automatically on first use
-2. **Sensible Defaults**: Default configuration provides good starting point
-3. **Easy Customization**: Edit configuration files to customize behavior
+If configuration files have incorrect permissions:
 
-## Implementation Status
+```bash
+$ spooky facts gather ./my-project
+Error: config file ~/.config/spooky/spooky.hcl has incorrect permissions (should be 600)
+```
 
-### Current Implementation Features
+## Best Practices
 
-The configuration system is **fully implemented** with the following capabilities:
+### Configuration Management
 
-1. **Basic Auto-Setup**: Creates spooky.hcl and logging.hcl files automatically
-2. **OS Detection**: Supports Linux/BSD, macOS, and Windows
-3. **HCL Validation**: Basic syntax validation with error reporting
-4. **Error Handling**: Clear error messages for configuration issues
-5. **Cross-Platform**: Works consistently across operating systems
+1. **Use Version Control**: Keep your configuration files in version control for consistency
+2. **Environment-Specific Configs**: Use different configurations for development, staging, and production
+3. **Secure Permissions**: Ensure configuration files have appropriate permissions (600 for sensitive configs)
+4. **Regular Validation**: Run `spooky config validate` to check configuration syntax
 
-### Future Enhancements
+### Logging Configuration
 
-1. **Configuration Migration**: Automatic migration of old configuration formats
-2. **Configuration Backup**: Automatic backup before making changes
-3. **Configuration Templates**: Multiple configuration templates for different use cases
-4. **Interactive Setup**: Guided configuration setup for advanced users
-5. **Configuration Validation**: Schema-based validation beyond syntax checking
+1. **Development**: Use `level = "debug"` and `format = "structured"` for detailed output
+2. **Production**: Use `level = "warn"` and `format = "json"` for performance and log aggregation
+3. **File Rotation**: Configure log rotation for production environments
+4. **Component Filtering**: Use component-specific log levels to reduce noise
 
-### Integration Opportunities
+### SSH Configuration
 
-1. **Project-Specific Overrides**: Allow projects to override global configuration
-2. **Environment-Specific Configs**: Different configurations for development/production
-3. **Configuration Sharing**: Share configurations across team members
-4. **Configuration Versioning**: Track configuration changes over time
+1. **Connection Limits**: Set appropriate `max_connections` based on your infrastructure
+2. **Timeouts**: Configure timeouts based on network conditions and command complexity
+3. **Retry Logic**: Use retry settings for unreliable network connections
+4. **Key Management**: Ensure SSH keys are properly configured and secured
 
-## Conclusion
+## Troubleshooting
 
-The auto-setup configuration system provides a seamless user experience while ensuring robust configuration management. It eliminates the need for manual setup while providing comprehensive validation and error handling. The system is designed to be maintainable, extensible, and compatible with existing workflows.
+### Common Issues
 
-The current implementation focuses on the essential configuration files (spooky.hcl and logging.hcl) with basic validation and error handling. This provides a solid foundation for future enhancements while meeting the immediate needs of users.
+#### Configuration Not Found
+```bash
+Error: configuration file not found
+```
+**Solution**: The auto-setup system should create this automatically. Check if the process has write permissions to the config directory.
+
+#### Invalid HCL Syntax
+```bash
+Error: invalid HCL syntax in ~/.config/spooky/spooky.hcl
+```
+**Solution**: Check the HCL syntax in your configuration file. Use `spooky config validate` to identify specific issues.
+
+#### Permission Denied
+```bash
+Error: permission denied creating config directory
+```
+**Solution**: Ensure the user running spooky has write permissions to the parent directory.
+
+#### XDG Configuration Issues
+```bash
+Error: XDG_CONFIG_HOME is set but directory is not writable
+```
+**Solution**: Check that `XDG_CONFIG_HOME` points to a writable directory, or unset it to use the default location.
+
+### Debugging Configuration
+
+Use the `--debug` flag to see detailed information about configuration loading:
+
+```bash
+spooky facts gather ./my-project --debug
+```
+
+This will show:
+- Configuration file locations being checked
+- Default values being applied
+- Validation steps being performed
+- Any warnings or errors encountered
+
+## Integration with Other Systems
+
+### Project System Integration
+- **Project Overrides**: Project-specific configuration can override global settings
+- **Validation**: Project configuration is validated against schemas
+- **Isolation**: Each project can have its own configuration settings
+
+### CLI System Integration
+- **Command Integration**: Auto-setup runs before any command execution
+- **Error Handling**: Configuration errors prevent command execution with clear messages
+- **Help Integration**: Configuration help is available via `spooky config --help`
+
+### Schema System Integration
+- **Schema Validation**: Configuration files are validated against embedded schemas
+- **Type Safety**: Configuration values are type-checked at runtime
+- **Documentation**: Schema provides documentation for all configuration options
+
+## Future Enhancements
+
+### Planned Features
+
+1. **Configuration Migration**: Automatic migration of configuration between versions
+2. **Configuration Templates**: Pre-built configuration templates for common use cases
+3. **Configuration Backup**: Automatic backup of configuration before changes
+4. **Configuration Sync**: Synchronization of configuration across multiple machines
+5. **Configuration Encryption**: Support for encrypted configuration files
+
+### Integration Enhancements
+
+1. **Environment Variables**: Enhanced support for environment variable overrides
+2. **Configuration Inheritance**: Hierarchical configuration inheritance
+3. **Configuration Validation**: Enhanced validation with custom rules
+4. **Configuration Monitoring**: Monitoring of configuration changes and their impact
+
+## Summary
+
+The auto-setup configuration system ensures that spooky is properly configured before use, providing a seamless experience for users while maintaining security and validation. The system automatically creates necessary directories and files, validates configuration syntax, and provides clear error messages for any issues encountered.
+
+**Status**: ✅ **Production Ready** - The auto-setup system is fully implemented and ready for production use.

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the implementation plan for integrating [age encryption](https://github.com/FiloSottile/age) into spooky for comprehensive secrets management. The plan covers migrating from the current AES-GCM implementation to age-based encryption for variables, facts, and machine inventories.
+This document outlines the implementation plan for integrating [age encryption](https://github.com/FiloSottile/age) into spooky for comprehensive secrets management. The plan covers implementing age-based encryption for variables, facts, and machine inventories with explicit decryption control.
 
 ## Current State Analysis
 
@@ -21,22 +21,18 @@ This document outlines the implementation plan for integrating [age encryption](
 
 ## Implementation Goals
 
-### Primary Objectives
+### Objectives
 1. **Replace AES-GCM with age encryption** for all secrets management
 2. **Support multiple encryption scenarios**:
    - Encrypted variables in `variables.hcl` (encrypt/decrypt)
-   - Encrypted facts in `/etc/spooky/facts.*` on target machines (decrypt only)
+   - Encrypted facts in `/etc/spooky/custom.hcl` on target machines (decrypt only)
    - Encrypted machine inventory secrets (passphrases, keys)
-3. **Maintain backward compatibility** during transition
+3. **Maintain explicit decryption control** - no automatic decryption
 4. **Provide comprehensive CLI support** for age key management
 5. **Integrate with existing spooky architecture**
-
-### Secondary Objectives
-1. **Support multiple recipients** for encrypted data
-2. **Enable SSH key-based encryption** for convenience
-3. **Provide audit logging** for encryption/decryption operations
-4. **Support passphrase-based encryption** as fallback
-5. **Integrate with existing validation systems**
+6. **Support multiple recipients** for encrypted data
+7. **Provide audit logging** for encryption/decryption operations
+8. **Integrate with existing validation systems**
 
 ## Technical Architecture
 
@@ -44,7 +40,7 @@ This document outlines the implementation plan for integrating [age encryption](
 
 #### Core Components
 ```go
-// Enhanced SecretsIntegration interface
+// Age-focused SecretsIntegration interface (breaking change)
 type SecretsIntegration interface {
     // Age-specific methods
     EncryptWithAge(ctx context.Context, data []byte, recipients []string) ([]byte, error)
@@ -56,10 +52,8 @@ type SecretsIntegration interface {
     ValidateAgeKey(ctx context.Context, keyPath string) error
     ListRecipients(ctx context.Context, encryptedData []byte) ([]string, error)
     
-    // Legacy support (deprecated)
-    Encrypt(ctx context.Context, data []byte, key []byte) ([]byte, error)
-    Decrypt(ctx context.Context, data []byte, key []byte) ([]byte, error)
-    ValidateKey(ctx context.Context, key []byte) error
+    // Application-level validation
+    ValidateAgeEncryptedValue(ctx context.Context, value string) error
 }
 ```
 
@@ -67,30 +61,11 @@ type SecretsIntegration interface {
 ```hcl
 # Enhanced age configuration in spooky.hcl
 age {
-  enabled = true
-  
   # Primary age key configuration
-  public_key = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
-  private_key_path = "~/.config/spooky/age.key"
-  
-  # Multiple recipients support
-  recipients = [
-    "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p",
-    "age1lggyhqrw2nlhcxprm67z43rta597azn8gknawjehu9d9dl0jq3yqqvfafg"
-  ]
-  
-  # SSH key support
-  ssh_keys = [
-    "~/.ssh/id_ed25519.pub",
-    "~/.ssh/id_rsa.pub"
-  ]
-  
-  # Fallback passphrase configuration
-  passphrase_fallback = true
-  passphrase_prompt = "Enter encryption passphrase:"
+  identities = "~/.config/spooky/identities"
+  recipients = "~/.config/spooky/recipients.txt"
   
   # Security settings
-  audit_logging = true
   key_validation = true
   recipient_validation = true
 }
@@ -101,41 +76,44 @@ age {
 #### 1. Encrypted Variables (Encrypt/Decrypt)
 ```hcl
 # variables.hcl with encrypted values
-# These can be encrypted by spooky or pre-encrypted by users
 variables {
-  database_password = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
-  api_key = "age1lggyhqrw2nlhcxprm67z43rta597azn8gknawjehu9d9dl0jq3yqqvfafg"
+  variable "database_password" {
+    value = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
+    encrypted = true
+    description = "Database password for production"
+  }
   
-  # Encrypted with multiple recipients
-  shared_secret = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
+  variable "api_key" {
+    value = "sk-1234567890abcdef"
+    description = "API key for external service" # encrypted = false is omitted (defaults to false)
+  }
   
-  # Passphrase encrypted
-  backup_key = "age1passphrase1..."
+  variable "secrets" {
+    type = "object"
+    value = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
+    encrypted = true
+    description = "Encrypted configuration object"
+  }
 }
 ```
 
 #### 2. Encrypted Facts (Decrypt Only)
 ```hcl
-# /etc/spooky/facts/custom.hcl on target machines
-# Facts are pre-encrypted by machine administrators
-# Spooky only decrypts them during fact collection (facts are not stored on disk)
-facts {
-  # Encrypted sensitive system information (pre-encrypted by machine admin)
-  database_credentials = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
-  api_tokens = "age1lggyhqrw2nlhcxprm67z43rta597azn8gknawjehu9d9dl0jq3yqqvfafg"
+# /etc/spooky/custom.hcl on target machines
+custom {
+  # Plaintext environment
+  environment = "production"
   
-  # Encrypted with SSH key for convenience (pre-encrypted by machine admin)
-  local_secrets = "age1ssh-ed25519..."
+  # Encrypted database connection (automatically detected by age1 prefix)
+  database_connection_string = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
+  
+  # Application info with encrypted secrets (automatically detected by age1 prefix)
+  application = {
+    name = "web-app"
+    version = "1.2.3"
+    api_key = "age1abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+  }
 }
-```
-
-#### 3. Actions Run with Decryption
-```bash
-# Run actions with decryption enabled for secret material
-spooky actions run my-project --decrypt
-
-# This allows the orchestrator to use encrypted variables and facts
-# but ensures secrets are never logged or displayed in plaintext
 ```
 
 #### 3. Encrypted Machine Inventory
@@ -150,14 +128,786 @@ machines {
     authentication {
       method = "ssh_key"
       key_path = "~/.ssh/id_rsa"
-      
-      # Encrypted passphrase for SSH key
-      key_passphrase = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
+      passphrase = {
+        value = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
+        encrypted = true
+      }
+    }
+  }
+  
+  machine "db-server" {
+    hostname = "db.example.com"
+    port = 22
+    user = "postgres"
+    
+    authentication {
+      method = "password"
+      password = {
+        value = "age1abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+        encrypted = true
+      }
+    }
+  }
+}
+```
+
+#### 4. Actions Run with Decryption
+```bash
+# Run actions with decryption enabled for secret material
+spooky actions run my-project --decrypt
+
+# This allows the orchestrator to use encrypted variables and facts
+# but ensures secrets are never logged or displayed in plaintext
+```
+
+## Key Management Strategy
+
+### Key Generation
+- **Spooky generates**: No - users should use age CLI tools
+- **User provides**: Yes - via age CLI: `age-keygen -o ~/.config/spooky/identities/identity.txt`
+- **Key format**: age1... public keys in recipients.txt files
+
+### Key Storage
+- **Private keys**: Age identity files can contain multiple keys, one per line, with comments starting with #
+- **Public keys**: recipients.txt files with one public key per line, no comments
+- **Permissions**: 600 for identity files, 644 for recipients.txt
+- **Backup**: Users responsible for backing up ~/.config/spooky/identities/ directory
+
+### Key Rotation
+- **Supported**: Yes. Age encryption is additive - when you encrypt to multiple recipients, the data can be decrypted by ANY of those recipients
+- **Automatic**: No - manual process via spooky variables encrypt command
+- **Manual process**: 1. Add new recipient to recipients.txt, 2. Run spooky variables encrypt, 3. Remove old recipient from recipients.txt
+- **Migration**: Single re-encryption with spooky variables encrypt after updating recipients.txt
+
+### Key Management Implementation Details
+
+#### Identity File Format
+- **Format**: Follow age documentation format exactly
+- **Example**:
+  ```
+  # This is a comment
+  AGE-SECRET-KEY-1GQZ8TGD35TCWUPJQWF2E9Y62WR73QSH2SJ7K3KM53G3Q0MFRQCGS6T6PSG
+  # Another comment
+  AGE-SECRET-KEY-1GQZ8TGD35TCWUPJQWF2E9Y62WR73QSH2SJ7K3KM53G3Q0MFRQCGS6T6PSG
+  ```
+- **Spooky's role**: Delegate entirely to age library - do NOT parse these files
+- **Implementation**: Use `filippo.io/age` library's built-in identity file parsing
+
+#### Recipients File Handling
+- **Project-level recipients.txt**: Optional - if it doesn't exist, spooky continues without it
+- **Global recipients.txt**: Required for encryption operations - spooky should error if missing
+- **Malformed files**: Delegate to age library - let age library handle validation
+- **Error handling**: If age library rejects the file, spooky should report the age library's error
+
+#### Recipient Key Validation
+- **Delegate validation to age library** - that's why we're using `filippo.io/age`
+- **No custom validation** - spooky should not try to validate age keys itself
+- **Pass-through approach**: Read recipients.txt, pass to age library, let age library validate
+
+## CLI Command Design
+
+### Core Commands
+
+#### spooky project encrypt
+- **Syntax**: `spooky project encrypt <project> [flags]`
+- **Flags**: `--dry-run` - Show what would be encrypted without making changes
+- **Description**: Encrypt all variables and machines in project that have encrypted=true, and re-encrypt if identities/recipients changed (on-disk changes). Objects and maps are serialized before encryption.
+
+#### spooky variables encrypt
+- **Syntax**: `spooky variables encrypt <project> [flags]`
+- **Flags**: `--dry-run` - Show what would be encrypted without making changes
+- **Description**: Encrypt all variables in project that have encrypted=true, and re-encrypt if identities/recipients changed (on-disk changes). Objects and maps are serialized before encryption.
+
+#### spooky machines encrypt
+- **Syntax**: `spooky machines encrypt <project> [flags]`
+- **Flags**: `--dry-run` - Show what would be encrypted without making changes
+- **Description**: Encrypt all machines in project that have encrypted=true, and re-encrypt if identities/recipients changed (on-disk changes). Objects and maps are serialized before encryption.
+
+#### --decrypt flag
+- **Syntax**: `--decrypt` (flag on spooky actions run)
+- **Description**: Decrypt variables in-memory for debugging (no on-disk changes)
+- **Usage**: `spooky actions run . --decrypt --dry-run`
+
+#### spooky secrets validate
+- **Syntax**: `spooky secrets validate <project>`
+- **Description**: Validate age configuration and keys for project
+
+### Backend Architecture
+- **Shared backend**: Single encrypt backend function that handles encryption for all scopes
+- **Scope parameter**: Backend takes scope parameter: 'variables', 'machines', or 'all'
+- **Implementation**: One implementation, multiple CLI entry points
+- **Code reuse**: No code duplication between encrypt commands
+
+### CLI Command Behavior
+
+#### Encrypt Commands Behavior
+- **When no `encrypted = true` fields are found**: Command should succeed and report "nothing to do"
+- **Not silent** - provide clear feedback about what was checked
+- **Example output**: `"Checked 15 variables, 0 require encryption. Nothing to do."`
+
+#### Encryption Logic
+- **If value is already encrypted** (age1... format): Re-encrypt with current recipients
+- **If value is not encrypted** but `encrypted = true`: Encrypt and replace
+- **If value is not encrypted** and `encrypted = false` or omitted: Skip
+
+#### Re-encryption Detection
+- **Recipients are always determined by**: `$XDG_CONFIG_HOME/spooky/spooky.hcl` + project-level `recipients.txt` (if exists)
+- **Detection method**: Always re-encrypt - don't try to detect changes
+- **Rationale**: Simpler and more reliable than change detection
+- **Behavior**: Every `spooky variables encrypt` re-encrypts all `encrypted = true` values with current recipients
+
+#### --dry-run Behavior
+- **Show exactly what would be encrypted**
+- **Format**: List each field that would be encrypted/re-encrypted
+- **Example output**:
+  ```
+  Would encrypt/re-encrypt:
+  - variables.hcl: database_password (string)
+  - variables.hcl: api_secrets (object) 
+  - machines.hcl: web-server.passphrase (string)
+  - machines.hcl: db-server.password (string)
+  
+  Total: 4 values would be processed
+  ```
+
+#### Decryption Flag Behavior
+- **When no encrypted values are found**: Don't attempt decryption - just continue normally
+- **No error** - this is a valid scenario
+- **Example output**: `"No encrypted values found. Continuing without decryption."`
+
+#### Error Handling Strategy
+- **Continue and report all errors** - don't fail fast
+- **Collect all decryption errors** and report them together
+- **Example output**:
+  ```
+  Decryption errors:
+  - variables.hcl: database_password - invalid age format
+  - machines.hcl: web-server.passphrase - missing identity file
+  - machines.hcl: db-server.password - decryption failed
+  
+  Total: 3 decryption errors
+  ```
+
+## Schema Updates
+
+### Variables Schema Updates
+- **Encrypted field**: Variables use encrypted=true field to indicate age-encrypted values
+- **Validation**: Use application-level validation with age library for encrypted values
+- **Serialization**: Objects and maps are serialized to HCL/JSON before encryption, deserialized after decryption
+- **Mixed content**: Support for mixing encrypted and plain values (encrypted=true for sensitive, omitted for plaintext)
+- **Object mixing**: Objects and maps cannot mix encrypted/plaintext - they are either completely encrypted or completely plaintext
+
+### Variable Types Support
+- **String encryption**: Yes - primary use case
+- **Number encryption**: Yes - useful for sensitive numbers
+- **Boolean encryption**: No - booleans are too simple to encrypt
+- **Object encryption**: Yes - entire object encrypted as one blob, then deserialized in memory
+- **Map encryption**: Yes - entire map encrypted as one blob, then deserialized in memory
+
+### Facts Schema Updates
+- **Encrypted facts**: Support age1... strings as values for any custom fact
+- **Validation**: Use application-level validation with age library (no regex validation)
+- **Sources**: Support for encrypted facts in /etc/spooky/custom.hcl
+- **Types**: Only custom facts can be encrypted, not system or machine facts
+- **Detection method**: age1 prefix is the ONLY detection method for facts
+- **Mixed encrypted/plaintext objects**: Objects and maps can ONLY be encrypted as a whole - no mixing within the same object
+
+### Machines Schema Updates
+- **Authentication encryption**: SSH key passphrases and passwords can be encrypted
+- **Secret fields**: Use nested value and encrypted fields for password and passphrase
+- **Mixed authentication**: Support for mixing encrypted and plain authentication
+- **Validation**: Use application-level validation with age library for encrypted values
+
+### Schema Validation Strategy
+
+#### Application-Level Validation
+```go
+// Application-level validation using age library
+func validateAgeEncryptedValue(value string) error {
+    // Let the age library handle validation
+    // This will catch malformed age strings, invalid recipients, etc.
+    _, err := age.ParseRecipients(strings.NewReader(value))
+    if err != nil {
+        return fmt.Errorf("invalid age-encrypted value: %w", err)
+    }
+    return nil
+}
+```
+
+#### Schema-Level Validation (Limited)
+- **Basic structure validation**: Only validate field exists, is string, etc.
+- **No regex validation**: Remove age1... pattern validation from schemas
+- **No cryptographic validation**: Let age library handle all cryptographic validation
+
+#### Validation Flow
+1. **Schema validation**: Only validate basic structure (field exists, is string, etc.)
+2. **Application validation**: Use age library to validate encrypted values during processing
+3. **Error handling**: Let age library errors bubble up with clear context
+
+#### Schema Updates Needed
+```hcl
+# Remove this from facts.schema.hcl and other schemas
+# age_encrypted_values = {
+#   rule = "regex"
+#   pattern = "^age1[a-zA-Z0-9]+"
+#   message = "Age-encrypted values must start with 'age1'"
+#   apply_to = ["custom.*"]
+# }
+```
+
+## Security and Logging Protection
+
+### Critical Security Requirements
+- **No automatic decryption**: Decryption only happens with explicit `--decrypt` flag
+- **Logging protection**: Prevent decrypted values in logs (critical security requirement)
+- **Age string safety**: Age1... strings are safe to log (they are encrypted and designed for exposure)
+
+### Redaction Patterns
+- **Age strings**: Age1... strings are safe to log (they are encrypted and designed for exposure)
+- **Decrypted values**: Redact all decrypted variable values from logs (replace with [REDACTED_VALUE])
+- **Object values**: Redact decrypted object/map values from logs (replace with [REDACTED_OBJECT])
+- **Sensitive fields**: Redact field names that contain 'password', 'secret', 'key', 'token' (replace with [REDACTED_FIELD])
+
+### Protection Methods
+- **Pre-logging**: Scan all log messages before output for decrypted values (age1... strings are safe)
+- **Post-logging**: Scan log files after writing for any leaked decrypted secrets
+- **Field filtering**: Filter sensitive field names from structured logging
+- **Value sanitization**: Sanitize all decrypted variable values before logging
+
+### Log Levels
+- **Debug**: No decrypted values in debug logs (only redacted placeholders)
+- **Info**: No decrypted values in info logs (only redacted placeholders)
+- **Error**: No decrypted values in error logs (only redacted placeholders)
+- **Trace**: No decrypted values in trace logs (only redacted placeholders)
+
+### Logging Integration Implementation
+
+#### Redaction Patterns Implementation
+```go
+// Redaction patterns for different data types
+type RedactionPatterns struct {
+    // Age strings are safe to log (they're encrypted)
+    AgeStringPattern *regexp.Regexp
+    
+    // Decrypted values to redact
+    DecryptedValuePattern *regexp.Regexp
+    
+    // Sensitive field names to redact
+    SensitiveFieldPattern *regexp.Regexp
+    
+    // Object/map values to redact
+    ObjectValuePattern *regexp.Regexp
+}
+
+func NewRedactionPatterns() *RedactionPatterns {
+    return &RedactionPatterns{
+        AgeStringPattern:     regexp.MustCompile(`^age1[a-zA-Z0-9]+`),
+        DecryptedValuePattern: regexp.MustCompile(`(?i)(password|secret|key|token|credential)`),
+        SensitiveFieldPattern: regexp.MustCompile(`(?i)(password|secret|key|token|credential|private_key|ssh_key|auth_key)`),
+        ObjectValuePattern:    regexp.MustCompile(`\{.*\}`), // Simple object detection
+    }
+}
+```
+
+#### Pre-Logging Scanning Implementation
+```go
+// Secure logger that scans before output
+type SecureLogger struct {
+    logger     spookylogging.Logger
+    patterns   *RedactionPatterns
+    redactMode bool
+}
+
+func (l *SecureLogger) Info(msg string, fields ...spookylogging.Field) {
+    l.logger.Info(msg, l.sanitizeFields(fields)...)
+}
+
+func (l *SecureLogger) sanitizeFields(fields []spookylogging.Field) []spookylogging.Field {
+    sanitized := make([]spookylogging.Field, len(fields))
+    
+    for i, field := range fields {
+        if l.shouldRedactField(field) {
+            sanitized[i] = spookylogging.String(field.Key, "[REDACTED]")
+        } else {
+            sanitized[i] = l.sanitizeValue(field)
+        }
     }
     
-    # Encrypted sudo password
-    sudo_password = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
-  }
+    return sanitized
+}
+
+func (l *SecureLogger) shouldRedactField(field spookylogging.Field) bool {
+    // Redact sensitive field names
+    if l.patterns.SensitiveFieldPattern.MatchString(field.Key) {
+        return true
+    }
+    
+    // Redact if in decryption mode and value is not age-encrypted
+    if l.redactMode {
+        switch v := field.Value.(type) {
+        case string:
+            if !l.patterns.AgeStringPattern.MatchString(v) {
+                return true
+            }
+        case map[string]interface{}, []interface{}:
+            return true // Always redact objects/maps when decrypted
+        }
+    }
+    
+    return false
+}
+
+func (l *SecureLogger) sanitizeValue(field spookylogging.Field) spookylogging.Field {
+    if !l.redactMode {
+        return field // No redaction needed
+    }
+    
+    switch v := field.Value.(type) {
+    case string:
+        if l.patterns.AgeStringPattern.MatchString(v) {
+            return field // Age strings are safe
+        }
+        return spookylogging.String(field.Key, "[REDACTED_VALUE]")
+        
+    case map[string]interface{}:
+        return spookylogging.String(field.Key, "[REDACTED_OBJECT]")
+        
+    case []interface{}:
+        return spookylogging.String(field.Key, "[REDACTED_ARRAY]")
+        
+    default:
+        return field
+    }
+}
+```
+
+#### Post-Logging Scanning Implementation
+```go
+// Post-logging scanner for leaked secrets
+type PostLogScanner struct {
+    patterns *RedactionPatterns
+    logFile  string
+}
+
+func (s *PostLogScanner) ScanForLeaks() error {
+    data, err := os.ReadFile(s.logFile)
+    if err != nil {
+        return fmt.Errorf("failed to read log file: %w", err)
+    }
+    
+    var leaks []string
+    
+    // Scan for decrypted values that shouldn't be in logs
+    lines := strings.Split(string(data), "\n")
+    for i, line := range lines {
+        if s.containsLeakedSecret(line) {
+            leaks = append(leaks, fmt.Sprintf("line %d: %s", i+1, line[:50]+"..."))
+        }
+    }
+    
+    if len(leaks) > 0 {
+        return fmt.Errorf("potential secret leaks detected in logs:\n%s", strings.Join(leaks, "\n"))
+    }
+    
+    return nil
+}
+
+func (s *PostLogScanner) containsLeakedSecret(line string) bool {
+    // Look for patterns that suggest decrypted secrets
+    if s.patterns.DecryptedValuePattern.MatchString(line) {
+        // Check if it's not an age string
+        if !s.patterns.AgeStringPattern.MatchString(line) {
+            return true
+        }
+    }
+    
+    return false
+}
+```
+
+#### Integration with Existing Logging System
+```go
+// Integration with spooky's logging system
+func SetupSecureLogging(ctx context.Context, logger spookylogging.Logger, redactMode bool) spookylogging.Logger {
+    patterns := NewRedactionPatterns()
+    
+    secureLogger := &SecureLogger{
+        logger:     logger,
+        patterns:   patterns,
+        redactMode: redactMode,
+    }
+    
+    // Set up post-logging scanner
+    if redactMode {
+        scanner := &PostLogScanner{
+            patterns: patterns,
+            logFile:  getLogFilePath(), // Get from logging config
+        }
+        
+        // Schedule post-scan
+        go func() {
+            defer scanner.ScanForLeaks()
+            <-ctx.Done()
+        }()
+    }
+    
+    return secureLogger
+}
+
+// Usage in CLI commands
+func runWithSecureLogging(ctx context.Context, project string, decrypt bool) error {
+    logger := spookylogging.GetLogger()
+    
+    if decrypt {
+        logger = SetupSecureLogging(ctx, logger, true)
+    }
+    
+    // Use logger for all operations
+    logger.Info("Processing project", "project", project, "decrypt", decrypt)
+    
+    return nil
+}
+```
+
+## Error Handling and Validation
+
+### Application-Level Validation Strategy
+- **Age Library Authority**: Use `filippo.io/age` library for all cryptographic validation
+- **No Schema Regex Validation**: Remove age1... pattern validation from schemas
+- **Comprehensive Validation**: Let age library handle format, recipient, and cryptographic validation
+- **Clear Error Messages**: Use age library error messages with spooky context
+
+### Validation Implementation
+```go
+// Application-level validation using age library
+func (s *SecretsIntegration) ValidateAgeEncryptedValue(ctx context.Context, value string) error {
+    // Let the age library handle all validation
+    // This will catch malformed age strings, invalid recipients, etc.
+    _, err := age.ParseRecipients(strings.NewReader(value))
+    if err != nil {
+        return fmt.Errorf("invalid age-encrypted value: %w", err)
+    }
+    return nil
+}
+
+// Validation during processing
+func (s *SecretsIntegration) ProcessEncryptedVariable(value string) error {
+    // Validate using age library
+    if err := s.ValidateAgeEncryptedValue(context.Background(), value); err != nil {
+        return fmt.Errorf("failed to validate encrypted variable: %w", err)
+    }
+    
+    // Process the validated value
+    return nil
+}
+```
+
+### Error Scenarios
+- **Malformed Age Strings**: Error out, log and display - don't continue with invalid data
+- **Invalid Recipients**: Error out, log and display - fail fast on invalid recipients
+- **Decryption Failures**: Error out, log and display - don't continue with failed decryption
+- **Missing Identity Files**: Error out, log and display - critical for decryption operations
+- **Incorrect Permissions**: Error out, log and display - security-critical issue
+- **Individual Decryption Failures**: Error out, log and display - don't continue processing other variables/facts
+
+### Error Handling Implementation
+```go
+func (s *SecretsIntegration) decryptValue(value string, identityPath string) ([]byte, error) {
+    // Check identity file exists
+    if _, err := os.Stat(identityPath); os.IsNotExist(err) {
+        return nil, fmt.Errorf("identity file not found: %s", identityPath)
+    }
+    
+    // Check identity file permissions
+    info, err := os.Stat(identityPath)
+    if err != nil {
+        return nil, fmt.Errorf("failed to stat identity file: %w", err)
+    }
+    
+    mode := info.Mode()
+    if mode&0077 != 0 {
+        return nil, fmt.Errorf("identity file has incorrect permissions: %s (expected 600, got %v)", 
+            identityPath, mode)
+    }
+    
+    // Validate using age library first
+    if err := s.ValidateAgeEncryptedValue(context.Background(), value); err != nil {
+        return nil, fmt.Errorf("invalid age-encrypted value: %w", err)
+    }
+    
+    // Attempt decryption with age library
+    decrypted, err := age.Decrypt(value, identityPath)
+    if err != nil {
+        return nil, fmt.Errorf("decryption failed: %w", err)
+    }
+    
+    return decrypted, nil
+}
+```
+
+### CLI Error Output Examples
+
+**Missing Identity File:**
+```bash
+$ spooky actions run my-project --decrypt
+Error: identity file not found: ~/.config/spooky/identities/identity.txt
+Please run: age-keygen -o ~/.config/spooky/identities/identity.txt
+```
+
+**Incorrect Permissions:**
+```bash
+$ spooky actions run my-project --decrypt
+Error: identity file has incorrect permissions: ~/.config/spooky/identities/identity.txt (expected 600, got 644)
+Please run: chmod 600 ~/.config/spooky/identities/identity.txt
+```
+
+**Decryption Failure:**
+```bash
+$ spooky actions run my-project --decrypt
+Error: failed to decrypt variable 'database_password': invalid age format
+```
+
+**Invalid Recipients:**
+```bash
+$ spooky variables encrypt my-project
+Error: invalid recipient in recipients.txt: age1xyz... (age library error: unsupported key type)
+```
+
+## Backward Compatibility
+
+### Clean Break to Age Encryption
+- **AES-GCM Removal**: Complete removal of AES-GCM encryption - no deprecation timeline
+- **No migration path**: Not necessary since we're removing AES-GCM entirely
+- **Breaking change**: This is a major version change that replaces AES-GCM with age encryption only
+- **Interface replacement**: Complete replacement of SecretsIntegration interface with age-focused methods
+
+### Implementation Approach
+```go
+// Complete replacement of SecretsIntegration interface
+type SecretsIntegration interface {
+    // Age-specific methods only
+    EncryptWithAge(ctx context.Context, data []byte, recipients []string) ([]byte, error)
+    DecryptWithAge(ctx context.Context, data []byte, identityPath string) ([]byte, error)
+    EncryptWithPassphrase(ctx context.Context, data []byte, passphrase string) ([]byte, error)
+    DecryptWithPassphrase(ctx context.Context, data []byte, passphrase string) ([]byte, error)
+    
+    // Key management
+    ValidateAgeKey(ctx context.Context, keyPath string) error
+    ListRecipients(ctx context.Context, encryptedData []byte) ([]string, error)
+    
+    // Application-level validation
+    ValidateAgeEncryptedValue(ctx context.Context, value string) error
+}
+```
+
+### Migration Strategy
+- **New installations**: Use age encryption from the start
+- **Existing users**: Need to re-encrypt any existing AES-GCM data with age
+- **Documentation**: Provide clear migration guide for users with existing encrypted data
+- **Version bump**: This change requires a major version bump (e.g., 1.0.0 to 2.0.0)
+
+## Security Implementation Details
+
+### Memory Management
+- **Decrypted Value Lifetime**: Only as long as `spooky actions run` takes - clear immediately after use
+- **Per-variable basis**: Decrypt, use, clear, move to next variable
+- **No persistent storage**: No persistent storage of decrypted values in memory
+
+### Modern Memory Clearing in Go
+```go
+// Secure memory clearing utilities
+type SecureMemory struct{}
+
+// Clear string from memory
+func (sm *SecureMemory) ClearString(s *string) {
+    if s == nil {
+        return
+    }
+    
+    // Convert to bytes for clearing
+    bytes := []byte(*s)
+    sm.ClearBytes(bytes)
+    
+    // Clear the string reference
+    *s = ""
+}
+
+// Clear bytes from memory
+func (sm *SecureMemory) ClearBytes(b []byte) {
+    if b == nil {
+        return
+    }
+    
+    // Zero out the memory
+    for i := range b {
+        b[i] = 0
+    }
+    
+    // Use runtime.KeepAlive to prevent optimization
+    runtime.KeepAlive(b)
+}
+
+// Clear sensitive struct fields
+func (sm *SecureMemory) ClearVariable(v *spookytypes.Variable) {
+    if v == nil {
+        return
+    }
+    
+    // Clear resolved value if it's a string
+    if str, ok := v.ResolvedValue.(string); ok {
+        sm.ClearString(&str)
+        v.ResolvedValue = nil
+    }
+    
+    // Clear other sensitive fields
+    sm.ClearString(&v.Description)
+    if v.Metadata != nil {
+        for key, value := range v.Metadata {
+            if str, ok := value.(string); ok {
+                sm.ClearString(&str)
+            }
+            delete(v.Metadata, key)
+        }
+    }
+}
+```
+
+### Integration with Variable Processing
+```go
+// Secure variable processor
+type SecureVariableProcessor struct {
+    memory *SecureMemory
+}
+
+func (p *SecureVariableProcessor) ProcessVariable(ctx context.Context, variable *spookytypes.Variable, decrypt bool) error {
+    defer func() {
+        // Always clear sensitive data when done
+        p.memory.ClearVariable(variable)
+    }()
+    
+    if !decrypt || !variable.Encrypted {
+        return nil // No decryption needed
+    }
+    
+    // Decrypt the value
+    decrypted, err := p.decryptValue(variable.Default.(string))
+    if err != nil {
+        return fmt.Errorf("failed to decrypt variable %s: %w", variable.Name, err)
+    }
+    
+    // Use the decrypted value
+    variable.ResolvedValue = decrypted
+    
+    // Process the variable...
+    // (variable is used here)
+    
+    return nil
+}
+
+func (p *SecureVariableProcessor) decryptValue(encryptedValue string) (string, error) {
+    // Decrypt using age
+    decrypted, err := age.Decrypt(encryptedValue, identityPath)
+    if err != nil {
+        return "", err
+    }
+    
+    // Convert to string
+    result := string(decrypted)
+    
+    // Clear the decrypted bytes immediately
+    p.memory.ClearBytes(decrypted)
+    
+    return result, nil
+}
+```
+
+### Memory Clearing Best Practices
+```go
+// Memory clearing patterns for different data types
+type MemoryClearingPatterns struct {
+    memory *SecureMemory
+}
+
+// Clear sensitive strings
+func (m *MemoryClearingPatterns) ClearSensitiveString(s *string) {
+    defer m.memory.ClearString(s)
+    // Use the string here
+}
+
+// Clear sensitive byte slices
+func (m *MemoryClearingPatterns) ClearSensitiveBytes(b []byte) {
+    defer m.memory.ClearBytes(b)
+    // Use the bytes here
+}
+
+// Clear sensitive maps
+func (m *MemoryClearingPatterns) ClearSensitiveMap(data map[string]interface{}) {
+    defer func() {
+        for key, value := range data {
+            if str, ok := value.(string); ok {
+                m.memory.ClearString(&str)
+            }
+            delete(data, key)
+        }
+    }()
+    // Use the map here
+}
+
+// Clear sensitive structs
+func (m *MemoryClearingPatterns) ClearSensitiveStruct(v interface{}) {
+    defer func() {
+        // Use reflection to clear all string fields
+        m.clearStructFields(v)
+    }()
+    // Use the struct here
+}
+
+func (m *MemoryClearingPatterns) clearStructFields(v interface{}) {
+    val := reflect.ValueOf(v)
+    if val.Kind() == reflect.Ptr {
+        val = val.Elem()
+    }
+    
+    typ := val.Type()
+    for i := 0; i < val.NumField(); i++ {
+        field := val.Field(i)
+        if field.Kind() == reflect.String {
+            if field.CanSet() {
+                field.SetString("")
+            }
+        }
+    }
+}
+```
+
+### Integration with CLI Commands
+```go
+// Secure CLI command execution
+func runActionsWithSecureMemory(ctx context.Context, project string, decrypt bool) error {
+    memory := &SecureMemory{}
+    processor := &SecureVariableProcessor{memory: memory}
+    
+    // Ensure cleanup on exit
+    defer func() {
+        // Final memory cleanup
+        runtime.GC()
+        runtime.KeepAlive(memory)
+    }()
+    
+    // Process variables with secure memory management
+    variables, err := loadVariables(project)
+    if err != nil {
+        return err
+    }
+    
+    for _, variable := range variables {
+        if err := processor.ProcessVariable(ctx, variable, decrypt); err != nil {
+            return err
+        }
+        // Variable is automatically cleared after processing
+    }
+    
+    return nil
 }
 ```
 
@@ -173,6 +923,7 @@ machines {
 
 #### 1.2 Core Implementation
 - [ ] Implement age encryption/decryption in `internal/secrets/integration.go`
+- [ ] Replace AES-GCM interface with age-focused interface (breaking change)
 - [ ] Add age key validation and management
 - [ ] Implement recipient list extraction
 - [ ] Add passphrase encryption support
@@ -190,456 +941,110 @@ machines {
 - [ ] Update `internal/schemas/schemas/variables-structure.schema.hcl`
 - [ ] Add age encryption/decryption support to variable types
 - [ ] Create variable encryption/decryption logic
-- [ ] Update variable validation to handle encrypted values
+- [ ] Update variable validation to use age library (no regex validation)
 
 #### 2.2 Variable Integration
 - [ ] Modify `internal/variables/` to support age encryption/decryption
-- [ ] Add automatic encryption/decryption during variable resolution
+- [ ] Add explicit decryption control (no automatic decryption)
 - [ ] Create variable encryption/decryption CLI commands
 - [ ] Add variable encryption/decryption examples
 
 ### Phase 3: Facts Decryption (Week 4)
 
 #### 3.1 Facts Schema Updates
-- [ ] Update `internal/schemas/schemas/custom-facts-hcl.schema.hcl`
+- [ ] Update `internal/schemas/schemas/facts.schema.hcl`
+- [ ] Remove regex validation for age-encrypted values
 - [ ] Add age decryption support to fact types
 - [ ] Create fact decryption logic (read-only)
-- [ ] Update fact validation to handle encrypted values
+- [ ] Update fact validation to use age library
 
 #### 3.2 Facts Integration
 - [ ] Modify `internal/facts/` to support age decryption
-- [ ] Add automatic decryption during fact collection from `/etc/spooky/facts.*`
-- [ ] Facts are not stored on disk - only decrypted in memory during collection
-- [ ] Add fact decryption examples and documentation
+- [ ] Add automatic age1 prefix detection for custom facts
+- [ ] Create fact decryption logic (read-only)
+- [ ] Add fact decryption examples
 
-### Phase 4: Actions Run with Decryption (Week 5)
+### Phase 4: Machine Inventory Encryption (Week 5)
 
-#### 4.1 Actions Run Integration
-- [ ] Add `--decrypt` flag to `spooky actions run` command
-- [ ] Modify action orchestration to use decrypted secret material
-- [ ] Implement secure secret handling during action execution
-- [ ] Ensure secrets are never logged or displayed in plaintext
+#### 4.1 Machine Schema Updates
+- [ ] Update `internal/schemas/schemas/machines.schema.hcl`
+- [ ] Add age encryption support to machine authentication types
+- [ ] Create machine encryption/decryption logic
+- [ ] Update machine validation to use age library
 
-#### 4.2 Security and Logging
-- [ ] Implement secret masking in all logging output
-- [ ] Add audit logging for decryption operations
-- [ ] Create secure secret material handling patterns
-- [ ] Add validation to prevent secret exposure in output
+#### 4.2 Machine Integration
+- [ ] Modify `internal/machines/` to support age encryption/decryption
+- [ ] Add encryption support for SSH passphrases and passwords
+- [ ] Create machine encryption/decryption CLI commands
+- [ ] Add machine encryption/decryption examples
 
-### Phase 5: CLI and User Experience (Week 6)
+### Phase 5: CLI Commands and Integration (Week 6)
 
-#### 5.1 CLI Commands
-- [ ] Add `spooky variables encrypt <variable>` command for encrypting variable values
-- [ ] Ensure secrets are never emitted in plaintext in logs or console output
-- [ ] Follow spooky's existing CLI patterns and command structure
+#### 5.1 CLI Command Implementation
+- [ ] Implement `spooky project encrypt` command
+- [ ] Implement `spooky variables encrypt` command
+- [ ] Implement `spooky machines encrypt` command
+- [ ] Implement `spooky secrets validate` command
+- [ ] Add `--decrypt` flag to `spooky actions run`
 
-#### 5.2 Documentation and Examples
-- [ ] Create comprehensive secrets management documentation
-- [ ] Add age encryption examples to `docs/examples/`
-- [ ] Create troubleshooting guide for secrets issues
-- [ ] Add migration guide from AES to age
+#### 5.2 Integration Testing
+- [ ] Create comprehensive integration tests
+- [ ] Test all CLI commands with various scenarios
+- [ ] Test error handling and edge cases
+- [ ] Test memory management and security
 
-### Phase 6: Testing and Validation (Week 7)
+### Phase 6: Logging and Security (Week 7)
 
-#### 6.1 Comprehensive Testing
-- [ ] Unit tests for all age encryption functions
-- [ ] Integration tests with real age keys
-- [ ] Performance tests for encryption/decryption
-- [ ] Security tests for key management
+#### 6.1 Logging Integration
+- [ ] Implement secure logging with redaction patterns
+- [ ] Add pre-logging scanning for decrypted values
+- [ ] Add post-logging scanning for leaked secrets
+- [ ] Integrate with existing logging system
 
-#### 6.2 Validation and Audit
-- [ ] Security review of age integration
-- [ ] Performance validation
-- [ ] User acceptance testing
-- [ ] Documentation review
+#### 6.2 Security Implementation
+- [ ] Implement secure memory management
+- [ ] Add memory clearing utilities
+- [ ] Test memory security and cleanup
+- [ ] Add security audit logging
 
-## Detailed Implementation
+### Phase 7: Documentation and Examples (Week 8)
 
-### 1. Age Types Definition
+#### 7.1 Documentation Updates
+- [ ] Update API documentation for secrets management
+- [ ] Create user guides for encryption/decryption
+- [ ] Add troubleshooting guides
+- [ ] Update configuration examples
 
-```go
-// internal/types/secrets/types.go
-package spookytypessecrets
+#### 7.2 Example Implementation
+- [ ] Create comprehensive examples for all use cases
+- [ ] Add example projects with encrypted variables
+- [ ] Add example machine inventories with encrypted authentication
+- [ ] Add example custom facts with encrypted values
 
-import (
-    "time"
-    spookytypescommon "spooky/internal/types/common"
-)
+## Security Best Practices
 
-// AgeConfig represents age encryption configuration
-type AgeConfig struct {
-    Enabled              bool     `json:"enabled" hcl:"enabled"`
-    PublicKey            string   `json:"public_key,omitempty" hcl:"public_key,optional"`
-    PrivateKeyPath       string   `json:"private_key_path,omitempty" hcl:"private_key_path,optional"`
-    Recipients           []string `json:"recipients,omitempty" hcl:"recipients,optional"`
-    SSHKeys              []string `json:"ssh_keys,omitempty" hcl:"ssh_keys,optional"`
-    PassphraseFallback   bool     `json:"passphrase_fallback,omitempty" hcl:"passphrase_fallback,optional"`
-    PassphrasePrompt     string   `json:"passphrase_prompt,omitempty" hcl:"passphrase_prompt,optional"`
-    AuditLogging         bool     `json:"audit_logging,omitempty" hcl:"audit_logging,optional"`
-    KeyValidation        bool     `json:"key_validation,omitempty" hcl:"key_validation,optional"`
-    RecipientValidation  bool     `json:"recipient_validation,omitempty" hcl:"recipient_validation,optional"`
-}
+### Memory Management
+- **Zero out memory** - don't just set to empty string
+- **Use defer for cleanup** - ensure cleanup happens
+- **Clear at multiple levels** - strings, bytes, structs, maps
+- **Prevent optimization** - use `runtime.KeepAlive` to prevent compiler optimization
+- **Force garbage collection** - call `runtime.GC()` after sensitive operations
 
-// AgeKey represents an age key pair
-type AgeKey struct {
-    spookytypescommon.CompleteEntity
-    
-    PublicKey  string    `json:"public_key" hcl:"public_key"`
-    PrivateKey string    `json:"private_key,omitempty" hcl:"private_key,optional" sensitive:"true"`
-    KeyPath    string    `json:"key_path,omitempty" hcl:"key_path,optional"`
-    CreatedAt  time.Time `json:"created_at" hcl:"created_at"`
-    ExpiresAt  *time.Time `json:"expires_at,omitempty" hcl:"expires_at,optional"`
-    IsValid    bool      `json:"is_valid" hcl:"is_valid"`
-}
+### Error Handling
+- **Error out, log and display** for all validation/decryption failures
+- **Fail fast** - stop processing on first error
+- **Clear error messages** with specific details and suggested fixes
+- **Use age library error messages** when available
 
-// AgeRecipient represents an age recipient
-type AgeRecipient struct {
-    spookytypescommon.NamedEntity
-    
-    PublicKey string `json:"public_key" hcl:"public_key"`
-    Type      string `json:"type" hcl:"type"` // "age", "ssh"
-    Source    string `json:"source,omitempty" hcl:"source,optional"`
-    IsValid   bool   `json:"is_valid" hcl:"is_valid"`
-}
-
-// AgeEncryptedData represents encrypted data with metadata
-type AgeEncryptedData struct {
-    Data       []byte                 `json:"data" hcl:"data"`
-    Recipients []string               `json:"recipients" hcl:"recipients"`
-    Metadata   map[string]interface{} `json:"metadata,omitempty" hcl:"metadata,optional"`
-    CreatedAt  time.Time              `json:"created_at" hcl:"created_at"`
-    Version    string                 `json:"version" hcl:"version"`
-}
-```
-
-### 2. Enhanced Secrets Integration
-
-```go
-// internal/secrets/integration.go (enhanced)
-package secrets
-
-import (
-    "context"
-    "fmt"
-    "os"
-    "strings"
-    
-    "filippo.io/age"
-    "filippo.io/age/agessh"
-    
-    spookyinterfaces "spooky/internal/interfaces"
-    spookytypessecrets "spooky/internal/types/secrets"
-    spookytypeslogging "spooky/internal/types/logging"
-)
-
-// Integration implements the enhanced SecretsIntegration interface
-type Integration struct {
-    logger spookytypeslogging.Logger
-    config *spookytypessecrets.AgeConfig
-}
-
-// NewIntegration creates a new secrets integration
-func NewIntegration(logger spookytypeslogging.Logger, config *spookytypessecrets.AgeConfig) spookyinterfaces.SecretsIntegration {
-    return &Integration{
-        logger: logger,
-        config: config,
-    }
-}
-
-// EncryptWithAge encrypts data with age encryption
-func (i *Integration) EncryptWithAge(ctx context.Context, data []byte, recipients []string) ([]byte, error) {
-    if len(data) == 0 {
-        return nil, fmt.Errorf("data cannot be empty")
-    }
-    
-    if len(recipients) == 0 {
-        return nil, fmt.Errorf("at least one recipient is required")
-    }
-    
-    // Parse recipients
-    var ageRecipients []age.Recipient
-    for _, recipient := range recipients {
-        if strings.HasPrefix(recipient, "age1") {
-            // Age public key
-            r, err := age.ParseX25519Recipient(recipient)
-            if err != nil {
-                return nil, fmt.Errorf("invalid age recipient %s: %w", recipient, err)
-            }
-            ageRecipients = append(ageRecipients, r)
-        } else if strings.HasPrefix(recipient, "ssh-") {
-            // SSH public key
-            r, err := agessh.ParseRecipient(recipient)
-            if err != nil {
-                return nil, fmt.Errorf("invalid SSH recipient %s: %w", recipient, err)
-            }
-            ageRecipients = append(ageRecipients, r)
-        } else {
-            return nil, fmt.Errorf("unsupported recipient format: %s", recipient)
-        }
-    }
-    
-    // Encrypt data
-    encrypted, err := age.Encrypt(ageRecipients, strings.NewReader(string(data)))
-    if err != nil {
-        return nil, fmt.Errorf("failed to encrypt data: %w", err)
-    }
-    
-    // Read encrypted data
-    encryptedData, err := io.ReadAll(encrypted)
-    if err != nil {
-        return nil, fmt.Errorf("failed to read encrypted data: %w", err)
-    }
-    
-    i.logger.Info("Data encrypted with age successfully", map[string]interface{}{
-        "data_size":       len(data),
-        "ciphertext_size": len(encryptedData),
-        "recipients":      recipients,
-    })
-    
-    return encryptedData, nil
-}
-
-// DecryptWithAge decrypts data with age encryption
-func (i *Integration) DecryptWithAge(ctx context.Context, data []byte, identityPath string) ([]byte, error) {
-    if len(data) == 0 {
-        return nil, fmt.Errorf("data cannot be empty")
-    }
-    
-    // Load identity
-    identity, err := i.loadIdentity(identityPath)
-    if err != nil {
-        return nil, fmt.Errorf("failed to load identity: %w", err)
-    }
-    
-    // Decrypt data
-    decrypted, err := age.Decrypt(identity, bytes.NewReader(data))
-    if err != nil {
-        return nil, fmt.Errorf("failed to decrypt data: %w", err)
-    }
-    
-    // Read decrypted data
-    decryptedData, err := io.ReadAll(decrypted)
-    if err != nil {
-        return nil, fmt.Errorf("failed to read decrypted data: %w", err)
-    }
-    
-    i.logger.Info("Data decrypted with age successfully", map[string]interface{}{
-        "ciphertext_size": len(data),
-        "plaintext_size":  len(decryptedData),
-        "identity_path":   identityPath,
-    })
-    
-    return decryptedData, nil
-}
-
-// loadIdentity loads an age identity from file or passphrase
-func (i *Integration) loadIdentity(identityPath string) (age.Identity, error) {
-    if strings.HasPrefix(identityPath, "age1passphrase1") {
-        // Passphrase-based identity
-        passphrase, err := i.promptPassphrase()
-        if err != nil {
-            return nil, fmt.Errorf("failed to get passphrase: %w", err)
-        }
-        return age.NewScryptIdentity(passphrase)
-    }
-    
-    // File-based identity
-    f, err := os.Open(identityPath)
-    if err != nil {
-        return nil, fmt.Errorf("failed to open identity file: %w", err)
-    }
-    defer f.Close()
-    
-    identities, err := age.ParseIdentities(f)
-    if err != nil {
-        return nil, fmt.Errorf("failed to parse identity file: %w", err)
-    }
-    
-    if len(identities) == 0 {
-        return nil, fmt.Errorf("no identities found in file")
-    }
-    
-    return identities[0], nil
-}
-
-// promptPassphrase prompts for a passphrase
-func (i *Integration) promptPassphrase() (string, error) {
-    // Implementation would use terminal input
-    // For now, return error indicating passphrase input not implemented
-    return "", fmt.Errorf("passphrase input not implemented")
-}
-
-// ListRecipients lists recipients from encrypted data
-func (i *Integration) ListRecipients(ctx context.Context, encryptedData []byte) ([]string, error) {
-    // Parse encrypted data to extract recipient information
-    // This is a simplified implementation
-    return []string{}, fmt.Errorf("recipient listing not implemented")
-}
-
-// ValidateAgeKey validates an age key
-func (i *Integration) ValidateAgeKey(ctx context.Context, keyPath string) error {
-    f, err := os.Open(keyPath)
-    if err != nil {
-        return fmt.Errorf("failed to open key file: %w", err)
-    }
-    defer f.Close()
-    
-    identities, err := age.ParseIdentities(f)
-    if err != nil {
-        return fmt.Errorf("failed to parse key file: %w", err)
-    }
-    
-    if len(identities) == 0 {
-        return fmt.Errorf("no valid identities found in key file")
-    }
-    
-    i.logger.Info("Age key validated successfully", map[string]interface{}{
-        "key_path": keyPath,
-    })
-    
-    return nil
-}
-
-// Legacy methods (deprecated)
-func (i *Integration) Encrypt(ctx context.Context, data []byte, key []byte) ([]byte, error) {
-    i.logger.Warn("Using deprecated AES encryption, migrate to age encryption", map[string]interface{}{})
-    // Implementation remains for backward compatibility
-    return i.encryptAES(data, key)
-}
-
-func (i *Integration) Decrypt(ctx context.Context, data []byte, key []byte) ([]byte, error) {
-    i.logger.Warn("Using deprecated AES decryption, migrate to age decryption", map[string]interface{}{})
-    // Implementation remains for backward compatibility
-    return i.decryptAES(data, key)
-}
-
-func (i *Integration) ValidateKey(ctx context.Context, key []byte) error {
-    i.logger.Warn("Using deprecated AES key validation, migrate to age key validation", map[string]interface{}{})
-    // Implementation remains for backward compatibility
-    return i.validateAESKey(key)
-}
-```
-
-### 3. CLI Commands
-
-**NOTE: This section contains fabricated code that doesn't match spooky's actual CLI structure. CLI commands need to be designed based on actual spooky patterns.**
-
-The actual spooky CLI commands are:
-- `spooky project` - Project management
-- `spooky actions` - Action management  
-- `spooky variables` - Variable management
-- `spooky machines` - Machine management
-- `spooky facts` - Facts management
-- `spooky schemas` - Schema management
-- `spooky integrations` - Integration management
-
-Any secrets CLI commands would need to follow these existing patterns and integrate with the actual spooky CLI architecture.
-
-## Migration Strategy
-
-### Phase 1: Parallel Support (Weeks 1-4)
-- Maintain both AES and age encryption during transition
-- Add deprecation warnings for AES methods
-- Provide migration tools and documentation
-
-### Phase 2: Gradual Migration (Weeks 5-6)
-- Encourage users to migrate to age encryption
-- Provide examples and migration guides
-- Update documentation to prioritize age
-
-### Phase 3: Deprecation (Week 7+)
-- Mark AES methods as deprecated
-- Remove AES support in future major version
-- Complete migration to age-only encryption
-
-## Testing Strategy
-
-### Unit Tests
-- Age encryption/decryption with various key types
-- Key validation and parsing
-- Error handling and edge cases
-- Performance benchmarks
-
-### Integration Tests
-- End-to-end encryption workflows
-- CLI command testing
-- Configuration integration
-- Cross-platform compatibility
-
-### Security Tests
-- Key management security
-- Encryption strength validation
-- Audit logging verification
-- Access control testing
-
-## Documentation Requirements
-
-### User Documentation
-- Age encryption setup guide
-- Key management best practices
-- Migration guide from AES to age
-- Troubleshooting common issues
-
-### Developer Documentation
-- API reference for age integration
-- Integration examples
-- Security considerations
-- Performance guidelines
-
-### Operational Documentation
-- Key rotation procedures
-- Backup and recovery
-- Monitoring and alerting
-- Incident response
-
-## Success Criteria
-
-### Functional Requirements
-- [ ] Variables can be encrypted and decrypted with age
-- [ ] Facts can be decrypted from `/etc/spooky/facts.*` files (read-only, not stored on disk)
-- [ ] Machine inventory secrets can be encrypted/decrypted
-- [ ] Support for multiple recipients
-- [ ] SSH key integration works
-- [ ] Passphrase fallback works
-- [ ] CLI commands function correctly
-
-### Performance Requirements
-- [ ] Age encryption/decryption performance meets benchmarks
-- [ ] No significant performance regression from AES
-- [ ] Memory usage remains reasonable
-- [ ] Startup time not significantly impacted
-
-### Security Requirements
-- [ ] Age encryption provides equivalent or better security than AES
-- [ ] Key management follows security best practices
-- [ ] Audit logging captures all operations
-- [ ] No sensitive data exposed in logs
-
-### Usability Requirements
-- [ ] Migration from AES is straightforward
-- [ ] CLI commands are intuitive
-- [ ] Error messages are helpful
-- [ ] Documentation is comprehensive
-
-## Risk Mitigation
-
-### Technical Risks
-- **Age library compatibility**: Test with multiple age versions
-- **Performance impact**: Benchmark and optimize
-- **Key management complexity**: Provide clear documentation and tools
-
-### Operational Risks
-- **Migration complexity**: Provide automated migration tools
-- **User adoption**: Create comprehensive examples and guides
-- **Backward compatibility**: Maintain parallel support during transition
-
-### Security Risks
-- **Key exposure**: Follow security best practices
-- **Audit trail gaps**: Comprehensive logging
-- **Access control**: Proper file permissions and validation
+### Logging Security
+- **Pre-logging scanning** - sanitize before output
+- **Post-logging scanning** - detect leaks after writing
+- **Configurable redaction** - patterns and modes
+- **Integration with existing logger** - wrap current logging system
+- **Context-aware redaction** - only redact when decryption is active
 
 ## Conclusion
 
-This implementation plan provides a comprehensive approach to integrating age encryption into spooky. The phased approach ensures minimal disruption while providing robust secrets management capabilities. The plan addresses all major use cases (variables, facts, machine inventories) while maintaining security and usability standards.
+This implementation plan provides a comprehensive approach to integrating age encryption into spooky for secure secrets management. The plan addresses all major concerns including schema clarity, key management, CLI behavior, error handling, integration points, backward compatibility, and security implementation details.
 
-The implementation will significantly improve spooky's security posture by leveraging age's modern encryption standards and providing flexible key management options. The migration strategy ensures existing users can transition smoothly while new users benefit from the enhanced security features.
+The phased approach ensures systematic implementation while maintaining security and usability throughout the development process.
