@@ -160,6 +160,9 @@ type FactsIntegration interface {
 	// ValidateFacts validates facts
 	ValidateFacts(ctx context.Context, facts interface{}) (*spookytypes.ValidationResult, error)
 
+	// DecryptFacts decrypts age-encrypted values in facts collection
+	DecryptFacts(ctx context.Context, facts interface{}, secretsIntegration SecretsIntegration, identityPath string) error
+
 	// GetManager returns the underlying fact manager
 	GetManager() interface{}
 }
@@ -207,6 +210,15 @@ type VariablesIntegration interface {
 
 	// ValidateVariables validates variables
 	ValidateVariables(ctx context.Context, variables map[string]*spookytypes.Variable) (*spookytypes.ValidationResult, error)
+
+	// SaveVariables saves variables to the given destination
+	SaveVariables(ctx context.Context, variables map[string]*spookytypes.Variable, destination string) error
+
+	// EncryptVariables encrypts all variables that have encrypted=true
+	EncryptVariables(ctx context.Context, projectPath string, secretsIntegration SecretsIntegration, recipients []string, dryRun bool) error
+
+	// DecryptVariables decrypts age-encrypted values in variables for debugging
+	DecryptVariables(ctx context.Context, variables map[string]*spookytypes.Variable, secretsIntegration SecretsIntegration, identityPath string) error
 }
 
 // TemplatesIntegration provides template management
@@ -244,6 +256,12 @@ type MachinesIntegration interface {
 	// LoadMachines loads machines from the given source
 	LoadMachines(ctx context.Context, source string) ([]spookytypes.Machine, error)
 
+	// SaveMachines saves machines to the given destination
+	SaveMachines(ctx context.Context, machines []spookytypes.Machine, destination string) error
+
+	// EncryptMachines encrypts all machine secrets that have encrypted=true
+	EncryptMachines(ctx context.Context, projectPath string, secretsIntegration SecretsIntegration, recipients []string, dryRun bool) error
+
 	// ValidateMachines validates machines
 	ValidateMachines(ctx context.Context, machines []spookytypes.Machine) (*spookytypes.ValidationResult, error)
 
@@ -264,18 +282,34 @@ type MachinesIntegration interface {
 
 	// GetMachinesByFilter applies complex filtering criteria to machines
 	GetMachinesByFilter(ctx context.Context, filter interface{}) ([]spookytypes.Machine, error)
+
+	// DecryptMachines decrypts age-encrypted values in machines for debugging
+	DecryptMachines(ctx context.Context, machines []spookytypes.Machine, secretsIntegration SecretsIntegration, identityPath string) error
 }
 
 // SecretsIntegration provides secrets management
 type SecretsIntegration interface {
-	// Encrypt encrypts data with the given key
-	Encrypt(ctx context.Context, data []byte, key []byte) ([]byte, error)
+	// Age-specific methods
+	EncryptWithAge(ctx context.Context, data []byte, recipients []string) ([]byte, error)
+	DecryptWithAge(ctx context.Context, data []byte, identityPath string) ([]byte, error)
+	EncryptWithPassphrase(ctx context.Context, data []byte, passphrase string) ([]byte, error)
+	DecryptWithPassphrase(ctx context.Context, data []byte, passphrase string) ([]byte, error)
 
-	// Decrypt decrypts data with the given key
-	Decrypt(ctx context.Context, data []byte, key []byte) ([]byte, error)
+	// Key management
+	ValidateAgeKey(ctx context.Context, keyPath string) error
+	ListRecipients(ctx context.Context, encryptedData []byte) ([]string, error)
 
-	// ValidateKey validates an encryption key
-	ValidateKey(ctx context.Context, key []byte) error
+	// Application-level validation
+	ValidateAgeEncryptedValue(ctx context.Context, value string) error
+	LoadRecipients(ctx context.Context, recipientsPath string) ([]string, error)
+	LoadIdentities(ctx context.Context, identitiesPath string) ([]string, error)
+
+	// HCL encryption and decryption methods
+	EncryptHCLValues(ctx context.Context, data interface{}, recipients []string, dryRun bool) error
+	EncryptHCLValuesSensitive(ctx context.Context, data interface{}, recipients []string, dryRun bool, shouldEncrypt func(path []string, value interface{}) bool) error
+	EncryptHCLValuesWithJSONSupport(ctx context.Context, data interface{}, recipients []string, dryRun bool) error
+	DecryptHCLValues(ctx context.Context, data interface{}, identityPath string) error
+	DecryptHCLValuesWithJSONSupport(ctx context.Context, data interface{}, identityPath string) error
 }
 
 // ActionValidator provides action validation

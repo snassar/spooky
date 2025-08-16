@@ -11,9 +11,13 @@ import (
 	"time"
 
 	spookyinterfaces "spooky/internal/interfaces"
+	spookysecrets "spooky/internal/secrets"
 	spookytypes "spooky/internal/types"
 	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesvariables "spooky/internal/types/variables"
+
+	"github.com/hashicorp/hcl/v2/hclwrite"
+	"github.com/zclconf/go-cty/cty"
 )
 
 // Manager provides variable management functionality
@@ -195,6 +199,92 @@ func (m *Manager) ResolveVariables(_ context.Context, variables map[string]*spoo
 		Warnings:  warnings,
 		Duration:  duration,
 	}, nil
+}
+
+// SaveVariables saves variables to the given destination
+func (m *Manager) SaveVariables(_ context.Context, variables map[string]*spookytypesvariables.Variable, destination string) error {
+	m.logger.Debug("Saving variables to destination", map[string]interface{}{
+		"destination": destination,
+		"count":       len(variables),
+	})
+
+	// Create HCL file
+	f := hclwrite.NewEmptyFile()
+	rootBody := f.Body()
+
+	// Create variables block
+	variablesBlock := rootBody.AppendNewBlock("variables", nil)
+	variablesBody := variablesBlock.Body()
+
+	// Add each variable
+	for name, variable := range variables {
+		varBlock := variablesBody.AppendNewBlock("variable", []string{name})
+		varBody := varBlock.Body()
+		addVariableToHCL(varBody, variable)
+	}
+
+	// Write to file
+	variablesFile := filepath.Join(destination, "variables.hcl")
+	if err := os.WriteFile(variablesFile, f.Bytes(), 0o600); err != nil {
+		return fmt.Errorf("failed to write variables file: %w", err)
+	}
+
+	m.logger.Info("Saved variables to file", map[string]interface{}{
+		"file_path": variablesFile,
+		"count":     len(variables),
+	})
+
+	return nil
+}
+
+// EncryptVariables encrypts age-encrypted values in variables for storage
+func (m *Manager) EncryptVariables(ctx context.Context, projectPath string, secretsIntegration spookyinterfaces.SecretsIntegration, recipients []string, dryRun bool) error {
+	m.logger.Info("Starting variables encryption for storage", map[string]interface{}{
+		"project_path": projectPath,
+		"recipients":   recipients,
+		"dry_run":      dryRun,
+	})
+
+	// Load variables
+	variables, err := m.LoadVariables(ctx, projectPath)
+	if err != nil {
+		return fmt.Errorf("failed to load variables: %w", err)
+	}
+
+	hclProcessor := spookysecrets.NewHCLProcessor(m.logger)
+
+	err = hclProcessor.EncryptHCLValues(ctx, variables, secretsIntegration, recipients, dryRun)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt variables: %w", err)
+	}
+
+	// Save the encrypted variables
+	if !dryRun {
+		if err := m.SaveVariables(ctx, variables, projectPath); err != nil {
+			return fmt.Errorf("failed to save encrypted variables: %w", err)
+		}
+	}
+
+	m.logger.Info("Variables encryption completed using explicit encrypted flag")
+	return nil
+}
+
+// DecryptVariables decrypts age-encrypted values in variables for debugging
+func (m *Manager) DecryptVariables(ctx context.Context, variables map[string]*spookytypesvariables.Variable, secretsIntegration spookyinterfaces.SecretsIntegration, identityPath string) error {
+	m.logger.Info("Starting variables decryption for debugging", map[string]interface{}{
+		"identity_path":  identityPath,
+		"variable_count": len(variables),
+	})
+
+	// Use the generic HCL decryption
+	hclProcessor := spookysecrets.NewHCLProcessor(m.logger)
+	err := hclProcessor.DecryptHCLValues(ctx, variables, secretsIntegration, identityPath)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt variables: %w", err)
+	}
+
+	m.logger.Info("Variables decryption completed using generic HCL decryption")
+	return nil
 }
 
 // resolveVariableDependencies resolves variables in dependency order
@@ -555,4 +645,58 @@ func (m *Manager) extractResolvedValues(variables map[string]*spookytypesvariabl
 		}
 	}
 	return resolved
+}
+
+// convertToCtyValue converts an interface{} value to cty.Value
+func convertToCtyValue(v interface{}) cty.Value {
+	switch val := v.(type) {
+	case string:
+		return cty.StringVal(val)
+	case int:
+		return cty.NumberIntVal(int64(val))
+	case float64:
+		return cty.NumberFloatVal(val)
+	case bool:
+		return cty.BoolVal(val)
+	case map[string]interface{}:
+		// Convert map to cty.ObjectVal
+		objMap := make(map[string]cty.Value)
+		for k, val := range val {
+			objMap[k] = convertToCtyValue(val)
+		}
+		return cty.ObjectVal(objMap)
+	case []interface{}:
+		// Convert slice to cty.ListVal
+		var listVals []cty.Value
+		for _, val := range val {
+			listVals = append(listVals, convertToCtyValue(val))
+		}
+		return cty.ListVal(listVals)
+	default:
+		return cty.StringVal(fmt.Sprintf("%v", v))
+	}
+}
+
+// addVariableToHCL adds a variable to the HCL body
+func addVariableToHCL(varBody *hclwrite.Body, variable *spookytypesvariables.Variable) {
+	// Add type if specified
+	if variable.Type != "" {
+		varBody.SetAttributeValue("type", cty.StringVal(string(variable.Type)))
+	}
+
+	// Add default value
+	if variable.Default != nil {
+		ctyValue := convertToCtyValue(variable.Default)
+		varBody.SetAttributeValue("default", ctyValue)
+	}
+
+	// Add encrypted flag if true
+	if variable.Encrypted {
+		varBody.SetAttributeValue("encrypted", cty.BoolVal(true))
+	}
+
+	// Add description if specified
+	if variable.Description != "" {
+		varBody.SetAttributeValue("description", cty.StringVal(variable.Description))
+	}
 }

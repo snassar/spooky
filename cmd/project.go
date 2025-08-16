@@ -83,6 +83,27 @@ schema and that all configuration files are properly formatted.`,
 	},
 }
 
+// projectEncryptCmd represents the project encrypt command
+var projectEncryptCmd = &cobra.Command{
+	Use:   "encrypt [project-path]",
+	Short: "Encrypt all variables and machines in a project",
+	Long: `Encrypt all variables and machines in a project that have encrypted=true.
+
+This command processes both variables and machines, encrypting any that have
+encrypted=true set. It will re-encrypt if identities/recipients have changed.
+
+Examples:
+  spooky project encrypt ./my-project
+  spooky project encrypt ./my-project --dry-run`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		projectPath := args[0]
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+		return handleProjectEncrypt(projectPath, dryRun)
+	},
+}
+
 // handleProjectInit handles project initialization using the ProjectManager interface
 func handleProjectInit(projectPath, name, description, version, author, _, url string) error {
 	ctx := context.Background()
@@ -186,6 +207,49 @@ func handleProjectValidate(projectPath string) error {
 	return nil
 }
 
+// handleProjectEncrypt handles project-wide encryption
+func handleProjectEncrypt(projectPath string, dryRun bool) error {
+	secretsIntegration, err := setupEncryption()
+	if err != nil {
+		return err
+	}
+
+	manager := GetIntegrationManager()
+	variablesIntegration := manager.GetVariablesIntegration()
+	machinesIntegration := manager.GetMachinesIntegration()
+
+	if variablesIntegration == nil || machinesIntegration == nil {
+		return fmt.Errorf("required integrations not available")
+	}
+
+	fmt.Printf("Project encryption for %s (dry-run: %t)\n", projectPath, dryRun)
+
+	recipients, err := loadRecipients(secretsIntegration)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Loaded %d recipients for encryption\n", len(recipients))
+
+	// Process variables
+	if err := variablesIntegration.EncryptVariables(context.Background(), projectPath, secretsIntegration, recipients, dryRun); err != nil {
+		return fmt.Errorf("failed to encrypt variables: %w", err)
+	}
+
+	// Process machines
+	if err := machinesIntegration.EncryptMachines(context.Background(), projectPath, secretsIntegration, recipients, dryRun); err != nil {
+		return fmt.Errorf("failed to encrypt machines: %w", err)
+	}
+
+	if dryRun {
+		fmt.Println("Dry run completed - no changes made")
+	} else {
+		fmt.Println("Project encryption completed successfully")
+	}
+
+	return nil
+}
+
 func init() {
 	// Add flags to project init command
 	projectInitCmd.Flags().String("name", "", "Project name (defaults to directory name)")
@@ -195,7 +259,11 @@ func init() {
 	projectInitCmd.Flags().String("email", "", "Project email")
 	projectInitCmd.Flags().String("url", "", "Project URL")
 
+	// Add flags to project encrypt command
+	projectEncryptCmd.Flags().Bool("dry-run", false, "Show what would be encrypted without making changes")
+
 	projectCmd.AddCommand(projectInitCmd)
 	projectCmd.AddCommand(projectValidateCmd)
+	projectCmd.AddCommand(projectEncryptCmd)
 	RootCmd.AddCommand(projectCmd)
 }

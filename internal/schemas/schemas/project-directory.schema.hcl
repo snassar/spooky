@@ -109,6 +109,14 @@ project_directory "project_root" {
     validate = "directory_exists"
   }
   
+  # Optional project-specific recipients file
+  file "recipients.txt" {
+    type = "file"
+    required = false
+    description = "Project-specific age recipients (one public key per line)"
+    pattern = "age1[a-zA-Z0-9]+"
+  }
+  
   # Cross-file validation rules
   validation_rules = [
     "machines_file_or_directory_exists",

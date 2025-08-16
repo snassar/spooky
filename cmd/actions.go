@@ -89,6 +89,74 @@ Use --dry-run to simulate running without making changes.`,
 				return err
 			}
 
+			// Check for decrypt flag
+			decrypt, _ := cmd.Flags().GetBool("decrypt")
+			if decrypt {
+				fmt.Println("🔓 Decryption mode enabled - encrypted variables and facts will be decrypted in-memory")
+
+				// Setup decryption
+				secretsIntegration, err := setupEncryption()
+				if err != nil {
+					return fmt.Errorf("failed to setup decryption: %w", err)
+				}
+
+				// Load identity path
+				identityPath := getIdentityPath()
+				if identityPath == "" {
+					return fmt.Errorf("no identity file found for decryption")
+				}
+
+				fmt.Printf("🔑 Using identity file: %s\n", identityPath)
+
+				// Create context for decryption operations
+				ctx := context.Background()
+
+				// Decrypt variables
+				variablesIntegration := getIntegrationManager().GetVariablesIntegration()
+				if variablesIntegration != nil {
+					variables, err := variablesIntegration.LoadVariables(ctx, projectPath)
+					if err != nil {
+						fmt.Printf("⚠️  Warning: failed to load variables for decryption: %v\n", err)
+					} else if len(variables) > 0 {
+						if err := variablesIntegration.DecryptVariables(ctx, variables, secretsIntegration, identityPath); err != nil {
+							fmt.Printf("⚠️  Warning: failed to decrypt variables: %v\n", err)
+						} else {
+							fmt.Printf("✅ Decrypted %d variables in-memory\n", len(variables))
+						}
+					}
+				}
+
+				// Decrypt facts
+				factsIntegration := getIntegrationManager().GetFactsIntegration()
+				if factsIntegration != nil {
+					facts, err := factsIntegration.LoadFacts(ctx)
+					if err != nil {
+						fmt.Printf("⚠️  Warning: failed to load facts for decryption: %v\n", err)
+					} else if facts != nil {
+						if err := factsIntegration.DecryptFacts(ctx, facts, secretsIntegration, identityPath); err != nil {
+							fmt.Printf("⚠️  Warning: failed to decrypt facts: %v\n", err)
+						} else {
+							fmt.Printf("✅ Decrypted facts in-memory\n")
+						}
+					}
+				}
+
+				// Decrypt machines
+				machinesIntegration := getIntegrationManager().GetMachinesIntegration()
+				if machinesIntegration != nil {
+					machines, err := machinesIntegration.LoadMachines(ctx, projectPath)
+					if err != nil {
+						fmt.Printf("⚠️  Warning: failed to load machines for decryption: %v\n", err)
+					} else if len(machines) > 0 {
+						if err := machinesIntegration.DecryptMachines(ctx, machines, secretsIntegration, identityPath); err != nil {
+							fmt.Printf("⚠️  Warning: failed to decrypt machines: %v\n", err)
+						} else {
+							fmt.Printf("✅ Decrypted %d machines in-memory\n", len(machines))
+						}
+					}
+				}
+			}
+
 			// Get actions integration
 			actionsIntegration := getIntegrationManager().GetActionsIntegration()
 			if actionsIntegration == nil {
@@ -292,4 +360,5 @@ func init() {
 	actionsRunCmd.Flags().StringSliceP("tags", "t", nil, "Target machines with specific tags")
 	actionsRunCmd.Flags().StringP("filter", "f", "", "Complex filter expression")
 	actionsRunCmd.Flags().IntP("parallel", "j", 1, "Number of parallel workers (minimum 2)")
+	actionsRunCmd.Flags().Bool("decrypt", false, "Decrypt encrypted variables and facts in-memory for debugging")
 }

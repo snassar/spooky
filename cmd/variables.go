@@ -89,6 +89,48 @@ context including environment variables, facts, and machine data.`,
 	},
 }
 
+// variablesEncryptCmd represents the variables encrypt command
+var variablesEncryptCmd = &cobra.Command{
+	Use:   "encrypt [project-path]",
+	Short: "Encrypt variables in a project",
+	Long: `Encrypt all variables in a project that have encrypted=true.
+
+This command processes variables files and encrypts any variables that have
+encrypted=true set. It will re-encrypt if identities/recipients have changed.
+
+Examples:
+  spooky variables encrypt ./my-project
+  spooky variables encrypt ./my-project --dry-run`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		projectPath := args[0]
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+		return handleVariablesEncrypt(projectPath, dryRun)
+	},
+}
+
+// variablesArmorCmd represents the variables armor command
+var variablesArmorCmd = &cobra.Command{
+	Use:   "armor [project-path]",
+	Short: "Armor (encrypt) variables in a project",
+	Long: `Armor (encrypt) variables in a project using age encryption.
+
+This command processes variables files and encrypts any variables that have
+encrypted=true set. It will re-encrypt if identities/recipients have changed.
+
+Examples:
+  spooky variables armor ./my-project
+  spooky variables armor ./my-project --dry-run`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		projectPath := args[0]
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+		return handleVariablesArmor(projectPath, dryRun)
+	},
+}
+
 // handleVariablesList handles listing variables using the VariablesIntegration interface
 func handleVariablesList(projectPath string) error {
 	ctx := context.Background()
@@ -317,6 +359,28 @@ func handleVariablesResolve(_ *cobra.Command, projectPath string) error {
 	return nil
 }
 
+// handleVariablesEncrypt handles variables encryption
+func handleVariablesEncrypt(projectPath string, dryRun bool) error {
+	manager := GetIntegrationManager()
+	variablesIntegration := manager.GetVariablesIntegration()
+	if variablesIntegration == nil {
+		return fmt.Errorf("variables integration not available")
+	}
+
+	return handleEncryptionOperation(projectPath, dryRun, "Variables", variablesIntegration.EncryptVariables)
+}
+
+// handleVariablesArmor handles variables armoring (encryption)
+func handleVariablesArmor(projectPath string, dryRun bool) error {
+	manager := GetIntegrationManager()
+	variablesIntegration := manager.GetVariablesIntegration()
+	if variablesIntegration == nil {
+		return fmt.Errorf("variables integration not available")
+	}
+
+	return handleEncryptionOperation(projectPath, dryRun, "Variables", variablesIntegration.EncryptVariables)
+}
+
 func init() {
 	// Add variables command to root
 	RootCmd.AddCommand(variablesCmd)
@@ -325,6 +389,8 @@ func init() {
 	variablesCmd.AddCommand(variablesListCmd)
 	variablesCmd.AddCommand(variablesValidateCmd)
 	variablesCmd.AddCommand(variablesResolveCmd)
+	variablesCmd.AddCommand(variablesEncryptCmd)
+	variablesCmd.AddCommand(variablesArmorCmd)
 
 	// Add flags to variables resolve command
 	variablesResolveCmd.Flags().String("environment", "", "Environment variables file (JSON)")
@@ -333,4 +399,10 @@ func init() {
 	variablesResolveCmd.Flags().String("user-data", "", "User data file (JSON)")
 	variablesResolveCmd.Flags().Bool("json", false, "Output results in JSON format")
 	variablesResolveCmd.Flags().Bool("verbose", false, "Show detailed resolution information")
+
+	// Add flags to variables encrypt command
+	variablesEncryptCmd.Flags().Bool("dry-run", false, "Show what would be encrypted without making changes")
+
+	// Add flags to variables armor command
+	variablesArmorCmd.Flags().Bool("dry-run", false, "Show what would be encrypted without making changes")
 }

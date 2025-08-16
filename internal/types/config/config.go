@@ -4,6 +4,8 @@ package config
 
 import (
 	"time"
+
+	spookytypessecrets "spooky/internal/types/secrets"
 )
 
 // Config represents the main spooky configuration
@@ -27,6 +29,9 @@ type Config struct {
 
 	// Storage settings
 	Storage *StorageConfig `json:"storage" hcl:"storage"`
+
+	// Age encryption settings
+	Age *spookytypessecrets.AgeConfig `json:"age" hcl:"age"`
 
 	// Security settings
 	Security *SecurityConfig `json:"security" hcl:"security"`

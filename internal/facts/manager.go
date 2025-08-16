@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	spookyinterfaces "spooky/internal/interfaces"
+	spookysecrets "spooky/internal/secrets"
 	spookytypes "spooky/internal/types"
 	spookytypesfacts "spooky/internal/types/facts"
 	spookytypesschemas "spooky/internal/types/schemas"
@@ -497,4 +499,36 @@ func isValidMachineID(machineID string) bool {
 	}
 
 	return true
+}
+
+// DecryptFacts decrypts age-encrypted values in facts collection
+func (m *Manager) DecryptFacts(ctx context.Context, facts *spookytypesfacts.FactCollection, secretsIntegration spookyinterfaces.SecretsIntegration, identityPath string) error {
+	if facts == nil {
+		return fmt.Errorf("facts cannot be nil")
+	}
+
+	if secretsIntegration == nil {
+		return fmt.Errorf("secrets integration cannot be nil")
+	}
+
+	if identityPath == "" {
+		return fmt.Errorf("identity path cannot be empty")
+	}
+
+	m.logger.Info("Decrypting age-encrypted values in facts", map[string]interface{}{
+		"machine_id": facts.MachineID,
+	})
+
+	// Use the HCL processor
+	hclProcessor := spookysecrets.NewHCLProcessor(m.logger)
+	err := hclProcessor.DecryptHCLValues(ctx, facts, secretsIntegration, identityPath)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt facts: %w", err)
+	}
+
+	m.logger.Info("Successfully decrypted age-encrypted values in facts using HCL processor", map[string]interface{}{
+		"machine_id": facts.MachineID,
+	})
+
+	return nil
 }

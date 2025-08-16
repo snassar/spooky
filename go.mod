@@ -3,6 +3,7 @@ module spooky
 go 1.24
 
 require (
+	filippo.io/age v1.2.1
 	github.com/hashicorp/hcl/v2 v2.24.0
 	github.com/pkg/sftp v1.13.9
 	github.com/spf13/cobra v1.9.1

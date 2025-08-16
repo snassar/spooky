@@ -273,30 +273,93 @@ spooky {
 
   # Age encryption configuration
   age {
-    enabled = {
-      type = "boolean"
-      required = false
-      default = false
-      description = "Enable age encryption for sensitive values"
-    }
-    
-    public_key = {
+    identities = {
       type = "string"
       required = false
-      description = "Age public key for encryption"
-    }
-    
-    private_key_path = {
-      type = "string"
-      required = false
-      description = "Path to age private key file"
+      default = "~/.config/spooky/identities"
+      description = "Path to directory containing age identity files (default: ~/.config/spooky/identities)"
     }
     
     recipients = {
-      type = "list"
+      type = "string"
       required = false
-      default = []
-      description = "List of age recipients (public keys)"
+      default = "~/.config/spooky/recipients.txt"
+      description = "Path to file containing age recipients (public keys, one per line)"
+    }
+    
+    passphrase = {
+      type = "string"
+      required = false
+      description = "Passphrase for age encryption (if not using identity files)"
+    }
+    
+    validation = {
+      type = "object"
+      required = false
+      default = {
+        strict_mode = true
+        check_recipients = true
+        validate_keys = true
+      }
+      description = "Age validation settings"
+      
+      properties = {
+        strict_mode = {
+          type = "boolean"
+          required = false
+          default = true
+          description = "Enable strict validation mode"
+        }
+        
+        check_recipients = {
+          type = "boolean"
+          required = false
+          default = true
+          description = "Validate recipient keys on encryption"
+        }
+        
+        validate_keys = {
+          type = "boolean"
+          required = false
+          default = true
+          description = "Validate identity keys on decryption"
+        }
+      }
+    }
+    
+    encryption = {
+      type = "object"
+      required = false
+      default = {
+        algorithm = "age"
+        compression = true
+        armor = false
+      }
+      description = "Age encryption settings"
+      
+      properties = {
+        algorithm = {
+          type = "string"
+          required = false
+          enum = ["age"]
+          default = "age"
+          description = "Encryption algorithm (only age supported)"
+        }
+        
+        compression = {
+          type = "boolean"
+          required = false
+          default = true
+          description = "Enable compression before encryption"
+        }
+        
+        armor = {
+          type = "boolean"
+          required = false
+          default = false
+          description = "Use armored output format"
+        }
+      }
     }
   }
 

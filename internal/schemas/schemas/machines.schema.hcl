@@ -1,470 +1,790 @@
-# Spooky Machines Configuration Schema
-# Comprehensive schema for machines.hcl files with enterprise-scale indexing and connectivity validation
+# Machines Schema
+# Schema for machine inventory and connectivity
+# Defines the structure and validation rules for machines
 
 # Schema metadata
 metadata {
-  schema_version = "0.20250809.0"
+  schema_version = "0.20250809.1"
   schema_type = "machines"
-  schema_name = "Spooky Machines Configuration Schema"
+  schema_name = "Machines Schema"
   last_updated = "2024-01-01"
-  compatibility = ["0.20250809.0"]
-  description = "Comprehensive schema for machines.hcl files with enterprise-scale indexing and connectivity validation"
+  compatibility = ["0.20250809.0", "0.20250809.1"]
+  description = "Schema for machine inventory and connectivity with age encryption support"
   
   # ScalVer format: 0.YYYYMMDD.N
   # - 0: Development phase
   # - 20250809: Date (9 August 2025)
-  # - 0: Patch version
-  scalver_format = "0.20250809.0"
+  # - 1: Patch version (added age encryption support)
+  scalver_format = "0.20250809.1"
 }
 
-# Machines block structure
-machines {
-  # Machine definitions
-  machine "machine_name" {
-    hostname = {
-      type = "string"
-      required = true
-      pattern = "^[a-zA-Z0-9.-]+$"
-      description = "Machine hostname"
+# Machine inventory structure
+machines_inventory {
+  # Machine list
+  machines {
+    type = "list"
+    required = true
+    description = "List of machines in the inventory"
+    
+    validation {
+      min_items = 0
+      max_items = 10000
     }
     
-    host = {
-      type = "string"
-      required = true
-      format = "ipv4|ipv6|hostname"
-      description = "Machine hostname or IP address"
-    }
-    
-    port = {
-      type = "integer"
-      required = false
-      min = 1
-      max = 65535
-      default = 22
-      description = "SSH port number"
-    }
-    
-    user = {
-      type = "string"
-      required = true
-      pattern = "^[a-zA-Z0-9._-]+$"
-      description = "SSH username"
-    }
-    
-    password = {
-      type = "string"
-      required = false
-      sensitive = true
-      description = "SSH password (mutually exclusive with key_file)"
-    }
-    
-    key_file = {
-      type = "string"
-      required = false
-      pattern = "^[^/].*"
-      description = "Path to SSH private key file (mutually exclusive with password)"
-    }
-    
-    passphrase = {
-      type = "string"
-      required = false
-      sensitive = true
-      description = "Passphrase for SSH private key"
-    }
-    
-    tags = {
+    # Individual machine structure
+    items {
       type = "object"
-      required = false
-      description = "Machine-specific tags for targeting and organization"
-      additional_properties = "string"
-    }
-    
-    groups = {
-      type = "array"
-      required = false
-      description = "Machine groups for organization and targeting"
-      items = {
-        type = "string"
-        pattern = "^[a-zA-Z0-9._-]+$"
-      }
-    }
-    
-    roles = {
-      type = "array"
-      required = false
-      description = "Functional roles this machine performs (e.g., web-server, database, load-balancer)"
-      items = {
-        type = "string"
-        pattern = "^[a-zA-Z0-9._-]+$"
-      }
-    }
-    
-    classes = {
-      type = "array"
-      required = false
-      description = "Configuration classes to apply to this machine"
-      items = {
-        type = "string"
-        pattern = "^[a-zA-Z0-9._-]+$"
-      }
-    }
-    
-    # SSH connection configuration (overrides global defaults)
-    connection_timeout = {
-      type = "integer"
-      required = false
-      min = 1
-      max = 300
-      default = 30
-      description = "SSH connection timeout in seconds (overrides global default)"
-    }
-    
-    command_timeout = {
-      type = "integer"
-      required = false
-      min = 1
-      max = 3600
-      default = 300
-      description = "Command run timeout in seconds (overrides global default)"
-    }
-    
-    max_connections = {
-      type = "integer"
-      required = false
-      min = 1
-      max = 100
-      default = 10
-      description = "Maximum concurrent SSH connections for this machine (overrides global default)"
-    }
-    
-    retry_attempts = {
-      type = "integer"
-      required = false
-      min = 0
-      max = 10
-      default = 3
-      description = "Number of connection retry attempts (overrides global default)"
-    }
-    
-    retry_delay = {
-      type = "integer"
-      required = false
-      min = 1
-      max = 60
-      default = 5
-      description = "Delay between retry attempts in seconds (overrides global default)"
-    }
-    
-    # Resource specifications (for capacity planning and validation)
-    resources = {
-      type = "object"
-      required = false
-      description = "Machine resource specifications"
+      required = true
+      description = "Individual machine with connectivity and authentication"
       
-      properties = {
-        cpu_cores = {
-          type = "integer"
-          required = false
-          min = 1
-          max = 1024
-          description = "Number of CPU cores"
-        }
-        
-        memory_gb = {
-          type = "integer"
-          required = false
-          min = 1
-          max = 32768
-          description = "Memory in GB"
-        }
-        
-        disk_gb = {
-          type = "integer"
-          required = false
-          min = 1
-          max = 1048576
-          description = "Disk space in GB"
-        }
-        
-        network_speed = {
+      structure {
+        # Machine name
+        name {
           type = "string"
-          required = false
-          pattern = "^[0-9]+(Gbps|Mbps)$"
-          description = "Network speed (e.g., 10Gbps, 1Gbps)"
-        }
-      }
-    }
-    
-    metadata = {
-      type = "object"
-      required = false
-      description = "Additional machine metadata"
-      additional_properties = "string"
-    }
-    
-    environment = {
-      type = "string"
-      required = false
-      pattern = "^[a-zA-Z0-9._-]+$"
-      description = "Environment this machine belongs to (e.g., production, staging, development, testing)"
-    }
-    
-    stage = {
-      type = "string"
-      required = false
-      pattern = "^[a-zA-Z0-9._-]+$"
-      description = "Deployment stage (e.g., blue, green, canary, main)"
-    }
-    
-    # Lifecycle and maintenance information
-    lifecycle = {
-      type = "object"
-      required = false
-      description = "Machine lifecycle and maintenance information"
-      
-      properties = {
-        status = {
-          type = "string"
-          required = false
-          enum = ["active", "maintenance", "decommissioned", "standby", "testing"]
-          description = "Current machine status - machines in 'maintenance' status are excluded from actions by default"
-        }
-        
-        maintenance_window = {
-          type = "object"
-          required = false
-          description = "Timezone-aware maintenance window"
+          required = true
+          description = "Name of the machine"
           
-          properties = {
-            start_time = {
+          validation {
+            pattern = "^[a-zA-Z0-9_.-]+$"
+            min_length = 1
+            max_length = 64
+          }
+        }
+        
+        # Machine description
+        description {
+          type = "string"
+          required = false
+          description = "Description of the machine"
+          
+          validation {
+            max_length = 256
+          }
+        }
+        
+        # Hostname or IP address
+        hostname {
+          type = "string"
+          required = true
+          description = "Hostname or IP address of the machine"
+          
+          validation {
+            # Allow hostnames and IP addresses
+            # Application-level validation for format
+            min_length = 1
+            max_length = 253
+          }
+        }
+        
+        # SSH port
+        port {
+          type = "integer"
+          required = false
+          default = 22
+          description = "SSH port number"
+          
+          validation {
+            min = 1
+            max = 65535
+          }
+        }
+        
+        # SSH user
+        user {
+          type = "string"
+          required = true
+          description = "SSH username"
+          
+          validation {
+            pattern = "^[a-zA-Z0-9_.-]+$"
+            min_length = 1
+            max_length = 32
+          }
+        }
+        
+        # Authentication configuration
+        authentication {
+          type = "object"
+          required = true
+          description = "SSH authentication configuration with age encryption support"
+          
+          structure {
+            # Authentication method
+            method {
               type = "string"
               required = true
-              pattern = "^[0-9]{2}:[0-9]{2}$"
-              description = "Start time in HH:MM format"
-            }
-            
-            end_time = {
-              type = "string"
-              required = true
-              pattern = "^[0-9]{2}:[0-9]{2}$"
-              description = "End time in HH:MM format"
-            }
-            
-            timezone = {
-              type = "string"
-              required = true
-              pattern = "^[A-Za-z_]+/[A-Za-z_]+$"
-              description = "Timezone in IANA format (e.g., America/New_York, Europe/London, Asia/Tokyo)"
-            }
-            
-            days_of_week = {
-              type = "array"
-              required = false
-              default = ["sunday"]
-              description = "Days of week when maintenance is allowed"
-              items = {
-                type = "string"
-                enum = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+              description = "Authentication method"
+              
+              validation {
+                allowed_values = ["ssh_key", "password", "passphrase", "certificate", "agent"]
               }
             }
             
-            auto_exclude = {
-              type = "boolean"
-              required = false
-              default = false
-              description = "Automatically exclude machine from actions during maintenance window (overrides status-based exclusion)"
-            }
-            
-            # Alternative: Simple string format for backward compatibility
-            simple = {
+            # SSH key path (for ssh_key method)
+            key_path {
               type = "string"
               required = false
-              pattern = "^[0-9]{2}:[0-9]{2}-[0-9]{2}:[0-9]{2}$"
-              description = "Simple maintenance window (e.g., 02:00-04:00) - local timezone only"
+              description = "Path to SSH private key file"
+              
+              validation {
+                # Path validation handled at application level
+                min_length = 1
+                max_length = 512
+              }
+            }
+            
+            # SSH key passphrase (optional, can be age-encrypted)
+            passphrase {
+              type = "object"
+              required = false
+              description = "SSH key passphrase with age encryption support"
+              
+              structure {
+                # Passphrase value (can be plaintext or age-encrypted)
+                value {
+                  type = "string"
+                  required = true
+                  description = "Passphrase value - can be plaintext or age-encrypted string"
+                  
+                  validation {
+                    # Application-level validation for age encryption
+                    min_length = 1
+                    max_length = 1024
+                  }
+                }
+                
+                # Encryption flag
+                encrypted {
+                  type = "bool"
+                  required = false
+                  default = false
+                  description = "Whether the passphrase is age-encrypted"
+                  
+                  validation {
+                    # Application-level validation ensures this is only true for age-encrypted strings
+                  }
+                }
+                
+                # Age encryption metadata (optional, only when encrypted = true)
+                encryption_metadata {
+                  type = "object"
+                  required = false
+                  description = "Age encryption metadata - only present when encrypted = true"
+                  
+                  structure {
+                    # Recipients list (required for encryption)
+                    recipients {
+                      type = "list"
+                      required = true
+                      description = "List of age public keys that can decrypt this value"
+                      
+                      validation {
+                        min_items = 1
+                        max_items = 10
+                      }
+                      
+                      # Each recipient must be a valid age public key
+                      items {
+                        type = "string"
+                        validation {
+                          # Age public key format: age1...
+                          pattern = "^age1[a-z0-9]{50,}$"
+                          description = "Must be a valid age public key starting with 'age1'"
+                        }
+                      }
+                    }
+                    
+                    # Encryption timestamp (optional)
+                    encrypted_at {
+                      type = "string"
+                      required = false
+                      description = "ISO 8601 timestamp when the value was encrypted"
+                      
+                      validation {
+                        # ISO 8601 format
+                        pattern = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+                      }
+                    }
+                    
+                    # Encryption method (optional)
+                    method {
+                      type = "string"
+                      required = false
+                      default = "age"
+                      description = "Encryption method used"
+                      
+                      validation {
+                        # Currently only age encryption is supported
+                        allowed_values = ["age"]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            
+            # Password (for password method, can be age-encrypted)
+            password {
+              type = "object"
+              required = false
+              description = "SSH password with age encryption support"
+              
+              structure {
+                # Password value (can be plaintext or age-encrypted)
+                value {
+                  type = "string"
+                  required = true
+                  description = "Password value - can be plaintext or age-encrypted string"
+                  
+                  validation {
+                    # Application-level validation for age encryption
+                    min_length = 1
+                    max_length = 1024
+                  }
+                }
+                
+                # Encryption flag
+                encrypted {
+                  type = "bool"
+                  required = false
+                  default = false
+                  description = "Whether the password is age-encrypted"
+                  
+                  validation {
+                    # Application-level validation ensures this is only true for age-encrypted strings
+                  }
+                }
+                
+                # Age encryption metadata (optional, only when encrypted = true)
+                encryption_metadata {
+                  type = "object"
+                  required = false
+                  description = "Age encryption metadata - only present when encrypted = true"
+                  
+                  structure {
+                    # Recipients list (required for encryption)
+                    recipients {
+                      type = "list"
+                      required = true
+                      description = "List of age public keys that can decrypt this value"
+                      
+                      validation {
+                        min_items = 1
+                        max_items = 10
+                      }
+                      
+                      # Each recipient must be a valid age public key
+                      items {
+                        type = "string"
+                        validation {
+                          # Age public key format: age1...
+                          pattern = "^age1[a-z0-9]{50,}$"
+                          description = "Must be a valid age public key starting with 'age1'"
+                        }
+                      }
+                    }
+                    
+                    # Encryption timestamp (optional)
+                    encrypted_at {
+                      type = "string"
+                      required = false
+                      description = "ISO 8601 timestamp when the value was encrypted"
+                      
+                      validation {
+                        # ISO 8601 format
+                        pattern = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+                      }
+                    }
+                    
+                    # Encryption method (optional)
+                    method {
+                      type = "string"
+                      required = false
+                      default = "age"
+                      description = "Encryption method used"
+                      
+                      validation {
+                        # Currently only age encryption is supported
+                        allowed_values = ["age"]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            
+            # Certificate path (for certificate method)
+            certificate_path {
+              type = "string"
+              required = false
+              description = "Path to SSH certificate file"
+              
+              validation {
+                # Path validation handled at application level
+                min_length = 1
+                max_length = 512
+              }
+            }
+            
+            # Certificate key path (for certificate method)
+            certificate_key_path {
+              type = "string"
+              required = false
+              description = "Path to SSH certificate private key file"
+              
+              validation {
+                # Path validation handled at application level
+                min_length = 1
+                max_length = 512
+              }
+            }
+            
+            # Certificate key passphrase (optional, can be age-encrypted)
+            certificate_key_passphrase {
+              type = "object"
+              required = false
+              description = "SSH certificate key passphrase with age encryption support"
+              
+              structure {
+                # Passphrase value (can be plaintext or age-encrypted)
+                value {
+                  type = "string"
+                  required = true
+                  description = "Passphrase value - can be plaintext or age-encrypted string"
+                  
+                  validation {
+                    # Application-level validation for age encryption
+                    min_length = 1
+                    max_length = 1024
+                  }
+                }
+                
+                # Encryption flag
+                encrypted {
+                  type = "bool"
+                  required = false
+                  default = false
+                  description = "Whether the passphrase is age-encrypted"
+                  
+                  validation {
+                    # Application-level validation ensures this is only true for age-encrypted strings
+                  }
+                }
+                
+                # Age encryption metadata (optional, only when encrypted = true)
+                encryption_metadata {
+                  type = "object"
+                  required = false
+                  description = "Age encryption metadata - only present when encrypted = true"
+                  
+                  structure {
+                    # Recipients list (required for encryption)
+                    recipients {
+                      type = "list"
+                      required = true
+                      description = "List of age public keys that can decrypt this value"
+                      
+                      validation {
+                        min_items = 1
+                        max_items = 10
+                      }
+                      
+                      # Each recipient must be a valid age public key
+                      items {
+                        type = "string"
+                        validation {
+                          # Age public key format: age1...
+                          pattern = "^age1[a-z0-9]{50,}$"
+                          description = "Must be a valid age public key starting with 'age1'"
+                        }
+                      }
+                    }
+                    
+                    # Encryption timestamp (optional)
+                    encrypted_at {
+                      type = "string"
+                      required = false
+                      description = "ISO 8601 timestamp when the value was encrypted"
+                      
+                      validation {
+                        # ISO 8601 format
+                        pattern = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+                      }
+                    }
+                    
+                    # Encryption method (optional)
+                    method {
+                      type = "string"
+                      required = false
+                      default = "age"
+                      description = "Encryption method used"
+                      
+                      validation {
+                        # Currently only age encryption is supported
+                        allowed_values = ["age"]
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         }
         
-        maintenance_team = {
-          type = "string"
-          required = false
-          pattern = "^[a-zA-Z0-9._-]+$"
-          description = "Team responsible for maintenance"
-        }
-        
-        team_timezone = {
-          type = "string"
-          required = false
-          pattern = "^[A-Za-z_]+/[A-Za-z_]+$"
-          description = "Primary timezone of the maintenance team (IANA format)"
-        }
-        
-        team_contact = {
+        # Connection settings
+        connection {
           type = "object"
           required = false
-          description = "Team contact information for maintenance coordination"
+          description = "SSH connection settings"
           
-          properties = {
-            primary = {
+          structure {
+            # Connection timeout
+            timeout {
               type = "string"
               required = false
-              description = "Primary contact (email or phone)"
+              default = "30s"
+              description = "SSH connection timeout (e.g., '30s', '2m')"
+              
+              validation {
+                pattern = "^\\d+[smhd]$"
+              }
             }
             
-            secondary = {
+            # Keep-alive interval
+            keepalive_interval {
               type = "string"
               required = false
-              description = "Secondary contact (email or phone)"
+              default = "30s"
+              description = "SSH keep-alive interval (e.g., '30s', '2m')"
+              
+              validation {
+                pattern = "^\\d+[smhd]$"
+              }
             }
             
-            slack_channel = {
-              type = "string"
+            # Max retries
+            max_retries {
+              type = "integer"
               required = false
-              pattern = "^#[a-zA-Z0-9._-]+$"
-              description = "Slack channel for maintenance coordination"
+              default = 3
+              description = "Maximum number of connection retries"
+              
+              validation {
+                min = 0
+                max = 10
+              }
             }
             
-            pagerduty_schedule = {
+            # Retry delay
+            retry_delay {
               type = "string"
               required = false
-              description = "PagerDuty schedule ID for escalation"
+              default = "5s"
+              description = "Delay between retries (e.g., '5s', '1m')"
+              
+              validation {
+                pattern = "^\\d+[smhd]$"
+              }
+            }
+            
+            # Host key verification
+            host_key_verification {
+              type = "bool"
+              required = false
+              default = true
+              description = "Whether to verify host keys"
+            }
+            
+            # Known hosts file
+            known_hosts_file {
+              type = "string"
+              required = false
+              description = "Path to known hosts file"
+              
+              validation {
+                # Path validation handled at application level
+                min_length = 1
+                max_length = 512
+              }
             }
           }
         }
         
-        warranty_expiry = {
-          type = "string"
+        # Machine tags
+        tags {
+          type = "list"
           required = false
-          format = "date"
-          description = "Hardware warranty expiry date (YYYY-MM-DD)"
+          description = "Tags for categorizing machines"
+          
+          validation {
+            max_items = 20
+          }
+          
+          items {
+            type = "string"
+            validation {
+              pattern = "^[a-zA-Z0-9_-]+$"
+              min_length = 1
+              max_length = 32
+            }
+          }
         }
         
-        retirement_date = {
-          type = "string"
+        # Machine metadata
+        metadata {
+          type = "object"
           required = false
-          format = "date"
-          description = "Planned retirement date (YYYY-MM-DD)"
+          description = "Additional metadata for the machine"
+          
+          structure {
+            # Environment information
+            environment {
+              type = "string"
+              required = false
+              description = "Environment name (e.g., 'development', 'staging', 'production')"
+              
+              validation {
+                allowed_values = ["development", "staging", "production", "testing", "qa"]
+              }
+            }
+            
+            # Role information
+            role {
+              type = "string"
+              required = false
+              description = "Machine role (e.g., 'web', 'database', 'load-balancer')"
+              
+              validation {
+                max_length = 64
+              }
+            }
+            
+            # Location information
+            location {
+              type = "string"
+              required = false
+              description = "Machine location (e.g., 'us-east-1', 'eu-west-1')"
+              
+              validation {
+                max_length = 64
+              }
+            }
+            
+            # Created timestamp
+            created_at {
+              type = "string"
+              required = false
+              description = "ISO 8601 timestamp when the machine was added"
+              
+              validation {
+                pattern = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+              }
+            }
+            
+            # Last accessed timestamp
+            last_accessed {
+              type = "string"
+              required = false
+              description = "ISO 8601 timestamp when the machine was last accessed"
+              
+              validation {
+                pattern = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+              }
+            }
+            
+            # Version information
+            version {
+              type = "string"
+              required = false
+              description = "Version of the machine configuration"
+              
+              validation {
+                pattern = "^[a-zA-Z0-9._-]+$"
+                max_length = 32
+              }
+            }
+          }
         }
       }
     }
   }
   
-  # Validation rules
-  validation = {
-    # Machine name validation
-    machine_name = {
-      rule = "regex"
-      pattern = "^[a-zA-Z][a-zA-Z0-9._-]*$"
-      message = "Machine names must start with a letter and contain only alphanumeric characters, dots, underscores, and hyphens"
+  # Inventory metadata
+  metadata {
+    type = "object"
+    required = false
+    description = "Metadata about the machine inventory"
+    
+    structure {
+      # Inventory name
+      name {
+        type = "string"
+        required = false
+        description = "Name of the machine inventory"
+        
+        validation {
+          pattern = "^[a-zA-Z0-9_.-]+$"
+          min_length = 1
+          max_length = 64
+        }
+      }
+      
+      # Inventory description
+      description {
+        type = "string"
+        required = false
+        description = "Description of the machine inventory"
+        
+        validation {
+          max_length = 256
+        }
+      }
+      
+      # Created timestamp
+      created_at {
+        type = "string"
+        required = false
+        description = "ISO 8601 timestamp when the inventory was created"
+        
+        validation {
+          pattern = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        }
+      }
+      
+      # Last updated timestamp
+      updated_at {
+        type = "string"
+        required = false
+        description = "ISO 8601 timestamp when the inventory was last updated"
+        
+        validation {
+          pattern = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        }
+      }
+      
+      # Version information
+      version {
+        type = "string"
+        required = false
+        description = "Version of the inventory"
+        
+        validation {
+          pattern = "^[a-zA-Z0-9._-]+$"
+          max_length = 32
+        }
+      }
+    }
+  }
+}
+
+# Validation rules for machines
+validation_rules {
+  # Cross-field validation rules
+  cross_field_validation {
+    # Authentication method validation
+    rule {
+      name = "ssh_key_method_validation"
+      description = "SSH key method requires key_path"
+      condition = "authentication.method == 'ssh_key' && authentication.key_path == null"
+      message = "SSH key authentication requires key_path"
     }
     
-    # Authentication validation
-    auth_method = {
-      rule = "conditional"
-      condition = "password != null || key_file != null"
-      message = "Machine must have either password or key_file authentication method"
+    rule {
+      name = "password_method_validation"
+      description = "Password method requires password"
+      condition = "authentication.method == 'password' && authentication.password == null"
+      message = "Password authentication requires password"
     }
     
-    auth_mutual_exclusive = {
-      rule = "conditional"
-      condition = "!(password != null && key_file != null)"
-      message = "Password and key_file authentication methods are mutually exclusive - specify only one"
+    rule {
+      name = "certificate_method_validation"
+      description = "Certificate method requires certificate_path and certificate_key_path"
+      condition = "authentication.method == 'certificate' && (authentication.certificate_path == null || authentication.certificate_key_path == null)"
+      message = "Certificate authentication requires certificate_path and certificate_key_path"
     }
     
-    # Host validation
-    host_format = {
-      rule = "format"
-      format = "ipv4|ipv6|hostname"
-      message = "Host must be a valid IPv4, IPv6, or hostname"
+    # Encryption metadata validation
+    rule {
+      name = "passphrase_encryption_metadata_required"
+      description = "Encryption metadata must be present when passphrase is encrypted"
+      condition = "authentication.passphrase.encrypted == true && authentication.passphrase.encryption_metadata == null"
+      message = "Encryption metadata is required when passphrase is encrypted"
     }
     
-    # Port validation
-    port_range = {
-      rule = "range"
-      min = 1
-      max = 65535
-      message = "Port must be between 1 and 65535"
+    rule {
+      name = "password_encryption_metadata_required"
+      description = "Encryption metadata must be present when password is encrypted"
+      condition = "authentication.password.encrypted == true && authentication.password.encryption_metadata == null"
+      message = "Encryption metadata is required when password is encrypted"
     }
     
-    # Tag validation
-    tag_names = {
-      rule = "regex"
-      pattern = "^[a-zA-Z][a-zA-Z0-9._-]*$"
-      message = "Tag names must start with a letter and contain only alphanumeric characters, dots, underscores, and hyphens"
+    rule {
+      name = "certificate_passphrase_encryption_metadata_required"
+      description = "Encryption metadata must be present when certificate passphrase is encrypted"
+      condition = "authentication.certificate_key_passphrase.encrypted == true && authentication.certificate_key_passphrase.encryption_metadata == null"
+      message = "Encryption metadata is required when certificate passphrase is encrypted"
     }
     
-    # Group validation
-    group_names = {
-      rule = "regex"
-      pattern = "^[a-zA-Z][a-zA-Z0-9._-]*$"
-      message = "Group names must start with a letter and contain only alphanumeric characters, dots, underscores, and hyphens"
+    # Age-encrypted values must start with 'age1'
+    rule {
+      name = "passphrase_age_encrypted_format"
+      description = "Age-encrypted passphrases must start with 'age1'"
+      condition = "authentication.passphrase.encrypted == true && !authentication.passphrase.value.startsWith('age1')"
+      message = "Age-encrypted passphrases must start with 'age1'"
     }
     
-    # SSH configuration validation
-    ssh_timeout_reasonable = {
-      rule = "range"
-      min = 1
-      max = 3600
-      message = "SSH timeouts must be between 1 and 3600 seconds"
+    rule {
+      name = "password_age_encrypted_format"
+      description = "Age-encrypted passwords must start with 'age1'"
+      condition = "authentication.password.encrypted == true && !authentication.password.value.startsWith('age1')"
+      message = "Age-encrypted passwords must start with 'age1'"
     }
     
-    ssh_connection_limit_reasonable = {
-      rule = "range"
-      min = 1
-      max = 100
-      message = "SSH connection limits must be between 1 and 100"
-    }
-    
-    ssh_retry_reasonable = {
-      rule = "range"
-      min = 0
-      max = 10
-      message = "SSH retry attempts must be between 0 and 10"
-    }
-    
-    # Enhanced validation rules
-    environment_validation = {
-      rule = "conditional"
-      condition = "environment != null && environment in ['production', 'staging', 'development', 'testing']"
-      message = "Environment must be one of: production, staging, development, testing"
-    }
-    
-    role_validation = {
-      rule = "conditional"
-      condition = "roles != null && len(roles) > 0"
-      message = "At least one role should be specified for proper classification"
-    }
-    
-    resource_validation = {
-      rule = "conditional"
-      condition = "resources != null && (resources.cpu_cores != null || resources.memory_gb != null)"
-      message = "Resource specifications should include CPU cores and/or memory"
-    }
-    
-    lifecycle_validation = {
-      rule = "conditional"
-      condition = "lifecycle != null && lifecycle.status != null"
-      message = "Lifecycle status should be specified for proper management"
-    }
-    
-    # Cross-field validation
-    production_safety = {
-      rule = "conditional"
-      condition = "environment != 'production' || (lifecycle != null && lifecycle.status == 'active')"
-      message = "Production machines must have active status"
-    }
-    
-    maintenance_window_validation = {
-      rule = "conditional"
-      condition = "lifecycle == null || lifecycle.maintenance_window == null || (lifecycle.maintenance_window.simple != null || (lifecycle.maintenance_window.start_time != null && lifecycle.maintenance_window.end_time != null && lifecycle.maintenance_window.timezone != null))"
-      message = "Maintenance window must be either simple format (HH:MM-HH:MM) or timezone-aware object with start_time, end_time, and timezone"
-    }
-    
-    timezone_validation = {
-      rule = "conditional"
-      condition = "lifecycle == null || lifecycle.maintenance_window == null || lifecycle.maintenance_window.timezone == null || lifecycle.maintenance_window.timezone in ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Asia/Tokyo', 'Asia/Shanghai', 'Australia/Sydney', 'UTC']"
-      message = "Timezone must be a valid IANA timezone identifier"
+    rule {
+      name = "certificate_passphrase_age_encrypted_format"
+      description = "Age-encrypted certificate passphrases must start with 'age1'"
+      condition = "authentication.certificate_key_passphrase.encrypted == true && !authentication.certificate_key_passphrase.value.startsWith('age1')"
+      message = "Age-encrypted certificate passphrases must start with 'age1'"
     }
   }
   
+  # Application-level validation notes
+  application_validation {
+    # These validations require application-level logic
+    # Schema validation cannot enforce all type relationships
+    
+    note = "Application must validate that encrypted = true is only used with age-encrypted strings"
+    note = "Application must validate age public key format and validity"
+    note = "Application must validate that encrypted values are valid age-encrypted strings"
+    note = "Application must handle decryption during authentication"
+    note = "Application must validate SSH key file permissions and format"
+    note = "Application must validate certificate file permissions and format"
+    note = "Application must validate hostname/IP address format"
+    note = "Application must validate file paths exist and are accessible"
+  }
+  
+  # Age encryption specific rules
+  age_encryption_rules {
+    # Age1 prefix detection for authentication values
+    rule {
+      name = "age1_prefix_detection_passphrase"
+      description = "Detect age1 prefix for passphrases"
+      condition = "authentication.passphrase.value.startsWith('age1') && authentication.passphrase.encrypted == false"
+      message = "Values starting with 'age1' should be marked as encrypted = true"
+    }
+    
+    rule {
+      name = "age1_prefix_detection_password"
+      description = "Detect age1 prefix for passwords"
+      condition = "authentication.password.value.startsWith('age1') && authentication.password.encrypted == false"
+      message = "Values starting with 'age1' should be marked as encrypted = true"
+    }
+    
+    rule {
+      name = "age1_prefix_detection_certificate_passphrase"
+      description = "Detect age1 prefix for certificate passphrases"
+      condition = "authentication.certificate_key_passphrase.value.startsWith('age1') && authentication.certificate_key_passphrase.encrypted == false"
+      message = "Values starting with 'age1' should be marked as encrypted = true"
+    }
+  }
 } 

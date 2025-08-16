@@ -116,3 +116,27 @@ func (i *Integration) ValidateFacts(ctx context.Context, facts interface{}) (*sp
 func (i *Integration) GetManager() interface{} {
 	return i.manager
 }
+
+// DecryptFacts decrypts age-encrypted values in facts collection
+func (i *Integration) DecryptFacts(ctx context.Context, facts interface{}, secretsIntegration spookyinterfaces.SecretsIntegration, identityPath string) error {
+	if facts == nil {
+		return fmt.Errorf("facts cannot be nil")
+	}
+
+	if secretsIntegration == nil {
+		return fmt.Errorf("secrets integration cannot be nil")
+	}
+
+	i.logger.Info("Decrypting facts via integration", map[string]interface{}{
+		"facts_type": fmt.Sprintf("%T", facts),
+	})
+
+	// Convert interface{} to FactCollection
+	factCollection, ok := facts.(*spookytypesfacts.FactCollection)
+	if !ok {
+		return fmt.Errorf("invalid facts type: expected *spookytypesfacts.FactCollection, got %T", facts)
+	}
+
+	// Decrypt facts using the manager
+	return i.manager.DecryptFacts(ctx, factCollection, secretsIntegration, identityPath)
+}

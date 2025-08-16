@@ -16,6 +16,7 @@ import (
 	spookyssh "spooky/internal/ssh"
 	spookytemplates "spooky/internal/templates"
 	spookytypes "spooky/internal/types"
+	spookytypesconfig "spooky/internal/types/config"
 	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesschemas "spooky/internal/types/schemas"
 	spookyvariables "spooky/internal/variables"
@@ -98,12 +99,14 @@ func (s *SimpleSchemaManager) Register(_ context.Context, _ *spookytypes.Schema)
 // Factory creates all integration components
 type Factory struct {
 	logger spookytypeslogging.Logger
+	config *spookytypesconfig.Config
 }
 
 // NewFactory creates a new integration factory
-func NewFactory(logger spookytypeslogging.Logger) *Factory {
+func NewFactory(logger spookytypeslogging.Logger, config *spookytypesconfig.Config) *Factory {
 	return &Factory{
 		logger: logger,
+		config: config,
 	}
 }
 
@@ -227,8 +230,8 @@ func (f *Factory) createMachinesIntegration() spookyinterfaces.MachinesIntegrati
 
 // createSecretsIntegration creates the secrets integration
 func (f *Factory) createSecretsIntegration() spookyinterfaces.SecretsIntegration {
-	// Create secrets integration
-	secretsIntegration := spookysecrets.NewIntegration(f.logger)
+	// Create secrets integration with age config
+	secretsIntegration := spookysecrets.NewIntegration(f.logger, f.config.Age)
 
 	return secretsIntegration
 }

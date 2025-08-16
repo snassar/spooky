@@ -39,3 +39,18 @@ func (i *Integration) ResolveVariables(ctx context.Context, variables map[string
 func (i *Integration) ValidateVariables(ctx context.Context, variables map[string]*spookytypes.Variable) (*spookytypes.ValidationResult, error) {
 	return i.manager.ValidateVariables(ctx, variables)
 }
+
+// SaveVariables saves variables to the given destination
+func (i *Integration) SaveVariables(ctx context.Context, variables map[string]*spookytypes.Variable, destination string) error {
+	return i.manager.SaveVariables(ctx, variables, destination)
+}
+
+// EncryptVariables encrypts all variables that have encrypted=true
+func (i *Integration) EncryptVariables(ctx context.Context, projectPath string, secretsIntegration spookyinterfaces.SecretsIntegration, recipients []string, dryRun bool) error {
+	return i.manager.EncryptVariables(ctx, projectPath, secretsIntegration, recipients, dryRun)
+}
+
+// DecryptVariables decrypts age-encrypted values in variables for debugging
+func (i *Integration) DecryptVariables(ctx context.Context, variables map[string]*spookytypes.Variable, secretsIntegration spookyinterfaces.SecretsIntegration, identityPath string) error {
+	return i.manager.DecryptVariables(ctx, variables, secretsIntegration, identityPath)
+}

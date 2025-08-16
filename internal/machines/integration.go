@@ -309,6 +309,21 @@ func (i *Integration) GetMachinesByFilter(ctx context.Context, filter interface{
 	return filteredMachines, nil
 }
 
+// SaveMachines saves machines to the given destination
+func (i *Integration) SaveMachines(ctx context.Context, machines []spookytypes.Machine, destination string) error {
+	return i.manager.SaveMachines(ctx, machines, destination)
+}
+
+// EncryptMachines encrypts all machine secrets that have encrypted=true
+func (i *Integration) EncryptMachines(ctx context.Context, projectPath string, secretsIntegration spookyinterfaces.SecretsIntegration, recipients []string, dryRun bool) error {
+	return i.manager.EncryptMachines(ctx, projectPath, secretsIntegration, recipients, dryRun)
+}
+
+// DecryptMachines decrypts age-encrypted values in machines for debugging
+func (i *Integration) DecryptMachines(ctx context.Context, machines []spookytypes.Machine, secretsIntegration spookyinterfaces.SecretsIntegration, identityPath string) error {
+	return i.manager.DecryptMachines(ctx, machines, secretsIntegration, identityPath)
+}
+
 // Helper methods
 
 // countReachableMachines counts reachable machines

@@ -112,6 +112,27 @@ Examples:
 	},
 }
 
+// machinesEncryptCmd represents the machines encrypt command
+var machinesEncryptCmd = &cobra.Command{
+	Use:   "encrypt [project-path]",
+	Short: "Encrypt machines in a project",
+	Long: `Encrypt machines in a project using age encryption.
+
+This command processes machines.hcl files and encrypts any authentication
+credentials that have encrypted=true set. It will re-encrypt if identities/recipients have changed.
+
+Examples:
+  spooky machines encrypt ./my-project
+  spooky machines encrypt ./my-project --dry-run`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		projectPath := args[0]
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+		return handleMachinesEncrypt(projectPath, dryRun)
+	},
+}
+
 // handleMachinesList handles listing machines using the MachinesIntegration interface
 func handleMachinesList(projectPath string) error {
 	ctx := context.Background()
@@ -410,6 +431,17 @@ func handleMachinesExport(cmd *cobra.Command, projectPath string) error {
 	return nil
 }
 
+// handleMachinesEncrypt handles machines encryption
+func handleMachinesEncrypt(projectPath string, dryRun bool) error {
+	manager := GetIntegrationManager()
+	machinesIntegration := manager.GetMachinesIntegration()
+	if machinesIntegration == nil {
+		return fmt.Errorf("machines integration not available")
+	}
+
+	return handleEncryptionOperation(projectPath, dryRun, "Machines", machinesIntegration.EncryptMachines)
+}
+
 // outputPingResultsText outputs ping results in text format
 func outputPingResultsText(statuses []spookytypes.MachineStatus, verbose bool) error {
 	fmt.Printf("\n📊 Ping Results:\n")
@@ -575,10 +607,14 @@ func init() {
 	machinesExportCmd.Flags().String("machine", "", "Export specific machine by hostname")
 	machinesExportCmd.Flags().StringArray("tags", []string{}, "Filter machines by tags (key=value or key-only)")
 
+	// Add flags to machines encrypt command
+	machinesEncryptCmd.Flags().Bool("dry-run", false, "Show what would be encrypted without making changes")
+
 	// Add machines commands to root
 	machinesCmd.AddCommand(machinesListCmd)
 	machinesCmd.AddCommand(machinesValidateCmd)
 	machinesCmd.AddCommand(machinesPingCmd)
 	machinesCmd.AddCommand(machinesExportCmd)
+	machinesCmd.AddCommand(machinesEncryptCmd)
 	RootCmd.AddCommand(machinesCmd)
 }

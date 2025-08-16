@@ -30,6 +30,9 @@ import (
 	// Schema types
 	spookytypesschemas "spooky/internal/types/schemas"
 
+	// Secrets types
+	spookytypessecrets "spooky/internal/types/secrets"
+
 	// Template types
 	spookytypestemplates "spooky/internal/types/templates"
 
@@ -507,3 +510,37 @@ type KnownHosts = spookyssh.KnownHosts
 
 // ConnectionFactory is a type alias for spookyssh.ConnectionFactory
 type ConnectionFactory = spookyssh.ConnectionFactory
+
+// =============================================================================
+// Secrets Types
+// =============================================================================
+
+// AgeConfig is a type alias for spookytypessecrets.AgeConfig
+type AgeConfig = spookytypessecrets.AgeConfig
+
+// AgeValidationConfig is a type alias for spookytypessecrets.AgeValidationConfig
+type AgeValidationConfig = spookytypessecrets.AgeValidationConfig
+
+// AgeEncryptionConfig is a type alias for spookytypessecrets.AgeEncryptionConfig
+type AgeEncryptionConfig = spookytypessecrets.AgeEncryptionConfig
+
+// AgeIdentity is a type alias for spookytypessecrets.AgeIdentity
+type AgeIdentity = spookytypessecrets.AgeIdentity
+
+// AgeRecipient is a type alias for spookytypessecrets.AgeRecipient
+type AgeRecipient = spookytypessecrets.AgeRecipient
+
+// AgeEncryptedData is a type alias for spookytypessecrets.AgeEncryptedData
+type AgeEncryptedData = spookytypessecrets.AgeEncryptedData
+
+// AgeKeyInfo is a type alias for spookytypessecrets.AgeKeyInfo
+type AgeKeyInfo = spookytypessecrets.AgeKeyInfo
+
+// AgeValidationResult is a type alias for spookytypessecrets.AgeValidationResult
+type AgeValidationResult = spookytypessecrets.AgeValidationResult
+
+// AgeEncryptionResult is a type alias for spookytypessecrets.AgeEncryptionResult
+type AgeEncryptionResult = spookytypessecrets.AgeEncryptionResult
+
+// AgeDecryptionResult is a type alias for spookytypessecrets.AgeDecryptionResult
+type AgeDecryptionResult = spookytypessecrets.AgeDecryptionResult

@@ -9,430 +9,276 @@ metadata {
   schema_type = "variables-structure"
   schema_name = "Variables Structure Schema"
   last_updated = "2024-01-01"
-  compatibility = ["0.20250809.0"]
-  description = "Common variable structure definitions for all storage formats - defines the structure of variables that can be stored"
+  compatibility = ["0.20250809.0", "0.20250809.1"]
+  description = "Common variable structure definitions for all storage formats - defines the structure of variables that can be stored with age encryption support"
   
   # ScalVer format: 0.YYYYMMDD.N
   # - 0: Development phase
   # - 20250809: Date (9 August 2025)
-  # - 0: Patch version
-  scalver_format = "0.20250809.0"
+  # - 1: Patch version (added age encryption support)
+  scalver_format = "0.20250809.1"
 }
 
-# Common variables structure
-variables_structure {
-  # Main variables file (variables.hcl in project root)
-  main_file = {
+# Variable structure definition
+# This defines the common structure for all variable types
+variable_structure {
+  # Variable name (required)
+  # Must be a valid identifier
+  name {
     type = "string"
-    required = false
-    pattern = "^variables\\.hcl$"
-    description = "Main variables file in project root"
-  }
-  
-  # Variables directory (variables/ in project root)
-  variables_directory = {
-    type = "string"
-    required = false
-    pattern = "^variables/$"
-    description = "Variables directory containing organized variable files"
-  }
-  
-  # Variable definition structure
-  variable_blocks = {
-    type = "list(object)"
     required = true
-    min_items = 0
+    description = "Variable name - must be a valid identifier"
     
-    properties = {
-      name = {
-        type = "string"
+    # Validation rules
+    validation {
+      # Must be a valid identifier
+      pattern = "^[a-zA-Z_][a-zA-Z0-9_]*$"
+      min_length = 1
+      max_length = 64
+    }
+  }
+  
+  # Variable description (optional)
+  description {
+    type = "string"
+    required = false
+    description = "Human-readable description of the variable"
+    
+    validation {
+      max_length = 256
+    }
+  }
+  
+  # Variable value (required)
+  # Can be string, number, boolean, or object
+  value {
+    type = "any"
+    required = true
+    description = "Variable value - can be string, number, boolean, or object"
+    
+    # Value type validation
+    validation {
+      # Allow any type for flexibility
+      # Type-specific validation handled by application
+    }
+  }
+  
+  # Sensitive flag (optional)
+  # Indicates if the variable contains sensitive data
+  # Used for logging, display, and documentation purposes
+  # Does NOT control encryption - use encrypted flag for that
+  sensitive {
+    type = "bool"
+    required = false
+    default = false
+    description = "Whether the variable contains sensitive data - used for logging, display, and documentation. Does NOT control encryption."
+    
+    # Sensitive variables are:
+    # - Masked in logs and output
+    # - Not displayed in plain text
+    # - Marked in documentation as sensitive
+    # - Still need encrypted = true to be encrypted
+    validation {
+      # No specific validation rules
+      # Application-level validation ensures proper handling
+    }
+  }
+  
+  # Encryption flag (optional)
+  # Indicates if the variable value should be encrypted
+  # This is the ONLY way to control encryption
+  encrypted {
+    type = "bool"
+    required = false
+    default = false
+    description = "Whether the variable value should be encrypted using age encryption. This is the ONLY way to control encryption."
+    
+    # Only applicable to string, number, and object values
+    # Booleans cannot be encrypted (they're simple true/false values)
+    validation {
+      # Application-level validation ensures this is only set for encryptable types
+      # Schema validation cannot enforce this cross-field relationship
+    }
+  }
+  
+  # Age encryption metadata (optional, only when encrypted = true)
+  encryption_metadata {
+    type = "object"
+    required = false
+    description = "Age encryption metadata - only present when encrypted = true"
+    
+    # Only validate if encrypted = true
+    validation {
+      # Cross-field validation: only present when encrypted = true
+      # Application-level validation required
+    }
+    
+    # Encryption metadata structure
+    structure {
+      # Recipients list (required for encryption)
+      recipients {
+        type = "list"
         required = true
-        description = "Variable name"
-        pattern = "^[a-z][a-z0-9_]*$"
-        min_length = 1
-        max_length = 100
-      }
-      
-      type = {
-        type = "string"
-        required = true
-        description = "Variable type - supports: string, number, float, bool, list, map, object, duration (e.g., '30s', '5m'), ip (IPv4/IPv6), cidr (e.g., '192.168.1.0/24'), path (file system path), file (file content), secret (encrypted value)"
-        enum = ["string", "number", "float", "bool", "list", "map", "object", "duration", "ip", "cidr", "path", "file", "secret"]
-      }
-      
-      description = {
-        type = "string"
-        required = false
-        description = "Variable description"
-        max_length = 500
-      }
-      
-      default = {
-        type = "any"
-        required = false
-        description = "Default value for the variable"
-      }
-      
-      required = {
-        type = "bool"
-        required = false
-        default = false
-        description = "Whether the variable is required"
-      }
-      
-      sensitive = {
-        type = "bool"
-        required = false
-        default = false
-        description = "Whether the variable contains sensitive data"
-      }
-      
-      encrypted = {
-        type = "bool"
-        required = false
-        default = false
-        description = "Whether the variable should be encrypted at rest"
-      }
-      
-      scope = {
-        type = "string"
-        required = false
-        enum = ["project", "global", "inherited"]
-        default = "project"
-        description = "Variable scope (project-only, global, or inherited)"
-      }
-      
-      dependencies = {
-        type = "array"
-        required = false
-        description = "List of other variables this variable depends on"
-        items = {
+        description = "List of age public keys that can decrypt this value"
+        
+        validation {
+          min_items = 1
+          max_items = 10
+        }
+        
+        # Each recipient must be a valid age public key
+        items {
           type = "string"
-          pattern = "^[a-z][a-z0-9_]*$"
-        }
-      }
-      
-      validation = {
-        type = "object"
-        required = false
-        max_occurrences = 1
-        
-        properties = {
-          condition = {
-            type = "string"
-            required = true
-            description = "Validation condition using HCL syntax"
-            max_length = 1000
-          }
-          
-          error_message = {
-            type = "string"
-            required = true
-            description = "Error message for validation failure"
-            max_length = 500
-          }
-          
-          warning_message = {
-            type = "string"
-            required = false
-            description = "Warning message for validation warning"
-            max_length = 500
+          validation {
+            # Age public key format: age1...
+            pattern = "^age1[a-z0-9]{50,}$"
+            description = "Must be a valid age public key starting with 'age1'"
           }
         }
       }
       
-      constraints = {
-        type = "object"
-        required = false
-        description = "Type-specific constraints"
-        
-        properties = {
-          # String constraints
-          min_length = {
-            type = "integer"
-            required = false
-            min = 0
-            description = "Minimum string length"
-          }
-          
-          max_length = {
-            type = "integer"
-            required = false
-            min = 1
-            description = "Maximum string length"
-          }
-          
-          pattern = {
-            type = "string"
-            required = false
-            description = "Regular expression pattern for string validation"
-          }
-          
-          # Numeric constraints
-          min_value = {
-            type = "number"
-            required = false
-            description = "Minimum numeric value"
-          }
-          
-          max_value = {
-            type = "number"
-            required = false
-            description = "Maximum numeric value"
-          }
-          
-          # List constraints
-          min_items = {
-            type = "integer"
-            required = false
-            min = 0
-            description = "Minimum number of list items"
-          }
-          
-          max_items = {
-            type = "integer"
-            required = false
-            min = 1
-            description = "Maximum number of list items"
-          }
-          
-          # File constraints
-          file_exists = {
-            type = "bool"
-            required = false
-            default = false
-            description = "Whether the file must exist"
-          }
-          
-          file_readable = {
-            type = "bool"
-            required = false
-            default = false
-            description = "Whether the file must be readable"
-          }
-          
-          file_size_max = {
-            type = "string"
-            required = false
-            pattern = "^\\d+[KMGT]?B$|^\\d+\\s*[KMGT]?B$"
-            description = "Maximum file size (e.g., '10MB', '1GB', '500KB', '2TB')"
-          }
-          
-          # Path constraints
-          path_exists = {
-            type = "bool"
-            required = false
-            default = false
-            description = "Whether the path must exist"
-          }
-          
-          path_absolute = {
-            type = "bool"
-            required = false
-            default = false
-            description = "Whether the path must be absolute"
-          }
-          
-          path_relative = {
-            type = "bool"
-            required = false
-            default = false
-            description = "Whether the path must be relative"
-          }
-        }
-      }
-      
-      metadata = {
-        type = "object"
-        required = false
-        description = "Additional variable metadata"
-        additional_properties = "string"
-      }
-    }
-  }
-  
-  # Variable resolution and interpolation
-  resolution = {
-    type = "object"
-    required = false
-    description = "Variable resolution configuration"
-    
-    properties = {
-      allow_self_reference = {
-        type = "bool"
-        required = false
-        default = false
-        description = "Allow variables to reference themselves"
-      }
-      
-      allow_circular_deps = {
-        type = "bool"
-        required = false
-        default = false
-        description = "Allow circular dependencies between variables"
-      }
-      
-      max_resolution_depth = {
-        type = "integer"
-        required = false
-        min = 1
-        max = 100
-        default = 10
-        description = "Maximum depth for variable resolution"
-      }
-      
-      fail_on_missing = {
-        type = "bool"
-        required = false
-        default = true
-        description = "Fail if required variables are missing"
-      }
-      
-      use_environment = {
-        type = "bool"
-        required = false
-        default = true
-        description = "Use environment variables as fallback"
-      }
-      
-      environment_prefix = {
+      # Encryption timestamp (optional)
+      encrypted_at {
         type = "string"
         required = false
-        default = "SPOOKY_"
-        pattern = "^[A-Z_]*$"
-        description = "Prefix for environment variable names"
-      }
-    }
-  }
-  
-  # Security and encryption
-  security = {
-    type = "object"
-    required = false
-    description = "Security and encryption settings"
-    
-    properties = {
-      encryption_enabled = {
-        type = "bool"
-        required = false
-        default = false
-        description = "Enable encryption for sensitive variables"
+        description = "ISO 8601 timestamp when the value was encrypted"
+        
+        validation {
+          # ISO 8601 format
+          pattern = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        }
       }
       
-      encryption_method = {
+      # Encryption method (optional)
+      method {
         type = "string"
         required = false
-        enum = ["age", "gpg", "none"]
         default = "age"
-        description = "Encryption method for sensitive variables"
-      }
-      
-      key_file = {
-        type = "string"
-        required = false
-        pattern = "^[a-zA-Z0-9/._-]+$"
-        description = "Path to encryption key file"
-      }
-      
-      key_id = {
-        type = "string"
-        required = false
-        description = "Encryption key identifier"
-      }
-      
-      mask_sensitive = {
-        type = "bool"
-        required = false
-        default = true
-        description = "Mask sensitive variable values in logs"
-      }
-      
-      audit_trail = {
-        type = "bool"
-        required = false
-        default = false
-        description = "Enable audit trail for variable access"
+        description = "Encryption method used"
+        
+        validation {
+          # Currently only age encryption is supported
+          allowed_values = ["age"]
+        }
       }
     }
   }
   
-  # Validation rules
-  validation = {
-    # File location validation
-    file_location = {
-      rule = "path"
-      pattern = "^(variables\\.hcl|variables/[^/]+\\.hcl)$"
-      message = "Variable files must be variables.hcl in project root or .hcl files in variables/ directory"
+  # Variable tags (optional)
+  tags {
+    type = "list"
+    required = false
+    description = "Tags for categorizing and filtering variables"
+    
+    validation {
+      max_items = 10
     }
     
-    # Variable name validation
-    variable_name = {
-      rule = "regex"
-      pattern = "^[a-z][a-z0-9_]*$"
-      message = "Variable names must be lowercase with underscores, starting with a letter"
-    }
-    
-    # Type validation
-    variable_type = {
-      rule = "enum"
-      allowed_values = ["string", "number", "float", "bool", "list", "map", "object", "duration", "ip", "cidr", "path", "file", "secret"]
-      message = "Variable type must be one of: string, number, float, bool, list, map, object, duration, ip, cidr, path, file, secret"
-    }
-    
-    # Required variable validation
-    required_variable = {
-      rule = "conditional"
-      condition = "required_variables_have_defaults_or_environment_or_dependencies"
-      message = "Required variables must have a default value, be provided via environment variable, or be resolved through dependencies"
-    }
-    
-    # Validation condition syntax
-    validation_condition = {
-      rule = "hcl"
-      message = "Validation condition must be valid HCL syntax"
-    }
-    
-    # No circular dependencies
-    no_circular_deps = {
-      rule = "acyclic"
-      message = "Variables cannot have circular dependencies"
-    }
-    
-    # Constraint validation
-    constraint_consistency = {
-      rule = "conditional"
-      condition = "constraints_are_consistent_with_type"
-      message = "Constraints must be consistent with variable type"
-    }
-    
-    # Security validation
-    sensitive_encryption = {
-      rule = "conditional"
-      condition = "sensitive_variables_are_encrypted"
-      message = "Sensitive variables should be encrypted"
-    }
-    
-    # Resolution validation
-    resolution_depth = {
-      rule = "range"
-      min = 1
-      max = 100
-      message = "Resolution depth must be between 1 and 100"
-    }
-    
-    # IP/CIDR validation
-    ip_cidr_validation = {
-      rule = "conditional"
-      condition = "ip_cidr_types_have_valid_format"
-      message = "IP and CIDR types must have valid format (e.g., '192.168.1.1', '2001:db8::1', '192.168.1.0/24')"
-    }
-    
-    # Duration validation
-    duration_validation = {
-      rule = "conditional"
-      condition = "duration_types_have_valid_format"
-      message = "Duration types must have valid format (e.g., '30s', '5m', '2h', '1d')"
+    items {
+      type = "string"
+      validation {
+        pattern = "^[a-zA-Z0-9_-]+$"
+        min_length = 1
+        max_length = 32
+      }
     }
   }
   
+  # Variable metadata (optional)
+  metadata {
+    type = "object"
+    required = false
+    description = "Additional metadata for the variable"
+    
+    # Flexible metadata structure
+    structure {
+      # Source information (optional)
+      source {
+        type = "string"
+        required = false
+        description = "Source of the variable (e.g., 'environment', 'file', 'manual')"
+        
+        validation {
+          allowed_values = ["environment", "file", "manual", "computed", "imported"]
+        }
+      }
+      
+      # Created timestamp (optional)
+      created_at {
+        type = "string"
+        required = false
+        description = "ISO 8601 timestamp when the variable was created"
+        
+        validation {
+          pattern = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        }
+      }
+      
+      # Last modified timestamp (optional)
+      modified_at {
+        type = "string"
+        required = false
+        description = "ISO 8601 timestamp when the variable was last modified"
+        
+        validation {
+          pattern = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+        }
+      }
+      
+      # Version information (optional)
+      version {
+        type = "string"
+        required = false
+        description = "Version identifier for the variable"
+        
+        validation {
+          pattern = "^[a-zA-Z0-9._-]+$"
+          max_length = 32
+        }
+      }
+    }
+  }
+}
+
+# Validation rules for variable structure
+validation_rules {
+  # Cross-field validation rules
+  cross_field_validation {
+    # Encryption metadata must be present when encrypted = true
+    rule {
+      name = "encryption_metadata_required"
+      description = "Encryption metadata must be present when encrypted = true"
+      condition = "encrypted == true && encryption_metadata == null"
+      message = "Encryption metadata is required when encrypted = true"
+    }
+    
+    # Encryption metadata must not be present when encrypted = false
+    rule {
+      name = "encryption_metadata_not_allowed"
+      description = "Encryption metadata must not be present when encrypted = false"
+      condition = "encrypted == false && encryption_metadata != null"
+      message = "Encryption metadata is not allowed when encrypted = false"
+    }
+    
+    # Value type validation for encryption
+    rule {
+      name = "encryptable_value_types"
+      description = "Only string, number, and object values can be encrypted"
+      condition = "encrypted == true && (value_type == 'bool')"
+      message = "Boolean values cannot be encrypted"
+    }
+  }
+  
+  # Application-level validation notes
+  application_validation {
+    # These validations require application-level logic
+    # Schema validation cannot enforce all type relationships
+    
+    note = "Application must validate that encrypted = true is only used with string, number, or object values"
+    note = "Application must validate age public key format and validity"
+    note = "Application must validate that encrypted values are valid age-encrypted strings"
+    note = "Application must handle decryption and re-encryption during variable operations"
+    note = "Sensitive variables should be masked in logs and output, regardless of encryption status"
+    note = "Only encrypted = true controls encryption - sensitive = true is for display/logging only"
+  }
 } 

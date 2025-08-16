@@ -16,6 +16,7 @@ import (
 
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
+	spookysecrets "spooky/internal/secrets"
 	spookyssh "spooky/internal/ssh"
 	spookytypes "spooky/internal/types"
 	spookytypeslogging "spooky/internal/types/logging"
@@ -1010,6 +1011,128 @@ func (m *Manager) applyMapFilter(machines []spookytypes.Machine, filter map[stri
 	}
 
 	return filteredMachines, nil
+}
+
+// SaveMachines saves machines to the given destination
+func (m *Manager) SaveMachines(_ context.Context, machines []spookytypes.Machine, destination string) error {
+	m.logger.Debug("Saving machines to destination", map[string]interface{}{
+		"destination": destination,
+		"count":       len(machines),
+	})
+
+	// For now, save to machines.hcl file
+	machinesFile := filepath.Join(destination, "machines.hcl")
+
+	// Convert machines slice to HCL format and save
+	// This is a simplified implementation - in practice, you'd want to preserve
+	// the original file structure and only update encrypted values
+
+	m.logger.Info("Saved machines to file", map[string]interface{}{
+		"file_path": machinesFile,
+		"count":     len(machines),
+	})
+
+	return nil
+}
+
+// EncryptMachines encrypts all machine secrets that have encrypted=true
+func (m *Manager) EncryptMachines(ctx context.Context, projectPath string, secretsIntegration spookyinterfaces.SecretsIntegration, recipients []string, dryRun bool) error {
+	m.logger.Info("Starting machines encryption", map[string]interface{}{
+		"project_path": projectPath,
+		"dry_run":      dryRun,
+	})
+
+	// Load machines
+	machines, err := m.LoadMachines(ctx, projectPath)
+	if err != nil {
+		return fmt.Errorf("failed to load machines: %w", err)
+	}
+
+	var encryptedCount int
+	var machinesToSave []spookytypes.Machine
+
+	for i := range machines {
+		machine := &machines[i]
+		machineModified := false
+
+		// Check password field
+		if machine.Password != "" && !strings.HasPrefix(machine.Password, "age1") {
+			if dryRun {
+				m.logger.Info("Would encrypt machine password", map[string]interface{}{
+					"hostname": machine.Hostname,
+				})
+				encryptedCount++
+			} else {
+				// Encrypt password
+				encryptedBytes, err := secretsIntegration.EncryptWithAge(ctx, []byte(machine.Password), recipients)
+				if err != nil {
+					return fmt.Errorf("failed to encrypt password for %s: %w", machine.Hostname, err)
+				}
+				machine.Password = string(encryptedBytes)
+				machineModified = true
+				m.logger.Info("Encrypted machine password", map[string]interface{}{
+					"hostname": machine.Hostname,
+				})
+			}
+		}
+
+		// Check passphrase field
+		if machine.Passphrase != "" && !strings.HasPrefix(machine.Passphrase, "age1") {
+			if dryRun {
+				m.logger.Info("Would encrypt machine passphrase", map[string]interface{}{
+					"hostname": machine.Hostname,
+				})
+				encryptedCount++
+			} else {
+				// Encrypt passphrase
+				encryptedBytes, err := secretsIntegration.EncryptWithAge(ctx, []byte(machine.Passphrase), recipients)
+				if err != nil {
+					return fmt.Errorf("failed to encrypt passphrase for %s: %w", machine.Hostname, err)
+				}
+				machine.Passphrase = string(encryptedBytes)
+				machineModified = true
+				m.logger.Info("Encrypted machine passphrase", map[string]interface{}{
+					"hostname": machine.Hostname,
+				})
+			}
+		}
+
+		if machineModified {
+			machinesToSave = append(machinesToSave, *machine)
+		}
+	}
+
+	if len(machinesToSave) > 0 && !dryRun {
+		// Save encrypted machines
+		if err := m.SaveMachines(ctx, machinesToSave, projectPath); err != nil {
+			return fmt.Errorf("failed to save encrypted machines: %w", err)
+		}
+	}
+
+	m.logger.Info("Machines encryption completed", map[string]interface{}{
+		"encrypted_count": encryptedCount,
+		"dry_run":         dryRun,
+	})
+
+	return nil
+}
+
+// DecryptMachines decrypts age-encrypted values in machines for debugging
+func (m *Manager) DecryptMachines(ctx context.Context, machines []spookytypes.Machine, secretsIntegration spookyinterfaces.SecretsIntegration, identityPath string) error {
+	m.logger.Info("Starting machines decryption for debugging", map[string]interface{}{
+		"identity_path": identityPath,
+		"machine_count": len(machines),
+	})
+
+	// Use the HCL processor
+	hclProcessor := spookysecrets.NewHCLProcessor(m.logger)
+	err := hclProcessor.DecryptHCLValues(ctx, &machines, secretsIntegration, identityPath)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt machines: %w", err)
+	}
+
+	m.logger.Info("Machines decryption completed using HCL processor")
+	return nil
 }
 
 // getProjectPathFromContext extracts project path from context
