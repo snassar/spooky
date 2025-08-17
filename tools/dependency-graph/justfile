@@ -1,0 +1,47 @@
+# Build the dependency graph tool
+build:
+    @echo "Building dependency graph tool..."
+    go build -o dependency-graph main.go
+
+# Generate all dependency graphs
+analyze: build
+    @echo "Generating all dependency graphs..."
+    ./dependency-graph analyze
+
+# Analyze specific package
+package pkg: build
+    @echo "Analyzing package: {{pkg}}"
+    ./dependency-graph package {{pkg}}
+
+# Generate interface dependency graph
+interface: build
+    @echo "Generating interface dependency graph..."
+    ./dependency-graph interface
+
+# Generate type dependency graph
+type: build
+    @echo "Generating type dependency graph..."
+    ./dependency-graph type
+
+# Generate function dependency graph
+function: build
+    @echo "Generating function dependency graph..."
+    ./dependency-graph function
+
+# Clean build artifacts
+clean:
+    @echo "Cleaning build artifacts..."
+    rm -f dependency-graph
+
+# Show help
+help:
+    @echo "Dependency Graph Tool"
+    @echo ""
+    @echo "Commands:"
+    @echo "  analyze   - Generate all dependency graphs"
+    @echo "  package   - Analyze specific package (e.g., just package internal/ssh)"
+    @echo "  interface - Generate interface dependency graph"
+    @echo "  type      - Generate type dependency graph"
+    @echo "  function  - Generate function dependency graph"
+    @echo "  clean     - Clean build artifacts"
+    @echo "  help      - Show this help"

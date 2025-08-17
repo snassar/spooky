@@ -7,8 +7,10 @@ import (
 	"net"
 	"regexp"
 	"strings"
+	"time"
 
 	spookyinterfaces "spooky/internal/interfaces"
+	spookyschemas "spooky/internal/schemas"
 	spookytypes "spooky/internal/types"
 	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesmachines "spooky/internal/types/machines"
@@ -17,13 +19,45 @@ import (
 
 // Validator implements the MachineValidator interface
 type Validator struct {
-	logger spookytypeslogging.Logger
+	logger                spookytypeslogging.Logger
+	schemaDrivenValidator *spookyschemas.SchemaDrivenValidator
+	enhancedValidator     *spookyschemas.EnhancedValidator
 }
 
 // NewValidator creates a new MachineValidator instance
 func NewValidator(logger spookytypeslogging.Logger) spookyinterfaces.MachineValidator {
+	// Create schema-driven validator for machine configuration validation
+	schemaDrivenConfig := &spookyschemas.SchemaDrivenValidationConfig{
+		UseEmbeddedSchemas: true,
+		StrictValidation:   true,
+		AllowUnknownFields: false,
+		DetailedErrors:     true,
+	}
+	schemaDrivenValidator := spookyschemas.NewSchemaDrivenValidator(logger, schemaDrivenConfig)
+
+	// Create enhanced validator for individual machine validation
+	enhancedConfig := &spookyschemas.ValidationConfig{
+		Mode: spookyschemas.ValidationModeStrict,
+		ErrorHandling: &spookyschemas.ErrorHandlingConfig{
+			StopOnFirstError:   false,
+			MaxErrors:          100,
+			IncludeWarnings:    true,
+			IncludeContext:     true,
+			IncludeSuggestions: true,
+		},
+		Evolution: &spookyschemas.EvolutionConfig{
+			EnableTracking:  true,
+			AllowDeprecated: true,
+			WarnDeprecated:  true,
+			AllowBreaking:   false,
+		},
+	}
+	enhancedValidator := spookyschemas.NewEnhancedValidator(enhancedConfig)
+
 	return &Validator{
-		logger: logger,
+		logger:                logger,
+		schemaDrivenValidator: schemaDrivenValidator,
+		enhancedValidator:     enhancedValidator,
 	}
 }
 
@@ -59,57 +93,96 @@ func (v *Validator) ValidateMachines(ctx context.Context, machines []spookytypes
 }
 
 // ValidateMachine validates a single machine
-func (v *Validator) ValidateMachine(_ context.Context, machine *spookytypes.Machine) (*spookytypes.ValidationResult, error) {
+func (v *Validator) ValidateMachine(ctx context.Context, machine *spookytypes.Machine) (*spookytypes.ValidationResult, error) {
 	v.logger.Debug("Validating machine", map[string]interface{}{
 		"hostname": machine.Hostname,
 		"host":     machine.Host,
 	})
 
-	var errors []spookytypesschemas.SchemaError
-	var warnings []spookytypesschemas.SchemaError
+	// Get machine schema for enhanced validation
+	machineSchema, err := v.getMachineSchema()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get machine schema: %w", err)
+	}
 
-	// Validate hostname
+	// Use enhanced validator for comprehensive machine validation
+	result, err := v.enhancedValidator.ValidateWithEnhancedFeatures(ctx, machineSchema, machine)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate machine with enhanced validator: %w", err)
+	}
+
+	// Add additional custom validation for machine-specific rules
+	v.addCustomMachineValidation(machine, result)
+
+	return &spookytypes.ValidationResult{
+		Valid:    result.Valid,
+		Errors:   result.Errors,
+		Warnings: result.Warnings,
+	}, nil
+}
+
+// getMachineSchema gets the machine schema for validation
+func (v *Validator) getMachineSchema() (*spookytypesschemas.Schema, error) {
+	// Try to get schema from embedded schemas first
+	if schema, err := v.schemaDrivenValidator.GetEmbeddedSchema("machines"); err == nil {
+		return schema, nil
+	}
+
+	// Fallback: create a basic machine schema
+	return &spookytypesschemas.Schema{
+		Name:        "machines",
+		Type:        "hcl",
+		Version:     "1.0",
+		Description: "Machine configuration schema",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Content:     "", // Will be loaded from file if needed
+		Metadata:    make(map[string]interface{}),
+	}, nil
+}
+
+// addCustomMachineValidation adds custom validation rules specific to machines
+func (v *Validator) addCustomMachineValidation(machine *spookytypes.Machine, result *spookytypesschemas.ValidationResult) {
+	// Validate hostname format
 	if err := v.validateHostname(machine.Hostname); err != nil {
-		errors = append(errors, v.convertErrorToSchemaError(err, "hostname"))
+		v.addSchemaError(result, "invalid_hostname", err.Error(), "error")
 	}
 
-	// Validate host
+	// Validate host format
 	if err := v.validateHost(machine.Host); err != nil {
-		errors = append(errors, v.convertErrorToSchemaError(err, "host"))
+		v.addSchemaError(result, "invalid_host", err.Error(), "error")
 	}
 
-	// Validate port
+	// Validate port range
 	if err := v.validatePort(machine.Port); err != nil {
-		errors = append(errors, v.convertErrorToSchemaError(err, "port"))
+		v.addSchemaError(result, "invalid_port", err.Error(), "error")
 	}
 
 	// Validate user
 	if err := v.validateUser(machine.User); err != nil {
-		errors = append(errors, v.convertErrorToSchemaError(err, "user"))
+		v.addSchemaError(result, "invalid_user", err.Error(), "error")
 	}
 
 	// Validate authentication
 	if err := v.validateAuthentication(machine); err != nil {
-		errors = append(errors, v.convertErrorToSchemaError(err, "authentication"))
+		v.addSchemaError(result, "invalid_authentication", err.Error(), "error")
 	}
 
 	// Validate SSH configuration
 	if err := v.validateSSHConfig(machine); err != nil {
-		errors = append(errors, v.convertErrorToSchemaError(err, "ssh_config"))
+		v.addSchemaError(result, "invalid_ssh_config", err.Error(), "error")
 	}
+}
 
-	// Validate resource specifications
-	if err := v.validateResources(machine.Resources); err != nil {
-		errors = append(errors, v.convertErrorToSchemaError(err, "resources"))
+// addSchemaError adds a schema error to the validation result
+func (v *Validator) addSchemaError(result *spookytypesschemas.ValidationResult, code, message, severity string) {
+	schemaError := spookytypesschemas.SchemaError{
+		Code:     code,
+		Message:  message,
+		Severity: severity,
 	}
-
-	valid := len(errors) == 0
-
-	return &spookytypes.ValidationResult{
-		Valid:    valid,
-		Errors:   errors,
-		Warnings: warnings,
-	}, nil
+	result.Errors = append(result.Errors, schemaError)
+	result.Valid = false
 }
 
 // validateHostname validates the machine hostname

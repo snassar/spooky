@@ -5,13 +5,26 @@ import (
 	"path/filepath"
 	"testing"
 
-	spookylogging "spooky/internal/logging"
+	spookytypeslogging "spooky/internal/types/logging"
 )
 
+// MockLogger is a mock implementation of Logger for testing
+type MockLogger struct{}
+
+func (m *MockLogger) Debug(msg string, fields ...map[string]interface{})                 {}
+func (m *MockLogger) Info(msg string, fields ...map[string]interface{})                  {}
+func (m *MockLogger) Warn(msg string, fields ...map[string]interface{})                  {}
+func (m *MockLogger) Error(msg string, err error, fields ...map[string]interface{})      {}
+func (m *MockLogger) Fatal(msg string, err error, fields ...map[string]interface{})      {}
+func (m *MockLogger) WithFields(fields map[string]interface{}) spookytypeslogging.Logger { return m }
+func (m *MockLogger) WithComponent(component string) spookytypeslogging.Logger           { return m }
+func (m *MockLogger) WithOperation(operation string) spookytypeslogging.Logger           { return m }
+func (m *MockLogger) SetLevel(level spookytypeslogging.LogLevel)                         {}
+func (m *MockLogger) GetLevel() spookytypeslogging.LogLevel                              { return spookytypeslogging.LogLevelInfo }
+
 func TestSchemaMetadataValidation(t *testing.T) {
-	// Create a logger for testing
-	logManager := spookylogging.NewLogManager()
-	logger := logManager.GetLogger("test")
+	// Create a mock logger for testing
+	logger := &MockLogger{}
 
 	// Create a schema manager
 	manager := NewManager(logger)
@@ -50,9 +63,8 @@ test_schema {
 }
 
 func TestSchemaMetadataValidationFailure(t *testing.T) {
-	// Create a logger for testing
-	logManager := spookylogging.NewLogManager()
-	logger := logManager.GetLogger("test")
+	// Create a mock logger for testing
+	logger := &MockLogger{}
 
 	// Create a schema manager
 	manager := NewManager(logger)
@@ -83,9 +95,8 @@ test_schema {
 }
 
 func TestSchemaMetadataValidationInvalidVersion(t *testing.T) {
-	// Create a logger for testing
-	logManager := spookylogging.NewLogManager()
-	logger := logManager.GetLogger("test")
+	// Create a mock logger for testing
+	logger := &MockLogger{}
 
 	// Create a schema manager
 	manager := NewManager(logger)
@@ -120,12 +131,11 @@ test_schema {
 }
 
 func TestLoadSchemasFromDirectoryWithMetadataValidation(t *testing.T) {
-	// Create a logger for testing
-	logManager := spookylogging.NewLogManager()
-	logger := logManager.GetLogger("test")
+	// Create a debug logger that outputs to t.Log
+	debugLogger := &DebugLogger{t: t}
 
 	// Create a schema manager
-	manager := NewManager(logger)
+	manager := NewManager(debugLogger)
 
 	// Test loading schemas from the actual schemas directory
 	// Use absolute path to ensure it works regardless of working directory
@@ -135,12 +145,12 @@ func TestLoadSchemasFromDirectoryWithMetadataValidation(t *testing.T) {
 	}
 
 	// The test runs from internal/schemas, so we need to go up one level
-	// and then into internal/schemas/schemas
-	schemasDir := filepath.Join(currentDir, "schemas")
+	// and then into internal/schemas/schemas/structure
+	schemasDir := filepath.Join(currentDir, "schemas", "structure")
 
-	// Check if the schemas directory exists
+	// Check if the structure schemas directory exists
 	if _, err := os.Stat(schemasDir); os.IsNotExist(err) {
-		t.Skipf("Schemas directory %s does not exist, skipping test", schemasDir)
+		t.Skipf("Structure schemas directory %s does not exist, skipping test", schemasDir)
 	}
 
 	schemas, err := manager.LoadSchemasFromDirectory(schemasDir)
@@ -163,4 +173,51 @@ func TestLoadSchemasFromDirectoryWithMetadataValidation(t *testing.T) {
 
 		t.Logf("Schema %s loaded successfully: %s", name, schema.Name)
 	}
+}
+
+// DebugLogger outputs log messages to the test log
+type DebugLogger struct {
+	t *testing.T
+}
+
+func (d *DebugLogger) Debug(msg string, fields ...map[string]interface{}) {
+	d.t.Logf("DEBUG: %s %v", msg, fields)
+}
+
+func (d *DebugLogger) Info(msg string, fields ...map[string]interface{}) {
+	d.t.Logf("INFO: %s %v", msg, fields)
+}
+
+func (d *DebugLogger) Warn(msg string, fields ...map[string]interface{}) {
+	d.t.Logf("WARN: %s %v", msg, fields)
+}
+
+func (d *DebugLogger) Error(msg string, err error, fields ...map[string]interface{}) {
+	if err != nil {
+		d.t.Logf("ERROR: %s %v %v", msg, err, fields)
+	} else {
+		d.t.Logf("ERROR: %s %v", msg, fields)
+	}
+}
+
+func (d *DebugLogger) Fatal(msg string, err error, fields ...map[string]interface{}) {
+	d.t.Logf("FATAL: %s %v %v", msg, err, fields)
+}
+
+func (d *DebugLogger) WithFields(fields map[string]interface{}) spookytypeslogging.Logger {
+	return d
+}
+
+func (d *DebugLogger) WithComponent(component string) spookytypeslogging.Logger {
+	return d
+}
+
+func (d *DebugLogger) WithOperation(operation string) spookytypeslogging.Logger {
+	return d
+}
+
+func (d *DebugLogger) SetLevel(level spookytypeslogging.LogLevel) {}
+
+func (d *DebugLogger) GetLevel() spookytypeslogging.LogLevel {
+	return spookytypeslogging.LogLevelInfo
 }

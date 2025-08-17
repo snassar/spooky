@@ -15,7 +15,9 @@ import (
 	"sync"
 	"time"
 
+	spookyschemas "spooky/internal/schemas"
 	spookytypeslogging "spooky/internal/types/logging"
+	spookytypesschemas "spooky/internal/types/schemas"
 )
 
 // LogManager implements the LogManager interface using slog
@@ -32,6 +34,10 @@ type LogManager struct {
 	// Loggers by component
 	loggers map[string]*Logger
 
+	// Schema validators
+	schemaDrivenValidator *spookyschemas.SchemaDrivenValidator
+	enhancedValidator     *spookyschemas.EnhancedValidator
+
 	// Mutex for thread safety
 	mutex sync.RWMutex
 
@@ -47,25 +53,54 @@ type LogManager struct {
 func NewLogManager() *LogManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Default configuration
+	// Default configuration - for CLI, don't output logs to terminal by default
 	config := &spookytypeslogging.LogConfig{
-		Level:  spookytypeslogging.LogLevelInfo,
+		Level:  spookytypeslogging.LogLevelError, // Only show errors by default
 		Format: "json",
-		Output: "stderr",
+		Output: "null", // Don't output logs to terminal by default
 	}
 
-	// Create default slog logger
-	logger := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
+	// Create default slog logger that discards logs by default
+	logger := slog.New(slog.NewJSONHandler(io.Discard, &slog.HandlerOptions{
+		Level: slog.LevelError, // Only show errors by default
 	}))
 
+	// Create schema validators for logging configuration validation
+	schemaDrivenConfig := &spookyschemas.SchemaDrivenValidationConfig{
+		UseEmbeddedSchemas: true,
+		StrictValidation:   true,
+		AllowUnknownFields: false,
+		DetailedErrors:     true,
+	}
+	schemaDrivenValidator := spookyschemas.NewSchemaDrivenValidator(nil, schemaDrivenConfig)
+
+	enhancedConfig := &spookyschemas.ValidationConfig{
+		Mode: spookyschemas.ValidationModeStrict,
+		ErrorHandling: &spookyschemas.ErrorHandlingConfig{
+			StopOnFirstError:   false,
+			MaxErrors:          100,
+			IncludeWarnings:    true,
+			IncludeContext:     true,
+			IncludeSuggestions: true,
+		},
+		Evolution: &spookyschemas.EvolutionConfig{
+			EnableTracking:  true,
+			AllowDeprecated: true,
+			WarnDeprecated:  true,
+			AllowBreaking:   false,
+		},
+	}
+	enhancedValidator := spookyschemas.NewEnhancedValidator(enhancedConfig)
+
 	return &LogManager{
-		config:  config,
-		logger:  logger,
-		writer:  os.Stderr,
-		loggers: make(map[string]*Logger),
-		ctx:     ctx,
-		cancel:  cancel,
+		config:                config,
+		logger:                logger,
+		writer:                io.Discard, // Don't output logs to terminal by default
+		loggers:               make(map[string]*Logger),
+		schemaDrivenValidator: schemaDrivenValidator,
+		enhancedValidator:     enhancedValidator,
+		ctx:                   ctx,
+		cancel:                cancel,
 	}
 }
 
@@ -293,6 +328,80 @@ func (lm *LogManager) Close() error {
 	}
 
 	return nil
+}
+
+// ValidateLogConfig validates logging configuration using schema validators
+func (lm *LogManager) ValidateLogConfig(ctx context.Context, config *spookytypeslogging.LogConfig) (*spookytypesschemas.ValidationResult, error) {
+	// Get logging schema for enhanced validation
+	loggingSchema, err := lm.getLoggingSchema()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get logging schema: %w", err)
+	}
+
+	// Use enhanced validator for comprehensive logging configuration validation
+	result, err := lm.enhancedValidator.ValidateWithEnhancedFeatures(ctx, loggingSchema, config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate logging config with enhanced validator: %w", err)
+	}
+
+	// Add additional custom validation for logging-specific rules
+	lm.addCustomLoggingValidation(config, result)
+
+	return result, nil
+}
+
+// getLoggingSchema gets the logging schema for validation
+func (lm *LogManager) getLoggingSchema() (*spookytypesschemas.Schema, error) {
+	// Try to get schema from embedded schemas first
+	if schema, err := lm.schemaDrivenValidator.GetEmbeddedSchema("logging"); err == nil {
+		return schema, nil
+	}
+
+	// Fallback: create a basic logging schema
+	return &spookytypesschemas.Schema{
+		Name:        "logging",
+		Type:        "hcl",
+		Version:     "1.0",
+		Description: "Logging configuration schema",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Content:     "", // Will be loaded from file if needed
+		Metadata:    make(map[string]interface{}),
+	}, nil
+}
+
+// addCustomLoggingValidation adds custom validation rules specific to logging
+func (lm *LogManager) addCustomLoggingValidation(config *spookytypeslogging.LogConfig, result *spookytypesschemas.ValidationResult) {
+	// Validate log level
+	if config.Level == "" {
+		lm.addSchemaError(result, "missing_log_level", "Log level is required", "error")
+	}
+
+	// Validate log format
+	if config.Format == "" {
+		lm.addSchemaError(result, "missing_log_format", "Log format is required", "error")
+	}
+
+	// Validate output configuration
+	if config.Output == "" {
+		lm.addSchemaError(result, "missing_log_output", "Log output is required", "error")
+	}
+
+	// Validate file path if output is file
+	if config.Output == "file" && (config.File == nil || config.File.Path == "") {
+		lm.addSchemaError(result, "missing_file_path", "File path is required when output is file", "error")
+	}
+}
+
+// addSchemaError adds a schema error to the validation result
+func (lm *LogManager) addSchemaError(result *spookytypesschemas.ValidationResult, code, message, severity string) {
+	schemaError := spookytypesschemas.SchemaError{
+		Code:     code,
+		Message:  message,
+		Severity: severity,
+	}
+	result.Errors = append(result.Errors, schemaError)
+	result.Valid = false
 }
 
 // Logger implements the Logger interface using slog

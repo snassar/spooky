@@ -202,8 +202,14 @@ type Config = spookytypesconfig.Config
 // Facts Types
 // =============================================================================
 
+// Facts is a type alias for spookytypesfacts.Facts
+type Facts = spookytypesfacts.Facts
+
 // FactCollection is a type alias for spookytypesfacts.FactCollection
 type FactCollection = spookytypesfacts.FactCollection
+
+// FactCollector is a type alias for spookytypesfacts.FactCollector
+type FactCollector = spookytypesfacts.FactCollector
 
 // =============================================================================
 // Logging Types

@@ -225,59 +225,70 @@ facts {
 func createDefaultLoggingConfig(configDir string) error {
 	content := `# Global logging configuration for spooky
 # This file configures logging behavior for all spooky operations
+# 
+# Default behavior (when this file doesn't exist or is empty):
+# - Log level: error (only errors are shown)
+# - Format: json (structured logging)
+# - Output: null (no logging output to terminal)
 
-logging {
-  # Log level (debug, info, warn, error, fatal)
-  level = "info"
-  
-  # Output format (json, text, structured)
-  format = "json"
-  
-  # Output destination (stdout, stderr, file, null)
-  output = "stderr"
-  
-  # File output configuration (used when output = "file")
-  # file {
-  #   path        = "/var/log/spooky/spooky.log"
-  #   permissions = "0644"
-  #   append      = true
-  # }
-  
-  # Component-specific filtering
-  filtering {
-    components = {
-      # "ssh"     = "debug"
-      # "facts"   = "info"
-      # "actions" = "warn"
-    }
-  }
-  
-  # Performance optimization
-  performance {
-    buffer {
-      enabled        = false
-      size           = 4096
-      flush_interval = "1s"
-    }
-    
-    async {
-      enabled       = false
-      queue_size    = 1000
-      workers       = 1
-      drop_when_full = false
-    }
-  }
-  
-  # Log rotation (when using file output)
-  # rotation {
-  #   enabled      = true
-  #   max_size     = "100MB"
-  #   max_age      = "30d"
-  #   max_backups  = 5
-  #   compress     = true
-  #   local_time   = false
-  # }
-}
+# Uncomment and modify the settings below to customize logging behavior:
+
+# logging {
+#   # Log level (debug, info, warn, error, fatal)
+#   # Default: error (only show errors)
+#   level = "error"
+#   
+#   # Output format (json, text, structured)
+#   # Default: json (structured logging)
+#   format = "json"
+#   
+#   # Output destination (stdout, stderr, file, null)
+#   # Default: null (no output to terminal)
+#   # Options: stdout, stderr, file, null
+#   output = "null"
+#   
+#   # File output configuration (used when output = "file")
+#   # file {
+#   #   path        = "/var/log/spooky/spooky.log"
+#   #   permissions = "0644"
+#   #   append      = true
+#   # }
+#   
+#   # Component-specific filtering
+#   # filtering {
+#   #   components = {
+#   #     "ssh"     = "debug"
+#   #     "facts"   = "info"
+#   #     "actions" = "warn"
+#   #   }
+#   # }
+#   
+#   # Performance optimization
+#   # performance {
+#   #   buffer {
+#   #     enabled        = false
+#   #     size           = 4096
+#   #     flush_interval = "1s"
+#   #   }
+#   #   
+#   #   async {
+#   #     enabled       = false
+#   #     queue_size    = 1000
+#   #     workers       = 1
+#   #     drop_when_full = false
+#   #   }
+#   # }
+#   
+#   # Log rotation (when using file output)
+#   # rotation {
+#   #   enabled      = true
+#   #   max_size     = "100MB"
+#   #   max_age      = "30d"
+#   #   max_backups  = 5
+#   #   compress     = true
+#   #   local_time   = false
+#   # }
+# }
 `
 
 	configPath := filepath.Join(configDir, "logging.hcl")

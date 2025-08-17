@@ -33,8 +33,8 @@ func NewMockSystemFactCollector() *MockSystemFactCollector {
 	}
 }
 
-func (m *MockFactCollector) Collect(_ context.Context, _ *spookytypes.Machine) (*spookytypesfacts.FactCollection, error) {
-	return &spookytypesfacts.FactCollection{
+func (m *MockFactCollector) Collect(_ context.Context, machine interface{}) (*spookytypes.FactCollection, error) {
+	return &spookytypes.FactCollection{
 		MachineID:   "a1b2c3d4e5f678901234567890123456", // Valid 32-character hex string
 		CollectedAt: time.Now(),
 		Facts: &spookytypesfacts.Facts{
@@ -65,7 +65,7 @@ func (m *MockFactCollector) Collect(_ context.Context, _ *spookytypes.Machine) (
 	}, nil
 }
 
-func (m *MockFactCollector) CollectViaSSH(_ context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error) {
+func (m *MockFactCollector) CollectViaSSH(_ context.Context, machine *spookytypes.Machine) (*spookytypes.FactCollection, error) {
 	// Return the same mock data for SSH collection
 	return m.Collect(context.Background(), machine)
 }

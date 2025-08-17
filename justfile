@@ -61,17 +61,20 @@ lint:
     @echo "Running linter..."
     golangci-lint run --timeout=5m
 
+# Run terminology checker
+lint-terminology:
+    @echo "Running terminology checker..."
+    @cd tools/terminology-checker && just run
+
 # Run linter on each file individually and capture TODOs (AI-optimized)
 lint-todos:
     @echo "Running AI-optimized file-by-file linting analysis..."
-    @mkdir -p docs/plans
-    @OUTPUT_FILE=docs/plans/linting-todos-$(date +%Y-%m-%d-%H-%M-%S).md go run scripts/lint-todos.go
+    @cd tools/todo-linter && just run
 
 # Run AI-optimized linter on a specific file
 lint-file file:
     @echo "Running AI-optimized linter on {{file}}..."
-    @mkdir -p docs/plans
-    @OUTPUT_FILE=docs/plans/linting-todos-$(date +%Y-%m-%d-%H-%M-%S).md LINT_FILE={{file}} go run scripts/lint-todos.go
+    @cd tools/todo-linter && LINT_FILE={{file}} just run
 
 
 
@@ -92,7 +95,7 @@ check-deps:
     @bash -c 'if [ -n "$$(git status --porcelain)" ]; then echo "go.mod or go.sum has uncommitted changes. Please run '\''go mod tidy'\''"; git status; exit 1; fi; echo "Dependencies are clean"'
 
 # Run all checks (lint, format, deps, tests)
-check: check-fmt check-deps lint test
+check: check-fmt check-deps lint lint-terminology test
 
 # Install development tools
 install-tools:
@@ -168,6 +171,86 @@ git-info:
     @echo "Current branch: $(git branch --show-current 2>/dev/null || echo 'unknown')"
     @echo "Current commit: $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
     @echo "Commit message: $(git log -1 --pretty=format:'%s' 2>/dev/null || echo 'unknown')"
+
+# Generate Architecture Decision Records from git history
+generate-adrs:
+    @echo "Generating Architecture Decision Records..."
+    @cd tools/adr-generator && just run
+    @echo "ADRs generated in docs/adr/data/"
+
+# Analyze git history for potential ADRs
+analyze-git-adrs:
+    @echo "Analyzing git history for potential ADRs..."
+    @cd tools/git-adr-analyzer && just run
+    @echo "Analysis complete. Check docs/adr/analysis/git-analysis.md"
+
+# Generate focused ADR recommendations
+focused-adr-analysis:
+    @echo "Generating focused ADR recommendations..."
+    @cd tools/focused-adr-analyzer && just run
+    @echo "Analysis complete. Check docs/adr/recommendations/focused-adr-recommendations.md"
+
+# Generate comprehensive git analysis
+analyze-git-comprehensive:
+    @echo "Generating comprehensive git analysis..."
+    @cd tools/git-adr-analyzer && just run
+    @echo "Analysis complete. Check docs/adr/analysis/git-analysis.md"
+
+# Generate simple ADRs with full paths
+generate-adrs-simple:
+    @echo "Generating simple ADRs..."
+    @cd tools/simple-adr-generator && just run
+    @echo "ADRs generated in docs/adr/"
+
+# Generate dependency graphs
+dependency-graph:
+    @echo "Generating dependency graphs..."
+    cd tools/dependency-graph && just analyze
+    @echo "Dependency graphs generated in docs/dependencies/"
+
+# Generate specific dependency graph
+dependency-graph-package pkg:
+    @echo "Generating dependency graph for package: {{pkg}}"
+    cd tools/dependency-graph && just package {{pkg}}
+    @echo "Package dependency graph generated in docs/dependencies/"
+
+# Generate interface dependency graph
+dependency-graph-interface:
+    @echo "Generating interface dependency graph..."
+    cd tools/dependency-graph && just interface
+    @echo "Interface dependency graph generated in docs/dependencies/"
+
+# Generate type dependency graph
+dependency-graph-type:
+    @echo "Generating type dependency graph..."
+    cd tools/dependency-graph && just type
+    @echo "Type dependency graph generated in docs/dependencies/"
+
+# Generate function dependency graph
+dependency-graph-function:
+    @echo "Generating function dependency graph..."
+    cd tools/dependency-graph && just function
+    @echo "Function dependency graph generated in docs/dependencies/"
+
+# Build all developer tools
+build-tools:
+    @echo "Building all developer tools..."
+    @cd tools && just build
+
+# Run all developer tools
+run-tools:
+    @echo "Running all developer tools..."
+    @cd tools && just run-all
+
+# Clean all developer tools
+clean-tools:
+    @echo "Cleaning all developer tools..."
+    @cd tools && just clean
+
+# Show tools help
+tools-help:
+    @echo "Developer Tools Help:"
+    @cd tools && just help
 
 # Development workflow: build, test, and show version
 dev: build test version

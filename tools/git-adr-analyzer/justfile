@@ -1,0 +1,29 @@
+# Git ADR Analyzer Tool
+# Analyzes ADRs from Git history
+
+# Build the tool
+build:
+    @echo "Building Git ADR analyzer tool..."
+    go build -o git-adr-analyzer main.go
+
+# Run the tool
+run: build
+    @echo "Analyzing ADRs from Git history..."
+    ./git-adr-analyzer
+
+# Clean build artifacts
+clean:
+    @echo "Cleaning build artifacts..."
+    rm -f git-adr-analyzer
+
+# Show help
+help:
+    @echo "Git ADR Analyzer Tool"
+    @echo ""
+    @echo "Purpose: Analyze ADRs from Git history"
+    @echo ""
+    @echo "Commands:"
+    @echo "  build   - Build the tool"
+    @echo "  run     - Analyze ADRs from Git history"
+    @echo "  clean   - Clean build artifacts"
+    @echo "  help    - Show this help"

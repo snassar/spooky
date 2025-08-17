@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	spookyinterfaces "spooky/internal/interfaces"
+	spookyschemas "spooky/internal/schemas"
 	spookytypes "spooky/internal/types"
 	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesproject "spooky/internal/types/project"
@@ -35,9 +36,9 @@ func NewManager(
 	}
 }
 
-// Initialize initializes a new project
+// Initialize initializes a new project using schema-driven approach
 func (m *Manager) Initialize(_ context.Context, projectPath string) (*spookytypes.Project, error) {
-	m.logger.Info("Initializing new project", map[string]interface{}{
+	m.logger.Info("Initializing new project with schema-driven approach", map[string]interface{}{
 		"project_path": projectPath,
 	})
 
@@ -57,27 +58,16 @@ func (m *Manager) Initialize(_ context.Context, projectPath string) (*spookytype
 		return nil, fmt.Errorf("failed to create project directory: %w", err)
 	}
 
-	// Create required directories according to project-directory.schema.hcl
-	requiredDirs := []string{
-		// No required directories
-	}
-	for _, dir := range requiredDirs {
-		dirPath := filepath.Join(absPath, dir)
-		if err := os.MkdirAll(dirPath, 0o755); err != nil {
-			return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
-		}
+	// Parse project directory schema
+	schemaParser := spookyschemas.NewProjectDirectorySchemaParser(m.logger)
+	schema, err := schemaParser.ParseProjectDirectorySchema()
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse project directory schema: %w", err)
 	}
 
-	// Create optional but commonly useful directories
-	optionalDirs := []string{
-		"files", // Optional but useful for static files
-		"logs",  // Optional but useful for log files
-	}
-	for _, dir := range optionalDirs {
-		dirPath := filepath.Join(absPath, dir)
-		if err := os.MkdirAll(dirPath, 0o755); err != nil {
-			return nil, fmt.Errorf("failed to create directory %s: %w", dir, err)
-		}
+	// Create project structure based on schema
+	if err := m.createProjectFromSchema(absPath, schema); err != nil {
+		return nil, fmt.Errorf("failed to create project from schema: %w", err)
 	}
 
 	// Create default project configuration
@@ -113,12 +103,185 @@ func (m *Manager) Initialize(_ context.Context, projectPath string) (*spookytype
 		return nil, fmt.Errorf("failed to create README.md: %w", err)
 	}
 
-	m.logger.Info("Project initialized successfully", map[string]interface{}{
+	m.logger.Info("Project initialized successfully with schema-driven approach", map[string]interface{}{
 		"project_path": absPath,
 		"project_name": projectName,
 	})
 
 	return project, nil
+}
+
+// createProjectFromSchema creates project structure based on the schema
+func (m *Manager) createProjectFromSchema(projectPath string, schema *spookyschemas.ProjectDirectorySchema) error {
+	m.logger.Debug("Creating project structure from schema", map[string]interface{}{
+		"project_path": projectPath,
+	})
+
+	// Create required directories from schema
+	for _, dir := range schema.GetRequiredDirectories() {
+		dirPath := filepath.Join(projectPath, dir.Name)
+		if err := os.MkdirAll(dirPath, 0o755); err != nil {
+			return fmt.Errorf("failed to create required directory %s: %w", dir.Name, err)
+		}
+		m.logger.Debug("Created required directory", map[string]interface{}{
+			"directory": dir.Name,
+			"path":      dirPath,
+		})
+	}
+
+	// Create optional directories from schema (with user choice)
+	for _, dir := range schema.GetOptionalDirectories() {
+		if schema.ShouldCreateOptionalDirectory(dir) {
+			dirPath := filepath.Join(projectPath, dir.Name)
+			if err := os.MkdirAll(dirPath, 0o755); err != nil {
+				return fmt.Errorf("failed to create optional directory %s: %w", dir.Name, err)
+			}
+			m.logger.Debug("Created optional directory", map[string]interface{}{
+				"directory":   dir.Name,
+				"path":        dirPath,
+				"description": dir.Description,
+			})
+		}
+	}
+
+	// Create required files from schema
+	for _, file := range schema.GetRequiredFiles() {
+		if err := m.createFileFromSchema(projectPath, file); err != nil {
+			return fmt.Errorf("failed to create required file %s: %w", file.Name, err)
+		}
+	}
+
+	// Create optional files from schema (with user choice)
+	for _, file := range schema.GetOptionalFiles() {
+		if schema.ShouldCreateOptionalFile(file) {
+			if err := m.createFileFromSchema(projectPath, file); err != nil {
+				return fmt.Errorf("failed to create optional file %s: %w", file.Name, err)
+			}
+		}
+	}
+
+	m.logger.Info("Project structure created from schema successfully", map[string]interface{}{
+		"project_path": projectPath,
+	})
+
+	return nil
+}
+
+// createFileFromSchema creates a file based on schema definition
+func (m *Manager) createFileFromSchema(projectPath string, file spookyschemas.SchemaFile) error {
+	filePath := filepath.Join(projectPath, file.Name)
+
+	// Skip if file already exists
+	if _, err := os.Stat(filePath); err == nil {
+		m.logger.Debug("File already exists, skipping", map[string]interface{}{
+			"file": file.Name,
+			"path": filePath,
+		})
+		return nil
+	}
+
+	// Create file based on type
+	switch file.Name {
+	case "README.md":
+		// README.md will be created by createREADME method
+		return nil
+	case "project.hcl":
+		// project.hcl will be created by createProjectHCL method
+		return nil
+	case "machines.hcl":
+		return m.createMachinesHCL(filePath)
+	case "actions.hcl":
+		return m.createActionsHCL(filePath)
+	case "variables.hcl":
+		return m.createVariablesHCL(filePath)
+	case "recipients.txt":
+		return m.createRecipientsTXT(filePath)
+	default:
+		// Create empty file for other types
+		if err := os.WriteFile(filePath, []byte(""), 0o644); err != nil {
+			return fmt.Errorf("failed to create file %s: %w", file.Name, err)
+		}
+		m.logger.Debug("Created file from schema", map[string]interface{}{
+			"file":        file.Name,
+			"path":        filePath,
+			"description": file.Description,
+		})
+		return nil
+	}
+}
+
+// createMachinesHCL creates a default machines.hcl file
+func (m *Manager) createMachinesHCL(filePath string) error {
+	content := `# Machine inventory for spooky project
+# Define your machines here
+
+machines {
+  # Example machine definition
+  # machine "web-server" {
+  #   hostname = "web.example.com"
+  #   port = 22
+  #   user = "admin"
+  #   
+  #   authentication {
+  #     method = "ssh_key"
+  #     key_path = "~/.ssh/id_rsa"
+  #   }
+  #   
+  #   tags = ["web", "production"]
+  # }
+}
+`
+	return os.WriteFile(filePath, []byte(content), 0o644)
+}
+
+// createActionsHCL creates a default actions.hcl file
+func (m *Manager) createActionsHCL(filePath string) error {
+	content := `# Actions for spooky project
+# Define your actions here
+
+actions {
+  # Example action definition
+  # action "deploy-web" {
+  #   description = "Deploy web application"
+  #   
+  #   machines = ["web-server"]
+  #   parallel = true
+  #   
+  #   template {
+  #     source = "templates/deploy.sh.tmpl"
+  #     destination = "/tmp/deploy.sh"
+  #     permissions = "0755"
+  #   }
+  #   
+  #   command = "/tmp/deploy.sh"
+  # }
+}
+`
+	return os.WriteFile(filePath, []byte(content), 0o644)
+}
+
+// createVariablesHCL creates a default variables.hcl file
+func (m *Manager) createVariablesHCL(filePath string) error {
+	content := `# Variables for spooky project
+# Define your variables here
+
+variables {
+  # Example variable definitions
+  # app_version = "1.0.0"
+  # environment = "production"
+  # backup_retention_days = 30
+}
+`
+	return os.WriteFile(filePath, []byte(content), 0o644)
+}
+
+// createRecipientsTXT creates a default recipients.txt file
+func (m *Manager) createRecipientsTXT(filePath string) error {
+	content := `# Age recipients for this project
+# Add your age public keys here (one per line)
+# Example: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
+`
+	return os.WriteFile(filePath, []byte(content), 0o644)
 }
 
 // Load loads a project from the given path
@@ -223,15 +386,17 @@ func (m *Manager) createProjectHCL(project *spookytypes.Project) error {
   name = "{{.Name}}"
   description = "{{.Description}}"
   {{- if .Metadata}}
-  {{- if .Metadata.Version}}
-  version = "{{.Metadata.Version}}"
-  {{- end}}
-  {{- if .Metadata.Author}}
-  author = "{{.Metadata.Author}}"
-  {{- end}}
-  {{- if .Metadata.URL}}
-  url = "{{.Metadata.URL}}"
-  {{- end}}
+  metadata {
+    {{- if .Metadata.Version}}
+    version = "{{.Metadata.Version}}"
+    {{- end}}
+    {{- if .Metadata.Author}}
+    author = "{{.Metadata.Author}}"
+    {{- end}}
+    {{- if .Metadata.URL}}
+    url = "{{.Metadata.URL}}"
+    {{- end}}
+  }
   {{- end}}
 
   {{- if .Settings}}

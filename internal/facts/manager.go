@@ -9,9 +9,11 @@ import (
 	"time"
 
 	spookyinterfaces "spooky/internal/interfaces"
+	spookyschemas "spooky/internal/schemas"
 	spookysecrets "spooky/internal/secrets"
 	spookytypes "spooky/internal/types"
 	spookytypesfacts "spooky/internal/types/facts"
+	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesschemas "spooky/internal/types/schemas"
 
 	"github.com/hashicorp/hcl/v2/hclwrite"
@@ -20,50 +22,85 @@ import (
 
 // Manager implements FactManager
 type Manager struct {
-	collector FactCollector
-	validator spookytypesschemas.SchemaValidator
-	logger    spookytypes.Logger
+	collector             spookytypes.FactCollector
+	schemaDrivenValidator *spookyschemas.SchemaDrivenValidator
+	enhancedValidator     *spookyschemas.EnhancedValidator
+	logger                spookytypeslogging.Logger
 }
 
 // NewManager creates a new fact manager
 func NewManager(
-	collector FactCollector,
-	validator spookytypesschemas.SchemaValidator,
-	logger spookytypes.Logger,
+	collector spookytypes.FactCollector,
+	logger spookytypeslogging.Logger,
 ) *Manager {
+	// Create schema-driven validator for fact configuration validation
+	schemaDrivenConfig := &spookyschemas.SchemaDrivenValidationConfig{
+		UseEmbeddedSchemas: true,
+		StrictValidation:   true,
+		AllowUnknownFields: false,
+		DetailedErrors:     true,
+	}
+	schemaDrivenValidator := spookyschemas.NewSchemaDrivenValidator(logger, schemaDrivenConfig)
+
+	// Create enhanced validator for fact data validation
+	enhancedConfig := &spookyschemas.ValidationConfig{
+		Mode: spookyschemas.ValidationModeStrict,
+		ErrorHandling: &spookyschemas.ErrorHandlingConfig{
+			StopOnFirstError:   false,
+			MaxErrors:          100,
+			IncludeWarnings:    true,
+			IncludeContext:     true,
+			IncludeSuggestions: true,
+		},
+		Evolution: &spookyschemas.EvolutionConfig{
+			EnableTracking:  true,
+			AllowDeprecated: true,
+			WarnDeprecated:  true,
+			AllowBreaking:   false,
+		},
+	}
+	enhancedValidator := spookyschemas.NewEnhancedValidator(enhancedConfig)
+
 	return &Manager{
-		collector: collector,
-		validator: validator,
-		logger:    logger,
+		collector:             collector,
+		schemaDrivenValidator: schemaDrivenValidator,
+		enhancedValidator:     enhancedValidator,
+		logger:                logger,
 	}
 }
 
 // CollectFacts collects facts from the given machine
-func (m *Manager) CollectFacts(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error) {
+func (m *Manager) CollectFacts(ctx context.Context, machine interface{}) (*spookytypes.FactCollection, error) {
 	if machine == nil {
 		return nil, fmt.Errorf("machine cannot be nil")
 	}
 
+	// Type assert to get machine details
+	machineObj, ok := machine.(*spookytypes.Machine)
+	if !ok {
+		return nil, fmt.Errorf("machine must be of type *spookytypes.Machine")
+	}
+
 	m.logger.Info("Collecting facts", map[string]interface{}{
-		"machine": machine.Hostname,
-		"host":    machine.Host,
+		"machine": machineObj.Hostname,
+		"host":    machineObj.Host,
 	})
 
 	// Determine collection method based on machine configuration
-	if machine.Host != "" && machine.Host != "localhost" && machine.Host != "127.0.0.1" {
+	if machineObj.Host != "" && machineObj.Host != "localhost" && machineObj.Host != "127.0.0.1" {
 		// Remote machine - use SSH-based collection
-		return m.collectFactsViaSSH(ctx, machine)
+		return m.collectFactsViaSSH(ctx, machineObj)
 	}
 
 	// Local machine - use local collection
-	facts, err := m.collector.Collect(ctx, machine)
+	facts, err := m.collector.Collect(ctx, machineObj)
 	if err != nil {
-		m.logger.Error("Failed to collect facts", err, map[string]interface{}{"machine": machine.Hostname})
-		return nil, fmt.Errorf("failed to collect facts for %s: %w", machine.Hostname, err)
+		m.logger.Error("Failed to collect facts", err, map[string]interface{}{"machine": machineObj.Hostname})
+		return nil, fmt.Errorf("failed to collect facts for %s: %w", machineObj.Hostname, err)
 	}
 
 	m.logger.Info("Successfully collected facts", map[string]interface{}{
-		"machine":   machine.Hostname,
+		"machine":   machineObj.Hostname,
 		"collector": m.collector.GetName(),
 	})
 
@@ -71,7 +108,7 @@ func (m *Manager) CollectFacts(ctx context.Context, machine *spookytypes.Machine
 }
 
 // collectFactsViaSSH collects facts from remote machine via SSH
-func (m *Manager) collectFactsViaSSH(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error) {
+func (m *Manager) collectFactsViaSSH(ctx context.Context, machine *spookytypes.Machine) (*spookytypes.FactCollection, error) {
 	m.logger.Info("Collecting facts via SSH", map[string]interface{}{
 		"machine": machine.Hostname,
 		"host":    machine.Host,
@@ -79,7 +116,7 @@ func (m *Manager) collectFactsViaSSH(ctx context.Context, machine *spookytypes.M
 
 	// Get SSH-capable collector
 	sshCollector, ok := m.collector.(interface {
-		CollectViaSSH(context.Context, *spookytypes.Machine) (*spookytypesfacts.FactCollection, error)
+		CollectViaSSH(context.Context, *spookytypes.Machine) (*spookytypes.FactCollection, error)
 	})
 	if !ok {
 		return nil, fmt.Errorf("collector does not support SSH operations")
@@ -104,66 +141,102 @@ func (m *Manager) collectFactsViaSSH(ctx context.Context, machine *spookytypes.M
 }
 
 // GetCollector returns the underlying collector for SSH operations
-func (m *Manager) GetCollector() FactCollector {
+func (m *Manager) GetCollector() spookytypes.FactCollector {
 	return m.collector
 }
 
-// ValidateFacts validates facts against schema
-func (m *Manager) ValidateFacts(_ context.Context, facts *spookytypesfacts.FactCollection) (*spookytypes.ValidationResult, error) {
-	if facts == nil {
-		return &spookytypes.ValidationResult{
-			Valid:    false,
-			Errors:   []spookytypesschemas.SchemaError{{Message: "facts cannot be nil"}},
-			Warnings: []spookytypesschemas.SchemaError{},
-		}, nil
+// ValidateFacts validates fact collection using schema validators
+func (m *Manager) ValidateFacts(ctx context.Context, facts *spookytypes.FactCollection) (interface{}, error) {
+	m.logger.Info("Validating facts", map[string]interface{}{
+		"machine_id": facts.MachineID,
+	})
+
+	// Get facts schema for enhanced validation
+	factsSchema, err := m.getFactsSchema()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get facts schema: %w", err)
 	}
 
-	// Basic validation
-	var errors []spookytypesschemas.SchemaError
-	var warnings []spookytypesschemas.SchemaError
+	// Use enhanced validator for comprehensive fact validation
+	result, err := m.enhancedValidator.ValidateWithEnhancedFeatures(ctx, factsSchema, facts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate facts with enhanced validator: %w", err)
+	}
 
+	// Add additional custom validation for fact-specific rules
+	m.addCustomFactValidation(facts, result)
+
+	return result, nil
+}
+
+// getFactsSchema gets the facts schema for validation
+func (m *Manager) getFactsSchema() (*spookytypesschemas.Schema, error) {
+	// Try to get schema from embedded schemas first
+	if schema, err := m.schemaDrivenValidator.GetEmbeddedSchema("facts"); err == nil {
+		return schema, nil
+	}
+
+	// Fallback: create a basic facts schema
+	return &spookytypesschemas.Schema{
+		Name:        "facts",
+		Type:        "hcl",
+		Version:     "1.0",
+		Description: "Facts collection schema",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Content:     "", // Will be loaded from file if needed
+		Metadata:    make(map[string]interface{}),
+	}, nil
+}
+
+// addCustomFactValidation adds custom validation rules specific to facts
+func (m *Manager) addCustomFactValidation(facts *spookytypes.FactCollection, result *spookytypesschemas.ValidationResult) {
 	// Validate machine ID
 	if facts.MachineID == "" {
-		errors = append(errors, spookytypesschemas.SchemaError{Message: "machine_id is required"})
-	} else if !isValidMachineID(facts.MachineID) {
-		errors = append(errors, spookytypesschemas.SchemaError{Message: "machine_id must be a 32-character hexadecimal string"})
+		m.addSchemaError(result, "missing_machine_id", "Machine ID is required", "error")
 	}
 
-	// Validate collection timestamp
+	// Validate fact collection timestamp
 	if facts.CollectedAt.IsZero() {
-		errors = append(errors, spookytypesschemas.SchemaError{Message: "collected_at is required"})
+		m.addSchemaError(result, "missing_collection_timestamp", "Collection timestamp is required", "error")
 	}
 
 	// Validate facts structure
 	if facts.Facts == nil {
-		errors = append(errors, spookytypesschemas.SchemaError{Message: "facts structure is required"})
-	} else {
-		// Validate system facts
-		if facts.Facts.System == nil {
-			errors = append(errors, spookytypesschemas.SchemaError{Message: "system facts are required"})
-		} else {
-			if facts.Facts.System.OS == nil {
-				errors = append(errors, spookytypesschemas.SchemaError{Message: "system.os facts are required"})
-			}
-			if facts.Facts.System.Hardware == nil {
-				errors = append(errors, spookytypesschemas.SchemaError{Message: "system.hardware facts are required"})
-			}
-			if facts.Facts.System.Network == nil {
-				errors = append(errors, spookytypesschemas.SchemaError{Message: "system.network facts are required"})
-			}
-		}
+		m.addSchemaError(result, "missing_facts_structure", "Facts structure is required", "error")
+		return
 	}
 
-	// Schema validation would be implemented here using the validator
-	// For now, we'll do basic validation
+	// Validate system facts
+	if facts.Facts.System == nil {
+		m.addSchemaError(result, "missing_system_facts", "System facts are required", "error")
+	} else {
+		// Validate OS facts
+		if facts.Facts.System.OS == nil {
+			m.addSchemaError(result, "missing_os_facts", "OS facts are required", "error")
+		}
 
-	valid := len(errors) == 0
+		// Validate hardware facts
+		if facts.Facts.System.Hardware == nil {
+			m.addSchemaError(result, "missing_hardware_facts", "Hardware facts are required", "error")
+		}
 
-	return &spookytypes.ValidationResult{
-		Valid:    valid,
-		Errors:   errors,
-		Warnings: warnings,
-	}, nil
+		// Validate network facts
+		if facts.Facts.System.Network == nil {
+			m.addSchemaError(result, "missing_network_facts", "Network facts are required", "error")
+		}
+	}
+}
+
+// addSchemaError adds a schema error to the validation result
+func (m *Manager) addSchemaError(result *spookytypesschemas.ValidationResult, code, message, severity string) {
+	schemaError := spookytypesschemas.SchemaError{
+		Code:     code,
+		Message:  message,
+		Severity: severity,
+	}
+	result.Errors = append(result.Errors, schemaError)
+	result.Valid = false
 }
 
 // ExportFacts exports facts to the given format
@@ -175,7 +248,7 @@ func (m *Manager) ExportFacts(ctx context.Context, machineIDs []string, format, 
 	})
 
 	// Collect facts for the specified machines
-	var allFacts []*spookytypesfacts.FactCollection
+	var allFacts []*spookytypes.FactCollection
 	for _, machineID := range machineIDs {
 		facts, err := m.CollectFacts(ctx, &spookytypes.Machine{Hostname: machineID})
 		if err != nil {
@@ -199,7 +272,7 @@ func (m *Manager) ExportFacts(ctx context.Context, machineIDs []string, format, 
 }
 
 // exportToJSON exports facts to JSON format following facts-structure.schema.hcl
-func (m *Manager) exportToJSON(facts []*spookytypesfacts.FactCollection, outputPath string) error {
+func (m *Manager) exportToJSON(facts []*spookytypes.FactCollection, outputPath string) error {
 	// Export each fact collection individually following the schema structure
 	var exportData []map[string]interface{}
 
@@ -232,7 +305,7 @@ func (m *Manager) exportToJSON(facts []*spookytypesfacts.FactCollection, outputP
 }
 
 // exportToHCL exports facts to HCL format following facts-structure.schema.hcl
-func (m *Manager) exportToHCL(facts []*spookytypesfacts.FactCollection, outputPath string) error {
+func (m *Manager) exportToHCL(facts []*spookytypes.FactCollection, outputPath string) error {
 	file := hclwrite.NewEmptyFile()
 	rootBody := file.Body()
 
@@ -256,7 +329,7 @@ func (m *Manager) exportToHCL(facts []*spookytypesfacts.FactCollection, outputPa
 }
 
 // addFactStructureToHCL adds a fact structure block to the HCL body
-func (m *Manager) addFactStructureToHCL(rootBody *hclwrite.Body, fact *spookytypesfacts.FactCollection) {
+func (m *Manager) addFactStructureToHCL(rootBody *hclwrite.Body, fact *spookytypes.FactCollection) {
 	// Create facts_structure block
 	factsStructureBlock := rootBody.AppendNewBlock("facts_structure", nil)
 	factsStructureBody := factsStructureBlock.Body()
@@ -428,6 +501,10 @@ func (m *Manager) addNetworkInterfacesToHCL(networkBody *hclwrite.Body, interfac
 
 // CollectAndStoreFacts collects facts for a machine (in-memory only)
 func (m *Manager) CollectAndStoreFacts(ctx context.Context, machine *spookytypes.Machine) error {
+	if machine == nil {
+		return fmt.Errorf("machine cannot be nil")
+	}
+
 	// Collect facts
 	facts, err := m.CollectFacts(ctx, machine)
 	if err != nil {
@@ -440,8 +517,11 @@ func (m *Manager) CollectAndStoreFacts(ctx context.Context, machine *spookytypes
 		return fmt.Errorf("facts validation failed: %w", err)
 	}
 
-	if !validationResult.Valid {
-		return fmt.Errorf("facts validation failed: %v", validationResult.Errors)
+	// Type assert validation result
+	if result, ok := validationResult.(*spookytypesschemas.ValidationResult); ok {
+		if !result.Valid {
+			return fmt.Errorf("facts validation failed: %v", result.Errors)
+		}
 	}
 
 	// Facts are stored in memory for the duration of the operation
@@ -509,7 +589,7 @@ func (m *Manager) GetStorageStats() (map[string]interface{}, error) {
 }
 
 // GetFacts retrieves facts for a specific machine (collects on demand)
-func (m *Manager) GetFacts(ctx context.Context, machineID string) (*spookytypesfacts.FactCollection, error) {
+func (m *Manager) GetFacts(ctx context.Context, machineID string) (*spookytypes.FactCollection, error) {
 	m.logger.Info("Getting facts for machine", map[string]interface{}{
 		"machine": machineID,
 	})
@@ -520,10 +600,10 @@ func (m *Manager) GetFacts(ctx context.Context, machineID string) (*spookytypesf
 
 // FactExport represents exported facts data
 type FactExport struct {
-	ExportedAt   time.Time                                   `json:"exported_at"`
-	Format       string                                      `json:"format"`
-	MachineCount int                                         `json:"machine_count"`
-	Facts        map[string]*spookytypesfacts.FactCollection `json:"facts"`
+	ExportedAt   time.Time                              `json:"exported_at"`
+	Format       string                                 `json:"format"`
+	MachineCount int                                    `json:"machine_count"`
+	Facts        map[string]*spookytypes.FactCollection `json:"facts"`
 }
 
 // ClearFacts removes all facts from memory
@@ -536,23 +616,8 @@ func (m *Manager) ClearFacts(_ context.Context) error {
 	return nil
 }
 
-// isValidMachineID validates machine ID format
-func isValidMachineID(machineID string) bool {
-	if len(machineID) != 32 {
-		return false
-	}
-
-	for _, char := range machineID {
-		if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f')) {
-			return false
-		}
-	}
-
-	return true
-}
-
 // DecryptFacts decrypts age-encrypted values in facts collection
-func (m *Manager) DecryptFacts(ctx context.Context, facts *spookytypesfacts.FactCollection, secretsIntegration spookyinterfaces.SecretsIntegration, identityPath string) error {
+func (m *Manager) DecryptFacts(ctx context.Context, facts *spookytypes.FactCollection, secretsIntegration spookyinterfaces.SecretsIntegration, identityPath string) error {
 	if facts == nil {
 		return fmt.Errorf("facts cannot be nil")
 	}

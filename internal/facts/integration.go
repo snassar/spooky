@@ -87,9 +87,9 @@ func (i *Integration) StoreFacts(_ context.Context, facts interface{}) error {
 	})
 
 	// Convert interface{} to FactCollection
-	factCollection, ok := facts.(*spookytypesfacts.FactCollection)
+	factCollection, ok := facts.(*spookytypes.FactCollection)
 	if !ok {
-		return fmt.Errorf("invalid facts type: expected *spookytypesfacts.FactCollection, got %T", facts)
+		return fmt.Errorf("invalid facts type: expected *spookytypes.FactCollection, got %T", facts)
 	}
 
 	// Store facts using the manager (collect and store)
@@ -125,11 +125,11 @@ func (i *Integration) ValidateFacts(ctx context.Context, facts interface{}) (*sp
 	})
 
 	// Convert interface{} to FactCollection
-	factCollection, ok := facts.(*spookytypesfacts.FactCollection)
+	factCollection, ok := facts.(*spookytypes.FactCollection)
 	if !ok {
 		return &spookytypes.ValidationResult{
 			Valid:    false,
-			Errors:   []spookytypesschemas.SchemaError{{Message: fmt.Sprintf("invalid facts type: expected *spookytypesfacts.FactCollection, got %T", facts)}},
+			Errors:   []spookytypesschemas.SchemaError{{Message: fmt.Sprintf("invalid facts type: expected *spookytypes.FactCollection, got %T", facts)}},
 			Warnings: []spookytypesschemas.SchemaError{},
 		}, nil
 	}
@@ -140,7 +140,17 @@ func (i *Integration) ValidateFacts(ctx context.Context, facts interface{}) (*sp
 		return nil, fmt.Errorf("failed to validate facts: %w", err)
 	}
 
-	return result, nil
+	// Type assert the result
+	if validationResult, ok := result.(*spookytypes.ValidationResult); ok {
+		return validationResult, nil
+	}
+
+	// Return a default validation result if type assertion fails
+	return &spookytypes.ValidationResult{
+		Valid:    false,
+		Errors:   []spookytypesschemas.SchemaError{{Message: "validation result type assertion failed"}},
+		Warnings: []spookytypesschemas.SchemaError{},
+	}, nil
 }
 
 // GetManager returns the underlying fact manager
@@ -163,9 +173,9 @@ func (i *Integration) DecryptFacts(ctx context.Context, facts interface{}, secre
 	})
 
 	// Convert interface{} to FactCollection
-	factCollection, ok := facts.(*spookytypesfacts.FactCollection)
+	factCollection, ok := facts.(*spookytypes.FactCollection)
 	if !ok {
-		return fmt.Errorf("invalid facts type: expected *spookytypesfacts.FactCollection, got %T", facts)
+		return fmt.Errorf("invalid facts type: expected *spookytypes.FactCollection, got %T", facts)
 	}
 
 	// Decrypt facts using the manager

@@ -55,13 +55,11 @@ func (m *MockFactStorage) GetStats() (map[string]interface{}, error) {
 
 func createTestManager(t *testing.T) *Manager {
 	collector := NewMockSystemFactCollector()
-	validator := &MockSchemaValidator{}
 	logger := &MockLogger{}
 
-	manager := NewManager(collector, validator, logger)
+	manager := NewManager(collector, logger)
 	assert.NotNil(t, manager)
 	assert.NotNil(t, manager.collector)
-	assert.NotNil(t, manager.validator)
 	assert.NotNil(t, manager.logger)
 
 	return manager

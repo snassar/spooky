@@ -10,6 +10,8 @@ This is a work-in-progress implementation of spooky. The CLI is now built using 
 
 The CLI is fully functional and supports comprehensive project management, machine inventory, variable management, and facts collection. For a complete reference of all available commands, see the [CLI Reference](docs/CLI_REFERENCE.md).
 
+> **Note**: Some systems have known issues and limitations. See [Known Issues](docs/KNOWN_ISSUES.md) for detailed information about current limitations and workarounds.
+
 **Available Command Categories:**
 - **Project Management**: `spooky project init`, `spooky project validate`
 - **Machine Inventory**: `spooky machines list`, `spooky machines validate`, `spooky machines ping`

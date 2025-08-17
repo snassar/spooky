@@ -9,6 +9,7 @@ import (
 	"time"
 
 	spookyinterfaces "spooky/internal/interfaces"
+	spookyschemas "spooky/internal/schemas"
 	spookytypes "spooky/internal/types"
 	spookytypescommon "spooky/internal/types/common"
 	spookytypeslogging "spooky/internal/types/logging"
@@ -17,13 +18,45 @@ import (
 
 // Validator implements the ProjectValidator interface
 type Validator struct {
-	logger spookytypeslogging.Logger
+	logger                spookytypeslogging.Logger
+	schemaDrivenValidator *spookyschemas.SchemaDrivenValidator
+	enhancedValidator     *spookyschemas.EnhancedValidator
 }
 
 // NewValidator creates a new ProjectValidator instance
 func NewValidator(logger spookytypeslogging.Logger) spookyinterfaces.ProjectValidator {
+	// Create schema-driven validator for project structure validation
+	schemaDrivenConfig := &spookyschemas.SchemaDrivenValidationConfig{
+		UseEmbeddedSchemas: true,
+		StrictValidation:   true,
+		AllowUnknownFields: false,
+		DetailedErrors:     true,
+	}
+	schemaDrivenValidator := spookyschemas.NewSchemaDrivenValidator(logger, schemaDrivenConfig)
+
+	// Create enhanced validator for configuration validation
+	enhancedConfig := &spookyschemas.ValidationConfig{
+		Mode: spookyschemas.ValidationModeStrict,
+		ErrorHandling: &spookyschemas.ErrorHandlingConfig{
+			StopOnFirstError:   false,
+			MaxErrors:          100,
+			IncludeWarnings:    true,
+			IncludeContext:     true,
+			IncludeSuggestions: true,
+		},
+		Evolution: &spookyschemas.EvolutionConfig{
+			EnableTracking:  true,
+			AllowDeprecated: true,
+			WarnDeprecated:  true,
+			AllowBreaking:   false,
+		},
+	}
+	enhancedValidator := spookyschemas.NewEnhancedValidator(enhancedConfig)
+
 	return &Validator{
-		logger: logger,
+		logger:                logger,
+		schemaDrivenValidator: schemaDrivenValidator,
+		enhancedValidator:     enhancedValidator,
 	}
 }
 
@@ -41,8 +74,8 @@ func (v *Validator) ValidateProject(ctx context.Context, project *spookytypes.Pr
 		Warnings:    []spookytypesschemas.SchemaError{},
 	}
 
-	// Validate project directory structure
-	dirResult, err := v.ValidateProjectDirectory(ctx, project.Path)
+	// Validate project directory structure using schema-driven validator
+	dirResult, err := v.schemaDrivenValidator.ValidateProjectStructure(ctx, project.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate project directory: %w", err)
 	}
@@ -54,9 +87,15 @@ func (v *Validator) ValidateProject(ctx context.Context, project *spookytypes.Pr
 	result.Errors = append(result.Errors, dirResult.Errors...)
 	result.Warnings = append(result.Warnings, dirResult.Warnings...)
 
-	// Validate project configuration
+	// Validate project configuration using enhanced validator
 	if project.Config != nil {
-		configResult, err := v.ValidateProjectConfig(ctx, project.Config)
+		// Get project schema for enhanced validation
+		projectSchema, err := v.getProjectSchema()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get project schema: %w", err)
+		}
+
+		configResult, err := v.enhancedValidator.ValidateWithEnhancedFeatures(ctx, projectSchema, project.Config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate project config: %w", err)
 		}
@@ -278,4 +317,24 @@ func (v *Validator) ValidateProjectConfig(_ context.Context, config *spookytypes
 	}
 
 	return result, nil
+}
+
+// getProjectSchema gets the project schema for validation
+func (v *Validator) getProjectSchema() (*spookytypesschemas.Schema, error) {
+	// Try to get schema from embedded schemas first
+	if schema, err := v.schemaDrivenValidator.GetEmbeddedSchema("project"); err == nil {
+		return schema, nil
+	}
+
+	// Fallback: create a basic schema
+	return &spookytypesschemas.Schema{
+		Name:        "project",
+		Type:        "hcl",
+		Version:     "1.0",
+		Description: "Project configuration schema",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Content:     "", // Will be loaded from file if needed
+		Metadata:    make(map[string]interface{}),
+	}, nil
 }

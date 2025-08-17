@@ -109,11 +109,11 @@ func (m *MockLogger) Error(msg string, err error, fields ...map[string]interface
 func (m *MockLogger) Fatal(msg string, err error, fields ...map[string]interface{}) {
 	fmt.Printf("FATAL: %s %v %+v\n", msg, err, fields)
 }
-func (m *MockLogger) WithFields(_ map[string]interface{}) spookytypeslogging.Logger { return m }
-func (m *MockLogger) WithComponent(_ string) spookytypeslogging.Logger              { return m }
-func (m *MockLogger) WithOperation(_ string) spookytypeslogging.Logger              { return m }
-func (m *MockLogger) SetLevel(_ spookytypeslogging.LogLevel)                        {}
-func (m *MockLogger) GetLevel() spookytypeslogging.LogLevel                         { return spookytypeslogging.LogLevelInfo }
+func (m *MockLogger) WithFields(_ map[string]interface{}) spookytypes.Logger { return m }
+func (m *MockLogger) WithComponent(_ string) spookytypes.Logger              { return m }
+func (m *MockLogger) WithOperation(_ string) spookytypes.Logger              { return m }
+func (m *MockLogger) SetLevel(_ spookytypes.LogLevel)                        {}
+func (m *MockLogger) GetLevel() spookytypes.LogLevel                         { return spookytypeslogging.LogLevelInfo }
 
 func TestDecryptHCLValues_ReplacesDecryptVariables(t *testing.T) {
 	// Create mock secrets integration

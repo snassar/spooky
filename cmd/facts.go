@@ -35,7 +35,7 @@ func InitializeFactsDependencies() error {
 
 	// Initialize facts components
 	collector := spookyfacts.NewSystemFactCollector(sshManager, factsLogger)
-	manager := spookyfacts.NewManager(collector, nil, factsLogger)
+	manager := spookyfacts.NewManager(collector, factsLogger)
 
 	// Create facts integration
 	factsManager = spookyfacts.NewIntegration(manager)

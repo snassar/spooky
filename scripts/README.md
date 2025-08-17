@@ -1,167 +1,60 @@
-# Linting Scripts
+# Scripts Directory
 
-This directory contains scripts for running golangci-lint on the spooky codebase in different ways to manage large numbers of linting issues.
+This directory contains shell scripts for build automation, deployment, and CI/CD processes.
 
-## Go Programs
+## Script Organization
 
-### `lint-todos.go` (AI-Optimized)
-A Go program that can handle both single file and batch linting with comprehensive reporting, **optimized for AI consumption**.
+The Go-based developer tools have been moved to the `tools/` directory. This directory now contains only shell scripts for:
 
-**Usage:**
-```bash
-# Lint all files and generate AI-optimized report
-go run scripts/lint-todos.go
+- Build automation
+- Deployment processes
+- CI/CD workflows
+- System administration tasks
 
-# Lint a single file
-LINT_FILE=./cmd/root.go go run scripts/lint-todos.go
+## Available Scripts
 
-# Customize output file
-OUTPUT_FILE=./docs/plans/lint-todos.md go run scripts/lint-todos.go
+### Build Scripts
+- `build.sh` - Main build automation script
+- `deploy.sh` - Deployment automation script
 
-# Adjust number of workers (default: CPU cores)
-LINT_WORKERS=4 go run scripts/lint-todos.go
+### CI/CD Scripts
+- `ci/` - Continuous integration and deployment scripts
 
-# Use fast mode (skips some linters for speed)
-LINT_FAST=true go run scripts/lint-todos.go
-```
-
-**AI-Optimized Features:**
-- **Issue Categorization** - Groups issues by type (typecheck, gocritic, etc.)
-- **Priority Classification** - High (build-breaking), Medium (code quality), Low (style)
-- **Actionable Fix Suggestions** - Specific code patterns and examples
-- **Batch Fix Opportunities** - Identifies issues that appear in multiple files
-- **Progress Tracking** - Shows completion status and recommended action plan
-- **Context & Dependencies** - File relationships and impact analysis
-- **Fix Patterns** - Common solutions with code examples
-- **Concurrent processing** - Uses all CPU cores for maximum speed
-- **Minimal output** - Only shows summary at the end
-
-**Generated Report Sections:**
-1. **📊 Summary Statistics** - Overview with priority breakdown
-2. **🏷️ Issue Categories** - Grouped by linter type with descriptions
-3. **📁 File-by-File Breakdown** - Detailed issues per file with priority levels
-4. **🔧 Batch Fix Opportunities** - Similar issues across multiple files
-5. **📈 Progress Tracking** - Current status and recommended action plan
-6. **🛠️ Common Fix Patterns** - Code examples for common issues
-
-## Just Targets
-
-The following just targets are available:
+## Usage
 
 ```bash
-# Run standard golangci-lint on entire codebase
-just lint
+# Run build script
+./scripts/build.sh
 
-# Run AI-optimized linter on each file individually and capture TODOs
-just lint-todos
+# Run deployment script
+./scripts/deploy.sh
 
-# Run linter on a specific file (Go program)
-just lint-file <file.go>
+# Run CI scripts
+./scripts/ci/setup.sh
 ```
 
-## Why File-by-File Linting?
+## Tool Integration
 
-When a codebase has many linting issues, running `golangci-lint run` on the entire codebase can:
+For Go-based developer tools, see the `tools/` directory:
 
-1. **Overwhelm the output** - Too many errors to process at once
-2. **Timeout** - golangci-lint may give up on large codebases
-3. **Make it hard to track progress** - Difficult to see what's been fixed
+```bash
+# Run developer tools
+just build-tools
+just run-tools
 
-File-by-file linting helps by:
-
-1. **Managing scope** - Focus on one file at a time
-2. **Tracking progress** - Clear indication of which files need work
-3. **Generating TODOs** - Structured output for systematic fixing
-4. **Avoiding timeouts** - Each file is processed independently
-
-## AI-Optimized Workflow
-
-The enhanced `lint-todos.go` program provides an AI-friendly workflow:
-
-### 1. **Issue Prioritization**
-- **🔴 High Priority**: Fix build-breaking issues first (typecheck errors)
-- **🟡 Medium Priority**: Address code quality issues (gocritic, govet)
-- **🟢 Low Priority**: Handle style and formatting issues last
-
-### 2. **Batch Processing**
-- Identify similar issues across multiple files
-- Apply systematic fixes using patterns
-- Use sed/find commands for bulk changes
-
-### 3. **Progress Tracking**
-- Monitor completion percentage
-- Track issues by priority level
-- Update status as fixes are applied
-
-### 4. **Fix Patterns**
-- Common solutions for each issue type
-- Code examples for implementation
-- Command-line tools for automation
-
-## Performance
-
-**Concurrent Processing:**
-- Uses worker pool pattern for maximum efficiency
-- Configurable number of workers (default: CPU cores)
-- ~2x speedup over sequential processing
-
-**Fast Mode:**
-- Use `LINT_FAST=true` to skip slower linters
-- Reduces processing time by ~30%
-- Still captures most important issues
-
-**Memory Usage:**
-- Processes files in memory-efficient batches
-- Minimal memory footprint per worker
-- Suitable for large codebases
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `LINT_CONFIG` | `.golangci.yml` | Path to golangci-lint config |
-| `OUTPUT_FILE` | `lint-todos.md` | Output file path |
-| `LINT_FILE` | `""` | Single file to lint (if set) |
-| `LINT_WORKERS` | `runtime.NumCPU()` | Number of concurrent workers |
-| `LINT_FAST` | `true` | Use fast mode (skip slow linters) |
-
-## Example Output
-
-The AI-optimized report includes:
-
-```markdown
-# Linting TODOs - AI-Optimized Report
-
-## 📊 Summary Statistics
-- **Total files processed:** 88
-- **Files with issues:** 54
-- **Total issues:** 223
-
-### Priority Breakdown
-- **🔴 High Priority (Build-breaking):** 149 issues (66.8%)
-- **🟡 Medium Priority (Code quality):** 73 issues (32.7%)
-- **🟢 Low Priority (Style):** 1 issues (0.4%)
-
-## 🏷️ Issue Categories
-### typecheck (103 issues)
-**Description:** Build-breaking errors that prevent compilation
-**Common Fix Patterns:**
-- Add missing import: `import "package/path"`
-- Define missing variable: `var variableName Type`
-
-## 🔧 Batch Fix Opportunities
-### Issues Found in Multiple Files
-#### revive (18 files)
-**Pattern:** unused-parameter: parameter 'ctx' seems to be unused
-**Affected files:**
-- internal/cli/commands/integrations.go:25
-- internal/integration/manager.go:140
-
-## 📈 Progress Tracking
-### Recommended Action Plan
-1. **🔴 Fix all High Priority issues first** (149 issues) - prevents compilation
-2. **🟡 Address Medium Priority issues** (73 issues) - improves code quality
-3. **🟢 Fix Low Priority issues** (1 issues) - style and formatting
+# Individual tools
+just --directory tools/dependency-graph run
+just --directory tools/todo-linter run
 ```
 
-This format makes it much easier for AI tools to understand the issues, prioritize fixes, and provide actionable solutions.
+## Migration Notes
+
+The following Go scripts were moved to `tools/` as individual tools:
+
+- `generate-adrs.go` → `tools/adr-generator/`
+- `analyze-git-adrs.go` → `tools/git-adr-analyzer/`
+- `focused-adr-analysis.go` → `tools/focused-adr-analyzer/`
+- `generate-adrs-simple.go` → `tools/simple-adr-generator/`
+- `lint-todos.go` → `tools/todo-linter/`
+
+Each tool now has its own justfile, documentation, and can be used independently or through the tools orchestration system.

@@ -24,15 +24,16 @@ import (
 
 // Manager provides enhanced template management functionality
 type Manager struct {
-	logger             spookytypeslogging.Logger
-	cache              TemplateCache
-	functions          TemplateFunctionRegistry
-	contextResolver    TemplateContextResolver
-	metadataManager    TemplateMetadataManager
-	validator          TemplateValidator
-	securityManager    TemplateSecurityManager
-	performanceManager TemplatePerformanceManager
-	mu                 sync.RWMutex
+	logger                spookytypeslogging.Logger
+	cache                 TemplateCache
+	functions             TemplateFunctionRegistry
+	contextResolver       TemplateContextResolver
+	metadataManager       TemplateMetadataManager
+	schemaDrivenValidator *spookyschemas.SchemaDrivenValidator
+	enhancedValidator     *spookyschemas.EnhancedValidator
+	securityManager       TemplateSecurityManager
+	performanceManager    TemplatePerformanceManager
+	mu                    sync.RWMutex
 }
 
 // TemplateCache provides template caching functionality
@@ -966,33 +967,61 @@ type Metric struct {
 	LastUpdate time.Time
 }
 
-// NewManager creates a new enhanced template manager
-func NewManager(
-	logger spookytypeslogging.Logger,
-) *Manager {
+// NewManager creates a new template manager
+func NewManager(logger spookytypeslogging.Logger) *Manager {
+	// Create schema-driven validator for template configuration validation
+	schemaDrivenConfig := &spookyschemas.SchemaDrivenValidationConfig{
+		UseEmbeddedSchemas: true,
+		StrictValidation:   true,
+		AllowUnknownFields: false,
+		DetailedErrors:     true,
+	}
+	schemaDrivenValidator := spookyschemas.NewSchemaDrivenValidator(logger, schemaDrivenConfig)
+
+	// Create enhanced validator for template content validation
+	enhancedConfig := &spookyschemas.ValidationConfig{
+		Mode: spookyschemas.ValidationModeStrict,
+		ErrorHandling: &spookyschemas.ErrorHandlingConfig{
+			StopOnFirstError:   false,
+			MaxErrors:          100,
+			IncludeWarnings:    true,
+			IncludeContext:     true,
+			IncludeSuggestions: true,
+		},
+		Evolution: &spookyschemas.EvolutionConfig{
+			EnableTracking:  true,
+			AllowDeprecated: true,
+			WarnDeprecated:  true,
+			AllowBreaking:   false,
+		},
+	}
+	enhancedValidator := spookyschemas.NewEnhancedValidator(enhancedConfig)
+
 	manager := &Manager{
 		logger: logger,
 		cache: TemplateCache{
 			cache: make(map[string]CacheEntry),
-			ttl:   5 * time.Minute,
+			ttl:   10 * time.Minute,
 		},
 		functions: TemplateFunctionRegistry{
 			functions: make(map[string]TemplateFunction),
 			security: FunctionSecurityManager{
-				restrictedMode:   false,
-				allowedFunctions: make(map[string]bool),
+				allowedFunctions:   make(map[string]bool),
+				forbiddenFunctions: make(map[string]bool),
 			},
 			cache: FunctionResultCache{
 				cache: make(map[string]FunctionCacheEntry),
-				ttl:   1 * time.Minute,
+				ttl:   5 * time.Minute,
 			},
 		},
 		contextResolver: TemplateContextResolver{
+			factsManager:     nil, // Will be set by SetFactsManager
+			variablesManager: nil, // Will be set by SetVariablesManager
+			machinesManager:  nil, // Will be set by SetMachinesManager
 			cache: ContextCache{
 				cache: make(map[string]ContextCacheEntry),
-				ttl:   2 * time.Minute,
+				ttl:   5 * time.Minute,
 			},
-			validator: ContextValidator{logger: logger},
 		},
 		metadataManager: TemplateMetadataManager{
 			validator: MetadataValidator{logger: logger},
@@ -1002,16 +1031,8 @@ func NewManager(
 				ttl:   10 * time.Minute,
 			},
 		},
-		validator: TemplateValidator{
-			functionValidator: FunctionValidator{logger: logger},
-			contextValidator:  ContextValidator{logger: logger},
-			metadataValidator: MetadataValidator{logger: logger},
-			cache: ValidationCache{
-				cache: make(map[string]ValidationCacheEntry),
-				ttl:   5 * time.Minute,
-			},
-			logger: logger,
-		},
+		schemaDrivenValidator: schemaDrivenValidator,
+		enhancedValidator:     enhancedValidator,
 		securityManager: TemplateSecurityManager{
 			sandbox: TemplateSandbox{
 				enabled:          true,
@@ -1200,7 +1221,49 @@ func (m *Manager) ResolveTemplateContext(ctx context.Context, template *spookyty
 
 // ValidateTemplateWithSchema validates template against schemas
 func (m *Manager) ValidateTemplateWithSchema(ctx context.Context, template *spookytypes.Template) (*spookytypesschemas.ValidationResult, error) {
-	return m.validator.ValidateTemplateComprehensive(ctx, template)
+	// Get template schema for enhanced validation
+	templateSchema, err := m.getTemplateSchema()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get template schema: %w", err)
+	}
+
+	// Use enhanced validator for comprehensive template validation
+	result, err := m.enhancedValidator.ValidateWithEnhancedFeatures(ctx, templateSchema, template)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate template with enhanced validator: %w", err)
+	}
+
+	return result, nil
+}
+
+// getTemplateSchema gets the template schema for validation
+func (m *Manager) getTemplateSchema() (*spookytypesschemas.Schema, error) {
+	// Try to get schema from embedded schemas first
+	if schema, err := m.schemaDrivenValidator.GetEmbeddedSchema("templates"); err == nil {
+		return schema, nil
+	}
+
+	// Fallback: create a basic template schema
+	return &spookytypesschemas.Schema{
+		Name:        "templates",
+		Type:        "hcl",
+		Version:     "1.0",
+		Description: "Template configuration schema",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Content:     "", // Will be loaded from file if needed
+		Metadata:    make(map[string]interface{}),
+	}, nil
+}
+
+// SetSchemaValidator sets the schema validator for template validation
+func (m *Manager) SetSchemaValidator(schemaValidator spookytypesschemas.SchemaValidator) {
+	// This method is kept for compatibility but the validator is now managed internally
+}
+
+// SetSchemaManager sets the schema manager for template validation
+func (m *Manager) SetSchemaManager(schemaManager *spookyschemas.Manager) {
+	// This method is kept for compatibility but the validator is now managed internally
 }
 
 // GetTemplateMetadata gets template metadata
@@ -1221,16 +1284,6 @@ func (m *Manager) SetVariablesIntegration(variablesIntegration spookyinterfaces.
 // SetMachinesIntegration sets the machines integration for context resolution
 func (m *Manager) SetMachinesIntegration(machinesIntegration spookyinterfaces.MachinesIntegration) {
 	m.contextResolver.machinesManager = machinesIntegration
-}
-
-// SetSchemaValidator sets the schema validator for template validation
-func (m *Manager) SetSchemaValidator(schemaValidator spookytypesschemas.SchemaValidator) {
-	m.validator.schemaValidator = schemaValidator
-}
-
-// SetSchemaManager sets the schema manager for template validation
-func (m *Manager) SetSchemaManager(schemaManager *spookyschemas.Manager) {
-	m.validator.schemaManager = schemaManager
 }
 
 // Private helper methods

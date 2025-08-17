@@ -6,20 +6,54 @@ import (
 	"time"
 
 	spookyinterfaces "spooky/internal/interfaces"
+	spookyschemas "spooky/internal/schemas"
 	spookytypes "spooky/internal/types"
 	spookytypesactions "spooky/internal/types/actions"
 	spookytypeslogging "spooky/internal/types/logging"
+	spookytypesschemas "spooky/internal/types/schemas"
 )
 
 // Validator implements the ActionValidator interface
 type Validator struct {
-	logger spookytypeslogging.Logger
+	logger                spookytypeslogging.Logger
+	schemaDrivenValidator *spookyschemas.SchemaDrivenValidator
+	enhancedValidator     *spookyschemas.EnhancedValidator
 }
 
 // NewValidator creates a new action validator
 func NewValidator(logger spookytypeslogging.Logger) spookyinterfaces.ActionValidator {
+	// Create schema-driven validator for action configuration validation
+	schemaDrivenConfig := &spookyschemas.SchemaDrivenValidationConfig{
+		UseEmbeddedSchemas: true,
+		StrictValidation:   true,
+		AllowUnknownFields: false,
+		DetailedErrors:     true,
+	}
+	schemaDrivenValidator := spookyschemas.NewSchemaDrivenValidator(logger, schemaDrivenConfig)
+
+	// Create enhanced validator for individual action validation
+	enhancedConfig := &spookyschemas.ValidationConfig{
+		Mode: spookyschemas.ValidationModeStrict,
+		ErrorHandling: &spookyschemas.ErrorHandlingConfig{
+			StopOnFirstError:   false,
+			MaxErrors:          100,
+			IncludeWarnings:    true,
+			IncludeContext:     true,
+			IncludeSuggestions: true,
+		},
+		Evolution: &spookyschemas.EvolutionConfig{
+			EnableTracking:  true,
+			AllowDeprecated: true,
+			WarnDeprecated:  true,
+			AllowBreaking:   false,
+		},
+	}
+	enhancedValidator := spookyschemas.NewEnhancedValidator(enhancedConfig)
+
 	return &Validator{
-		logger: logger,
+		logger:                logger,
+		schemaDrivenValidator: schemaDrivenValidator,
+		enhancedValidator:     enhancedValidator,
 	}
 }
 
@@ -73,129 +107,90 @@ func (v *Validator) ValidateActions(ctx context.Context, actions []spookytypes.A
 }
 
 // ValidateAction validates a single action
-func (v *Validator) ValidateAction(_ context.Context, action *spookytypes.Action) (*spookytypes.ValidationResult, error) {
+func (v *Validator) ValidateAction(ctx context.Context, action *spookytypes.Action) (*spookytypes.ValidationResult, error) {
 	v.logger.Debug("Validating action", map[string]interface{}{
 		"action": action.Name,
 		"type":   action.Type,
 	})
 
-	// Initialize result
-	result := &spookytypes.ValidationResult{
-		Valid:    true,
-		Errors:   []spookytypes.SchemaError{},
-		Warnings: []spookytypes.SchemaError{},
+	// Get action schema for enhanced validation
+	actionSchema, err := v.getActionSchema()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get action schema: %w", err)
 	}
 
+	// Use enhanced validator for comprehensive action validation
+	result, err := v.enhancedValidator.ValidateWithEnhancedFeatures(ctx, actionSchema, action)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate action with enhanced validator: %w", err)
+	}
+
+	// Add additional custom validation for action-specific rules
+	v.addCustomActionValidation(action, result)
+
+	return &spookytypes.ValidationResult{
+		Valid:    result.Valid,
+		Errors:   result.Errors,
+		Warnings: result.Warnings,
+	}, nil
+}
+
+// getActionSchema gets the action schema for validation
+func (v *Validator) getActionSchema() (*spookytypesschemas.Schema, error) {
+	// Try to get schema from embedded schemas first
+	if schema, err := v.schemaDrivenValidator.GetEmbeddedSchema("actions"); err == nil {
+		return schema, nil
+	}
+
+	// Fallback: create a basic action schema
+	return &spookytypesschemas.Schema{
+		Name:        "actions",
+		Type:        "hcl",
+		Version:     "1.0",
+		Description: "Action configuration schema",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Content:     "", // Will be loaded from file if needed
+		Metadata:    make(map[string]interface{}),
+	}, nil
+}
+
+// addCustomActionValidation adds custom validation rules specific to actions
+func (v *Validator) addCustomActionValidation(action *spookytypes.Action, result *spookytypesschemas.ValidationResult) {
 	// Validate required fields
 	if action.Name == "" {
-		result.Valid = false
-		result.Errors = append(result.Errors, spookytypes.SchemaError{
-			Code:        "missing_name",
-			Message:     "Action name is required",
-			Severity:    "error",
-			Recoverable: false,
-		})
+		v.addSchemaError(result, "missing_name", "Action name is required", "error")
 	}
 
 	if action.Type == "" {
-		result.Valid = false
-		result.Errors = append(result.Errors, spookytypes.SchemaError{
-			Code:        "missing_type",
-			Message:     "Action type is required",
-			Severity:    "error",
-			Recoverable: false,
-		})
+		v.addSchemaError(result, "missing_type", "Action type is required", "error")
 	}
 
-	// Validate action type-specific requirements
-	switch action.Type {
-	case string(spookytypesactions.ActionTypeCommand):
-		if action.Command == nil {
-			result.Valid = false
-			result.Errors = append(result.Errors, spookytypes.SchemaError{
-				Code:        "missing_command",
-				Message:     "Command action requires a command",
-				Severity:    "error",
-				Recoverable: false,
-			})
-		}
-
-	case string(spookytypesactions.ActionTypeScript):
-		if action.Script == nil {
-			result.Valid = false
-			result.Errors = append(result.Errors, spookytypes.SchemaError{
-				Code:        "missing_script",
-				Message:     "Script action requires a script path",
-				Severity:    "error",
-				Recoverable: false,
-			})
-		}
-
-	case string(spookytypesactions.ActionTypeTemplateDeploy):
-		if action.Template == nil {
-			result.Valid = false
-			result.Errors = append(result.Errors, spookytypes.SchemaError{
-				Code:        "missing_template",
-				Message:     "Template action requires template configuration",
-				Severity:    "error",
-				Recoverable: false,
-			})
-		}
-
-	case string(spookytypesactions.ActionTypeFileCopy):
-		if action.FileCopy == nil {
-			result.Valid = false
-			result.Errors = append(result.Errors, spookytypes.SchemaError{
-				Code:        "missing_file_copy",
-				Message:     "File copy action requires file copy configuration",
-				Severity:    "error",
-				Recoverable: false,
-			})
-		}
-
-	case string(spookytypesactions.ActionTypeServiceControl):
-		if action.ServiceControl == nil {
-			result.Valid = false
-			result.Errors = append(result.Errors, spookytypes.SchemaError{
-				Code:        "missing_service_control",
-				Message:     "Service control action requires service control configuration",
-				Severity:    "error",
-				Recoverable: false,
-			})
-		}
-
-	default:
-		result.Valid = false
-		result.Errors = append(result.Errors, spookytypes.SchemaError{
-			Code:        "invalid_type",
-			Message:     fmt.Sprintf("Invalid action type: %s", action.Type),
-			Severity:    "error",
-			Recoverable: false,
-		})
+	// Validate action type
+	if err := v.validateActionType(action.Type); err != nil {
+		v.addSchemaError(result, "invalid_type", err.Error(), "error")
 	}
 
-	// Validate timeout
-	if action.Timeout <= 0 {
-		result.Warnings = append(result.Warnings, spookytypes.SchemaError{
-			Code:        "no_timeout",
-			Message:     "No timeout specified, using default",
-			Severity:    "warning",
-			Recoverable: true,
-		})
+	// Validate action parameters
+	if err := v.validateActionParameters(action); err != nil {
+		v.addSchemaError(result, "invalid_parameters", err.Error(), "error")
 	}
 
-	// Validate retries
-	if action.Retries < 0 {
-		result.Valid = false
-		result.Errors = append(result.Errors, spookytypes.SchemaError{
-			Code:        "invalid_retries",
-			Message:     "Retries must be non-negative",
-			Severity:    "error",
-			Recoverable: false,
-		})
+	// Validate action dependencies
+	if err := v.validateActionDependencies(action); err != nil {
+		v.addSchemaError(result, "invalid_dependencies", err.Error(), "error")
 	}
+}
 
-	return result, nil
+// addSchemaError adds a schema error to the validation result
+func (v *Validator) addSchemaError(result *spookytypesschemas.ValidationResult, code, message, severity string) {
+	schemaError := spookytypesschemas.SchemaError{
+		Code:     code,
+		Message:  message,
+		Severity: severity,
+	}
+	result.Errors = append(result.Errors, schemaError)
+	result.Valid = false
 }
 
 // validateDependencies validates dependencies across all actions
@@ -247,4 +242,70 @@ func (v *Validator) hasCycle(action string, dependencies map[string][]string, vi
 
 	recStack[action] = false
 	return false
+}
+
+// validateActionType validates the action type
+func (v *Validator) validateActionType(actionType string) error {
+	validTypes := []string{
+		string(spookytypesactions.ActionTypeCommand),
+		string(spookytypesactions.ActionTypeScript),
+		string(spookytypesactions.ActionTypeTemplateDeploy),
+		string(spookytypesactions.ActionTypeFileCopy),
+		string(spookytypesactions.ActionTypeServiceControl),
+	}
+
+	for _, validType := range validTypes {
+		if actionType == validType {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid action type: %s", actionType)
+}
+
+// validateActionParameters validates action parameters based on type
+func (v *Validator) validateActionParameters(action *spookytypes.Action) error {
+	switch action.Type {
+	case string(spookytypesactions.ActionTypeCommand):
+		if action.Command == nil {
+			return fmt.Errorf("command action requires a command")
+		}
+
+	case string(spookytypesactions.ActionTypeScript):
+		if action.Script == nil {
+			return fmt.Errorf("script action requires a script path")
+		}
+
+	case string(spookytypesactions.ActionTypeTemplateDeploy):
+		if action.Template == nil {
+			return fmt.Errorf("template action requires template configuration")
+		}
+
+	case string(spookytypesactions.ActionTypeFileCopy):
+		if action.FileCopy == nil {
+			return fmt.Errorf("file copy action requires file copy configuration")
+		}
+
+	case string(spookytypesactions.ActionTypeServiceControl):
+		if action.ServiceControl == nil {
+			return fmt.Errorf("service control action requires service control configuration")
+		}
+	}
+
+	return nil
+}
+
+// validateActionDependencies validates action dependencies
+func (v *Validator) validateActionDependencies(action *spookytypes.Action) error {
+	// Validate timeout
+	if action.Timeout <= 0 {
+		return fmt.Errorf("timeout must be positive")
+	}
+
+	// Validate retries
+	if action.Retries < 0 {
+		return fmt.Errorf("retries must be non-negative")
+	}
+
+	return nil
 }

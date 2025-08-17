@@ -1,11 +1,11 @@
 run:
   timeout: 5m
   go: "1.24"
+  modules-download-mode: readonly
 
 linters:
   enable:
     - gofmt
-    - goimports
     - govet
     - errcheck
     - staticcheck
@@ -16,33 +16,22 @@ linters:
     - gosec
     - gocyclo
     - dupl
+    - goconst
     - gocritic
-    - revive
+    - goimports
 
 linters-settings:
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
   gocyclo:
-    min-complexity: 20
+    min-complexity: 10
   dupl:
     threshold: 100
+  goconst:
+    min-len: 3
+    min-occurrences: 3
 
 issues:
   exclude-rules:
     - path: _test\.go
-      linters:
-        - gocyclo
-        - dupl
-    - path: examples/
-      linters:
-        - gocyclo
-        - dupl
-    - path: tools/
       linters:
         - gocyclo
         - dupl 

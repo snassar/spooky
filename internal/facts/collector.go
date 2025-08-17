@@ -38,9 +38,15 @@ func (c *SystemFactCollector) GetName() string {
 }
 
 // Collect collects facts from the given machine
-func (c *SystemFactCollector) Collect(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error) {
+func (c *SystemFactCollector) Collect(ctx context.Context, machine interface{}) (*spookytypes.FactCollection, error) {
+	// Type assert to get machine details
+	machineObj, ok := machine.(*spookytypes.Machine)
+	if !ok {
+		return nil, fmt.Errorf("machine must be of type *spookytypes.Machine")
+	}
+
 	// Get machine ID
-	machineID, err := c.getMachineID(machine)
+	machineID, err := c.getMachineID(machineObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get machine ID: %w", err)
 	}
@@ -51,14 +57,14 @@ func (c *SystemFactCollector) Collect(ctx context.Context, machine *spookytypes.
 	}
 
 	// Collect system facts via SSH
-	systemFacts, err := c.collectSystemFacts(ctx, machine)
+	systemFacts, err := c.collectSystemFacts(ctx, machineObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect system facts: %w", err)
 	}
 	facts.System = systemFacts
 
 	// Collect collector facts via SSH (if available)
-	collectorFacts, err := c.collectCollectorFacts(ctx, machine)
+	collectorFacts, err := c.collectCollectorFacts(ctx, machineObj)
 	if err != nil {
 		// Collector facts are optional, log but don't fail
 		fmt.Printf("Warning: failed to collect collector facts: %v\n", err)
@@ -67,7 +73,7 @@ func (c *SystemFactCollector) Collect(ctx context.Context, machine *spookytypes.
 	}
 
 	// Collect custom facts via SSH (if available)
-	customFacts, err := c.collectCustomFacts(ctx, machine)
+	customFacts, err := c.collectCustomFacts(ctx, machineObj)
 	if err != nil {
 		// Custom facts are optional, log but don't fail
 		fmt.Printf("Warning: failed to collect custom facts: %v\n", err)
@@ -76,13 +82,13 @@ func (c *SystemFactCollector) Collect(ctx context.Context, machine *spookytypes.
 	}
 
 	// Create fact collection
-	collection := &spookytypesfacts.FactCollection{
+	collection := &spookytypes.FactCollection{
 		MachineID:   machineID,
 		CollectedAt: time.Now(),
 		Facts:       facts,
 		Metadata: map[string]interface{}{
 			"collector": c.name,
-			"machine":   machine.Hostname,
+			"machine":   machineObj.Hostname,
 		},
 	}
 
@@ -90,7 +96,7 @@ func (c *SystemFactCollector) Collect(ctx context.Context, machine *spookytypes.
 }
 
 // CollectViaSSH collects facts from remote machine via SSH
-func (c *SystemFactCollector) CollectViaSSH(ctx context.Context, machine *spookytypes.Machine) (*spookytypesfacts.FactCollection, error) {
+func (c *SystemFactCollector) CollectViaSSH(ctx context.Context, machine *spookytypes.Machine) (*spookytypes.FactCollection, error) {
 	c.logger.Info("Starting SSH-based fact collection", map[string]interface{}{
 		"machine": machine.Hostname,
 		"host":    machine.Host,

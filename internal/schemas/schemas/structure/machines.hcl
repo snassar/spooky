@@ -748,21 +748,6 @@ validation_rules {
     }
   }
   
-  # Application-level validation notes
-  application_validation {
-    # These validations require application-level logic
-    # Schema validation cannot enforce all type relationships
-    
-    note = "Application must validate that encrypted = true is only used with age-encrypted strings"
-    note = "Application must validate age public key format and validity"
-    note = "Application must validate that encrypted values are valid age-encrypted strings"
-    note = "Application must handle decryption during authentication"
-    note = "Application must validate SSH key file permissions and format"
-    note = "Application must validate certificate file permissions and format"
-    note = "Application must validate hostname/IP address format"
-    note = "Application must validate file paths exist and are accessible"
-  }
-  
   # Age encryption specific rules
   age_encryption_rules {
     # Age1 prefix detection for authentication values

@@ -25,25 +25,25 @@ func (m *MockLogger) Error(_ string, _ error, _ ...map[string]interface{}) {}
 func (m *MockLogger) Fatal(_ string, _ error, _ ...map[string]interface{}) {}
 
 // WithFields returns a logger with additional fields
-func (m *MockLogger) WithFields(_ map[string]interface{}) spookytypeslogging.Logger {
+func (m *MockLogger) WithFields(_ map[string]interface{}) spookytypes.Logger {
 	return m
 }
 
 // WithComponent returns a logger with a component name
-func (m *MockLogger) WithComponent(_ string) spookytypeslogging.Logger {
+func (m *MockLogger) WithComponent(_ string) spookytypes.Logger {
 	return m
 }
 
 // WithOperation returns a logger with an operation name
-func (m *MockLogger) WithOperation(_ string) spookytypeslogging.Logger {
+func (m *MockLogger) WithOperation(_ string) spookytypes.Logger {
 	return m
 }
 
 // SetLevel sets the log level
-func (m *MockLogger) SetLevel(_ spookytypeslogging.LogLevel) {}
+func (m *MockLogger) SetLevel(_ spookytypes.LogLevel) {}
 
 // GetLevel returns the current log level
-func (m *MockLogger) GetLevel() spookytypeslogging.LogLevel {
+func (m *MockLogger) GetLevel() spookytypes.LogLevel {
 	return spookytypeslogging.LogLevelInfo
 }
 

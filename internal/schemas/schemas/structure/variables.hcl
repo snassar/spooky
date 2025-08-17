@@ -268,17 +268,4 @@ validation_rules {
       message = "Boolean values cannot be encrypted"
     }
   }
-  
-  # Application-level validation notes
-  application_validation {
-    # These validations require application-level logic
-    # Schema validation cannot enforce all type relationships
-    
-    note = "Application must validate that encrypted = true is only used with string, number, or object values"
-    note = "Application must validate age public key format and validity"
-    note = "Application must validate that encrypted values are valid age-encrypted strings"
-    note = "Application must handle decryption and re-encryption during variable operations"
-    note = "Sensitive variables should be masked in logs and output, regardless of encryption status"
-    note = "Only encrypted = true controls encryption - sensitive = true is for display/logging only"
-  }
 } 

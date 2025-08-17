@@ -188,11 +188,8 @@ func (f *Factory) createFactsIntegration() spookyinterfaces.FactsIntegration {
 	// Create fact collector
 	collector := spookyfacts.NewSystemFactCollector(sshManager, f.logger)
 
-	// Create a simple schema validator for facts validation
-	schemaValidator := &SimpleSchemaValidator{logger: f.logger}
-
 	// Create facts manager with proper schema validator
-	factsManager := spookyfacts.NewManager(collector, schemaValidator, f.logger)
+	factsManager := spookyfacts.NewManager(collector, f.logger)
 
 	// Create facts integration
 	factsIntegration := spookyfacts.NewIntegration(factsManager)

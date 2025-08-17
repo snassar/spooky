@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	spookyinterfaces "spooky/internal/interfaces"
+	spookyschemas "spooky/internal/schemas"
 	spookytypes "spooky/internal/types"
 	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesschemas "spooky/internal/types/schemas"
@@ -16,13 +18,45 @@ import (
 
 // Validator implements the VariableValidator interface
 type Validator struct {
-	logger spookytypeslogging.Logger
+	logger                spookytypeslogging.Logger
+	schemaDrivenValidator *spookyschemas.SchemaDrivenValidator
+	enhancedValidator     *spookyschemas.EnhancedValidator
 }
 
 // NewValidator creates a new VariableValidator instance
 func NewValidator(logger spookytypeslogging.Logger) spookyinterfaces.VariableValidator {
+	// Create schema-driven validator for variable configuration validation
+	schemaDrivenConfig := &spookyschemas.SchemaDrivenValidationConfig{
+		UseEmbeddedSchemas: true,
+		StrictValidation:   true,
+		AllowUnknownFields: false,
+		DetailedErrors:     true,
+	}
+	schemaDrivenValidator := spookyschemas.NewSchemaDrivenValidator(logger, schemaDrivenConfig)
+
+	// Create enhanced validator for individual variable validation
+	enhancedConfig := &spookyschemas.ValidationConfig{
+		Mode: spookyschemas.ValidationModeStrict,
+		ErrorHandling: &spookyschemas.ErrorHandlingConfig{
+			StopOnFirstError:   false,
+			MaxErrors:          100,
+			IncludeWarnings:    true,
+			IncludeContext:     true,
+			IncludeSuggestions: true,
+		},
+		Evolution: &spookyschemas.EvolutionConfig{
+			EnableTracking:  true,
+			AllowDeprecated: true,
+			WarnDeprecated:  true,
+			AllowBreaking:   false,
+		},
+	}
+	enhancedValidator := spookyschemas.NewEnhancedValidator(enhancedConfig)
+
 	return &Validator{
-		logger: logger,
+		logger:                logger,
+		schemaDrivenValidator: schemaDrivenValidator,
+		enhancedValidator:     enhancedValidator,
 	}
 }
 
@@ -63,70 +97,93 @@ func (v *Validator) ValidateVariables(ctx context.Context, variables map[string]
 }
 
 // ValidateVariable validates a single variable
-func (v *Validator) ValidateVariable(_ context.Context, variable *spookytypesvariables.Variable) (*spookytypes.ValidationResult, error) {
+func (v *Validator) ValidateVariable(ctx context.Context, variable *spookytypesvariables.Variable) (*spookytypes.ValidationResult, error) {
 	v.logger.Debug("Validating variable", map[string]interface{}{
 		"name": variable.Name,
 		"type": variable.Type,
 	})
 
-	var errors []spookytypesschemas.SchemaError
-	var warnings []spookytypesschemas.SchemaError
+	// Get variable schema for enhanced validation
+	variableSchema, err := v.getVariableSchema()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get variable schema: %w", err)
+	}
 
+	// Use enhanced validator for comprehensive variable validation
+	result, err := v.enhancedValidator.ValidateWithEnhancedFeatures(ctx, variableSchema, variable)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate variable with enhanced validator: %w", err)
+	}
+
+	// Add additional custom validation for variable-specific rules
+	v.addCustomVariableValidation(variable, result)
+
+	return &spookytypes.ValidationResult{
+		Valid:    result.Valid,
+		Errors:   result.Errors,
+		Warnings: result.Warnings,
+	}, nil
+}
+
+// getVariableSchema gets the variable schema for validation
+func (v *Validator) getVariableSchema() (*spookytypesschemas.Schema, error) {
+	// Try to get schema from embedded schemas first
+	if schema, err := v.schemaDrivenValidator.GetEmbeddedSchema("variables"); err == nil {
+		return schema, nil
+	}
+
+	// Fallback: create a basic variable schema
+	return &spookytypesschemas.Schema{
+		Name:        "variables",
+		Type:        "hcl",
+		Version:     "1.0",
+		Description: "Variable configuration schema",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Content:     "", // Will be loaded from file if needed
+		Metadata:    make(map[string]interface{}),
+	}, nil
+}
+
+// addCustomVariableValidation adds custom validation rules specific to variables
+func (v *Validator) addCustomVariableValidation(variable *spookytypesvariables.Variable, result *spookytypesschemas.ValidationResult) {
 	// Validate variable name
 	if err := v.validateVariableName(variable.Name); err != nil {
-		errors = append(errors, v.convertErrorToSchemaError(err, "name"))
+		v.addSchemaError(result, "invalid_name", err.Error(), "error")
 	}
 
 	// Validate variable type
 	if err := v.validateVariableType(variable.Type); err != nil {
-		errors = append(errors, v.convertErrorToSchemaError(err, "type"))
+		v.addSchemaError(result, "invalid_type", err.Error(), "error")
 	}
 
 	// Validate variable scope
 	if err := v.validateVariableScope(variable.Scope); err != nil {
-		errors = append(errors, v.convertErrorToSchemaError(err, "scope"))
+		v.addSchemaError(result, "invalid_scope", err.Error(), "error")
 	}
 
 	// Validate variable dependencies
 	if err := v.validateVariableDependencies(variable); err != nil {
-		errors = append(errors, v.convertErrorToSchemaError(err, "dependencies"))
+		v.addSchemaError(result, "invalid_dependencies", err.Error(), "error")
 	}
 
 	// Validate variable constraints
 	if variable.Constraints != nil {
 		if err := v.validateVariableConstraints(variable); err != nil {
-			errors = append(errors, v.convertErrorToSchemaError(err, "constraints"))
+			v.addSchemaError(result, "invalid_constraints", err.Error(), "error")
 		}
 	}
+}
 
-	// Validate variable validation rules
-	if variable.Validation != nil {
-		if err := v.validateVariableValidation(variable); err != nil {
-			errors = append(errors, v.convertErrorToSchemaError(err, "validation"))
-		}
+// addSchemaError adds a schema error to the validation result
+func (v *Validator) addSchemaError(result *spookytypesschemas.ValidationResult, code, message, severity string) {
+	schemaError := spookytypesschemas.SchemaError{
+		Code:     code,
+		Message:  message,
+		Severity: severity,
 	}
-
-	// Validate required variables have defaults or environment fallback
-	if variable.Required {
-		if err := v.validateRequiredVariable(variable); err != nil {
-			errors = append(errors, v.convertErrorToSchemaError(err, "required"))
-		}
-	}
-
-	// Validate sensitive variables
-	if variable.Sensitive {
-		if err := v.validateSensitiveVariable(variable); err != nil {
-			warnings = append(warnings, v.convertErrorToSchemaError(err, "sensitive"))
-		}
-	}
-
-	valid := len(errors) == 0
-
-	return &spookytypes.ValidationResult{
-		Valid:    valid,
-		Errors:   errors,
-		Warnings: warnings,
-	}, nil
+	result.Errors = append(result.Errors, schemaError)
+	result.Valid = false
 }
 
 // validateVariableName validates the variable name

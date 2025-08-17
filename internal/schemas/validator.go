@@ -765,6 +765,12 @@ func (v *Validator) loadSchemaFromFile(filePath string) (*spookytypesschemas.Sch
 		return nil, fmt.Errorf("failed to parse schema file: %s", diags.Error())
 	}
 
+	// Parse validation rules from HCL content
+	schemaParser := NewSchemaParser(v.logger)
+	if err := schemaParser.ParseValidationRules(schema); err != nil {
+		return nil, fmt.Errorf("failed to parse validation rules: %w", err)
+	}
+
 	return schema, nil
 }
 

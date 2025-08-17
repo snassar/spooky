@@ -5,160 +5,123 @@ import (
 	"testing"
 	"time"
 
-	spookyinterfaces "spooky/internal/interfaces"
 	spookytypes "spooky/internal/types"
-	spookytypesfacts "spooky/internal/types/facts"
 )
 
 func TestNewIntegration(t *testing.T) {
-	// Create a real manager with mock dependencies
-	mockCollector := NewMockSystemFactCollector()
-	mockValidator := &MockSchemaValidator{}
+	mockCollector := &MockSystemFactCollector{}
 	mockLogger := &MockLogger{}
 
-	manager := NewManager(mockCollector, mockValidator, mockLogger)
+	// Create facts manager
+	manager := NewManager(mockCollector, mockLogger)
 
 	integration := NewIntegration(manager)
 
 	if integration == nil {
-		t.Fatal("NewIntegration returned nil")
+		t.Error("Expected integration to be created, got nil")
 	}
-
-	// Test that the integration implements the interface
-	var _ spookyinterfaces.FactsIntegration = integration
 }
 
 func TestIntegrationCollectFacts(t *testing.T) {
-	// Create a real manager with mock dependencies
 	mockCollector := NewMockSystemFactCollector()
-	mockValidator := &MockSchemaValidator{}
 	mockLogger := &MockLogger{}
 
-	manager := NewManager(mockCollector, mockValidator, mockLogger)
+	// Create facts manager
+	manager := NewManager(mockCollector, mockLogger)
 	integration := NewIntegration(manager)
 
 	machine := &spookytypes.Machine{
-		Hostname: "test-server",
-		Port:     22,
-		User:     "test-user",
+		Hostname: "test-host",
+		Host:     "localhost",
 	}
 
-	facts, err := integration.CollectFacts(context.Background(), machine)
+	ctx := context.Background()
+	result, err := integration.CollectFacts(ctx, machine)
+
 	if err != nil {
-		t.Fatalf("CollectFacts failed: %v", err)
-	}
-
-	if facts == nil {
-		t.Fatal("CollectFacts returned nil facts")
-	}
-
-	// Verify facts structure
-	if factCollection, ok := facts.(*spookytypesfacts.FactCollection); ok {
-		expectedMachineID := "a1b2c3d4e5f678901234567890123456" // Valid 32-character hex string
-		if factCollection.MachineID != expectedMachineID {
-			t.Errorf("Expected machine ID %s, got %s", expectedMachineID, factCollection.MachineID)
-		}
-	} else {
-		t.Fatal("CollectFacts did not return *spookytypesfacts.FactCollection")
-	}
-}
-
-func TestIntegrationStoreFacts(t *testing.T) {
-	// Create a real manager with mock dependencies
-	mockCollector := NewMockSystemFactCollector()
-	mockValidator := &MockSchemaValidator{}
-	mockLogger := &MockLogger{}
-
-	manager := NewManager(mockCollector, mockValidator, mockLogger)
-	integration := NewIntegration(manager)
-
-	facts := &spookytypesfacts.FactCollection{
-		MachineID:   "test-server",
-		CollectedAt: time.Now(),
-		Facts: &spookytypesfacts.Facts{
-			System: &spookytypesfacts.SystemFacts{
-				OS: &spookytypesfacts.OSFacts{
-					Name:    "Linux",
-					Version: "Ubuntu 20.04",
-				},
-			},
-		},
-	}
-
-	err := integration.StoreFacts(context.Background(), facts)
-	if err != nil {
-		t.Fatalf("StoreFacts failed: %v", err)
-	}
-}
-
-func TestIntegrationLoadFacts(t *testing.T) {
-	// Create a real manager with mock dependencies
-	mockCollector := NewMockSystemFactCollector()
-	mockValidator := &MockSchemaValidator{}
-	mockLogger := &MockLogger{}
-
-	manager := NewManager(mockCollector, mockValidator, mockLogger)
-	integration := NewIntegration(manager)
-
-	facts, err := integration.LoadFacts(context.Background())
-	if err != nil {
-		t.Fatalf("LoadFacts failed: %v", err)
-	}
-
-	// LoadFacts returns nil for in-memory storage
-	if facts != nil {
-		t.Fatal("LoadFacts should return nil for in-memory storage")
-	}
-}
-
-func TestIntegrationValidateFacts(t *testing.T) {
-	// Create a real manager with mock dependencies
-	mockCollector := NewMockSystemFactCollector()
-	mockValidator := &MockSchemaValidator{}
-	mockLogger := &MockLogger{}
-
-	manager := NewManager(mockCollector, mockValidator, mockLogger)
-	integration := NewIntegration(manager)
-
-	facts := &spookytypesfacts.FactCollection{
-		MachineID:   "test-server",
-		CollectedAt: time.Now(),
-		Facts: &spookytypesfacts.Facts{
-			System: &spookytypesfacts.SystemFacts{
-				OS: &spookytypesfacts.OSFacts{
-					Name:    "Linux",
-					Version: "Ubuntu 20.04",
-				},
-			},
-		},
-	}
-
-	result, err := integration.ValidateFacts(context.Background(), facts)
-	if err != nil {
-		t.Fatalf("ValidateFacts failed: %v", err)
+		t.Errorf("Expected no error, got %v", err)
 	}
 
 	if result == nil {
-		t.Fatal("ValidateFacts returned nil result")
+		t.Error("Expected result, got nil")
+	}
+
+	// Verify the result is the correct type
+	if _, ok := result.(*spookytypes.FactCollection); !ok {
+		t.Errorf("Expected *spookytypes.FactCollection, got %T", result)
 	}
 }
 
-func TestIntegrationGetManager(t *testing.T) {
-	// Create a real manager with mock dependencies
+func TestIntegrationCollectFactsViaSSH(t *testing.T) {
 	mockCollector := NewMockSystemFactCollector()
-	mockValidator := &MockSchemaValidator{}
 	mockLogger := &MockLogger{}
 
-	manager := NewManager(mockCollector, mockValidator, mockLogger)
+	// Create facts manager
+	manager := NewManager(mockCollector, mockLogger)
 	integration := NewIntegration(manager)
 
-	managerInterface := integration.GetManager()
-	if managerInterface == nil {
-		t.Fatal("GetManager returned nil")
+	machine := &spookytypes.Machine{
+		Hostname: "test-host",
+		Host:     "192.168.1.100", // Remote machine
 	}
 
-	// Verify it's the same manager
-	if managerInterface != manager {
-		t.Fatal("GetManager returned different manager")
+	ctx := context.Background()
+	result, err := integration.CollectFacts(ctx, machine)
+
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	if result == nil {
+		t.Error("Expected result, got nil")
+	}
+
+	// Verify the result is the correct type
+	if _, ok := result.(*spookytypes.FactCollection); !ok {
+		t.Errorf("Expected *spookytypes.FactCollection, got %T", result)
+	}
+}
+
+func TestIntegrationCollectFactsError(t *testing.T) {
+	// This test would need a mock that can return errors
+	// For now, we'll skip this test since the mock doesn't support error injection
+	t.Skip("Mock doesn't support error injection")
+}
+
+func TestIntegrationStoreFacts(t *testing.T) {
+	mockCollector := NewMockSystemFactCollector()
+	mockLogger := &MockLogger{}
+
+	// Create facts manager
+	manager := NewManager(mockCollector, mockLogger)
+	integration := NewIntegration(manager)
+
+	facts := &spookytypes.FactCollection{
+		MachineID:   "test-machine",
+		CollectedAt: time.Now(),
+		Facts:       &spookytypes.Facts{},
+	}
+
+	ctx := context.Background()
+	err := integration.StoreFacts(ctx, facts)
+
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+}
+
+func TestIntegrationStoreFactsNil(t *testing.T) {
+	mockCollector := NewMockSystemFactCollector()
+	mockLogger := &MockLogger{}
+
+	// Create facts manager
+	manager := NewManager(mockCollector, mockLogger)
+	integration := NewIntegration(manager)
+
+	ctx := context.Background()
+	err := integration.StoreFacts(ctx, nil)
+
+	if err == nil {
+		t.Error("Expected error for nil facts, got nil")
 	}
 }

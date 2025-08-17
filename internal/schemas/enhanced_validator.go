@@ -13,13 +13,11 @@ import (
 	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/hashicorp/hcl/v2/hclsimple"
 
-	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesschemas "spooky/internal/types/schemas"
 )
 
 // EnhancedValidator provides comprehensive schema validation with advanced features
 type EnhancedValidator struct {
-	logger   spookytypeslogging.Logger
 	registry spookytypesschemas.SchemaRegistry
 	parser   *hclparse.Parser
 
@@ -88,7 +86,7 @@ type EvolutionConfig struct {
 type CustomValidatorFunc func(ctx context.Context, data interface{}, config map[string]interface{}) (*spookytypesschemas.ValidationResult, error)
 
 // NewEnhancedValidator creates a new enhanced validator instance
-func NewEnhancedValidator(logger spookytypeslogging.Logger, config *ValidationConfig) *EnhancedValidator {
+func NewEnhancedValidator(config *ValidationConfig) *EnhancedValidator {
 	if config == nil {
 		config = &ValidationConfig{
 			Mode: ValidationModeStrict,
@@ -109,7 +107,7 @@ func NewEnhancedValidator(logger spookytypeslogging.Logger, config *ValidationCo
 	}
 
 	return &EnhancedValidator{
-		logger:           logger,
+		registry:         nil, // Will be set later if needed
 		parser:           hclparse.NewParser(),
 		config:           config,
 		customValidators: make(map[string]CustomValidatorFunc),
@@ -144,7 +142,8 @@ func (v *EnhancedValidator) ValidateWithEnhancedFeatures(ctx context.Context, sc
 
 	// Validate schema configuration
 	if err := v.validateSchemaConfiguration(schema, result); err != nil {
-		return result, err
+		// Don't return error, just continue with validation result
+		// The error has already been added to the result
 	}
 
 	// Check for early termination
@@ -222,10 +221,8 @@ func (v *EnhancedValidator) ValidateWithEnhancedFeatures(ctx context.Context, sc
 	result.Statistics.Duration = time.Since(start)
 	result.Statistics.ValidFields = result.Statistics.TotalFields - result.Statistics.InvalidFields
 
-	// Update valid flag based on errors
-	if len(result.Errors) > 0 {
-		result.Valid = false
-	}
+	// Ensure valid flag is set correctly
+	result.Valid = len(result.Errors) == 0
 
 	// Generate recommendations
 	v.generateEnhancedRecommendations(schema, result)
@@ -266,10 +263,6 @@ func (v *EnhancedValidator) RegisterCustomValidator(name string, validator Custo
 
 	v.customValidators[name] = validator
 
-	v.logger.Debug("Custom validator registered", map[string]interface{}{
-		"validator_name": name,
-	})
-
 	return nil
 }
 
@@ -302,7 +295,8 @@ func (v *EnhancedValidator) validateSchemaConfiguration(schema *spookytypesschem
 func (v *EnhancedValidator) validateDataStructure(_ *spookytypesschemas.Schema, data interface{}, result *spookytypesschemas.ValidationResult) error {
 	if data == nil {
 		v.addError(result, "data_nil", "Data cannot be nil", "", "error")
-		return fmt.Errorf("data cannot be nil")
+		// Don't return error, just add it to the result
+		return nil
 	}
 
 	return nil
@@ -310,6 +304,11 @@ func (v *EnhancedValidator) validateDataStructure(_ *spookytypesschemas.Schema, 
 
 // validateFieldConstraints validates field constraints for a schema
 func (v *EnhancedValidator) validateFieldConstraints(schema *spookytypesschemas.Schema, data interface{}, result *spookytypesschemas.ValidationResult) error {
+	// Handle nil schema
+	if schema == nil {
+		return nil
+	}
+
 	if schema.Validation == nil || schema.Validation.Fields == nil {
 		return nil
 	}
@@ -439,6 +438,11 @@ func (v *EnhancedValidator) validateFormat(format, value, fieldPath string, resu
 
 // validateCrossFieldRules validates cross-field validation rules
 func (v *EnhancedValidator) validateCrossFieldRules(schema *spookytypesschemas.Schema, data interface{}, result *spookytypesschemas.ValidationResult) error {
+	// Handle nil schema
+	if schema == nil {
+		return nil
+	}
+
 	if schema.Validation == nil || len(schema.Validation.CrossFieldValidations) == 0 {
 		return nil
 	}
@@ -482,6 +486,11 @@ func (v *EnhancedValidator) validateCrossFieldRules(schema *spookytypesschemas.S
 
 // validateCustomRules validates custom validation rules
 func (v *EnhancedValidator) validateCustomRules(ctx context.Context, schema *spookytypesschemas.Schema, data interface{}, result *spookytypesschemas.ValidationResult) error {
+	// Handle nil schema
+	if schema == nil {
+		return nil
+	}
+
 	if schema.Validation == nil || len(schema.Validation.CustomValidators) == 0 {
 		return nil
 	}
@@ -518,7 +527,13 @@ func (v *EnhancedValidator) validateCustomRules(ctx context.Context, schema *spo
 
 // validateSchemaEvolution validates schema evolution
 func (v *EnhancedValidator) validateSchemaEvolution(schema *spookytypesschemas.Schema, data interface{}, result *spookytypesschemas.ValidationResult) error {
-	if !v.config.Evolution.EnableTracking || schema.Evolution == nil {
+	// Handle nil schema
+	if schema == nil {
+		return nil
+	}
+
+	// Handle nil config or Evolution
+	if v.config == nil || v.config.Evolution == nil || !v.config.Evolution.EnableTracking || schema.Evolution == nil {
 		return nil
 	}
 
@@ -619,6 +634,11 @@ func (v *EnhancedValidator) addWarning(result *spookytypesschemas.ValidationResu
 
 // shouldStopValidation checks if validation should stop
 func (v *EnhancedValidator) shouldStopValidation(result *spookytypesschemas.ValidationResult) bool {
+	// Handle nil config
+	if v.config == nil || v.config.ErrorHandling == nil {
+		return false
+	}
+
 	if v.config.ErrorHandling.StopOnFirstError && len(result.Errors) > 0 {
 		return true
 	}

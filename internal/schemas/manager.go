@@ -40,7 +40,7 @@ func NewManager(logger spookytypeslogging.Logger) *Manager {
 	validator := NewValidator(logger)
 	validator.SetRegistry(registry)
 
-	enhancedValidator := NewEnhancedValidator(logger, nil)
+	enhancedValidator := NewEnhancedValidator(nil)
 	enhancedValidator.SetRegistry(registry)
 
 	evolutionManager := NewEvolutionManager(logger, registry)
@@ -57,6 +57,9 @@ func NewManager(logger spookytypeslogging.Logger) *Manager {
 
 	// Set the manager as the validator's manager for metadata validation
 	validator.SetManager(manager)
+
+	// Load embedded schemas at initialization
+	manager.loadEmbeddedSchemas()
 
 	return manager
 }
@@ -95,8 +98,31 @@ func (m *Manager) Load(filePath string) (*spookytypesschemas.Schema, error) {
 		return nil, fmt.Errorf("failed to parse schema file: %w", err)
 	}
 
-	// Validate schema metadata if this is not the metadata schema itself
-	if !strings.HasSuffix(filepath.Base(filePath), "schema-metadata.schema.hcl") {
+	// Ensure validation structure is properly initialized
+	if schema.Validation == nil {
+		schema.Validation = &spookytypesschemas.SchemaValidation{
+			Enabled: true,
+			Mode:    "strict",
+			Fields:  make(map[string]*spookytypesschemas.FieldValidation),
+		}
+	}
+
+	// Parse validation rules from HCL content
+	// Note: Schema definition files (like project.schema.hcl) are not validation rule files
+	// They contain schema structure definitions, not validation rules
+	// Only parse validation rules if this is actually a validation rule file
+	if strings.Contains(filePath, "validation") || strings.Contains(filePath, "rules") {
+		schemaParser := NewSchemaParser(m.logger)
+		if err := schemaParser.ParseValidationRules(schema); err != nil {
+			return nil, fmt.Errorf("failed to parse validation rules: %w", err)
+		}
+	}
+
+	// Validate schema metadata if this is not the metadata schema itself or a validation rule file
+	if !strings.HasSuffix(filepath.Base(filePath), "schema-metadata.hcl") &&
+		!strings.HasSuffix(filepath.Base(filePath), "schema-metadata.schema.hcl") &&
+		!strings.Contains(filePath, "validation") &&
+		!strings.Contains(filePath, "rules") {
 		if err := m.validateSchemaMetadata(data, filePath); err != nil {
 			return nil, fmt.Errorf("schema metadata validation failed: %w", err)
 		}
@@ -171,11 +197,193 @@ func (m *Manager) LoadEmbedded(name string) (*spookytypesschemas.Schema, error) 
 		return nil, fmt.Errorf("schema name cannot be empty")
 	}
 
-	// Look for embedded schema in the schemas directory
-	schemasDir := filepath.Join("internal", "schemas", "schemas")
-	schemaPath := filepath.Join(schemasDir, name+".schema.hcl")
+	// Look for embedded schema in the new directory structure
+	// Try structure schemas first
+	schemasDir := filepath.Join("schemas", "structure")
+	schemaPath := filepath.Join(schemasDir, name+".hcl")
+
+	if _, err := os.Stat(schemaPath); err == nil {
+		return m.Load(schemaPath)
+	}
+
+	// Try validation schemas
+	schemasDir = filepath.Join("schemas", "validation")
+	schemaPath = filepath.Join(schemasDir, name+".hcl")
+
+	if _, err := os.Stat(schemaPath); err == nil {
+		return m.Load(schemaPath)
+	}
+
+	// Try metadata schemas
+	schemasDir = filepath.Join("schemas", "metadata")
+	schemaPath = filepath.Join(schemasDir, name+".hcl")
+
+	if _, err := os.Stat(schemaPath); err == nil {
+		return m.Load(schemaPath)
+	}
+
+	// Fallback to old structure for backward compatibility
+	schemasDir = filepath.Join("internal", "schemas", "schemas")
+	schemaPath = filepath.Join(schemasDir, name+".schema.hcl")
 
 	return m.Load(schemaPath)
+}
+
+// loadEmbeddedSchemas loads all embedded schemas at initialization
+func (m *Manager) loadEmbeddedSchemas() {
+	// Load structure schemas
+	m.loadSchemasFromDirectory("schemas/structure", "structure", true)
+
+	// Load validation schemas
+	m.loadSchemasFromDirectory("schemas/validation", "validation", false)
+
+	// Load metadata schemas
+	m.loadSchemasFromDirectory("schemas/metadata", "metadata", false)
+}
+
+// capitalizeFirstLetter capitalizes the first letter of a string
+func capitalizeFirstLetter(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+// loadSchemasFromDirectory loads all schema files from a specific directory
+func (m *Manager) loadSchemasFromDirectory(dirPath, schemaType string, logErrorOnNotFound bool) {
+	if info, err := os.Stat(dirPath); err != nil || !info.IsDir() {
+		if logErrorOnNotFound {
+			m.logger.Error(fmt.Sprintf("%s schemas directory not found", capitalizeFirstLetter(schemaType)),
+				fmt.Errorf("directory %s does not exist or is not a directory", dirPath),
+				map[string]interface{}{
+					"dir_path":           dirPath,
+					"schema_type":        schemaType,
+					"error_on_not_found": logErrorOnNotFound,
+				})
+		} else {
+			m.logger.Debug(fmt.Sprintf("%s schemas directory not found", capitalizeFirstLetter(schemaType)),
+				map[string]interface{}{
+					"dir_path":           dirPath,
+					"schema_type":        schemaType,
+					"error_on_not_found": logErrorOnNotFound,
+				})
+		}
+		return
+	}
+
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		m.logger.Error(fmt.Sprintf("Failed to read %s schemas directory", capitalizeFirstLetter(schemaType)),
+			err,
+			map[string]interface{}{
+				"dir_path":    dirPath,
+				"schema_type": schemaType,
+			})
+		return
+	}
+
+	m.logger.Debug(fmt.Sprintf("Found %d entries in %s directory", len(entries), schemaType),
+		map[string]interface{}{
+			"dir_path":    dirPath,
+			"entry_count": len(entries),
+		})
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".hcl") {
+			continue
+		}
+
+		schemaPath := filepath.Join(dirPath, entry.Name())
+		schemaName := strings.TrimSuffix(entry.Name(), ".hcl")
+
+		schema, err := m.loadSchemaFromFile(schemaPath, schemaName, schemaType)
+		if err != nil {
+			m.logger.Error(fmt.Sprintf("Failed to load %s schema", capitalizeFirstLetter(schemaType)),
+				err,
+				map[string]interface{}{
+					"schema_path": schemaPath,
+					"schema_name": schemaName,
+					"schema_type": schemaType,
+				})
+			continue
+		}
+
+		m.logger.Info(fmt.Sprintf("Loaded %s schema", capitalizeFirstLetter(schemaType)),
+			map[string]interface{}{
+				"schema_name": schemaName,
+				"schema_path": schemaPath,
+			})
+
+		// Register schema with registry
+		if err := m.registry.Register(schema); err != nil {
+			m.logger.Error(fmt.Sprintf("Failed to register %s schema", capitalizeFirstLetter(schemaType)),
+				err,
+				map[string]interface{}{
+					"schema_name": schemaName,
+					"schema_path": schemaPath,
+					"schema_type": schemaType,
+				})
+			continue
+		}
+	}
+}
+
+// loadSchemaFromFile loads a single schema file from a given path
+func (m *Manager) loadSchemaFromFile(filePath, schemaName, schemaType string) (*spookytypesschemas.Schema, error) {
+	// Read file content
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read schema file: %w", err)
+	}
+
+	// Create schema from file content
+	schema := &spookytypesschemas.Schema{
+		Version:     "1.0",
+		Type:        "hcl",
+		Name:        schemaName,
+		Description: fmt.Sprintf("Schema loaded from %s", filePath),
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Content:     string(data),
+		Metadata:    make(map[string]interface{}),
+	}
+
+	// Parse HCL content to validate it
+	if err := m.validateSchemaContent(data, filePath); err != nil {
+		return nil, fmt.Errorf("failed to parse schema file: %w", err)
+	}
+
+	// Ensure validation structure is properly initialized
+	if schema.Validation == nil {
+		schema.Validation = &spookytypesschemas.SchemaValidation{
+			Enabled: true,
+			Mode:    "strict",
+			Fields:  make(map[string]*spookytypesschemas.FieldValidation),
+		}
+	}
+
+	// Parse validation rules from HCL content
+	// Note: Schema definition files (like project.schema.hcl) are not validation rule files
+	// They contain schema structure definitions, not validation rules
+	// Only parse validation rules if this is actually a validation rule file
+	if strings.Contains(filePath, "validation") || strings.Contains(filePath, "rules") {
+		schemaParser := NewSchemaParser(m.logger)
+		if err := schemaParser.ParseValidationRules(schema); err != nil {
+			return nil, fmt.Errorf("failed to parse validation rules: %w", err)
+		}
+	}
+
+	// Validate schema metadata if this is not the metadata schema itself or a validation rule file
+	if !strings.HasSuffix(filepath.Base(filePath), "schema-metadata.hcl") &&
+		!strings.HasSuffix(filepath.Base(filePath), "schema-metadata.schema.hcl") &&
+		!strings.Contains(filePath, "validation") &&
+		!strings.Contains(filePath, "rules") {
+		if err := m.validateSchemaMetadata(data, filePath); err != nil {
+			return nil, fmt.Errorf("schema metadata validation failed: %w", err)
+		}
+	}
+
+	return schema, nil
 }
 
 // LoadEmbeddedSchema loads an embedded schema (interface compatibility)
@@ -228,7 +436,15 @@ func (m *Manager) LoadWithValidation(filePath string) (*spookytypesschemas.Schem
 func (m *Manager) LoadMultiple(filePaths []string) (map[string]*spookytypesschemas.Schema, error) {
 	schemas := make(map[string]*spookytypesschemas.Schema)
 
+	m.logger.Info("Loading multiple schemas", map[string]interface{}{
+		"file_count": len(filePaths),
+	})
+
 	for _, filePath := range filePaths {
+		m.logger.Info("Loading schema file", map[string]interface{}{
+			"file": filePath,
+		})
+
 		schema, err := m.Load(filePath)
 		if err != nil {
 			m.logger.Warn("Failed to load schema", map[string]interface{}{
@@ -240,7 +456,16 @@ func (m *Manager) LoadMultiple(filePaths []string) (map[string]*spookytypesschem
 
 		schemaName := strings.TrimSuffix(filepath.Base(filePath), ".schema.hcl")
 		schemas[schemaName] = schema
+		m.logger.Info("Successfully loaded schema", map[string]interface{}{
+			"file": filePath,
+			"name": schemaName,
+		})
 	}
+
+	m.logger.Info("Completed loading multiple schemas", map[string]interface{}{
+		"successful_count": len(schemas),
+		"total_files":      len(filePaths),
+	})
 
 	return schemas, nil
 }
@@ -270,8 +495,11 @@ func (m *Manager) LoadSchemasFromDirectory(dirPath string) (map[string]*spookyty
 		}
 
 		// Only process schema files
-		if strings.HasSuffix(info.Name(), ".schema.hcl") {
+		if strings.HasSuffix(info.Name(), ".hcl") {
 			schemaFiles = append(schemaFiles, path)
+			m.logger.Info("Found schema file", map[string]interface{}{
+				"file": path,
+			})
 		}
 
 		return nil
@@ -288,7 +516,20 @@ func (m *Manager) LoadSchemasFromDirectory(dirPath string) (map[string]*spookyty
 	})
 
 	// Load all schemas with metadata validation
-	return m.LoadMultiple(schemaFiles)
+	schemas, err := m.LoadMultiple(schemaFiles)
+	if err != nil {
+		m.logger.Error("Failed to load schemas", err, map[string]interface{}{
+			"directory": dirPath,
+		})
+		return nil, err
+	}
+
+	m.logger.Info("Successfully loaded schemas", map[string]interface{}{
+		"directory":    dirPath,
+		"loaded_count": len(schemas),
+	})
+
+	return schemas, nil
 }
 
 // Validate validates data against a schema
@@ -820,12 +1061,13 @@ func (m *Manager) validateDescription(metadata map[string]interface{}) error {
 
 // loadMetadataSchema loads the schema-metadata.schema.hcl file
 func (m *Manager) loadMetadataSchema() error {
-	// Look for the metadata schema in the schemas directory
+	// Look for the metadata schema in the new metadata directory structure
 	// Try multiple possible paths
 	possiblePaths := []string{
-		filepath.Join("internal", "schemas", "schemas", "schema-metadata.schema.hcl"),
-		filepath.Join("schemas", "schema-metadata.schema.hcl"),
-		"schema-metadata.schema.hcl",
+		filepath.Join("schemas", "metadata", "schema-metadata.hcl"),
+		filepath.Join("internal", "schemas", "schemas", "metadata", "schema-metadata.hcl"),
+		"schemas/metadata/schema-metadata.hcl",
+		"metadata/schema-metadata.hcl",
 	}
 
 	var metadataSchemaPath string

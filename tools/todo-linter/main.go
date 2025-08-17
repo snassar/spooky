@@ -299,7 +299,7 @@ func lintPackage(pkg, lintConfig string, useFastMode bool) LintResult {
 func parseLintOutput(output, _ string) []LintIssue {
 	var issues []LintIssue
 
-	// Skip if it's a parallel execution error
+	// Skip if it's a parallel processing error
 	if strings.Contains(output, "parallel golangci-lint is running") {
 		return issues
 	}
