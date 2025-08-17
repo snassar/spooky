@@ -265,8 +265,8 @@ type ConfigurationError struct {
 	ConfigModified time.Time `json:"config_modified" hcl:"config_modified"`
 }
 
-// ActionExecutionError represents SSH action execution errors
-type ActionExecutionError struct {
+// ActionOrchestrationError represents SSH action orchestration errors
+type ActionOrchestrationError struct {
 	BaseError Error
 
 	// Action-specific details
@@ -278,26 +278,26 @@ type ActionExecutionError struct {
 	Stdout        string `json:"stdout" hcl:"stdout"`
 	Stderr        string `json:"stderr" hcl:"stderr"`
 
-	// Action execution context
-	WorkingDir    string            `json:"working_dir,omitempty" hcl:"working_dir,optional"`
-	Environment   map[string]string `json:"environment,omitempty" hcl:"environment,optional"`
-	Timeout       time.Duration     `json:"timeout" hcl:"timeout"`
-	ExecutionTime time.Duration     `json:"execution_time" hcl:"execution_time"`
+	// Action orchestration context
+	WorkingDir        string            `json:"working_dir,omitempty" hcl:"working_dir,optional"`
+	Environment       map[string]string `json:"environment,omitempty" hcl:"environment,optional"`
+	Timeout           time.Duration     `json:"timeout" hcl:"timeout"`
+	OrchestrationTime time.Duration     `json:"orchestration_time" hcl:"orchestration_time"`
 
-	// Action execution state
+	// Action orchestration state
 	ActionStarted  time.Time  `json:"action_started" hcl:"action_started"`
 	ActionFinished *time.Time `json:"action_finished,omitempty" hcl:"action_finished,optional"`
 	Killed         bool       `json:"killed" hcl:"killed"`
 
-	// Action execution metrics
+	// Action orchestration metrics
 	RetryCount    int `json:"retry_count" hcl:"retry_count"`
 	MaxRetries    int `json:"max_retries" hcl:"max_retries"`
 	RetryAttempts int `json:"retry_attempts" hcl:"retry_attempts"`
 }
 
-// NewActionExecutionError creates a new action execution error
-func NewActionExecutionError(actionName, machineName, sessionID, commandString, message string, exitCode int, stdout, stderr string) *ActionExecutionError {
-	return &ActionExecutionError{
+// NewActionOrchestrationError creates a new action orchestration error
+func NewActionOrchestrationError(actionName, machineName, sessionID, commandString, message string, exitCode int, stdout, stderr string) *ActionOrchestrationError {
+	return &ActionOrchestrationError{
 		BaseError: Error{
 			ErrorType:    ErrorTypeCommand,
 			ErrorCode:    exitCode,
@@ -318,6 +318,6 @@ func NewActionExecutionError(actionName, machineName, sessionID, commandString, 
 }
 
 // Error implements the error interface
-func (e *ActionExecutionError) Error() string {
+func (e *ActionOrchestrationError) Error() string {
 	return e.BaseError.ErrorMessage
 }

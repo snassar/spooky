@@ -47,7 +47,7 @@ func (h *SchemaHelpers) ValidateMigration(schema *spookytypesschemas.Schema, mig
 	// Validate migration prerequisites
 	if migration.Validation != nil {
 		for _, preValidation := range migration.Validation.PreValidation {
-			h.logger.Debug("Executing pre-validation", map[string]interface{}{
+			h.logger.Debug("Running pre-validation", map[string]interface{}{
 				"validation": preValidation,
 			})
 		}

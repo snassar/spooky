@@ -92,7 +92,7 @@ func handleSchemasValidate(schemaFile, dataFile string) error {
 		fmt.Printf("📊 Statistics:\n")
 		fmt.Printf("   - Total fields: %d\n", result.Statistics.TotalFields)
 		fmt.Printf("   - Valid fields: %d\n", result.Statistics.ValidFields)
-		fmt.Printf("   - Rules executed: %d\n", result.Statistics.RulesExecuted)
+		fmt.Printf("   - Rules processed: %d\n", result.Statistics.RulesProcessed)
 		fmt.Printf("   - Duration: %v\n", result.Statistics.Duration)
 	} else {
 		fmt.Printf("❌ Validation failed\n")

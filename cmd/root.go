@@ -50,7 +50,7 @@ Examples:
 	},
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
+// Run the root command with all child commands and sets flags appropriately.
 func Execute() {
 	err := RootCmd.Execute()
 	if err != nil {

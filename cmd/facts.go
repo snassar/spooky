@@ -258,7 +258,7 @@ func collectFactsParallel(ctx context.Context, machines []spookytypes.Machine, f
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
-	// Create semaphore for parallel execution
+	// Create semaphore for parallel processing
 	semaphore := make(chan struct{}, parallel)
 
 	for idx := range machines {

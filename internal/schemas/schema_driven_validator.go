@@ -114,11 +114,11 @@ func (v *SchemaDrivenValidator) ValidateConfiguration(_ context.Context, configP
 		Info:        []spookytypesschemas.SchemaError{},
 		Details:     make(map[string]interface{}),
 		Statistics: &spookytypesschemas.ValidationStatistics{
-			TotalFields:   0,
-			ValidFields:   0,
-			InvalidFields: 0,
-			RulesExecuted: 0,
-			RulesFailed:   0,
+			TotalFields:    0,
+			ValidFields:    0,
+			InvalidFields:  0,
+			RulesProcessed: 0,
+			RulesFailed:    0,
 		},
 	}
 
@@ -187,11 +187,11 @@ func (v *SchemaDrivenValidator) ValidateProjectStructure(_ context.Context, proj
 		Info:        []spookytypesschemas.SchemaError{},
 		Details:     make(map[string]interface{}),
 		Statistics: &spookytypesschemas.ValidationStatistics{
-			TotalFields:   0,
-			ValidFields:   0,
-			InvalidFields: 0,
-			RulesExecuted: 0,
-			RulesFailed:   0,
+			TotalFields:    0,
+			ValidFields:    0,
+			InvalidFields:  0,
+			RulesProcessed: 0,
+			RulesFailed:    0,
 		},
 	}
 
@@ -601,5 +601,5 @@ func (v *SchemaDrivenValidator) addWarning(result *spookytypesschemas.Validation
 		warning.AddSuggestion(suggestion)
 	}
 	result.Warnings = append(result.Warnings, *warning)
-	result.Statistics.RulesExecuted++
+	result.Statistics.RulesProcessed++
 }

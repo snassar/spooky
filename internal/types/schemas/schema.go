@@ -147,7 +147,7 @@ type ValidationRule struct {
 	// Rule dependencies
 	Dependencies []string `json:"dependencies,omitempty" hcl:"dependencies,optional"`
 
-	// Rule execution order
+	// Rule processing order
 	Priority int `json:"priority,omitempty" hcl:"priority,optional"`
 }
 
@@ -546,8 +546,8 @@ type ValidationStatistics struct {
 	// Validation duration
 	Duration time.Duration `json:"duration,omitempty" hcl:"duration,optional"`
 
-	// Rules executed
-	RulesExecuted int `json:"rules_executed" hcl:"rules_executed"`
+	// Rules processed
+	RulesProcessed int `json:"rules_processed" hcl:"rules_processed"`
 
 	// Rules failed
 	RulesFailed int `json:"rules_failed" hcl:"rules_failed"`

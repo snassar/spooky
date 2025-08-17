@@ -231,11 +231,11 @@ func (m *Manager) CreateActingSession(_ context.Context, connection *spookytypes
 	return actingSession, nil
 }
 
-// RunAction executes an action on a remote machine via SSH with connection reuse
+// RunAction runs an action on a remote machine via SSH with connection reuse
 func (m *Manager) RunAction(ctx context.Context, session *spookytypesactions.ActingSession, action *spookytypesactions.Action) (*spookytypesactions.ActingResult, error) {
-	// Log action execution start
+	// Log action orchestration start
 	startTime := time.Now()
-	m.logActionExecution(action, &spookytypes.Machine{Hostname: "unknown"}, session, startTime)
+	m.logActionOrchestration(action, &spookytypes.Machine{Hostname: "unknown"}, session, startTime)
 
 	// Get the target machine from the session's machine inventory
 	var targetMachine *spookytypes.Machine
@@ -246,7 +246,7 @@ func (m *Manager) RunAction(ctx context.Context, session *spookytypesactions.Act
 		targetMachine = &session.MachineInventory[0]
 	} else {
 		// Create error for no target machine
-		actionError := spookytypesssh.NewActionExecutionError(
+		actionError := spookytypesssh.NewActionOrchestrationError(
 			action.Name,
 			"unknown",
 			session.SessionID,
@@ -258,7 +258,7 @@ func (m *Manager) RunAction(ctx context.Context, session *spookytypesactions.Act
 		)
 
 		// Log the error
-		m.logger.Error("Action execution failed", actionError, map[string]interface{}{
+		m.logger.Error("Action orchestration failed", actionError, map[string]interface{}{
 			"action_name": action.Name,
 			"session_id":  session.SessionID,
 			"error_type":  actionError.BaseError.ErrorType,
@@ -298,8 +298,8 @@ func (m *Manager) RunAction(ctx context.Context, session *spookytypesactions.Act
 	}
 
 	if err != nil {
-		// Create detailed action execution error
-		actionError := spookytypesssh.NewActionExecutionError(
+		// Create detailed action orchestration error
+		actionError := spookytypesssh.NewActionOrchestrationError(
 			action.Name,
 			targetMachine.Hostname,
 			session.SessionID,
@@ -311,25 +311,25 @@ func (m *Manager) RunAction(ctx context.Context, session *spookytypesactions.Act
 		)
 
 		// Set additional error context
-		actionError.ExecutionTime = endTime.Sub(startTime)
+		actionError.OrchestrationTime = endTime.Sub(startTime)
 		actionError.ActionFinished = &endTime
 		actionError.WorkingDir = action.WorkingDir
 		actionError.Timeout = time.Duration(action.Timeout) * time.Second
 
 		// Log the detailed error
-		m.logger.Error("Action execution failed", actionError, map[string]interface{}{
-			"action_name":    actionError.ActionName,
-			"machine_name":   actionError.MachineName,
-			"session_id":     actionError.SessionID,
-			"command":        actionError.CommandString,
-			"exit_code":      actionError.ExitCode,
-			"stdout":         actionError.Stdout,
-			"stderr":         actionError.Stderr,
-			"execution_time": actionError.ExecutionTime,
-			"error_type":     actionError.BaseError.ErrorType,
-			"error_code":     actionError.BaseError.ErrorCode,
-			"retryable":      actionError.BaseError.Retryable,
-			"recoverable":    actionError.BaseError.Recoverable,
+		m.logger.Error("Action orchestration failed", actionError, map[string]interface{}{
+			"action_name":        actionError.ActionName,
+			"machine_name":       actionError.MachineName,
+			"session_id":         actionError.SessionID,
+			"command":            actionError.CommandString,
+			"exit_code":          actionError.ExitCode,
+			"stdout":             actionError.Stdout,
+			"stderr":             actionError.Stderr,
+			"orchestration_time": actionError.OrchestrationTime,
+			"error_type":         actionError.BaseError.ErrorType,
+			"error_code":         actionError.BaseError.ErrorCode,
+			"retryable":          actionError.BaseError.Retryable,
+			"recoverable":        actionError.BaseError.Recoverable,
 		})
 
 		actingResult.Status = "failed"
@@ -488,7 +488,7 @@ func (m *Manager) TransferFile(ctx context.Context, session *spookytypes.Session
 		User:     session.Connection.User,
 	}
 
-	// Execute file transfer
+	// Run file transfer
 	startTime := time.Now()
 	var bytesTransferred int64
 	var err error
@@ -573,9 +573,9 @@ func (m *Manager) downloadFile(ctx context.Context, machine *spookytypes.Machine
 	return int64(len(remoteData)), nil
 }
 
-// logActionExecution logs action execution details
-func (m *Manager) logActionExecution(action *spookytypesactions.Action, machine *spookytypes.Machine, session *spookytypesactions.ActingSession, startTime time.Time) {
-	m.logger.Info("Starting action execution", map[string]interface{}{
+// logActionOrchestration logs action orchestration details
+func (m *Manager) logActionOrchestration(action *spookytypesactions.Action, machine *spookytypes.Machine, session *spookytypesactions.ActingSession, startTime time.Time) {
+	m.logger.Info("Starting action orchestration", map[string]interface{}{
 		"action_name":  action.Name,
 		"machine_name": machine.Hostname,
 		"machine_host": machine.Host,
@@ -590,7 +590,7 @@ func (m *Manager) logActionExecution(action *spookytypesactions.Action, machine 
 
 // logActionCompletion logs action completion details
 func (m *Manager) logActionCompletion(action *spookytypesactions.Action, machine *spookytypes.Machine, result *spookytypesactions.ActingResult) {
-	m.logger.Info("Completed action execution", map[string]interface{}{
+	m.logger.Info("Completed action orchestration", map[string]interface{}{
 		"action_name":  action.Name,
 		"machine_name": machine.Hostname,
 		"status":       result.Status,

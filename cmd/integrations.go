@@ -150,7 +150,7 @@ This command shows which integrations are available and working correctly.`,
 		// Create integrations command
 		integrationsCmd := spookycli.NewIntegrationsCommand(integrationManager)
 
-		// Execute list command
+		// Run list command
 		ctx := context.Background()
 		return integrationsCmd.List(ctx, args)
 	},
@@ -175,7 +175,7 @@ and reports any issues found.`,
 		// Create integrations command
 		integrationsCmd := spookycli.NewIntegrationsCommand(integrationManager)
 
-		// Execute validate command
+		// Run validate command
 		ctx := context.Background()
 		return integrationsCmd.Validate(ctx, args)
 	},

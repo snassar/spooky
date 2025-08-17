@@ -69,7 +69,7 @@ type TemplateFunction struct {
 // FunctionSecurity defines security restrictions for template functions
 type FunctionSecurity struct {
 	AllowedInRestricted bool
-	MaxExecutionTime    time.Duration
+	MaxRunningTime      time.Duration
 	MaxMemoryUsage      int64
 	AllowedPatterns     []string
 	ForbiddenPatterns   []string
@@ -713,10 +713,10 @@ type TemplateSecurityManager struct {
 	mu              sync.RWMutex
 }
 
-// TemplateSandbox provides template execution sandboxing
+// TemplateSandbox provides template running sandboxing
 type TemplateSandbox struct {
 	enabled          bool
-	maxExecutionTime time.Duration
+	maxRunningTime   time.Duration
 	maxMemoryUsage   int64
 	allowedFunctions map[string]bool
 }
@@ -737,8 +737,8 @@ type PatternFilter struct {
 
 // ResourceMonitor monitors template resource usage
 type ResourceMonitor struct {
-	maxMemoryUsage   int64
-	maxExecutionTime time.Duration
+	maxMemoryUsage int64
+	maxRunningTime time.Duration
 }
 
 // AuditLogger logs template operations for security
@@ -770,7 +770,7 @@ func (s *TemplateSecurityManager) ValidateTemplateSecurity(ctx context.Context, 
 	return nil
 }
 
-// SandboxTemplate creates a sandbox for template execution
+// SandboxTemplate creates a sandbox for template running
 func (s *TemplateSecurityManager) SandboxTemplate(_ context.Context, template *spookytypes.Template) (*TemplateSandbox, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -779,7 +779,7 @@ func (s *TemplateSecurityManager) SandboxTemplate(_ context.Context, template *s
 	sandbox := &TemplateSandbox{
 		allowedFunctions: make(map[string]bool),
 		enabled:          s.sandbox.enabled,
-		maxExecutionTime: s.sandbox.maxExecutionTime,
+		maxRunningTime:   s.sandbox.maxRunningTime,
 		maxMemoryUsage:   s.sandbox.maxMemoryUsage,
 	}
 
@@ -787,11 +787,11 @@ func (s *TemplateSecurityManager) SandboxTemplate(_ context.Context, template *s
 	switch template.SecurityLevel {
 	case "restricted":
 		sandbox.enabled = true
-		sandbox.maxExecutionTime = 10 * time.Second
+		sandbox.maxRunningTime = 10 * time.Second
 		sandbox.maxMemoryUsage = 50 * 1024 * 1024 // 50MB
 	case "unrestricted":
 		sandbox.enabled = false
-		sandbox.maxExecutionTime = 60 * time.Second
+		sandbox.maxRunningTime = 60 * time.Second
 		sandbox.maxMemoryUsage = 500 * 1024 * 1024 // 500MB
 	default:
 		// Use default settings
@@ -799,11 +799,11 @@ func (s *TemplateSecurityManager) SandboxTemplate(_ context.Context, template *s
 
 	// Log sandbox creation
 	s.auditLogger.LogSecurityEvent("sandbox_created", map[string]interface{}{
-		"template_id":        template.ID,
-		"security_level":     template.SecurityLevel,
-		"enabled":            sandbox.enabled,
-		"max_execution_time": sandbox.maxExecutionTime,
-		"max_memory_usage":   sandbox.maxMemoryUsage,
+		"template_id":      template.ID,
+		"security_level":   template.SecurityLevel,
+		"enabled":          sandbox.enabled,
+		"max_running_time": sandbox.maxRunningTime,
+		"max_memory_usage": sandbox.maxMemoryUsage,
 	})
 
 	return sandbox, nil
@@ -1015,7 +1015,7 @@ func NewManager(
 		securityManager: TemplateSecurityManager{
 			sandbox: TemplateSandbox{
 				enabled:          true,
-				maxExecutionTime: 30 * time.Second,
+				maxRunningTime:   30 * time.Second,
 				maxMemoryUsage:   100 * 1024 * 1024, // 100MB
 				allowedFunctions: make(map[string]bool),
 			},
@@ -1031,8 +1031,8 @@ func NewManager(
 				allowedPatterns: []string{},
 			},
 			resourceMonitor: ResourceMonitor{
-				maxMemoryUsage:   100 * 1024 * 1024, // 100MB
-				maxExecutionTime: 30 * time.Second,
+				maxMemoryUsage: 100 * 1024 * 1024, // 100MB
+				maxRunningTime: 30 * time.Second,
 			},
 			auditLogger: AuditLogger{logger: logger},
 		},
@@ -1146,14 +1146,14 @@ func (m *Manager) RenderTemplate(ctx context.Context, tmplData *spookytypes.Temp
 		return "", fmt.Errorf("failed to compile template: %w", err)
 	}
 
-	// Execute the template with the resolved data
+	// Run the template with the resolved data
 	var buf bytes.Buffer
 	if err := compiledTemplate.Execute(&buf, resolvedData); err != nil {
-		m.logger.Error("Failed to execute template", err, map[string]interface{}{
+		m.logger.Error("Failed to run template", err, map[string]interface{}{
 			"template": tmplData.ID,
 			"error":    err.Error(),
 		})
-		return "", fmt.Errorf("failed to execute template %s: %w", tmplData.ID, err)
+		return "", fmt.Errorf("failed to run template %s: %w", tmplData.ID, err)
 	}
 
 	result := buf.String()

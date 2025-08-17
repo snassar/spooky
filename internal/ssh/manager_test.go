@@ -183,14 +183,14 @@ func TestManagerConnectionReuse(t *testing.T) {
 		User:     "testuser",
 	}
 
-	// Simulate multiple command executions (they will fail due to no real connection)
+	// Simulate multiple command runs (they will fail due to no real connection)
 	// but we can verify the interface is working correctly
 	for i := 0; i < 3; i++ {
 		ctx := context.Background()
 		_, err := concreteManager.client.RunCommand(ctx, testMachine, "echo 'test'")
 		// We expect this to fail since there's no real SSH server, but the interface should work
 		if err == nil {
-			t.Logf("Command %d executed successfully (unexpected in test environment)", i+1)
+			t.Logf("Command %d ran successfully (unexpected in test environment)", i+1)
 		} else {
 			t.Logf("Command %d failed as expected: %v", i+1, err)
 		}

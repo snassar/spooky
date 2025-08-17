@@ -134,11 +134,11 @@ func (v *EnhancedValidator) ValidateWithEnhancedFeatures(ctx context.Context, sc
 		Info:        []spookytypesschemas.SchemaError{},
 		Details:     make(map[string]interface{}),
 		Statistics: &spookytypesschemas.ValidationStatistics{
-			TotalFields:   0,
-			ValidFields:   0,
-			InvalidFields: 0,
-			RulesExecuted: 0,
-			RulesFailed:   0,
+			TotalFields:    0,
+			ValidFields:    0,
+			InvalidFields:  0,
+			RulesProcessed: 0,
+			RulesFailed:    0,
 		},
 	}
 
@@ -326,7 +326,7 @@ func (v *EnhancedValidator) validateFieldConstraints(schema *spookytypesschemas.
 		} else {
 			result.Statistics.ValidFields++
 		}
-		result.Statistics.RulesExecuted++
+		result.Statistics.RulesProcessed++
 
 		// Check for early termination
 		if v.shouldStopValidation(result) {
@@ -444,7 +444,7 @@ func (v *EnhancedValidator) validateCrossFieldRules(schema *spookytypesschemas.S
 	}
 
 	for _, crossFieldValidation := range schema.Validation.CrossFieldValidations {
-		result.Statistics.RulesExecuted++
+		result.Statistics.RulesProcessed++
 
 		// Extract field values
 		fieldValues := make(map[string]interface{})
@@ -487,9 +487,9 @@ func (v *EnhancedValidator) validateCustomRules(ctx context.Context, schema *spo
 	}
 
 	for _, customValidator := range schema.Validation.CustomValidators {
-		result.Statistics.RulesExecuted++
+		result.Statistics.RulesProcessed++
 
-		// Execute custom validator
+		// Run custom validator
 		if validator, exists := v.customValidators[customValidator]; exists {
 			if customResult, err := validator(ctx, data, nil); err != nil {
 				schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Custom validation failed: %v", err))

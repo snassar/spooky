@@ -300,11 +300,11 @@ func (v *Validator) Validate(schema *spookytypesschemas.Schema, data interface{}
 		Info:        []spookytypesschemas.SchemaError{},
 		Details:     make(map[string]interface{}),
 		Statistics: &spookytypesschemas.ValidationStatistics{
-			TotalFields:   0,
-			ValidFields:   0,
-			InvalidFields: 0,
-			RulesExecuted: 0,
-			RulesFailed:   0,
+			TotalFields:    0,
+			ValidFields:    0,
+			InvalidFields:  0,
+			RulesProcessed: 0,
+			RulesFailed:    0,
 		},
 	}
 
@@ -492,7 +492,7 @@ func (v *Validator) validateSchemaFieldConstraints(schema *spookytypesschemas.Sc
 		} else {
 			result.Statistics.ValidFields++
 		}
-		result.Statistics.RulesExecuted++
+		result.Statistics.RulesProcessed++
 	}
 
 	return nil
@@ -647,7 +647,7 @@ func (v *Validator) validateCrossFieldRules(schema *spookytypesschemas.Schema, d
 	}
 
 	for _, crossFieldValidation := range schema.Validation.CrossFieldValidations {
-		result.Statistics.RulesExecuted++
+		result.Statistics.RulesProcessed++
 
 		// Extract field values (simplified - would need proper HCL parsing)
 		fieldValues := make(map[string]interface{})
@@ -685,9 +685,9 @@ func (v *Validator) validateCustomRules(schema *spookytypesschemas.Schema, data 
 	}
 
 	for _, customValidator := range schema.Validation.CustomValidators {
-		result.Statistics.RulesExecuted++
+		result.Statistics.RulesProcessed++
 
-		// Execute custom validator (simplified - would need plugin system)
+		// Run custom validator (simplified - would need plugin system)
 		if err := v.executeCustomValidator(customValidator, data); err != nil {
 			schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Custom validation failed: %v", err))
 			schemaError.Severity = "error"
@@ -971,7 +971,7 @@ func (v *Validator) evaluateComparisonCondition(condition string, fieldValues ma
 	return false
 }
 
-// executeCustomValidator executes a custom validator
+// executeCustomValidator runs a custom validator
 func (v *Validator) executeCustomValidator(validator string, data interface{}) error {
 	// Custom validator implementation supporting common validation rules
 

@@ -1219,7 +1219,7 @@ type ConnectionMetrics struct {
 	FailedConnections     int64
 	ReusedConnections     int64
 	AuthenticationTime    time.Duration
-	CommandExecutionTime  time.Duration
+	CommandRunningTime    time.Duration
 	mutex                 sync.RWMutex
 }
 
@@ -1239,7 +1239,7 @@ func NewReusableSSHClient(config *spookytypes.ClientConfig, logger spookytypeslo
 	return client
 }
 
-// RunCommand executes a command on a remote machine via SSH with connection reuse
+// RunCommand runs a command on a remote machine via SSH with connection reuse
 func (c *ReusableSSHClient) RunCommand(ctx context.Context, machine *spookytypes.Machine, command string) (string, error) {
 	c.logger.Debug("Running SSH command", map[string]interface{}{
 		"machine": machine.Hostname,
@@ -1254,20 +1254,20 @@ func (c *ReusableSSHClient) RunCommand(ctx context.Context, machine *spookytypes
 		return "", fmt.Errorf("failed to get connection for %s: %w", machine.Hostname, err)
 	}
 
-	// Execute command using cached connection
+	// Run command using cached connection
 	result, err := c.executeCommandOnConnection(ctx, connection, command)
 	if err != nil {
 		// Mark connection as unhealthy on error
 		c.markConnectionUnhealthy(machine)
 		c.recordConnectionFailure()
-		return "", fmt.Errorf("failed to execute command on %s: %w", machine.Hostname, err)
+		return "", fmt.Errorf("failed to run command on %s: %w", machine.Hostname, err)
 	}
 
 	// Update connection last used time
 	c.updateConnectionLastUsed(machine)
 	c.recordConnectionSuccess(true) // This is a reused connection
 
-	c.logger.Debug("Successfully executed SSH command", map[string]interface{}{
+	c.logger.Debug("Successfully ran SSH command", map[string]interface{}{
 		"machine": machine.Hostname,
 		"host":    machine.Host,
 		"command": command,
@@ -1511,7 +1511,7 @@ func (c *ReusableSSHClient) testAuthentication(_ context.Context, machine *spook
 	}
 	defer session.Close()
 
-	// Try to execute a simple command
+	// Try to run a simple command
 	err = session.Run("echo 'authentication test'")
 	return err == nil
 }
@@ -1551,7 +1551,7 @@ func (c *ReusableSSHClient) createSSHConfig(machine *spookytypes.Machine, authIn
 	}, nil
 }
 
-// executeCommandOnConnection executes a command on a cached connection
+// executeCommandOnConnection runs a command on a cached connection
 func (c *ReusableSSHClient) executeCommandOnConnection(ctx context.Context, connection *cachedConnection, command string) (string, error) {
 	connection.mutex.Lock()
 	defer connection.mutex.Unlock()
@@ -1568,12 +1568,12 @@ func (c *ReusableSSHClient) executeCommandOnConnection(ctx context.Context, conn
 	}
 	defer session.Close()
 
-	// Set up command execution
+	// Set up command running
 	var stdout, stderr bytes.Buffer
 	session.Stdout = &stdout
 	session.Stderr = &stderr
 
-	// Execute command with context
+	// Run command with context
 	errChan := make(chan error, 1)
 	go func() {
 		errChan <- session.Run(command)
@@ -1583,10 +1583,10 @@ func (c *ReusableSSHClient) executeCommandOnConnection(ctx context.Context, conn
 	select {
 	case err := <-errChan:
 		if err != nil {
-			return "", fmt.Errorf("command execution failed: %w, stderr: %s", err, stderr.String())
+			return "", fmt.Errorf("command running failed: %w, stderr: %s", err, stderr.String())
 		}
 	case <-ctx.Done():
-		return "", fmt.Errorf("command execution cancelled: %w", ctx.Err())
+		return "", fmt.Errorf("command running cancelled: %w", ctx.Err())
 	}
 
 	return stdout.String(), nil
@@ -1615,7 +1615,7 @@ func (c *ReusableSSHClient) isConnectionHealthy(connection *cachedConnection) bo
 	}
 	defer session.Close()
 
-	// Try to execute a simple command
+	// Try to run a simple command
 	err = session.Run("echo 'health check'")
 	return err == nil
 }
@@ -1801,18 +1801,18 @@ func (c *ReusableSSHClient) GetMetrics() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"total_connections":          c.metrics.TotalConnections,
-		"successful_connections":     c.metrics.SuccessfulConnections,
-		"failed_connections":         c.metrics.FailedConnections,
-		"reused_connections":         c.metrics.ReusedConnections,
-		"success_rate":               successRate,
-		"reuse_rate":                 reuseRate,
-		"avg_authentication_time":    c.metrics.AuthenticationTime,
-		"avg_command_execution_time": c.metrics.CommandExecutionTime,
+		"total_connections":        c.metrics.TotalConnections,
+		"successful_connections":   c.metrics.SuccessfulConnections,
+		"failed_connections":       c.metrics.FailedConnections,
+		"reused_connections":       c.metrics.ReusedConnections,
+		"success_rate":             successRate,
+		"reuse_rate":               reuseRate,
+		"avg_authentication_time":  c.metrics.AuthenticationTime,
+		"avg_command_running_time": c.metrics.CommandRunningTime,
 	}
 }
 
-// RunCommandWithStdin executes a command with stdin data
+// RunCommandWithStdin runs a command with stdin data
 func (c *ReusableSSHClient) RunCommandWithStdin(ctx context.Context, machine *spookytypes.Machine, command, stdin string) (string, error) {
 	c.logger.Debug("Running SSH command with stdin", map[string]interface{}{
 		"machine": machine.Hostname,
@@ -1827,13 +1827,13 @@ func (c *ReusableSSHClient) RunCommandWithStdin(ctx context.Context, machine *sp
 		return "", fmt.Errorf("failed to get connection for %s: %w", machine.Hostname, err)
 	}
 
-	// Execute command with stdin using cached connection
+	// Run command with stdin using cached connection
 	result, err := c.executeCommandOnConnectionWithStdin(ctx, connection, command, stdin)
 	if err != nil {
 		// Mark connection as unhealthy on error
 		c.markConnectionUnhealthy(machine)
 		c.recordConnectionFailure()
-		return "", fmt.Errorf("failed to execute command on %s: %w", machine.Hostname, err)
+		return "", fmt.Errorf("failed to run command on %s: %w", machine.Hostname, err)
 	}
 
 	// Update connection last used time
@@ -1843,12 +1843,12 @@ func (c *ReusableSSHClient) RunCommandWithStdin(ctx context.Context, machine *sp
 	return result, nil
 }
 
-// executeCommandOnConnectionWithStdin executes a command with stdin data
+// executeCommandOnConnectionWithStdin runs a command with stdin data
 func (c *ReusableSSHClient) executeCommandOnConnectionWithStdin(_ context.Context, connection *cachedConnection, command, stdin string) (string, error) {
 	connection.mutex.Lock()
 	defer connection.mutex.Unlock()
 
-	// Create new session for command execution
+	// Create new session for command running
 	session, err := connection.client.NewSession()
 	if err != nil {
 		return "", fmt.Errorf("failed to create SSH session: %w", err)
@@ -1865,10 +1865,10 @@ func (c *ReusableSSHClient) executeCommandOnConnectionWithStdin(_ context.Contex
 	session.Stdout = &stdout
 	session.Stderr = &stderr
 
-	// Execute command
+	// Run command
 	err = session.Run(command)
 	if err != nil {
-		return "", fmt.Errorf("command execution failed: %w (stderr: %s)", err, stderr.String())
+		return "", fmt.Errorf("command running failed: %w (stderr: %s)", err, stderr.String())
 	}
 
 	return stdout.String(), nil

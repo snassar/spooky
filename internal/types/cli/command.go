@@ -131,7 +131,7 @@ type CommandRegistry interface {
 	Run(ctx context.Context, name string, args []string) error
 }
 
-// CommandExecutor provides command run functionality
+// CommandExecutor provides command orchestration functionality
 type CommandExecutor interface {
 	// Run runs a command with the given context
 	Run(ctx context.Context, command Command, args []string) error
