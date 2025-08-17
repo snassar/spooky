@@ -20,6 +20,11 @@ import (
 	spookytypesschemas "spooky/internal/types/schemas"
 )
 
+// Constants for common type strings
+const (
+	typeString = "string"
+)
+
 // Manager provides comprehensive schema management functionality
 type Manager struct {
 	logger            spookytypeslogging.Logger
@@ -1522,7 +1527,7 @@ func (m *Manager) generateBasicExample(schema *spookytypesschemas.Schema) string
 			example.WriteString(fmt.Sprintf("%s = ", fieldName))
 
 			switch field.Type {
-			case "string":
+			case typeString:
 				if field.Default != nil {
 					example.WriteString(fmt.Sprintf(`"%v"`, field.Default))
 				} else {

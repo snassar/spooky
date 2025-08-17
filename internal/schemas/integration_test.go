@@ -321,7 +321,7 @@ project {
   description = "A test project"
 }
 `
-	err := os.WriteFile(testFile, []byte(testContent), 0644)
+	err := os.WriteFile(testFile, []byte(testContent), 0600)
 	require.NoError(t, err)
 
 	// Test configuration validation

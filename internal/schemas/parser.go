@@ -17,6 +17,13 @@ import (
 	spookytypesschemas "spooky/internal/types/schemas"
 )
 
+// Constants for common validation strings
+const (
+	parserValidationType     = "type"
+	parserValidationRequired = "required"
+	parserValidationString   = "string"
+)
+
 // SchemaParser provides functionality to parse HCL schema content into structured validation rules
 type SchemaParser struct {
 	logger spookytypeslogging.Logger
@@ -291,9 +298,9 @@ func (p *SchemaParser) parseFieldValidationBlock(block *hclsyntax.ObjectConsExpr
 
 		keyStr := key.AsString()
 		switch keyStr {
-		case "type":
+		case parserValidationType:
 			fieldValidation.Type = value.AsString()
-		case "required":
+		case parserValidationRequired:
 			fieldValidation.Required = value.True()
 		case "description":
 			fieldValidation.Description = value.AsString()
@@ -344,7 +351,7 @@ func (p *SchemaParser) parseFieldValidationBlock(block *hclsyntax.ObjectConsExpr
 
 	// Set default type if not specified
 	if fieldValidation.Type == "" {
-		fieldValidation.Type = "string"
+		fieldValidation.Type = parserValidationString
 	}
 
 	return fieldValidation, nil
@@ -394,7 +401,7 @@ func (p *SchemaParser) convertCtyValue(val cty.Value) interface{} {
 func (p *SchemaParser) inferTypeFromValue(val cty.Value) string {
 	switch {
 	case val.Type() == cty.String:
-		return "string"
+		return parserValidationString
 	case val.Type() == cty.Number:
 		return "number"
 	case val.Type() == cty.Bool:
@@ -404,7 +411,7 @@ func (p *SchemaParser) inferTypeFromValue(val cty.Value) string {
 	case val.Type().IsMapType():
 		return "object"
 	default:
-		return "string"
+		return parserValidationString
 	}
 }
 

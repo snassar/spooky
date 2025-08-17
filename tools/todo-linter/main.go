@@ -14,6 +14,13 @@ import (
 	"time"
 )
 
+// Priority constants
+const (
+	priorityMedium = "Medium"
+	priorityHigh   = "High"
+	priorityLow    = "Low"
+)
+
 type LintIssue struct {
 	Line       string
 	Message    string
@@ -350,17 +357,17 @@ func categorizeSeverity(errorType, _ string) string {
 	// Medium priority - code quality and potential issues
 	if errorType == "gocritic" || errorType == "govet" || errorType == "errcheck" ||
 		errorType == "gosec" || errorType == "ineffassign" || errorType == "deadcode" {
-		return "Medium"
+		return priorityMedium
 	}
 
 	// Low priority - style and formatting
 	if errorType == "gofmt" || errorType == "goimports" || errorType == "misspell" ||
 		errorType == "gosimple" || errorType == "revive" || errorType == "unused" ||
 		errorType == "gocyclo" || errorType == "dupl" {
-		return "Low"
+		return priorityLow
 	}
 
-	return "Medium"
+	return priorityMedium
 }
 
 func generateReport(results []LintResult, config *Config) {
@@ -500,11 +507,11 @@ func calculateStats(results []LintResult, categories map[string]*IssueCategory) 
 	for _, category := range categories {
 		for _, issue := range category.Issues {
 			switch issue.Severity {
-			case "High":
+			case priorityHigh:
 				highPriority++
-			case "Medium":
+			case priorityMedium:
 				mediumPriority++
-			case "Low":
+			case priorityLow:
 				lowPriority++
 			}
 		}

@@ -16,6 +16,14 @@ import (
 	spookytypesschemas "spooky/internal/types/schemas"
 )
 
+// Constants for common validation strings
+const (
+	validationEmail    = "email"
+	validationRequired = "required"
+	validationError    = "error"
+	validationWarning  = "warning"
+)
+
 // EnhancedValidator provides comprehensive schema validation with advanced features
 type EnhancedValidator struct {
 	registry spookytypesschemas.SchemaRegistry
@@ -141,10 +149,7 @@ func (v *EnhancedValidator) ValidateWithEnhancedFeatures(ctx context.Context, sc
 	}
 
 	// Validate schema configuration
-	if err := v.validateSchemaConfiguration(schema, result); err != nil {
-		// Don't return error, just continue with validation result
-		// The error has already been added to the result
-	}
+	v.validateSchemaConfiguration(schema, result)
 
 	// Check for early termination
 	if v.shouldStopValidation(result) {
@@ -167,14 +172,14 @@ func (v *EnhancedValidator) ValidateWithEnhancedFeatures(ctx context.Context, sc
 	case []byte:
 		parsed, err := v.parseHCLData(dataVal, "data")
 		if err != nil {
-			v.addError(result, "hcl_parse_error", "Failed to parse HCL data", err.Error(), "error")
+			v.addError(result, "hcl_parse_error", "Failed to parse HCL data", err.Error(), validationError)
 			return result, nil
 		}
 		parsedData = parsed
 	case string:
 		parsed, err := v.parseHCLData([]byte(dataVal), "data")
 		if err != nil {
-			v.addError(result, "hcl_parse_error", "Failed to parse HCL string", err.Error(), "error")
+			v.addError(result, "hcl_parse_error", "Failed to parse HCL string", err.Error(), validationError)
 			return result, nil
 		}
 		parsedData = parsed
@@ -271,21 +276,21 @@ func (v *EnhancedValidator) RegisterCustomValidator(name string, validator Custo
 // validateSchemaConfiguration validates the schema configuration itself
 func (v *EnhancedValidator) validateSchemaConfiguration(schema *spookytypesschemas.Schema, result *spookytypesschemas.ValidationResult) error {
 	if schema == nil {
-		v.addError(result, "schema_nil", "Schema cannot be nil", "", "error")
+		v.addError(result, "schema_nil", "Schema cannot be nil", "", validationError)
 		return fmt.Errorf("schema cannot be nil")
 	}
 
 	// Validate required schema fields
 	if schema.Name == "" {
-		v.addError(result, "schema_name_missing", "Schema name is required", "", "error")
+		v.addError(result, "schema_name_missing", "Schema name is required", "", validationError)
 	}
 
 	if schema.Type == "" {
-		v.addError(result, "schema_type_missing", "Schema type is required", "", "error")
+		v.addError(result, "schema_type_missing", "Schema type is required", "", validationError)
 	}
 
 	if schema.Version == "" {
-		v.addWarning(result, "schema_version_missing", "Schema version is recommended", "", "warning")
+		v.addWarning(result, "schema_version_missing", "Schema version is recommended", "")
 	}
 
 	return nil
@@ -294,7 +299,7 @@ func (v *EnhancedValidator) validateSchemaConfiguration(schema *spookytypesschem
 // validateDataStructure validates the basic data structure
 func (v *EnhancedValidator) validateDataStructure(_ *spookytypesschemas.Schema, data interface{}, result *spookytypesschemas.ValidationResult) error {
 	if data == nil {
-		v.addError(result, "data_nil", "Data cannot be nil", "", "error")
+		v.addError(result, "data_nil", "Data cannot be nil", "", validationError)
 		// Don't return error, just add it to the result
 		return nil
 	}
@@ -340,7 +345,7 @@ func (v *EnhancedValidator) validateFieldConstraints(schema *spookytypesschemas.
 func (v *EnhancedValidator) validateFieldValue(fieldValidation *spookytypesschemas.FieldValidation, value interface{}, fieldPath string, result *spookytypesschemas.ValidationResult) error {
 	// Check required field
 	if fieldValidation.Required && value == nil {
-		v.addError(result, "required_field_missing", fmt.Sprintf("Required field '%s' is missing", fieldPath), fmt.Sprintf("Add the required field '%s'", fieldPath), "error")
+		v.addError(result, "required_field_missing", fmt.Sprintf("Required field '%s' is missing", fieldPath), fmt.Sprintf("Add the required field '%s'", fieldPath), validationError)
 		return fmt.Errorf("required field missing")
 	}
 
@@ -364,19 +369,19 @@ func (v *EnhancedValidator) validateFieldConstraintsValue(constraints *spookytyp
 	// String constraints
 	if strValue, ok := value.(string); ok {
 		if constraints.MinLength != nil && len(strValue) < *constraints.MinLength {
-			v.addError(result, "string_too_short", fmt.Sprintf("Field '%s' length %d is less than minimum %d", fieldPath, len(strValue), *constraints.MinLength), fmt.Sprintf("Increase the length of field '%s' to at least %d characters", fieldPath, *constraints.MinLength), "error")
+			v.addError(result, "string_too_short", fmt.Sprintf("Field '%s' length %d is less than minimum %d", fieldPath, len(strValue), *constraints.MinLength), fmt.Sprintf("Increase the length of field '%s' to at least %d characters", fieldPath, *constraints.MinLength), validationError)
 		}
 
 		if constraints.MaxLength != nil && len(strValue) > *constraints.MaxLength {
-			v.addError(result, "string_too_long", fmt.Sprintf("Field '%s' length %d exceeds maximum %d", fieldPath, len(strValue), *constraints.MaxLength), fmt.Sprintf("Reduce the length of field '%s' to at most %d characters", fieldPath, *constraints.MaxLength), "error")
+			v.addError(result, "string_too_long", fmt.Sprintf("Field '%s' length %d exceeds maximum %d", fieldPath, len(strValue), *constraints.MaxLength), fmt.Sprintf("Reduce the length of field '%s' to at most %d characters", fieldPath, *constraints.MaxLength), validationError)
 		}
 
 		if constraints.Pattern != nil {
 			matched, err := regexp.MatchString(*constraints.Pattern, strValue)
 			if err != nil {
-				v.addError(result, "invalid_regex", fmt.Sprintf("Invalid regex pattern for field '%s': %v", fieldPath, err), "", "error")
+				v.addError(result, "invalid_regex", fmt.Sprintf("Invalid regex pattern for field '%s': %v", fieldPath, err), "", validationError)
 			} else if !matched {
-				v.addError(result, "pattern_mismatch", fmt.Sprintf("Field '%s' value '%s' does not match pattern '%s'", fieldPath, strValue, *constraints.Pattern), fmt.Sprintf("Ensure field '%s' matches the required pattern", fieldPath), "error")
+				v.addError(result, "pattern_mismatch", fmt.Sprintf("Field '%s' value '%s' does not match pattern '%s'", fieldPath, strValue, *constraints.Pattern), fmt.Sprintf("Ensure field '%s' matches the required pattern", fieldPath), validationError)
 			}
 		}
 
@@ -390,11 +395,11 @@ func (v *EnhancedValidator) validateFieldConstraintsValue(constraints *spookytyp
 	// Numeric constraints
 	if numValue, ok := v.toFloat64(value); ok {
 		if constraints.Min != nil && numValue < *constraints.Min {
-			v.addError(result, "number_too_small", fmt.Sprintf("Field '%s' value %f is less than minimum %f", fieldPath, numValue, *constraints.Min), fmt.Sprintf("Increase the value of field '%s' to at least %f", fieldPath, *constraints.Min), "error")
+			v.addError(result, "number_too_small", fmt.Sprintf("Field '%s' value %f is less than minimum %f", fieldPath, numValue, *constraints.Min), fmt.Sprintf("Increase the value of field '%s' to at least %f", fieldPath, *constraints.Min), validationError)
 		}
 
 		if constraints.Max != nil && numValue > *constraints.Max {
-			v.addError(result, "number_too_large", fmt.Sprintf("Field '%s' value %f exceeds maximum %f", fieldPath, numValue, *constraints.Max), fmt.Sprintf("Reduce the value of field '%s' to at most %f", fieldPath, *constraints.Max), "error")
+			v.addError(result, "number_too_large", fmt.Sprintf("Field '%s' value %f exceeds maximum %f", fieldPath, numValue, *constraints.Max), fmt.Sprintf("Reduce the value of field '%s' to at most %f", fieldPath, *constraints.Max), validationError)
 		}
 	}
 
@@ -408,7 +413,7 @@ func (v *EnhancedValidator) validateFieldConstraintsValue(constraints *spookytyp
 			}
 		}
 		if !found {
-			v.addError(result, "invalid_enum_value", fmt.Sprintf("Field '%s' value '%v' is not in allowed enum values", fieldPath, value), fmt.Sprintf("Use one of the allowed values for field '%s': %v", fieldPath, constraints.Enum), "error")
+			v.addError(result, "invalid_enum_value", fmt.Sprintf("Field '%s' value '%v' is not in allowed enum values", fieldPath, value), fmt.Sprintf("Use one of the allowed values for field '%s': %v", fieldPath, constraints.Enum), validationError)
 		}
 	}
 
@@ -418,19 +423,19 @@ func (v *EnhancedValidator) validateFieldConstraintsValue(constraints *spookytyp
 // validateFormat validates format constraints
 func (v *EnhancedValidator) validateFormat(format, value, fieldPath string, result *spookytypesschemas.ValidationResult) error {
 	switch format {
-	case "email":
+	case validationEmail:
 		emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 		if !emailRegex.MatchString(value) {
-			v.addError(result, "invalid_email", fmt.Sprintf("Field '%s' value '%s' is not a valid email address", fieldPath, value), "Enter a valid email address (e.g., user@example.com)", "error")
+			v.addError(result, "invalid_email", fmt.Sprintf("Field '%s' value '%s' is not a valid email address", fieldPath, value), "Enter a valid email address (e.g., user@example.com)", validationError)
 		}
 	case "uri":
 		if !strings.HasPrefix(value, "http://") && !strings.HasPrefix(value, "https://") {
-			v.addError(result, "invalid_uri", fmt.Sprintf("Field '%s' value '%s' is not a valid URI", fieldPath, value), "Enter a valid URI starting with http:// or https://", "error")
+			v.addError(result, "invalid_uri", fmt.Sprintf("Field '%s' value '%s' is not a valid URI", fieldPath, value), "Enter a valid URI starting with http:// or https://", validationError)
 		}
 	case "ipv4":
 		ipv4Regex := regexp.MustCompile(`^(\d{1,3}\.){3}\d{1,3}$`)
 		if !ipv4Regex.MatchString(value) {
-			v.addError(result, "invalid_ipv4", fmt.Sprintf("Field '%s' value '%s' is not a valid IPv4 address", fieldPath, value), "Enter a valid IPv4 address (e.g., 192.168.1.1)", "error")
+			v.addError(result, "invalid_ipv4", fmt.Sprintf("Field '%s' value '%s' is not a valid IPv4 address", fieldPath, value), "Enter a valid IPv4 address (e.g., 192.168.1.1)", validationError)
 		}
 	}
 	return nil
@@ -464,9 +469,9 @@ func (v *EnhancedValidator) validateCrossFieldRules(schema *spookytypesschemas.S
 			schemaError.AddContext("condition", crossFieldValidation.Condition)
 
 			switch crossFieldValidation.Severity {
-			case "error":
+			case validationError:
 				result.Errors = append(result.Errors, *schemaError)
-			case "warning":
+			case validationWarning:
 				result.Warnings = append(result.Warnings, *schemaError)
 			case "info":
 				result.Info = append(result.Info, *schemaError)
@@ -502,7 +507,7 @@ func (v *EnhancedValidator) validateCustomRules(ctx context.Context, schema *spo
 		if validator, exists := v.customValidators[customValidator]; exists {
 			if customResult, err := validator(ctx, data, nil); err != nil {
 				schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Custom validation failed: %v", err))
-				schemaError.Severity = "error"
+				schemaError.Severity = validationError
 				schemaError.AddContext("validator", customValidator)
 				result.Errors = append(result.Errors, *schemaError)
 				result.Statistics.RulesFailed++
@@ -513,7 +518,7 @@ func (v *EnhancedValidator) validateCustomRules(ctx context.Context, schema *spo
 				result.Info = append(result.Info, customResult.Info...)
 			}
 		} else {
-			v.addWarning(result, "custom_validator_not_found", fmt.Sprintf("Custom validator '%s' not found", customValidator), "Register the custom validator or remove the reference", "warning")
+			v.addWarning(result, "custom_validator_not_found", fmt.Sprintf("Custom validator '%s' not found", customValidator), "Register the custom validator or remove the reference")
 		}
 
 		// Check for early termination
@@ -548,7 +553,7 @@ func (v *EnhancedValidator) validateSchemaEvolution(schema *spookytypesschemas.S
 				if deprecation.Replacement != "" {
 					message += fmt.Sprintf(" (use '%s' instead)", deprecation.Replacement)
 				}
-				v.addWarning(result, "deprecated_field", message, deprecation.MigrationGuidance, "warning")
+				v.addWarning(result, "deprecated_field", message, deprecation.MigrationGuidance)
 			}
 		}
 	}
@@ -558,7 +563,7 @@ func (v *EnhancedValidator) validateSchemaEvolution(schema *spookytypesschemas.S
 		for _, breakingChange := range schema.Evolution.BreakingChanges {
 			if v.extractFieldValue(data, breakingChange.Field) != nil {
 				message := fmt.Sprintf("Breaking change detected for field '%s': %s", breakingChange.Field, breakingChange.Description)
-				v.addError(result, "breaking_change", message, breakingChange.Mitigation, "error")
+				v.addError(result, "breaking_change", message, breakingChange.Mitigation, validationError)
 			}
 		}
 	}
@@ -622,14 +627,14 @@ func (v *EnhancedValidator) addError(result *spookytypesschemas.ValidationResult
 }
 
 // addWarning adds a warning to the validation result
-func (v *EnhancedValidator) addWarning(result *spookytypesschemas.ValidationResult, code, message, suggestion, severity string) {
-	warning := spookytypesschemas.NewSchemaError("", "", message)
-	warning.Code = code
-	warning.Severity = severity
+func (v *EnhancedValidator) addWarning(result *spookytypesschemas.ValidationResult, code, message, suggestion string) {
+	schemaError := spookytypesschemas.NewSchemaError("", "", message)
+	schemaError.Code = code
+	schemaError.Severity = validationWarning
 	if suggestion != "" {
-		warning.AddSuggestion(suggestion)
+		schemaError.AddSuggestion(suggestion)
 	}
-	result.Warnings = append(result.Warnings, *warning)
+	result.Warnings = append(result.Warnings, *schemaError)
 }
 
 // shouldStopValidation checks if validation should stop
@@ -714,7 +719,7 @@ func (v *EnhancedValidator) evaluateCrossFieldCondition(condition string, fieldV
 
 	// Handle common condition patterns
 	switch {
-	case strings.Contains(condition, "required"):
+	case strings.Contains(condition, validationRequired):
 		// Check if required fields are present
 		requiredFields := extractRequiredFields(condition)
 		for _, field := range requiredFields {
@@ -776,7 +781,7 @@ func extractFieldNames(condition string) []string {
 	words := strings.Fields(condition)
 	for _, word := range words {
 		if !strings.Contains(word, "(") && !strings.Contains(word, ")") &&
-			word != "equals" && word != "not_equals" && word != "required" {
+			word != "equals" && word != "not_equals" && word != validationRequired {
 			fields = append(fields, word)
 		}
 	}

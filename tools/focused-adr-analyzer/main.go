@@ -113,8 +113,14 @@ func parseSignificantCommits(output, pattern string) []SignificantCommit {
 					re := regexp.MustCompile(`(\d+) insertions?.*?(\d+) deletions?`)
 					matches := re.FindStringSubmatch(stats)
 					if len(matches) >= 3 {
-						fmt.Sscanf(matches[1], "%d", &currentCommit.Additions)
-						fmt.Sscanf(matches[2], "%d", &currentCommit.Deletions)
+						if _, err := fmt.Sscanf(matches[1], "%d", &currentCommit.Additions); err != nil {
+							// Log error but continue
+							fmt.Printf("Warning: failed to parse additions: %v\n", err)
+						}
+						if _, err := fmt.Sscanf(matches[2], "%d", &currentCommit.Deletions); err != nil {
+							// Log error but continue
+							fmt.Printf("Warning: failed to parse deletions: %v\n", err)
+						}
 					}
 				}
 			}
@@ -168,8 +174,16 @@ func findLargeArchitecturalCommits(output string) []SignificantCommit {
 					matches := re.FindStringSubmatch(stats)
 					if len(matches) >= 3 {
 						var additions, deletions int
-						fmt.Sscanf(matches[1], "%d", &additions)
-						fmt.Sscanf(matches[2], "%d", &deletions)
+						if _, err := fmt.Sscanf(matches[1], "%d", &additions); err != nil {
+							// Log error but continue
+							fmt.Printf("Warning: failed to parse additions: %v\n", err)
+							continue
+						}
+						if _, err := fmt.Sscanf(matches[2], "%d", &deletions); err != nil {
+							// Log error but continue
+							fmt.Printf("Warning: failed to parse deletions: %v\n", err)
+							continue
+						}
 
 						// Only consider very large commits
 						if additions > 1000 || deletions > 500 {

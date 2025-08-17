@@ -83,8 +83,14 @@ func getGitHistory() []GitCommit {
 					matches := re.FindStringSubmatch(stats)
 					if len(matches) >= 3 {
 						var additions, deletions int
-						fmt.Sscanf(matches[1], "%d", &additions)
-						fmt.Sscanf(matches[2], "%d", &deletions)
+						if _, err := fmt.Sscanf(matches[1], "%d", &additions); err != nil {
+							// Log error but continue
+							fmt.Printf("Warning: failed to parse additions: %v\n", err)
+						}
+						if _, err := fmt.Sscanf(matches[2], "%d", &deletions); err != nil {
+							// Log error but continue
+							fmt.Printf("Warning: failed to parse deletions: %v\n", err)
+						}
 
 						currentCommit.Files = append(currentCommit.Files, parts[0])
 						currentCommit.Additions += additions

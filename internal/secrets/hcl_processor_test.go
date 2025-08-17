@@ -14,6 +14,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Test constants
+const (
+	testDecryptedFact   = "decrypted_fact"
+	testDecryptedCustom = "decrypted_custom"
+)
+
 // MockSecretsIntegration implements SecretsIntegration for testing
 type MockSecretsIntegration struct {
 	decryptFunc func(ctx context.Context, data []byte, identityPath string) ([]byte, error)
@@ -206,8 +212,8 @@ func TestDecryptHCLValues_ReplacesDecryptFacts(t *testing.T) {
 	// Create mock secrets integration
 	secretsIntegration := &MockSecretsIntegration{
 		decryptFunc: func(_ context.Context, _ []byte, _ string) ([]byte, error) {
-			// Mock decryption - return "decrypted_fact" for any age1... string
-			return []byte("decrypted_fact"), nil
+			// Mock decryption - return testDecryptedFact for any age1... string
+			return []byte(testDecryptedFact), nil
 		},
 	}
 
@@ -238,18 +244,18 @@ func TestDecryptHCLValues_ReplacesDecryptFacts(t *testing.T) {
 
 	// Verify that the encrypted values were decrypted
 	customFacts := facts.Facts.Custom
-	if customFacts["secret_key"] != "decrypted_fact" {
-		t.Errorf("secret_key was not decrypted properly: got %v, want decrypted_fact", customFacts["secret_key"])
+	if customFacts["secret_key"] != testDecryptedFact {
+		t.Errorf("secret_key was not decrypted properly: got %v, want %s", customFacts["secret_key"], testDecryptedFact)
 	}
 
 	nestedSecrets := customFacts["nested_secrets"].(map[string]interface{})
-	if nestedSecrets["api_token"] != "decrypted_fact" {
-		t.Errorf("nested api_token was not decrypted properly: got %v, want decrypted_fact", nestedSecrets["api_token"])
+	if nestedSecrets["api_token"] != testDecryptedFact {
+		t.Errorf("nested api_token was not decrypted properly: got %v, want %s", nestedSecrets["api_token"], testDecryptedFact)
 	}
 
 	secretArray := customFacts["secret_array"].([]interface{})
-	if secretArray[0] != "decrypted_fact" {
-		t.Errorf("secret_array[0] was not decrypted properly: got %v, want decrypted_fact", secretArray[0])
+	if secretArray[0] != testDecryptedFact {
+		t.Errorf("secret_array[0] was not decrypted properly: got %v, want %s", secretArray[0], testDecryptedFact)
 	}
 	if secretArray[1] != "plain_value" {
 		t.Errorf("secret_array[1] was modified when it shouldn't be: got %v, want plain_value", secretArray[1])
@@ -260,8 +266,8 @@ func TestDecryptHCLValues_HandlesCustomHCLFiles(t *testing.T) {
 	// Create mock secrets integration
 	secretsIntegration := &MockSecretsIntegration{
 		decryptFunc: func(_ context.Context, _ []byte, _ string) ([]byte, error) {
-			// Mock decryption - return "decrypted_custom" for any age1... string
-			return []byte("decrypted_custom"), nil
+			// Mock decryption - return testDecryptedCustom for any age1... string
+			return []byte(testDecryptedCustom), nil
 		},
 	}
 
@@ -296,11 +302,11 @@ func TestDecryptHCLValues_HandlesCustomHCLFiles(t *testing.T) {
 	}
 
 	secretConfig := customHCL["secret_config"].(map[string]interface{})
-	if secretConfig["database_url"] != "decrypted_custom" {
-		t.Errorf("database_url was not decrypted properly: got %v, want decrypted_custom", secretConfig["database_url"])
+	if secretConfig["database_url"] != testDecryptedCustom {
+		t.Errorf("database_url was not decrypted properly: got %v, want %s", secretConfig["database_url"], testDecryptedCustom)
 	}
-	if secretConfig["api_secret"] != "decrypted_custom" {
-		t.Errorf("api_secret was not decrypted properly: got %v, want decrypted_custom", secretConfig["api_secret"])
+	if secretConfig["api_secret"] != testDecryptedCustom {
+		t.Errorf("api_secret was not decrypted properly: got %v, want %s", secretConfig["api_secret"], testDecryptedCustom)
 	}
 
 	publicConfig := customHCL["public_config"].(map[string]interface{})
@@ -312,11 +318,11 @@ func TestDecryptHCLValues_HandlesCustomHCLFiles(t *testing.T) {
 	}
 
 	secretList := customHCL["secret_list"].([]interface{})
-	if secretList[0] != "decrypted_custom" {
-		t.Errorf("secret_list[0] was not decrypted properly: got %v, want decrypted_custom", secretList[0])
+	if secretList[0] != testDecryptedCustom {
+		t.Errorf("secret_list[0] was not decrypted properly: got %v, want %s", secretList[0], testDecryptedCustom)
 	}
-	if secretList[1] != "decrypted_custom" {
-		t.Errorf("secret_list[1] was not decrypted properly: got %v, want decrypted_custom", secretList[1])
+	if secretList[1] != testDecryptedCustom {
+		t.Errorf("secret_list[1] was not decrypted properly: got %v, want %s", secretList[1], testDecryptedCustom)
 	}
 }
 

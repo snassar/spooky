@@ -424,7 +424,7 @@ func (v *Validator) ValidateField(schema *spookytypesschemas.Schema, fieldPath s
 func (v *Validator) validateSchemaConfiguration(schema *spookytypesschemas.Schema, result *spookytypesschemas.ValidationResult) error {
 	if schema == nil {
 		schemaError := spookytypesschemas.NewSchemaError("", "", "Schema cannot be nil")
-		schemaError.Severity = "error"
+		schemaError.Severity = validationError
 		result.Errors = append(result.Errors, *schemaError)
 		return fmt.Errorf("schema cannot be nil")
 	}
@@ -432,13 +432,13 @@ func (v *Validator) validateSchemaConfiguration(schema *spookytypesschemas.Schem
 	// Validate required schema fields
 	if schema.Name == "" {
 		schemaError := spookytypesschemas.NewSchemaError(schema.Name, schema.Type, "Schema name is required")
-		schemaError.Severity = "error"
+		schemaError.Severity = validationError
 		result.Errors = append(result.Errors, *schemaError)
 	}
 
 	if schema.Type == "" {
 		schemaError := spookytypesschemas.NewSchemaError(schema.Name, schema.Type, "Schema type is required")
-		schemaError.Severity = "error"
+		schemaError.Severity = validationError
 		result.Errors = append(result.Errors, *schemaError)
 	}
 
@@ -455,7 +455,7 @@ func (v *Validator) validateSchemaConfiguration(schema *spookytypesschemas.Schem
 func (v *Validator) validateDataStructure(schema *spookytypesschemas.Schema, data interface{}, result *spookytypesschemas.ValidationResult) error {
 	if data == nil {
 		schemaError := spookytypesschemas.NewSchemaError(schema.Name, schema.Type, "Data cannot be nil")
-		schemaError.Severity = "error"
+		schemaError.Severity = validationError
 		result.Errors = append(result.Errors, *schemaError)
 		return fmt.Errorf("data cannot be nil")
 	}
@@ -465,7 +465,7 @@ func (v *Validator) validateDataStructure(schema *spookytypesschemas.Schema, dat
 		if _, ok := data.([]byte); !ok {
 			if _, ok := data.(string); !ok {
 				schemaError := spookytypesschemas.NewSchemaError(schema.Name, schema.Type, "HCL schema expects byte array or string data")
-				schemaError.Severity = "error"
+				schemaError.Severity = validationError
 				result.Errors = append(result.Errors, *schemaError)
 			}
 		}
@@ -504,7 +504,7 @@ func (v *Validator) validateFieldValue(fieldValidation *spookytypesschemas.Field
 	if fieldValidation.Required && value == nil {
 		schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Required field '%s' is missing", fieldPath))
 		schemaError.FieldPath = fieldPath
-		schemaError.Severity = "error"
+		schemaError.Severity = validationError
 		schemaError.AddSuggestion(fmt.Sprintf("Add the required field '%s'", fieldPath))
 		result.Errors = append(result.Errors, *schemaError)
 		return fmt.Errorf("required field missing")
@@ -533,7 +533,7 @@ func (v *Validator) validateFieldConstraints(constraints *spookytypesschemas.Fie
 			schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' length %d is less than minimum %d", fieldPath, len(strValue), *constraints.MinLength))
 			schemaError.FieldPath = fieldPath
 			schemaError.Value = strValue
-			schemaError.Severity = "error"
+			schemaError.Severity = validationError
 			schemaError.AddSuggestion(fmt.Sprintf("Increase the length of field '%s' to at least %d characters", fieldPath, *constraints.MinLength))
 			result.Errors = append(result.Errors, *schemaError)
 		}
@@ -542,7 +542,7 @@ func (v *Validator) validateFieldConstraints(constraints *spookytypesschemas.Fie
 			schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' length %d exceeds maximum %d", fieldPath, len(strValue), *constraints.MaxLength))
 			schemaError.FieldPath = fieldPath
 			schemaError.Value = strValue
-			schemaError.Severity = "error"
+			schemaError.Severity = validationError
 			schemaError.AddSuggestion(fmt.Sprintf("Reduce the length of field '%s' to at most %d characters", fieldPath, *constraints.MaxLength))
 			result.Errors = append(result.Errors, *schemaError)
 		}
@@ -552,13 +552,13 @@ func (v *Validator) validateFieldConstraints(constraints *spookytypesschemas.Fie
 			if err != nil {
 				schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Invalid regex pattern for field '%s': %v", fieldPath, err))
 				schemaError.FieldPath = fieldPath
-				schemaError.Severity = "error"
+				schemaError.Severity = validationError
 				result.Errors = append(result.Errors, *schemaError)
 			} else if !matched {
 				schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' value '%s' does not match pattern '%s'", fieldPath, strValue, *constraints.Pattern))
 				schemaError.FieldPath = fieldPath
 				schemaError.Value = strValue
-				schemaError.Severity = "error"
+				schemaError.Severity = validationError
 				schemaError.AddSuggestion(fmt.Sprintf("Ensure field '%s' matches the required pattern", fieldPath))
 				result.Errors = append(result.Errors, *schemaError)
 			}
@@ -577,7 +577,7 @@ func (v *Validator) validateFieldConstraints(constraints *spookytypesschemas.Fie
 			schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' value %f is less than minimum %f", fieldPath, numValue, *constraints.Min))
 			schemaError.FieldPath = fieldPath
 			schemaError.Value = numValue
-			schemaError.Severity = "error"
+			schemaError.Severity = validationError
 			schemaError.AddSuggestion(fmt.Sprintf("Increase the value of field '%s' to at least %f", fieldPath, *constraints.Min))
 			result.Errors = append(result.Errors, *schemaError)
 		}
@@ -586,7 +586,7 @@ func (v *Validator) validateFieldConstraints(constraints *spookytypesschemas.Fie
 			schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' value %f exceeds maximum %f", fieldPath, numValue, *constraints.Max))
 			schemaError.FieldPath = fieldPath
 			schemaError.Value = numValue
-			schemaError.Severity = "error"
+			schemaError.Severity = validationError
 			schemaError.AddSuggestion(fmt.Sprintf("Reduce the value of field '%s' to at most %f", fieldPath, *constraints.Max))
 			result.Errors = append(result.Errors, *schemaError)
 		}
@@ -605,7 +605,7 @@ func (v *Validator) validateFieldConstraints(constraints *spookytypesschemas.Fie
 			schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' value '%v' is not in allowed enum values", fieldPath, value))
 			schemaError.FieldPath = fieldPath
 			schemaError.Value = value
-			schemaError.Severity = "error"
+			schemaError.Severity = validationError
 			schemaError.AddSuggestion(fmt.Sprintf("Use one of the allowed values for field '%s': %v", fieldPath, constraints.Enum))
 			result.Errors = append(result.Errors, *schemaError)
 		}
@@ -623,7 +623,7 @@ func (v *Validator) validateFormat(format, value, fieldPath string, result *spoo
 			schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' value '%s' is not a valid email address", fieldPath, value))
 			schemaError.FieldPath = fieldPath
 			schemaError.Value = value
-			schemaError.Severity = "error"
+			schemaError.Severity = validationError
 			schemaError.AddSuggestion("Enter a valid email address (e.g., user@example.com)")
 			result.Errors = append(result.Errors, *schemaError)
 		}
@@ -632,7 +632,7 @@ func (v *Validator) validateFormat(format, value, fieldPath string, result *spoo
 			schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' value '%s' is not a valid URI", fieldPath, value))
 			schemaError.FieldPath = fieldPath
 			schemaError.Value = value
-			schemaError.Severity = "error"
+			schemaError.Severity = validationError
 			schemaError.AddSuggestion("Enter a valid URI starting with http:// or https://")
 			result.Errors = append(result.Errors, *schemaError)
 		}
@@ -788,7 +788,7 @@ func (v *Validator) validateAgainstSchema(file *hcl.File, schema *spookytypessch
 	// Basic validation: check if the file has content
 	if len(file.Bytes) == 0 {
 		schemaError := spookytypesschemas.NewSchemaError(schema.Name, schema.Type, "File is empty")
-		schemaError.Severity = "error"
+		schemaError.Severity = validationError
 		schemaError.SetLocation(filePath, 1, 1)
 		result.Errors = append(result.Errors, *schemaError)
 		result.Valid = false
