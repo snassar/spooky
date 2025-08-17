@@ -2,20 +2,21 @@
 package templates
 
 import (
-	"crypto/md5"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
-	"math/rand"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	spookytypeslogging "spooky/internal/types/logging"
 )
@@ -38,7 +39,7 @@ func (b *BuiltInFunctions) GetFunctions() map[string]interface{} {
 		// String manipulation functions
 		"upper":      strings.ToUpper,
 		"lower":      strings.ToLower,
-		"title":      strings.Title,
+		"title":      b.title,
 		"trim":       strings.TrimSpace,
 		"trimLeft":   strings.TrimLeft,
 		"trimRight":  strings.TrimRight,
@@ -81,7 +82,6 @@ func (b *BuiltInFunctions) GetFunctions() map[string]interface{} {
 		"containsItem": b.containsItem,
 
 		// Hash and encoding functions
-		"md5":          b.md5,
 		"sha256":       b.sha256,
 		"base64":       b.base64,
 		"base64Decode": b.base64Decode,
@@ -99,36 +99,32 @@ func (b *BuiltInFunctions) GetFunctions() map[string]interface{} {
 		"fromJSON":   b.fromJSON,
 		"prettyJSON": b.prettyJSON,
 
-		// Date and time functions
-		"now":        b.now,
-		"formatTime": b.formatTime,
-		"parseTime":  b.parseTime,
-		"addDays":    b.addDays,
-		"addHours":   b.addHours,
-
-		// Utility functions
-		"default":      b.defaultValue,
-		"coalesce":     b.coalesce,
-		"ternary":      b.ternary,
+		// Regular expression functions
 		"regexMatch":   b.regexMatch,
 		"regexReplace": b.regexReplace,
-		"random":       b.random,
-		"uuid":         b.uuid,
+
+		// Random functions
+		"random": b.random,
+		"uuid":   b.uuid,
 	}
 }
 
 // String manipulation functions
 
-func (b *BuiltInFunctions) substring(s string, start, length int) string {
+func (b *BuiltInFunctions) title(s string) string {
+	caser := cases.Title(language.English)
+	return caser.String(s)
+}
+
+func (b *BuiltInFunctions) substring(s string, start, end int) string {
 	if start < 0 {
 		start = 0
 	}
-	if start >= len(s) {
-		return ""
-	}
-	end := start + length
 	if end > len(s) {
 		end = len(s)
+	}
+	if start >= end {
+		return ""
 	}
 	return s[start:end]
 }
@@ -142,30 +138,38 @@ func (b *BuiltInFunctions) length(v interface{}) int {
 	case map[string]interface{}:
 		return len(val)
 	default:
-		return 0
+		return len(b.toString(val))
 	}
 }
 
 // Mathematical functions
 
-func (b *BuiltInFunctions) add(a, bVal interface{}) float64 {
-	return b.toFloat(a) + b.toFloat(bVal)
+func (b *BuiltInFunctions) add(values ...interface{}) float64 {
+	result := 0.0
+	for _, v := range values {
+		result += b.toFloat(v)
+	}
+	return result
 }
 
 func (b *BuiltInFunctions) sub(a, bVal interface{}) float64 {
 	return b.toFloat(a) - b.toFloat(bVal)
 }
 
-func (b *BuiltInFunctions) mul(a, bVal interface{}) float64 {
-	return b.toFloat(a) * b.toFloat(bVal)
+func (b *BuiltInFunctions) mul(values ...interface{}) float64 {
+	result := 1.0
+	for _, v := range values {
+		result *= b.toFloat(v)
+	}
+	return result
 }
 
 func (b *BuiltInFunctions) div(a, bVal interface{}) float64 {
 	divisor := b.toFloat(bVal)
 	if divisor == 0 {
-		b.logger.Warn("Division by zero attempted", map[string]interface{}{
+		b.logger.Warn("Division by zero", map[string]interface{}{
 			"dividend": a,
-			"divisor":  bVal,
+			"divisor":  divisor,
 		})
 		return 0
 	}
@@ -175,9 +179,9 @@ func (b *BuiltInFunctions) div(a, bVal interface{}) float64 {
 func (b *BuiltInFunctions) mod(a, bVal interface{}) int {
 	divisor := b.toInt(bVal)
 	if divisor == 0 {
-		b.logger.Warn("Modulo by zero attempted", map[string]interface{}{
+		b.logger.Warn("Modulo by zero", map[string]interface{}{
 			"dividend": a,
-			"divisor":  bVal,
+			"divisor":  divisor,
 		})
 		return 0
 	}
@@ -188,26 +192,26 @@ func (b *BuiltInFunctions) min(values ...interface{}) float64 {
 	if len(values) == 0 {
 		return 0
 	}
-	min := b.toFloat(values[0])
+	minVal := b.toFloat(values[0])
 	for _, v := range values[1:] {
-		if val := b.toFloat(v); val < min {
-			min = val
+		if val := b.toFloat(v); val < minVal {
+			minVal = val
 		}
 	}
-	return min
+	return minVal
 }
 
 func (b *BuiltInFunctions) max(values ...interface{}) float64 {
 	if len(values) == 0 {
 		return 0
 	}
-	max := b.toFloat(values[0])
+	maxVal := b.toFloat(values[0])
 	for _, v := range values[1:] {
-		if val := b.toFloat(v); val > max {
-			max = val
+		if val := b.toFloat(v); val > maxVal {
+			maxVal = val
 		}
 	}
-	return max
+	return maxVal
 }
 
 // Array manipulation functions
@@ -285,8 +289,8 @@ func (b *BuiltInFunctions) uniq(slice []interface{}) []interface{} {
 }
 
 func (b *BuiltInFunctions) containsItem(slice []interface{}, item interface{}) bool {
-	for _, val := range slice {
-		if b.toString(val) == b.toString(item) {
+	for _, v := range slice {
+		if b.toString(v) == b.toString(item) {
 			return true
 		}
 	}
@@ -294,11 +298,6 @@ func (b *BuiltInFunctions) containsItem(slice []interface{}, item interface{}) b
 }
 
 // Hash and encoding functions
-
-func (b *BuiltInFunctions) md5(s string) string {
-	hash := md5.Sum([]byte(s))
-	return hex.EncodeToString(hash[:])
-}
 
 func (b *BuiltInFunctions) sha256(s string) string {
 	hash := sha256.Sum256([]byte(s))
@@ -386,7 +385,7 @@ func (b *BuiltInFunctions) toBool(v interface{}) bool {
 	case bool:
 		return val
 	case string:
-		return strings.ToLower(val) == "true" || val == "1"
+		return strings.EqualFold(val, "true") || val == "1"
 	case int:
 		return val != 0
 	case float64:
@@ -404,7 +403,7 @@ func (b *BuiltInFunctions) toJSON(v interface{}) string {
 			"value": v,
 			"error": err.Error(),
 		})
-		return "{}"
+		return ""
 	}
 	return string(data)
 }
@@ -428,69 +427,15 @@ func (b *BuiltInFunctions) prettyJSON(v interface{}) string {
 			"value": v,
 			"error": err.Error(),
 		})
-		return "{}"
+		return ""
 	}
 	return string(data)
 }
 
-// Date and time functions
-
-func (b *BuiltInFunctions) now() time.Time {
-	return time.Now()
-}
-
-func (b *BuiltInFunctions) formatTime(t time.Time, layout string) string {
-	return t.Format(layout)
-}
-
-func (b *BuiltInFunctions) parseTime(s, layout string) time.Time {
-	t, err := time.Parse(layout, s)
-	if err != nil {
-		b.logger.Warn("Failed to parse time", map[string]interface{}{
-			"input":  s,
-			"layout": layout,
-			"error":  err.Error(),
-		})
-		return time.Time{}
-	}
-	return t
-}
-
-func (b *BuiltInFunctions) addDays(t time.Time, days int) time.Time {
-	return t.AddDate(0, 0, days)
-}
-
-func (b *BuiltInFunctions) addHours(t time.Time, hours int) time.Time {
-	return t.Add(time.Duration(hours) * time.Hour)
-}
-
-// Utility functions
-
-func (b *BuiltInFunctions) defaultValue(value, defaultValue interface{}) interface{} {
-	if value == nil || value == "" {
-		return defaultValue
-	}
-	return value
-}
-
-func (b *BuiltInFunctions) coalesce(values ...interface{}) interface{} {
-	for _, v := range values {
-		if v != nil && v != "" {
-			return v
-		}
-	}
-	return nil
-}
-
-func (b *BuiltInFunctions) ternary(condition bool, trueValue, falseValue interface{}) interface{} {
-	if condition {
-		return trueValue
-	}
-	return falseValue
-}
+// Regular expression functions
 
 func (b *BuiltInFunctions) regexMatch(pattern, s string) bool {
-	matched, err := regexp.MatchString(pattern, s)
+	re, err := regexp.Compile(pattern)
 	if err != nil {
 		b.logger.Warn("Invalid regex pattern", map[string]interface{}{
 			"pattern": pattern,
@@ -498,10 +443,10 @@ func (b *BuiltInFunctions) regexMatch(pattern, s string) bool {
 		})
 		return false
 	}
-	return matched
+	return re.MatchString(s)
 }
 
-func (b *BuiltInFunctions) regexReplace(pattern, replacement, s string) string {
+func (b *BuiltInFunctions) regexReplace(pattern, s, replacement string) string {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
 		b.logger.Warn("Invalid regex pattern", map[string]interface{}{
@@ -513,19 +458,61 @@ func (b *BuiltInFunctions) regexReplace(pattern, replacement, s string) string {
 	return re.ReplaceAllString(s, replacement)
 }
 
-func (b *BuiltInFunctions) random(min, max int) int {
-	if min >= max {
-		return min
+func (b *BuiltInFunctions) random(minVal, maxVal int) int {
+	if minVal >= maxVal {
+		return minVal
 	}
-	return rand.Intn(max-min+1) + min
+
+	// Use crypto/rand for secure random number generation
+	rangeSize := maxVal - minVal + 1
+	if rangeSize <= 0 {
+		return minVal
+	}
+
+	// Use a simpler approach to avoid integer overflow
+	buf := make([]byte, 4)
+	_, err := rand.Read(buf)
+	if err != nil {
+		b.logger.Warn("Failed to generate random number", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return minVal
+	}
+
+	// Convert to uint32 and scale to range
+	randomUint := uint32(buf[0])<<24 | uint32(buf[1])<<16 | uint32(buf[2])<<8 | uint32(buf[3])
+
+	// Use modulo to get a value in range [0, rangeSize)
+	// Ensure rangeSize is positive and within uint32 bounds
+	if rangeSize > 0 && rangeSize <= 1<<31-1 {
+		scaledValue := randomUint % uint32(rangeSize)
+		return minVal + int(scaledValue)
+	}
+
+	// Fallback for very large ranges
+	fallbackRange := maxVal - minVal + 1
+	if fallbackRange > 0 && fallbackRange <= 1<<31-1 {
+		return minVal + int(randomUint%uint32(fallbackRange))
+	}
+	// If range is still too large, just return minVal
+	return minVal
 }
 
 func (b *BuiltInFunctions) uuid() string {
-	// Simple UUID v4 implementation
+	// Secure UUID v4 implementation using crypto/rand
 	buf := make([]byte, 16)
-	rand.Read(buf)
+	_, err := rand.Read(buf)
+	if err != nil {
+		b.logger.Warn("Failed to generate UUID", map[string]interface{}{
+			"error": err.Error(),
+		})
+		return ""
+	}
+
+	// Set version (4) and variant bits
 	buf[6] = (buf[6] & 0x0f) | 0x40
 	buf[8] = (buf[8] & 0x3f) | 0x80
+
 	return fmt.Sprintf("%x-%x-%x-%x-%x", buf[0:4], buf[4:6], buf[6:8], buf[8:10], buf[10:])
 }
 

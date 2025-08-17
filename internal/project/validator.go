@@ -10,6 +10,7 @@ import (
 
 	spookyinterfaces "spooky/internal/interfaces"
 	spookytypes "spooky/internal/types"
+	spookytypescommon "spooky/internal/types/common"
 	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesschemas "spooky/internal/types/schemas"
 )
@@ -229,12 +230,13 @@ func (v *Validator) ValidateProjectConfig(_ context.Context, config *spookytypes
 	// Validate metadata if present
 	if config.Metadata != nil {
 		if config.Metadata.Version != "" {
-			// Basic version validation - could be enhanced
-			if len(config.Metadata.Version) > 64 {
-				result.Warnings = append(result.Warnings, spookytypesschemas.SchemaError{
-					Code:     "version_too_long",
-					Message:  "Project version should be 64 characters or less",
-					Severity: "warning",
+			// Use centralized ScalVer validation
+			if !spookytypescommon.IsValidScalVerFormat(config.Metadata.Version) {
+				result.Valid = false
+				result.Errors = append(result.Errors, spookytypesschemas.SchemaError{
+					Code:     "invalid_version_format",
+					Message:  "Project version must be in ScalVer format (MAJOR.DATE.PATCH)",
+					Severity: "error",
 				})
 			}
 		}

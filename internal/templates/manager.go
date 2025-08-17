@@ -7,13 +7,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	texttemplate "text/template"
 	"time"
 
 	spookyinterfaces "spooky/internal/interfaces"
+	spookyschemas "spooky/internal/schemas"
 	spookytypes "spooky/internal/types"
+	spookytypescommon "spooky/internal/types/common"
 	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesschemas "spooky/internal/types/schemas"
 	spookytypestemplates "spooky/internal/types/templates"
@@ -82,7 +85,6 @@ type FunctionExample struct {
 // FunctionResultCache caches function results
 type FunctionResultCache struct {
 	cache map[string]FunctionCacheEntry
-	mu    sync.RWMutex
 	ttl   time.Duration
 }
 
@@ -118,7 +120,6 @@ type ContextCacheEntry struct {
 // ContextValidator validates template contexts
 type ContextValidator struct {
 	logger spookytypeslogging.Logger
-	mu     sync.RWMutex
 }
 
 // ResolveContext resolves template context with facts, variables, and machines data
@@ -184,10 +185,7 @@ func (c *TemplateContextResolver) ResolveContext(ctx context.Context, template *
 }
 
 // ValidateContext validates a template context
-func (c *TemplateContextResolver) ValidateContext(ctx context.Context, context *spookytypes.TemplateContext) error {
-	c.validator.mu.Lock()
-	defer c.validator.mu.Unlock()
-
+func (c *TemplateContextResolver) ValidateContext(_ context.Context, context *spookytypes.TemplateContext) error {
 	// Validate project context
 	if context.Project == nil {
 		return fmt.Errorf("project context is required")
@@ -221,7 +219,7 @@ func (c *TemplateContextResolver) ValidateContext(ctx context.Context, context *
 }
 
 // TransformContext transforms a template context
-func (c *TemplateContextResolver) TransformContext(ctx context.Context, context *spookytypes.TemplateContext) error {
+func (c *TemplateContextResolver) TransformContext(_ context.Context, context *spookytypes.TemplateContext) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -256,7 +254,7 @@ func (c *TemplateContextResolver) TransformContext(ctx context.Context, context 
 // TemplateMetadataManager manages template metadata
 type TemplateMetadataManager struct {
 	validator MetadataValidator
-	indexer   MetadataIndexer
+	indexer   *EnhancedMetadataIndexer
 	cache     MetadataCache
 	mu        sync.RWMutex
 }
@@ -299,7 +297,7 @@ func (m *TemplateMetadataManager) LoadMetadata(ctx context.Context, templatePath
 }
 
 // ValidateMetadata validates template metadata
-func (m *TemplateMetadataManager) ValidateMetadata(ctx context.Context, metadata *spookytypestemplates.TemplateMetadata) error {
+func (m *TemplateMetadataManager) ValidateMetadata(_ context.Context, metadata *spookytypestemplates.TemplateMetadata) error {
 	// Basic validation
 	if metadata == nil {
 		return fmt.Errorf("metadata cannot be nil")
@@ -330,43 +328,27 @@ func (m *TemplateMetadataManager) ValidateMetadata(ctx context.Context, metadata
 }
 
 // IndexMetadata indexes template metadata
-func (m *TemplateMetadataManager) IndexMetadata(ctx context.Context, metadata *spookytypestemplates.TemplateMetadata) error {
-	m.indexer.mu.Lock()
-	defer m.indexer.mu.Unlock()
-
-	// Index by name
-	m.indexer.index[metadata.Name] = metadata
-
-	// Index by tags
-	if metadata.Tags != nil {
-		for _, tag := range metadata.Tags {
-			tagKey := "tag:" + tag
-			m.indexer.index[tagKey] = metadata
-		}
-	}
-
-	return nil
+func (m *TemplateMetadataManager) IndexMetadata(_ context.Context, metadata *spookytypestemplates.TemplateMetadata) error {
+	return m.indexer.IndexMetadata(metadata)
 }
 
 // SearchMetadata searches for template metadata
-func (m *TemplateMetadataManager) SearchMetadata(ctx context.Context, query string) ([]*spookytypestemplates.TemplateMetadata, error) {
-	m.indexer.mu.RLock()
-	defer m.indexer.mu.RUnlock()
-
-	var results []*spookytypestemplates.TemplateMetadata
-
-	// Simple search implementation
-	for key, metadata := range m.indexer.index {
-		if contains(key, query) || contains(metadata.Name, query) || contains(metadata.Description, query) {
-			results = append(results, metadata)
-		}
+func (m *TemplateMetadataManager) SearchMetadata(_ context.Context, query string) ([]*spookytypestemplates.TemplateMetadata, error) {
+	results, err := m.indexer.Search(query, &SearchFilters{})
+	if err != nil {
+		return nil, err
 	}
 
-	return results, nil
+	var metadata []*spookytypestemplates.TemplateMetadata
+	for _, result := range results {
+		metadata = append(metadata, result.Metadata)
+	}
+
+	return metadata, nil
 }
 
 // loadMetadataFromFile loads metadata from a file
-func (m *TemplateMetadataManager) loadMetadataFromFile(ctx context.Context, templatePath string) (*spookytypestemplates.TemplateMetadata, error) {
+func (m *TemplateMetadataManager) loadMetadataFromFile(_ context.Context, templatePath string) (*spookytypestemplates.TemplateMetadata, error) {
 	// Check if metadata file exists
 	metadataPath := templatePath + ".meta"
 	if _, err := os.Stat(metadataPath); os.IsNotExist(err) {
@@ -427,12 +409,6 @@ func (m *TemplateMetadataManager) cacheMetadata(key string, metadata *spookytype
 	}
 }
 
-// MetadataIndexer indexes template metadata
-type MetadataIndexer struct {
-	index map[string]*spookytypestemplates.TemplateMetadata
-	mu    sync.RWMutex
-}
-
 // MetadataCache caches template metadata
 type MetadataCache struct {
 	cache map[string]MetadataCacheEntry
@@ -449,6 +425,7 @@ type MetadataCacheEntry struct {
 // TemplateValidator provides comprehensive template validation
 type TemplateValidator struct {
 	schemaValidator   spookytypesschemas.SchemaValidator
+	schemaManager     *spookyschemas.Manager
 	functionValidator FunctionValidator
 	contextValidator  ContextValidator
 	metadataValidator MetadataValidator
@@ -458,8 +435,24 @@ type TemplateValidator struct {
 
 // ValidateTemplateComprehensive validates template against schemas
 func (v *TemplateValidator) ValidateTemplateComprehensive(ctx context.Context, template *spookytypes.Template) (*spookytypesschemas.ValidationResult, error) {
-	// For now, return a basic validation result
-	// This will be enhanced with schema validation
+	if v.schemaValidator == nil {
+		return &spookytypesschemas.ValidationResult{
+			Valid:       false,
+			ValidatedAt: time.Now(),
+			Errors: []spookytypesschemas.SchemaError{
+				{
+					Message:   "schema validator not configured",
+					FieldPath: "schema_validator",
+					Severity:  "error",
+				},
+			},
+			Warnings: []spookytypesschemas.SchemaError{},
+			Info:     []spookytypesschemas.SchemaError{},
+			Details:  make(map[string]interface{}),
+		}, nil
+	}
+
+	// Create a comprehensive validation result
 	result := &spookytypesschemas.ValidationResult{
 		Valid:       true,
 		ValidatedAt: time.Now(),
@@ -469,7 +462,228 @@ func (v *TemplateValidator) ValidateTemplateComprehensive(ctx context.Context, t
 		Details:     make(map[string]interface{}),
 	}
 
+	// Validate template structure against template-structure schema
+	if err := v.validateTemplateStructure(ctx, template, result); err != nil {
+		v.logger.Error("Template structure validation failed", err, map[string]interface{}{
+			"template_id": template.ID,
+		})
+		result.Valid = false
+	}
+
+	// Validate template context against template-context schema
+	if err := v.validateTemplateContext(ctx, template, result); err != nil {
+		v.logger.Error("Template context validation failed", err, map[string]interface{}{
+			"template_id": template.ID,
+		})
+		result.Valid = false
+	}
+
+	// Validate template functions against template-functions schema
+	if err := v.validateTemplateFunctions(ctx, template, result); err != nil {
+		v.logger.Error("Template functions validation failed", err, map[string]interface{}{
+			"template_id": template.ID,
+		})
+		result.Valid = false
+	}
+
+	// Validate template metadata against template-metadata schema
+	if err := v.validateTemplateMetadata(ctx, template, result); err != nil {
+		v.logger.Error("Template metadata validation failed", err, map[string]interface{}{
+			"template_id": template.ID,
+		})
+		result.Valid = false
+	}
+
 	return result, nil
+}
+
+// validateTemplateStructure validates template against template-structure schema
+func (v *TemplateValidator) validateTemplateStructure(_ context.Context, template *spookytypes.Template, result *spookytypesschemas.ValidationResult) error {
+	// Load template-metadata-validation schema
+	schema, err := v.loadTemplateSchema("template-metadata-validation")
+	if err != nil {
+		return fmt.Errorf("failed to load template-metadata-validation schema: %w", err)
+	}
+
+	// Convert template metadata to map for validation
+	metadataData := v.templateMetadataToMap(template)
+
+	// Validate against schema
+	validationResult, err := v.schemaValidator.Validate(schema, metadataData)
+	if err != nil {
+		return fmt.Errorf("template metadata validation failed: %w", err)
+	}
+
+	// Merge validation results
+	v.mergeValidationResults(result, validationResult)
+
+	return nil
+}
+
+// loadTemplateSchema loads a template schema by name
+func (v *TemplateValidator) loadTemplateSchema(schemaName string) (*spookytypesschemas.Schema, error) {
+	schemaPath := fmt.Sprintf("internal/schemas/schemas/%s.schema.hcl", schemaName)
+
+	// Use schema manager to properly load and parse the schema
+	if v.schemaManager != nil {
+		return v.schemaManager.Load(schemaPath)
+	}
+
+	// Fallback to manual loading if no schema manager available
+	data, err := os.ReadFile(schemaPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read schema file %s: %w", schemaPath, err)
+	}
+
+	// Create schema object
+	schema := &spookytypesschemas.Schema{
+		Name:        schemaName,
+		Description: fmt.Sprintf("Template %s schema", schemaName),
+		Content:     string(data),
+		Type:        "hcl",
+		Version:     "1.0",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+		Metadata:    make(map[string]interface{}),
+	}
+
+	return schema, nil
+}
+
+// templateContextToMap converts template context to a map for validation
+func (v *TemplateValidator) templateContextToMap(template *spookytypes.Template) map[string]interface{} {
+	if template.ContextData == nil {
+		return make(map[string]interface{})
+	}
+
+	return template.ContextData
+}
+
+// mergeValidationResults merges validation results
+func (v *TemplateValidator) mergeValidationResults(target, source *spookytypesschemas.ValidationResult) {
+	// Merge errors
+	target.Errors = append(target.Errors, source.Errors...)
+
+	// Merge warnings
+	target.Warnings = append(target.Warnings, source.Warnings...)
+
+	// Merge info
+	target.Info = append(target.Info, source.Info...)
+
+	// Update validity
+	if !source.Valid {
+		target.Valid = false
+	}
+
+	// Merge details
+	for key, value := range source.Details {
+		target.Details[key] = value
+	}
+}
+
+// validateTemplateContext validates template against template-context schema
+func (v *TemplateValidator) validateTemplateContext(_ context.Context, template *spookytypes.Template, result *spookytypesschemas.ValidationResult) error {
+	// Load template-context schema
+	schema, err := v.loadTemplateSchema("template-context")
+	if err != nil {
+		return fmt.Errorf("failed to load template-context schema: %w", err)
+	}
+
+	// Convert template context to map for validation
+	contextData := v.templateContextToMap(template)
+
+	// Validate against schema
+	validationResult, err := v.schemaValidator.Validate(schema, contextData)
+	if err != nil {
+		return fmt.Errorf("template context validation failed: %w", err)
+	}
+
+	// Merge validation results
+	v.mergeValidationResults(result, validationResult)
+
+	return nil
+}
+
+// validateTemplateFunctions validates template against template-functions schema
+func (v *TemplateValidator) validateTemplateFunctions(_ context.Context, template *spookytypes.Template, result *spookytypesschemas.ValidationResult) error {
+	// Load template-functions schema
+	schema, err := v.loadTemplateSchema("template-functions")
+	if err != nil {
+		return fmt.Errorf("failed to load template-functions schema: %w", err)
+	}
+
+	// Convert template functions to map for validation
+	functionsData := v.templateFunctionsToMap(template)
+
+	// Validate against schema
+	validationResult, err := v.schemaValidator.Validate(schema, functionsData)
+	if err != nil {
+		return fmt.Errorf("template functions validation failed: %w", err)
+	}
+
+	// Merge validation results
+	v.mergeValidationResults(result, validationResult)
+
+	return nil
+}
+
+// validateTemplateMetadata validates template against template-metadata schema
+func (v *TemplateValidator) validateTemplateMetadata(_ context.Context, template *spookytypes.Template, result *spookytypesschemas.ValidationResult) error {
+	// Load template-metadata schema
+	schema, err := v.loadTemplateSchema("template-metadata")
+	if err != nil {
+		return fmt.Errorf("failed to load template-metadata schema: %w", err)
+	}
+
+	// Convert template metadata to map for validation
+	metadataData := v.templateMetadataToMap(template)
+
+	// Validate against schema
+	validationResult, err := v.schemaValidator.Validate(schema, metadataData)
+	if err != nil {
+		return fmt.Errorf("template metadata validation failed: %w", err)
+	}
+
+	// Merge validation results
+	v.mergeValidationResults(result, validationResult)
+
+	return nil
+}
+
+// templateFunctionsToMap converts template functions to map for validation
+func (v *TemplateValidator) templateFunctionsToMap(template *spookytypes.Template) map[string]interface{} {
+	return map[string]interface{}{
+		"template_functions": map[string]interface{}{
+			"include":       "template-structure",
+			"scope":         "functions",
+			"template_type": "functions",
+			"functions":     template.Functions,
+		},
+	}
+}
+
+// templateMetadataToMap converts template metadata to map for validation
+func (v *TemplateValidator) templateMetadataToMap(template *spookytypes.Template) map[string]interface{} {
+	metadata := map[string]interface{}{
+		"template_metadata": map[string]interface{}{
+			"include":       "template-structure",
+			"scope":         "metadata",
+			"template_type": "metadata",
+		},
+	}
+
+	if template.Metadata != nil {
+		metadata["template_metadata"].(map[string]interface{})["metadata"] = map[string]interface{}{
+			"name":        template.Metadata.Name,
+			"description": template.Metadata.Description,
+			"author":      template.Metadata.Author,
+			"version":     template.Metadata.Version,
+			"tags":        template.Metadata.Tags,
+			"license":     template.Metadata.License,
+		}
+	}
+
+	return metadata
 }
 
 // FunctionValidator validates template functions
@@ -480,7 +694,6 @@ type FunctionValidator struct {
 // ValidationCache caches validation results
 type ValidationCache struct {
 	cache map[string]ValidationCacheEntry
-	mu    sync.RWMutex
 	ttl   time.Duration
 }
 
@@ -506,7 +719,6 @@ type TemplateSandbox struct {
 	maxExecutionTime time.Duration
 	maxMemoryUsage   int64
 	allowedFunctions map[string]bool
-	mu               sync.RWMutex
 }
 
 // AccessController manages template access control
@@ -527,7 +739,6 @@ type PatternFilter struct {
 type ResourceMonitor struct {
 	maxMemoryUsage   int64
 	maxExecutionTime time.Duration
-	mu               sync.RWMutex
 }
 
 // AuditLogger logs template operations for security
@@ -560,7 +771,7 @@ func (s *TemplateSecurityManager) ValidateTemplateSecurity(ctx context.Context, 
 }
 
 // SandboxTemplate creates a sandbox for template execution
-func (s *TemplateSecurityManager) SandboxTemplate(ctx context.Context, template *spookytypes.Template) (*TemplateSandbox, error) {
+func (s *TemplateSecurityManager) SandboxTemplate(_ context.Context, template *spookytypes.Template) (*TemplateSandbox, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -599,7 +810,7 @@ func (s *TemplateSecurityManager) SandboxTemplate(ctx context.Context, template 
 }
 
 // CheckAccessControl checks access control for a template
-func (s *TemplateSecurityManager) CheckAccessControl(ctx context.Context, template *spookytypes.Template, user string) error {
+func (s *TemplateSecurityManager) CheckAccessControl(_ context.Context, template *spookytypes.Template, user string) error {
 	s.accessControl.mu.RLock()
 	defer s.accessControl.mu.RUnlock()
 
@@ -623,7 +834,7 @@ func (s *TemplateSecurityManager) CheckAccessControl(ctx context.Context, templa
 }
 
 // FilterDangerousPatterns filters dangerous patterns in templates
-func (s *TemplateSecurityManager) FilterDangerousPatterns(ctx context.Context, template *spookytypes.Template) error {
+func (s *TemplateSecurityManager) FilterDangerousPatterns(_ context.Context, template *spookytypes.Template) error {
 	s.patternFilter.mu.RLock()
 	defer s.patternFilter.mu.RUnlock()
 
@@ -711,7 +922,6 @@ type TemplatePerformanceManager struct {
 	compiler     TemplateCompiler
 	parallelizer ParallelProcessor
 	monitor      PerformanceMonitor
-	mu           sync.RWMutex
 }
 
 // TemplateResultCache caches template rendering results
@@ -738,7 +948,6 @@ type TemplateCompiler struct {
 type ParallelProcessor struct {
 	maxWorkers int
 	semaphore  chan struct{}
-	mu         sync.RWMutex
 }
 
 // PerformanceMonitor monitors template performance
@@ -787,9 +996,7 @@ func NewManager(
 		},
 		metadataManager: TemplateMetadataManager{
 			validator: MetadataValidator{logger: logger},
-			indexer: MetadataIndexer{
-				index: make(map[string]*spookytypestemplates.TemplateMetadata),
-			},
+			indexer:   NewEnhancedMetadataIndexer(),
 			cache: MetadataCache{
 				cache: make(map[string]MetadataCacheEntry),
 				ttl:   10 * time.Minute,
@@ -1021,6 +1228,11 @@ func (m *Manager) SetSchemaValidator(schemaValidator spookytypesschemas.SchemaVa
 	m.validator.schemaValidator = schemaValidator
 }
 
+// SetSchemaManager sets the schema manager for template validation
+func (m *Manager) SetSchemaManager(schemaManager *spookyschemas.Manager) {
+	m.validator.schemaManager = schemaManager
+}
+
 // Private helper methods
 
 func (m *Manager) getCachedTemplate(templatePath string) *spookytypes.Template {
@@ -1074,13 +1286,13 @@ func (m *Manager) cacheResult(template *spookytypes.Template, data map[string]in
 	}
 }
 
-func (m *Manager) resolveTemplateContext(ctx context.Context, template *spookytypes.Template, data map[string]interface{}) (map[string]interface{}, error) {
+func (m *Manager) resolveTemplateContext(_ context.Context, _ *spookytypes.Template, data map[string]interface{}) (map[string]interface{}, error) {
 	// For now, return the original data
 	// This will be enhanced with facts, variables, and machines data
 	return data, nil
 }
 
-func (m *Manager) validateTemplateSecurity(ctx context.Context, template *spookytypes.Template) error {
+func (m *Manager) validateTemplateSecurity(_ context.Context, template *spookytypes.Template) error {
 	// For now, basic security check
 	if strings.Contains(template.Content, "exec") || strings.Contains(template.Content, "system") {
 		return fmt.Errorf("template contains forbidden patterns")
@@ -1088,7 +1300,7 @@ func (m *Manager) validateTemplateSecurity(ctx context.Context, template *spooky
 	return nil
 }
 
-func (m *Manager) compileTemplate(ctx context.Context, template *spookytypes.Template) (*texttemplate.Template, error) {
+func (m *Manager) compileTemplate(_ context.Context, template *spookytypes.Template) (*texttemplate.Template, error) {
 	// Check compilation cache
 	m.performanceManager.compiler.mu.RLock()
 	if cached, exists := m.performanceManager.compiler.cache[template.ID]; exists {
@@ -1111,7 +1323,7 @@ func (m *Manager) compileTemplate(ctx context.Context, template *spookytypes.Tem
 	return tmpl, nil
 }
 
-func (m *Manager) loadTemplateMetadata(ctx context.Context, template *spookytypes.Template) error {
+func (m *Manager) loadTemplateMetadata(_ context.Context, template *spookytypes.Template) error {
 	// For now, create basic metadata
 	// This will be enhanced to load from metadata files
 	template.Metadata = &spookytypestemplates.TemplateMetadata{
@@ -1123,7 +1335,7 @@ func (m *Manager) loadTemplateMetadata(ctx context.Context, template *spookytype
 	return nil
 }
 
-func (m *Manager) validateTemplate(ctx context.Context, template *spookytypes.Template) error {
+func (m *Manager) validateTemplate(_ context.Context, template *spookytypes.Template) error {
 	// Basic validation
 	if template.Content == "" {
 		return fmt.Errorf("template content is empty")
@@ -1199,7 +1411,7 @@ func (m *Manager) recordPerformanceMetric(name string, value float64) {
 // TemplateContextResolver helper methods
 
 // generateCacheKey generates a cache key for the context
-func (c *TemplateContextResolver) generateCacheKey(template *spookytypes.Template, data map[string]interface{}) string {
+func (c *TemplateContextResolver) generateCacheKey(template *spookytypes.Template, _ map[string]interface{}) string {
 	// Simple cache key generation - in a real implementation, this would be more sophisticated
 	return fmt.Sprintf("%s:%s:%s", template.ID, template.SourcePath, template.Type)
 }
@@ -1235,7 +1447,7 @@ func (c *TemplateContextResolver) cacheContext(key string, context *spookytypes.
 }
 
 // resolveProjectContext resolves project information
-func (c *TemplateContextResolver) resolveProjectContext(ctx context.Context, template *spookytypes.Template) (map[string]interface{}, error) {
+func (c *TemplateContextResolver) resolveProjectContext(_ context.Context, template *spookytypes.Template) (map[string]interface{}, error) {
 	project := make(map[string]interface{})
 
 	// Add basic project information
@@ -1259,7 +1471,7 @@ func (c *TemplateContextResolver) resolveProjectContext(ctx context.Context, tem
 }
 
 // resolveFactsContext resolves facts data
-func (c *TemplateContextResolver) resolveFactsContext(ctx context.Context, template *spookytypes.Template) (map[string]interface{}, error) {
+func (c *TemplateContextResolver) resolveFactsContext(ctx context.Context, _ *spookytypes.Template) (map[string]interface{}, error) {
 	if c.factsManager == nil {
 		return make(map[string]interface{}), nil
 	}
@@ -1281,7 +1493,7 @@ func (c *TemplateContextResolver) resolveFactsContext(ctx context.Context, templ
 }
 
 // resolveMachinesContext resolves machines data
-func (c *TemplateContextResolver) resolveMachinesContext(ctx context.Context, template *spookytypes.Template) ([]map[string]interface{}, error) {
+func (c *TemplateContextResolver) resolveMachinesContext(ctx context.Context, _ *spookytypes.Template) ([]map[string]interface{}, error) {
 	if c.machinesManager == nil {
 		return make([]map[string]interface{}, 0), nil
 	}
@@ -1294,12 +1506,12 @@ func (c *TemplateContextResolver) resolveMachinesContext(ctx context.Context, te
 
 	// Convert machines to []map[string]interface{}
 	machinesMap := make([]map[string]interface{}, len(machines))
-	for i, machine := range machines {
+	for i := range machines {
 		machineMap := make(map[string]interface{})
-		machineMap["hostname"] = machine.Hostname
-		machineMap["port"] = machine.Port
-		machineMap["user"] = machine.User
-		machineMap["tags"] = machine.Tags
+		machineMap["hostname"] = machines[i].Hostname
+		machineMap["port"] = machines[i].Port
+		machineMap["user"] = machines[i].User
+		machineMap["tags"] = machines[i].Tags
 		// Add other machine fields as needed
 		machinesMap[i] = machineMap
 	}
@@ -1308,7 +1520,7 @@ func (c *TemplateContextResolver) resolveMachinesContext(ctx context.Context, te
 }
 
 // resolveEnvironmentContext resolves environment variables
-func (c *TemplateContextResolver) resolveEnvironmentContext(ctx context.Context, template *spookytypes.Template) (map[string]string, error) {
+func (c *TemplateContextResolver) resolveEnvironmentContext(_ context.Context, template *spookytypes.Template) (map[string]string, error) {
 	environment := make(map[string]string)
 
 	// Add common environment variables
@@ -1330,7 +1542,7 @@ func (c *TemplateContextResolver) resolveEnvironmentContext(ctx context.Context,
 }
 
 // resolveVariablesContext resolves variables data
-func (c *TemplateContextResolver) resolveVariablesContext(ctx context.Context, template *spookytypes.Template) (map[string]interface{}, error) {
+func (c *TemplateContextResolver) resolveVariablesContext(ctx context.Context, _ *spookytypes.Template) (map[string]interface{}, error) {
 	if c.variablesManager == nil {
 		return make(map[string]interface{}), nil
 	}
@@ -1351,31 +1563,31 @@ func (c *TemplateContextResolver) resolveVariablesContext(ctx context.Context, t
 }
 
 // transformProjectContext transforms project context
-func (c *TemplateContextResolver) transformProjectContext(project map[string]interface{}) error {
+func (c *TemplateContextResolver) transformProjectContext(_ map[string]interface{}) error {
 	// Add any project-specific transformations here
 	return nil
 }
 
 // transformFactsContext transforms facts context
-func (c *TemplateContextResolver) transformFactsContext(facts map[string]interface{}) error {
+func (c *TemplateContextResolver) transformFactsContext(_ map[string]interface{}) error {
 	// Add any facts-specific transformations here
 	return nil
 }
 
 // transformMachinesContext transforms machines context
-func (c *TemplateContextResolver) transformMachinesContext(machines []map[string]interface{}) error {
+func (c *TemplateContextResolver) transformMachinesContext(_ []map[string]interface{}) error {
 	// Add any machines-specific transformations here
 	return nil
 }
 
 // transformEnvironmentContext transforms environment context
-func (c *TemplateContextResolver) transformEnvironmentContext(environment map[string]string) error {
+func (c *TemplateContextResolver) transformEnvironmentContext(_ map[string]string) error {
 	// Add any environment-specific transformations here
 	return nil
 }
 
 // transformVariablesContext transforms variables context
-func (c *TemplateContextResolver) transformVariablesContext(variables map[string]interface{}) error {
+func (c *TemplateContextResolver) transformVariablesContext(_ map[string]interface{}) error {
 	// Add any variables-specific transformations here
 	return nil
 }
@@ -1390,30 +1602,18 @@ func getEnvOrDefault(key, defaultValue string) string {
 
 // Helper functions for metadata management
 
-// isValidVersion checks if a version string is valid
+// isValidVersion checks if a version string is valid ScalVer format
 func isValidVersion(version string) bool {
-	// Simple version validation
-	// This could be enhanced to support semantic versioning
-	return len(version) > 0 && len(version) < 50
-}
-
-// contains checks if a string contains a substring (case-insensitive)
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr ||
-		(len(s) > len(substr) && (s[:len(substr)] == substr ||
-			s[len(s)-len(substr):] == substr ||
-			containsSubstring(s, substr))))
-}
-
-// containsSubstring checks if a string contains a substring
-func containsSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
+	if version == "" {
+		return false
 	}
-	return false
+
+	// Check if it's a valid ScalVer format
+	return spookytypescommon.IsValidScalVerFormat(version)
 }
+
+// Note: ScalVer functionality is now centralized in spookytypescommon package
+// Use spookytypescommon.ScalVer, spookytypescommon.ParseScalVer, etc.
 
 // ValidateTemplate validates a template
 func (m *Manager) ValidateTemplate(ctx context.Context, template *spookytypes.Template) (*spookytypes.ValidationResult, error) {
@@ -1421,36 +1621,403 @@ func (m *Manager) ValidateTemplate(ctx context.Context, template *spookytypes.Te
 		"template": template.ID,
 	})
 
-	// Basic validation
+	// Use comprehensive schema validation
+	schemaResult, err := m.ValidateTemplateWithSchema(ctx, template)
+	if err != nil {
+		m.logger.Error("Schema validation failed", err, map[string]interface{}{
+			"template": template.ID,
+		})
+		return &spookytypes.ValidationResult{
+			Valid:    false,
+			Errors:   []spookytypes.SchemaError{{Message: fmt.Sprintf("schema validation failed: %v", err)}},
+			Warnings: []spookytypes.SchemaError{},
+		}, nil
+	}
+
+	// Convert schema validation result to interface validation result
 	var errors []spookytypes.SchemaError
 	var warnings []spookytypes.SchemaError
 
-	// Check if template has content
-	if template.Content == "" {
+	// Convert schema errors
+	for i := range schemaResult.Errors {
 		errors = append(errors, spookytypes.SchemaError{
-			Message: "template content cannot be empty",
+			Message: schemaResult.Errors[i].Message,
 		})
 	}
 
-	// Check for basic template syntax
-	if strings.Contains(template.Content, "{{") && !strings.Contains(template.Content, "}}") {
-		errors = append(errors, spookytypes.SchemaError{
-			Message: "unclosed template variable",
+	// Convert schema warnings
+	for i := range schemaResult.Warnings {
+		warnings = append(warnings, spookytypes.SchemaError{
+			Message: schemaResult.Warnings[i].Message,
 		})
 	}
-
-	valid := len(errors) == 0
 
 	m.logger.Info("Template validation completed", map[string]interface{}{
 		"template": template.ID,
-		"valid":    valid,
+		"valid":    schemaResult.Valid,
 		"errors":   len(errors),
 		"warnings": len(warnings),
 	})
 
 	return &spookytypes.ValidationResult{
-		Valid:    valid,
+		Valid:    schemaResult.Valid,
 		Errors:   errors,
 		Warnings: warnings,
 	}, nil
+}
+
+// EnhancedMetadataIndexer provides multi-dimensional indexing for template metadata
+type EnhancedMetadataIndexer struct {
+	// Multiple indexes for different search dimensions
+	byName         map[string]*spookytypestemplates.TemplateMetadata
+	byTags         map[string][]*spookytypestemplates.TemplateMetadata
+	byCategory     map[string][]*spookytypestemplates.TemplateMetadata
+	bySubcategory  map[string][]*spookytypestemplates.TemplateMetadata
+	byAuthor       map[string][]*spookytypestemplates.TemplateMetadata
+	byKeywords     map[string][]*spookytypestemplates.TemplateMetadata
+	byDependencies map[string][]*spookytypestemplates.TemplateMetadata
+
+	// Full-text search index (simple implementation)
+	fullTextIndex map[string][]*spookytypestemplates.TemplateMetadata
+
+	// Priority-based index
+	byPriority map[int][]*spookytypestemplates.TemplateMetadata
+
+	mu sync.RWMutex
+}
+
+// NewEnhancedMetadataIndexer creates a new enhanced metadata indexer
+func NewEnhancedMetadataIndexer() *EnhancedMetadataIndexer {
+	return &EnhancedMetadataIndexer{
+		byName:         make(map[string]*spookytypestemplates.TemplateMetadata),
+		byTags:         make(map[string][]*spookytypestemplates.TemplateMetadata),
+		byCategory:     make(map[string][]*spookytypestemplates.TemplateMetadata),
+		bySubcategory:  make(map[string][]*spookytypestemplates.TemplateMetadata),
+		byAuthor:       make(map[string][]*spookytypestemplates.TemplateMetadata),
+		byKeywords:     make(map[string][]*spookytypestemplates.TemplateMetadata),
+		byDependencies: make(map[string][]*spookytypestemplates.TemplateMetadata),
+		fullTextIndex:  make(map[string][]*spookytypestemplates.TemplateMetadata),
+		byPriority:     make(map[int][]*spookytypestemplates.TemplateMetadata),
+	}
+}
+
+// IndexMetadata indexes template metadata across all dimensions
+func (i *EnhancedMetadataIndexer) IndexMetadata(metadata *spookytypestemplates.TemplateMetadata) error {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	// Index by name
+	i.byName[metadata.Name] = metadata
+
+	// Index by tags
+	if metadata.Tags != nil {
+		for _, tag := range metadata.Tags {
+			i.byTags[tag] = append(i.byTags[tag], metadata)
+		}
+	}
+
+	// Index by category
+	if metadata.Category != "" {
+		i.byCategory[metadata.Category] = append(i.byCategory[metadata.Category], metadata)
+	}
+
+	// Index by subcategory
+	if metadata.Subcategory != "" {
+		i.bySubcategory[metadata.Subcategory] = append(i.bySubcategory[metadata.Subcategory], metadata)
+	}
+
+	// Index by author
+	if metadata.Author != "" {
+		i.byAuthor[metadata.Author] = append(i.byAuthor[metadata.Author], metadata)
+	}
+
+	// Index by keywords
+	if metadata.Keywords != nil {
+		for _, keyword := range metadata.Keywords {
+			i.byKeywords[keyword] = append(i.byKeywords[keyword], metadata)
+		}
+	}
+
+	// Index by dependencies
+	if metadata.Dependencies != nil {
+		for _, dep := range metadata.Dependencies {
+			i.byDependencies[dep] = append(i.byDependencies[dep], metadata)
+		}
+	}
+
+	// Index by priority
+	i.byPriority[metadata.Priority] = append(i.byPriority[metadata.Priority], metadata)
+
+	// Build full-text index
+	i.buildFullTextIndex(metadata)
+
+	return nil
+}
+
+// buildFullTextIndex builds full-text search index
+func (i *EnhancedMetadataIndexer) buildFullTextIndex(metadata *spookytypestemplates.TemplateMetadata) {
+	// Index name
+	if metadata.Name != "" {
+		words := strings.Fields(strings.ToLower(metadata.Name))
+		for _, word := range words {
+			i.fullTextIndex[word] = append(i.fullTextIndex[word], metadata)
+		}
+	}
+
+	// Index description
+	if metadata.Description != "" {
+		words := strings.Fields(strings.ToLower(metadata.Description))
+		for _, word := range words {
+			i.fullTextIndex[word] = append(i.fullTextIndex[word], metadata)
+		}
+	}
+
+	// Index tags
+	if metadata.Tags != nil {
+		for _, tag := range metadata.Tags {
+			words := strings.Fields(strings.ToLower(tag))
+			for _, word := range words {
+				i.fullTextIndex[word] = append(i.fullTextIndex[word], metadata)
+			}
+		}
+	}
+
+	// Index keywords
+	if metadata.Keywords != nil {
+		for _, keyword := range metadata.Keywords {
+			words := strings.Fields(strings.ToLower(keyword))
+			for _, word := range words {
+				i.fullTextIndex[word] = append(i.fullTextIndex[word], metadata)
+			}
+		}
+	}
+}
+
+// SearchResult represents a search result with relevance score
+type SearchResult struct {
+	Metadata *spookytypestemplates.TemplateMetadata
+	Score    float64
+	Matched  []string // What matched in the search
+}
+
+// Search searches for templates with multiple algorithms
+func (i *EnhancedMetadataIndexer) Search(query string, filters *SearchFilters) ([]SearchResult, error) {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+
+	var results []SearchResult
+	seen := make(map[string]bool)
+
+	// Search by name (exact and partial)
+	if nameResults := i.searchByName(query); len(nameResults) > 0 {
+		for _, result := range nameResults {
+			if !seen[result.Metadata.Name] {
+				results = append(results, result)
+				seen[result.Metadata.Name] = true
+			}
+		}
+	}
+
+	// Search by tags
+	if tagResults := i.searchByTags(query); len(tagResults) > 0 {
+		for _, result := range tagResults {
+			if !seen[result.Metadata.Name] {
+				results = append(results, result)
+				seen[result.Metadata.Name] = true
+			}
+		}
+	}
+
+	// Search by keywords
+	if keywordResults := i.searchByKeywords(query); len(keywordResults) > 0 {
+		for _, result := range keywordResults {
+			if !seen[result.Metadata.Name] {
+				results = append(results, result)
+				seen[result.Metadata.Name] = true
+			}
+		}
+	}
+
+	// Search by full-text
+	if fullTextResults := i.searchByFullText(query); len(fullTextResults) > 0 {
+		for _, result := range fullTextResults {
+			if !seen[result.Metadata.Name] {
+				results = append(results, result)
+				seen[result.Metadata.Name] = true
+			}
+		}
+	}
+
+	// Apply filters
+	results = i.applyFilters(results, filters)
+
+	// Sort by score
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Score > results[j].Score
+	})
+
+	return results, nil
+}
+
+// SearchFilters represents search filters
+type SearchFilters struct {
+	Tags        []string
+	Category    string
+	Subcategory string
+	Author      string
+	MinScore    float64
+	Limit       int
+}
+
+// searchByName searches by template name
+func (i *EnhancedMetadataIndexer) searchByName(query string) []SearchResult {
+	var results []SearchResult
+	queryLower := strings.ToLower(query)
+
+	for name, metadata := range i.byName {
+		if strings.Contains(strings.ToLower(name), queryLower) {
+			score := 1.0
+			if strings.EqualFold(name, query) {
+				score = 2.0 // Exact match gets higher score
+			}
+			results = append(results, SearchResult{
+				Metadata: metadata,
+				Score:    score,
+				Matched:  []string{"name"},
+			})
+		}
+	}
+
+	return results
+}
+
+// searchByIndex searches by a specific index with configurable scoring
+func (i *EnhancedMetadataIndexer) searchByIndex(index map[string][]*spookytypestemplates.TemplateMetadata, query, matchType string, exactScore, partialScore float64) []SearchResult {
+	var results []SearchResult
+	queryLower := strings.ToLower(query)
+
+	// Search for exact matches
+	if templates, exists := index[query]; exists {
+		for _, metadata := range templates {
+			results = append(results, SearchResult{
+				Metadata: metadata,
+				Score:    exactScore,
+				Matched:  []string{matchType},
+			})
+		}
+	}
+
+	// Search for partial matches
+	for key, templates := range index {
+		if strings.Contains(strings.ToLower(key), queryLower) && key != query {
+			for _, metadata := range templates {
+				results = append(results, SearchResult{
+					Metadata: metadata,
+					Score:    partialScore,
+					Matched:  []string{matchType},
+				})
+			}
+		}
+	}
+
+	return results
+}
+
+// searchByTags searches by template tags
+func (i *EnhancedMetadataIndexer) searchByTags(query string) []SearchResult {
+	return i.searchByIndex(i.byTags, query, "tag", 1.5, 1.0)
+}
+
+// searchByKeywords searches by template keywords
+func (i *EnhancedMetadataIndexer) searchByKeywords(query string) []SearchResult {
+	return i.searchByIndex(i.byKeywords, query, "keyword", 1.3, 1.0)
+}
+
+// searchByFullText searches using full-text index
+func (i *EnhancedMetadataIndexer) searchByFullText(query string) []SearchResult {
+	var results []SearchResult
+	queryLower := strings.ToLower(query)
+	words := strings.Fields(queryLower)
+
+	// Count matches for each template
+	templateScores := make(map[string]float64)
+	templateMatches := make(map[string][]string)
+
+	for _, word := range words {
+		if templates, exists := i.fullTextIndex[word]; exists {
+			for _, metadata := range templates {
+				templateScores[metadata.Name] += 0.5
+				templateMatches[metadata.Name] = append(templateMatches[metadata.Name], word)
+			}
+		}
+	}
+
+	// Convert to results
+	for name, score := range templateScores {
+		// Find the metadata for this name
+		if metadata, exists := i.byName[name]; exists {
+			results = append(results, SearchResult{
+				Metadata: metadata,
+				Score:    score,
+				Matched:  templateMatches[name],
+			})
+		}
+	}
+
+	return results
+}
+
+// applyFilters applies search filters to results
+func (i *EnhancedMetadataIndexer) applyFilters(results []SearchResult, filters *SearchFilters) []SearchResult {
+	var filtered []SearchResult
+
+	for _, result := range results {
+		// Apply tag filter
+		if len(filters.Tags) > 0 {
+			hasTag := false
+			for _, filterTag := range filters.Tags {
+				for _, templateTag := range result.Metadata.Tags {
+					if filterTag == templateTag {
+						hasTag = true
+						break
+					}
+				}
+				if hasTag {
+					break
+				}
+			}
+			if !hasTag {
+				continue
+			}
+		}
+
+		// Apply category filter
+		if filters.Category != "" && result.Metadata.Category != filters.Category {
+			continue
+		}
+
+		// Apply subcategory filter
+		if filters.Subcategory != "" && result.Metadata.Subcategory != filters.Subcategory {
+			continue
+		}
+
+		// Apply author filter
+		if filters.Author != "" && result.Metadata.Author != filters.Author {
+			continue
+		}
+
+		// Apply minimum score filter
+		if result.Score < filters.MinScore {
+			continue
+		}
+
+		filtered = append(filtered, result)
+
+		// Apply limit
+		if filters.Limit > 0 && len(filtered) >= filters.Limit {
+			break
+		}
+	}
+
+	return filtered
 }

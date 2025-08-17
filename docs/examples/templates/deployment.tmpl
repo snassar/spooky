@@ -1,0 +1,83 @@
+# Enhanced Template Metadata Example
+# This template demonstrates the new metadata structure with categorization and search capabilities
+
+metadata {
+  name = "kubernetes-deployment"
+  description = "Standard Kubernetes deployment template with configurable replicas, image, and resources"
+  author = "spooky-team"
+  version = "1.2.0"
+  tags = ["kubernetes", "deployment", "container", "orchestration"]
+  license = "MIT"
+  
+  # Enhanced categorization
+  category = "deployment"
+  subcategory = "kubernetes"
+  priority = 1
+  
+  # Search optimization
+  keywords = ["k8s", "deploy", "pods", "replicas", "resources", "scaling"]
+  
+  # Template dependencies
+  dependencies = ["base-kubernetes", "resource-limits"]
+  
+  # Compatibility information
+  compatibility = {
+    "kubernetes" = ">=1.20.0"
+    "spooky" = ">=1.0.0"
+  }
+  
+  # Usage analytics (these would be updated by the system)
+  usage_count = 42
+  last_used = "2024-01-15T10:30:00Z"
+}
+
+# Template content
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Name }}
+  namespace: {{ .Namespace }}
+  labels:
+    app: {{ .Name }}
+    version: {{ .Version }}
+    environment: {{ .Environment }}
+spec:
+  replicas: {{ .Replicas | default 3 }}
+  selector:
+    matchLabels:
+      app: {{ .Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Name }}
+        version: {{ .Version }}
+    spec:
+      containers:
+      - name: {{ .Name }}
+        image: {{ .Image }}
+        ports:
+        - containerPort: {{ .Port | default 8080 }}
+        resources:
+          requests:
+            memory: {{ .MemoryRequest | default "128Mi" }}
+            cpu: {{ .CpuRequest | default "100m" }}
+          limits:
+            memory: {{ .MemoryLimit | default "256Mi" }}
+            cpu: {{ .CpuLimit | default "200m" }}
+        env:
+        {{- range .EnvironmentVariables }}
+        - name: {{ .Name }}
+          value: {{ .Value }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: {{ .HealthCheckPath | default "/health" }}
+            port: {{ .Port | default 8080 }}
+          initialDelaySeconds: {{ .HealthCheckDelay | default 30 }}
+          periodSeconds: {{ .HealthCheckPeriod | default 10 }}
+        readinessProbe:
+          httpGet:
+            path: {{ .ReadinessPath | default "/ready" }}
+            port: {{ .Port | default 8080 }}
+          initialDelaySeconds: {{ .ReadinessDelay | default 5 }}
+          periodSeconds: {{ .ReadinessPeriod | default 5 }}

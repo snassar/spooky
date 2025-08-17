@@ -57,12 +57,12 @@ func (t *TemplateSchemaValidator) ValidateBytes(schema *spookytypesschemas.Schem
 }
 
 // ValidateWithContext validates data with additional context
-func (t *TemplateSchemaValidator) ValidateWithContext(schema *spookytypesschemas.Schema, data interface{}, context map[string]interface{}) (*spookytypesschemas.ValidationResult, error) {
+func (t *TemplateSchemaValidator) ValidateWithContext(schema *spookytypesschemas.Schema, data interface{}, _ map[string]interface{}) (*spookytypesschemas.ValidationResult, error) {
 	return t.schemaValidator.Validate(schema, data)
 }
 
 // ValidateField validates a specific field
-func (t *TemplateSchemaValidator) ValidateField(schema *spookytypesschemas.Schema, fieldPath string, value interface{}) (*spookytypesschemas.ValidationResult, error) {
+func (t *TemplateSchemaValidator) ValidateField(schema *spookytypesschemas.Schema, _ string, value interface{}) (*spookytypesschemas.ValidationResult, error) {
 	return t.schemaValidator.Validate(schema, value)
 }
 
@@ -237,13 +237,17 @@ func (f *Factory) createVariablesIntegration() spookyinterfaces.VariablesIntegra
 
 // createTemplatesIntegration creates the templates integration
 func (f *Factory) createTemplatesIntegration() spookyinterfaces.TemplatesIntegration {
+	// Create schema manager for proper schema loading and parsing
+	schemaManager := spookyschemas.NewManager(f.logger)
+
 	// Create a proper schema validator for templates
 	schemaValidator := NewTemplateSchemaValidator(f.logger)
 
 	// Create templates manager
 	templatesManager := spookytemplates.NewManager(f.logger)
 
-	// Set schema validator for template validation
+	// Set schema manager and validator for template validation
+	templatesManager.SetSchemaManager(schemaManager)
 	templatesManager.SetSchemaValidator(schemaValidator)
 
 	// Create templates integration

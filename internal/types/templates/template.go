@@ -59,6 +59,16 @@ type TemplateMetadata struct {
 	Version     string   `json:"version,omitempty" hcl:"version,optional"`
 	Tags        []string `json:"tags,omitempty" hcl:"tags,optional"`
 	License     string   `json:"license,omitempty" hcl:"license,optional"`
+
+	// Enhanced fields for categorization and search
+	Category      string            `json:"category,omitempty" hcl:"category,optional"`
+	Subcategory   string            `json:"subcategory,omitempty" hcl:"subcategory,optional"`
+	Priority      int               `json:"priority,omitempty" hcl:"priority,optional"`
+	Keywords      []string          `json:"keywords,omitempty" hcl:"keywords,optional"`
+	Dependencies  []string          `json:"dependencies,omitempty" hcl:"dependencies,optional"`
+	Compatibility map[string]string `json:"compatibility,omitempty" hcl:"compatibility,optional"`
+	UsageCount    int               `json:"usage_count,omitempty" hcl:"usage_count,optional"`
+	LastUsed      time.Time         `json:"last_used,omitempty" hcl:"last_used,optional"`
 }
 
 // TemplateContext represents the context available to templates during rendering

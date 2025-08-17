@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	spookyinterfaces "spooky/internal/interfaces"
 	spookytypes "spooky/internal/types"
@@ -76,7 +78,7 @@ var templatesRenderCmd = &cobra.Command{
 
 		if outputFile != "" {
 			// Write to output file
-			if err := os.WriteFile(outputFile, []byte(result), 0644); err != nil {
+			if err := os.WriteFile(outputFile, []byte(result), 0o600); err != nil {
 				return fmt.Errorf("failed to write output file: %w", err)
 			}
 			fmt.Printf("Template rendered successfully to: %s\n", outputFile)
@@ -276,34 +278,238 @@ func init() {
 
 // Helper functions
 
-func loadDataFile(dataFile string) (map[string]interface{}, error) {
+func loadDataFile(_ string) (map[string]interface{}, error) {
 	// For now, return empty data
 	// This will be enhanced to load from JSON/HCL files
 	return make(map[string]interface{}), nil
 }
 
 func validateAllTemplates(ctx context.Context, integration spookyinterfaces.TemplatesIntegration, templatesDir string) error {
-	// For now, just check if templates directory exists
+	// Check if templates directory exists
 	if _, err := os.Stat(templatesDir); os.IsNotExist(err) {
 		fmt.Printf("No templates directory found: %s\n", templatesDir)
 		return nil
 	}
 
 	fmt.Printf("Validating templates in: %s\n", templatesDir)
-	// This will be enhanced to validate all templates in the directory
+
+	// Scan for template files
+	templateFiles, err := filepath.Glob(filepath.Join(templatesDir, "*.tmpl"))
+	if err != nil {
+		return fmt.Errorf("failed to scan templates directory: %w", err)
+	}
+
+	if len(templateFiles) == 0 {
+		fmt.Println("No template files found")
+		return nil
+	}
+
+	var totalErrors int
+	var totalWarnings int
+
+	// Validate each template file
+	for _, templateFile := range templateFiles {
+		fmt.Printf("Validating: %s\n", filepath.Base(templateFile))
+
+		// Load template
+		template, err := integration.LoadTemplate(ctx, templateFile)
+		if err != nil {
+			fmt.Printf("  ❌ Failed to load template: %v\n", err)
+			totalErrors++
+			continue
+		}
+
+		// Validate template using schema validation
+		result, err := integration.ValidateTemplate(ctx, template)
+		if err != nil {
+			fmt.Printf("  ❌ Validation failed: %v\n", err)
+			totalErrors++
+			continue
+		}
+
+		if result.Valid {
+			fmt.Printf("  ✅ Template is valid")
+			if len(result.Warnings) > 0 {
+				fmt.Printf(" (with %d warnings)", len(result.Warnings))
+			}
+			fmt.Println()
+		} else {
+			fmt.Printf("  ❌ Template has %d errors", len(result.Errors))
+			if len(result.Warnings) > 0 {
+				fmt.Printf(" and %d warnings", len(result.Warnings))
+			}
+			fmt.Println()
+
+			// Print errors
+			for i := range result.Errors {
+				fmt.Printf("    - Error: %s\n", result.Errors[i].Message)
+			}
+
+			// Print warnings
+			for i := range result.Warnings {
+				fmt.Printf("    - Warning: %s\n", result.Warnings[i].Message)
+			}
+
+			totalErrors += len(result.Errors)
+			totalWarnings += len(result.Warnings)
+		}
+	}
+
+	// Print summary
+	fmt.Printf("\nValidation Summary:\n")
+	fmt.Printf("  Templates processed: %d\n", len(templateFiles))
+	fmt.Printf("  Total errors: %d\n", totalErrors)
+	fmt.Printf("  Total warnings: %d\n", totalWarnings)
+
+	if totalErrors > 0 {
+		return fmt.Errorf("validation failed with %d errors", totalErrors)
+	}
+
 	return nil
 }
 
 func listTemplates(projectPath string) ([]*spookytypes.Template, error) {
-	// For now, return empty list
-	// This will be enhanced to scan templates directory
-	return []*spookytypes.Template{}, nil
+	templatesDir := filepath.Join(projectPath, "templates")
+
+	// Check if templates directory exists
+	if _, err := os.Stat(templatesDir); os.IsNotExist(err) {
+		return []*spookytypes.Template{}, nil
+	}
+
+	// Scan for template files
+	templateFiles, err := filepath.Glob(filepath.Join(templatesDir, "*.tmpl"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan templates directory: %w", err)
+	}
+
+	var templates []*spookytypes.Template
+
+	// Load each template
+	for _, templateFile := range templateFiles {
+		// Create a basic template object for now
+		// In a full implementation, this would load the actual template content
+		template := &spookytypes.Template{
+			ID:         filepath.Base(templateFile),
+			SourcePath: templateFile,
+			Type:       "template",
+			Scope:      "project",
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		}
+
+		templates = append(templates, template)
+	}
+
+	return templates, nil
 }
 
 func searchTemplates(projectPath, query string, tags []string, category string) ([]*spookytypes.Template, error) {
-	// For now, return empty list
-	// This will be enhanced to search templates
-	return []*spookytypes.Template{}, nil
+	// Get templates integration
+	integration := GetIntegrationManager().GetTemplatesIntegration()
+	if integration == nil {
+		return nil, fmt.Errorf("templates integration not available")
+	}
+
+	// Load all templates in the project
+	allTemplates, err := loadAllTemplates(integration, projectPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter templates based on search criteria
+	return filterTemplates(allTemplates, query, tags, category), nil
+}
+
+// loadAllTemplates loads all templates from the project
+func loadAllTemplates(integration spookyinterfaces.TemplatesIntegration, projectPath string) ([]*spookytypes.Template, error) {
+	templatesDir := filepath.Join(projectPath, "templates")
+	if _, err := os.Stat(templatesDir); os.IsNotExist(err) {
+		return []*spookytypes.Template{}, nil
+	}
+
+	// Scan for template files
+	templateFiles, err := filepath.Glob(filepath.Join(templatesDir, "*.tmpl"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan templates directory: %w", err)
+	}
+
+	var allTemplates []*spookytypes.Template
+
+	// Load each template
+	for _, templateFile := range templateFiles {
+		template, err := integration.LoadTemplate(context.Background(), templateFile)
+		if err != nil {
+			// Skip templates that can't be loaded
+			continue
+		}
+		allTemplates = append(allTemplates, template)
+	}
+
+	return allTemplates, nil
+}
+
+// filterTemplates filters templates based on search criteria
+func filterTemplates(templates []*spookytypes.Template, query string, tags []string, category string) []*spookytypes.Template {
+	var results []*spookytypes.Template
+	queryLower := strings.ToLower(query)
+
+	for _, template := range templates {
+		if matchesTemplate(template, queryLower, tags, category) {
+			results = append(results, template)
+		}
+	}
+
+	return results
+}
+
+// matchesTemplate checks if a template matches the search criteria
+func matchesTemplate(template *spookytypes.Template, queryLower string, tags []string, category string) bool {
+	// Search in template name
+	if strings.Contains(strings.ToLower(template.ID), queryLower) {
+		return true
+	}
+
+	// Search in metadata
+	if template.Metadata != nil {
+		// Search in metadata name
+		if template.Metadata.Name != "" && strings.Contains(strings.ToLower(template.Metadata.Name), queryLower) {
+			return true
+		}
+
+		// Search in metadata description
+		if template.Metadata.Description != "" && strings.Contains(strings.ToLower(template.Metadata.Description), queryLower) {
+			return true
+		}
+
+		// Check tag filter
+		if len(tags) > 0 && !hasMatchingTag(template.Metadata.Tags, tags) {
+			return false
+		}
+
+		// Check category filter
+		if category != "" && template.Metadata.Category != category {
+			return false
+		}
+	}
+
+	return false
+}
+
+// hasMatchingTag checks if template has any of the required tags
+func hasMatchingTag(templateTags, searchTags []string) bool {
+	if templateTags == nil {
+		return false
+	}
+
+	for _, searchTag := range searchTags {
+		for _, templateTag := range templateTags {
+			if searchTag == templateTag {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func outputJSON(templates []*spookytypes.Template) {

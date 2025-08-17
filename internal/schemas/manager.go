@@ -15,6 +15,7 @@ import (
 	"github.com/zclconf/go-cty/cty"
 
 	spookytypes "spooky/internal/types"
+	spookytypescommon "spooky/internal/types/common"
 	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesschemas "spooky/internal/types/schemas"
 )
@@ -728,11 +729,9 @@ func (m *Manager) validateMetadataBlock(metadata map[string]interface{}) error {
 	return nil
 }
 
-// isValidScalVerFormat checks if a string is in ScalVer format (0.YYYYMMDD.N)
+// isValidScalVerFormat checks if a string is in ScalVer format
 func (m *Manager) isValidScalVerFormat(version string) bool {
-	// Simple regex check for ScalVer format: 0.YYYYMMDD.N
-	matched, _ := regexp.MatchString(`^0\.\d{8}\.\d+$`, version)
-	return matched
+	return spookytypescommon.IsValidScalVerFormat(version)
 }
 
 // isValidSchemaTypeFormat checks if a string is a valid schema type format
