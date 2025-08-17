@@ -6,6 +6,16 @@ The spooky logging system provides comprehensive logging capabilities for monito
 
 **Status: Production Ready** - The logging system is fully implemented with comprehensive logging, formatting, and output capabilities.
 
+## Related Documentation
+
+- [Actions User Guide](ACTIONS_USER_GUIDE.md) - Logging during action orchestration
+- [SSH User Guide](SSH_USER_GUIDE.md) - SSH operation logging
+- [Machines User Guide](MACHINES_USER_GUIDE.md) - Machine connectivity logging
+- [Facts User Guide](FACTS_USER_GUIDE.md) - Fact collection logging
+- [Templates User Guide](TEMPLATES_USER_GUIDE.md) - Template rendering logging
+
+> **See also**: [User Guides Index](USER_GUIDES_INDEX.md) - Complete overview of all user guides
+
 ## Getting Started
 
 ### Prerequisites
@@ -61,6 +71,16 @@ Key features include:
 - **Structured Output** - JSON and text formatting options
 - **Performance Metrics** - Operation timing and resource usage
 - **Context Propagation** - Track operations across components
+
+### Integration with Other Systems
+
+The logging system provides logging for all spooky systems:
+
+- **Actions**: Log [action orchestration](ACTIONS_USER_GUIDE.md) operations
+- **SSH**: Log [SSH operations](SSH_USER_GUIDE.md) and connectivity
+- **Machines**: Log [machine connectivity](MACHINES_USER_GUIDE.md) testing
+- **Facts**: Log [fact collection](FACTS_USER_GUIDE.md) operations
+- **Templates**: Log [template rendering](TEMPLATES_USER_GUIDE.md) operations
 
 ## Configuration
 

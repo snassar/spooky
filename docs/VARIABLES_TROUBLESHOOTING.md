@@ -60,10 +60,8 @@ ls -la ./my-project/variables/
 cat > ./my-project/variables.hcl << 'EOF'
 variables {
   variable "app_name" {
-    type = "string"
+    value = "my-app"
     description = "Application name"
-    default = "my-app"
-    scope = "project"
   }
 }
 EOF
@@ -86,10 +84,8 @@ spooky variables validate ./my-project
 # Example of correct syntax:
 variables {
   variable "app_name" {
-    type = "string"  # Use quotes for strings
+    value = "my-app"
     description = "Application name"
-    default = "my-app"
-    scope = "project"
   }
 }
 ```
@@ -106,14 +102,12 @@ grep -r "app_name" ./my-project/variables/
 # Rename one of the variables to make it unique
 # In variables.hcl:
 variable "app_name" {
-  type = "string"
-  default = "my-app"
+  value = "my-app"
 }
 
 # In variables/app.hcl:
 variable "app_name_alt" {  # Changed from "app_name"
-  type = "string"
-  default = "my-app-alt"
+  value = "my-app-alt"
 }
 ```
 
@@ -128,16 +122,14 @@ variable "app_name_alt" {  # Changed from "app_name"
 # ✅ CORRECT - Valid variable name
 variables {
   variable "app_name" {  # Use underscores, not hyphens
-    type = "string"
-    default = "my-app"
+    value = "my-app"
   }
 }
 
 # ❌ WRONG - Invalid variable name
 variables {
   variable "app-name" {  # Hyphens not allowed
-    type = "string"
-    default = "my-app"
+    value = "my-app"
   }
 }
 ```
@@ -151,10 +143,8 @@ variables {
 # ✅ CORRECT - All required fields present
 variables {
   variable "app_name" {
-    type = "string"        # Required
+    value = "my-app"       # Required
     description = "App name"  # Optional but recommended
-    default = "my-app"     # Optional
-    scope = "project"      # Optional
   }
 }
 ```

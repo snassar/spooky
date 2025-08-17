@@ -6,6 +6,16 @@ The spooky machines system provides comprehensive machine inventory management, 
 
 **Status: Production Ready** - The machines system is fully implemented with comprehensive inventory management, connectivity testing, and validation capabilities.
 
+## Related Documentation
+
+- [SSH User Guide](SSH_USER_GUIDE.md) - SSH connectivity and authentication
+- [Actions User Guide](ACTIONS_USER_GUIDE.md) - Machine targeting for actions
+- [Facts User Guide](FACTS_USER_GUIDE.md) - Machine-based fact collection
+- [Templates User Guide](TEMPLATES_USER_GUIDE.md) - Machine-specific template rendering
+- [Variables User Guide](VARIABLES_USER_GUIDE.md) - Machine-specific variables
+
+> **See also**: [User Guides Index](USER_GUIDES_INDEX.md) - Complete overview of all user guides
+
 ## Getting Started
 
 ### Prerequisites
@@ -175,6 +185,15 @@ Export machine inventory to JSON:
 spooky machines export ./my-project --output inventory.json
 ```
 
+### Integration with Other Systems
+
+The machines system integrates with other spooky systems:
+
+- **Facts Collection**: Use machine inventory for [fact collection](FACTS_USER_GUIDE.md)
+- **Action Targeting**: Target machines for [action orchestration](ACTIONS_USER_GUIDE.md)
+- **Template Deployment**: Deploy templates to specific machines via [templates system](TEMPLATES_USER_GUIDE.md)
+- **Variable Resolution**: Use machine-specific variables from [variables system](VARIABLES_USER_GUIDE.md)
+
 ## Project Configuration
 
 ### Basic Machine Configuration
@@ -183,43 +202,48 @@ Create machine inventory in your project:
 
 ```hcl
 # machines.hcl
-machines {
-  machine "web-server" {
-    hostname = "web.example.com"
-    host = "192.168.1.10"
-    user = "admin"
-    port = 22
-    
-    tags = {
-      environment = "production"
-      role = "web"
-      datacenter = "us-east-1"
+machines_inventory {
+  machines {
+    machine "web-server" {
+      hostname = "web.example.com"
+      user = "admin"
+      port = 22
+      
+      tags = ["production", "web"]
+      
+      metadata {
+        environment = "production"
+        role = "web"
+        location = "us-east-1"
+      }
     }
-  }
-  
-  machine "db-server" {
-    hostname = "db.example.com"
-    host = "192.168.1.11"
-    user = "admin"
-    port = 22
     
-    tags = {
-      environment = "production"
-      role = "database"
-      datacenter = "us-east-1"
+    machine "db-server" {
+      hostname = "db.example.com"
+      user = "admin"
+      port = 22
+      
+      tags = ["production", "database"]
+      
+      metadata {
+        environment = "production"
+        role = "database"
+        location = "us-east-1"
+      }
     }
-  }
-  
-  machine "cache-server" {
-    hostname = "cache.example.com"
-    host = "192.168.1.12"
-    user = "admin"
-    port = 22
     
-    tags = {
-      environment = "production"
-      role = "cache"
-      datacenter = "us-east-1"
+    machine "cache-server" {
+      hostname = "cache.example.com"
+      user = "admin"
+      port = 22
+      
+      tags = ["production", "cache"]
+      
+      metadata {
+        environment = "production"
+        role = "cache"
+        location = "us-east-1"
+      }
     }
   }
 }
@@ -231,31 +255,41 @@ Configure SSH authentication for machines:
 
 ```hcl
 # machines.hcl
-machines {
-  machine "web-server" {
-    hostname = "web.example.com"
-    user = "admin"
-    
-    # SSH key authentication
-    key_file = "~/.ssh/id_ed25519"
-    
-    # Optional passphrase for encrypted keys
-    passphrase = "your-passphrase"
-    
-    tags = {
-      environment = "production"
+machines_inventory {
+  machines {
+    machine "web-server" {
+      hostname = "web.example.com"
+      user = "admin"
+      
+      authentication {
+        method = "ssh_key"
+        key_path = "~/.ssh/id_ed25519"
+      }
+      
+      tags = ["production"]
+      
+      metadata {
+        environment = "production"
+      }
     }
-  }
-  
-  machine "db-server" {
-    hostname = "db.example.com"
-    user = "admin"
     
-    # Password authentication
-    password = "your-password"
-    
-    tags = {
-      environment = "production"
+    machine "db-server" {
+      hostname = "db.example.com"
+      user = "admin"
+      
+      authentication {
+        method = "password"
+        password {
+          value = "your-password"
+          encrypted = false
+        }
+      }
+      
+      tags = ["production"]
+      
+      metadata {
+        environment = "production"
+      }
     }
   }
 }

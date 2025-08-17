@@ -675,7 +675,6 @@ spooky templates search <project> <query> [--tags <tags>] [--category <category>
 ```bash
 # Render nginx configuration
 spooky templates render ./myproject templates/nginx.conf.tmpl \
-  --data data/variables.hcl \
   --output /etc/nginx/nginx.conf
 
 # Validate all templates

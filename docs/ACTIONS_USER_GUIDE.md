@@ -6,6 +6,17 @@ The spooky actions system provides comprehensive action orchestration capabiliti
 
 **Status: Partially Implemented** - The actions system has basic functionality but SSH-based action orchestration has known issues that need to be addressed.
 
+## Related Documentation
+
+- [SSH User Guide](SSH_USER_GUIDE.md) - SSH configuration and authentication for actions
+- [Machines User Guide](MACHINES_USER_GUIDE.md) - Machine targeting and inventory management
+- [Variables User Guide](VARIABLES_USER_GUIDE.md) - Variable usage in actions
+- [Templates User Guide](TEMPLATES_USER_GUIDE.md) - Template deployment through actions
+- [Facts User Guide](FACTS_USER_GUIDE.md) - Using facts in action variables
+- [Secrets User Guide](SECRETS_USER_GUIDE.md) - Encrypted variable handling in actions
+
+> **See also**: [User Guides Index](USER_GUIDES_INDEX.md) - Complete overview of all user guides
+
 ## Getting Started
 
 ### Prerequisites
@@ -71,6 +82,17 @@ The action run process follows these steps:
 6. **Result Collection** - Collect and aggregate results from all machines
 7. **Error Handling** - Handle failures and provide detailed error reporting
 
+### Integration with Other Systems
+
+Actions integrate with other spooky systems:
+
+- **SSH**: Use [SSH connectivity](SSH_USER_GUIDE.md) for remote execution
+- **Machines**: Target machines from [machine inventory](MACHINES_USER_GUIDE.md)
+- **Variables**: Use [variables](VARIABLES_USER_GUIDE.md) in action definitions
+- **Templates**: Deploy [templates](TEMPLATES_USER_GUIDE.md) through actions
+- **Facts**: Reference [machine facts](FACTS_USER_GUIDE.md) in actions
+- **Secrets**: Decrypt [encrypted variables](SECRETS_USER_GUIDE.md) during execution
+
 ## Current Implementation Status
 
 ### ✅ Working Features
@@ -88,6 +110,10 @@ The action run process follows these steps:
 - **Parallel Execution**: No parallel action execution support
 - **Action Planning**: Limited action planning capabilities
 - **Result Aggregation**: No action result aggregation
+
+> **Note**: While the SSH system itself is fully implemented (see [SSH User Guide](SSH_USER_GUIDE.md)), the integration between actions and SSH-based execution has known issues. Basic SSH connectivity works, but action orchestration over SSH requires additional development.
+
+> **See also**: [Known Issues](KNOWN_ISSUES.md#actions-system-ssh-issues) - Detailed information about SSH-based action orchestration issues and workarounds
 
 ### 🔧 Current Workarounds
 

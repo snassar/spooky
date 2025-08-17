@@ -6,6 +6,15 @@ The spooky secrets system provides comprehensive encryption, decryption, and key
 
 **Status: Production Ready** - The secrets system is fully implemented with comprehensive encryption, decryption, and key management capabilities.
 
+## Related Documentation
+
+- [Variables User Guide](VARIABLES_USER_GUIDE.md) - Encrypted variable management
+- [Actions User Guide](ACTIONS_USER_GUIDE.md) - Decrypting variables during actions
+- [Templates User Guide](TEMPLATES_USER_GUIDE.md) - Using encrypted variables in templates
+- [Machines User Guide](MACHINES_USER_GUIDE.md) - Machine-specific secrets
+
+> **See also**: [User Guides Index](USER_GUIDES_INDEX.md) - Complete overview of all user guides
+
 ## Getting Started
 
 ### Prerequisites
@@ -59,6 +68,15 @@ Security features include:
 - **Access Control** - Control who can perform operations
 - **Key Validation** - Validate key integrity and permissions
 - **Secure Storage** - Store keys securely
+
+### Integration with Other Systems
+
+The secrets system integrates with other spooky systems:
+
+- **Variables**: Encrypt sensitive [variables](VARIABLES_USER_GUIDE.md)
+- **Actions**: Decrypt variables during [action execution](ACTIONS_USER_GUIDE.md)
+- **Templates**: Use encrypted variables in [template rendering](TEMPLATES_USER_GUIDE.md)
+- **Machines**: Store machine-specific secrets securely
 
 ## Configuration
 

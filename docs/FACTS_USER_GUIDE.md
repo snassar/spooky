@@ -6,6 +6,16 @@ The spooky facts system provides fact collection and export capabilities for gat
 
 **Status: Partially Implemented** - The facts system has basic functionality but SSH-based fact collection has known issues that need to be addressed.
 
+## Related Documentation
+
+- [SSH User Guide](SSH_USER_GUIDE.md) - SSH-based fact collection
+- [Machines User Guide](MACHINES_USER_GUIDE.md) - Machine inventory for fact collection
+- [Variables User Guide](VARIABLES_USER_GUIDE.md) - Using facts as variables
+- [Templates User Guide](TEMPLATES_USER_GUIDE.md) - Using facts in templates
+- [Actions User Guide](ACTIONS_USER_GUIDE.md) - Using facts in actions
+
+> **See also**: [User Guides Index](USER_GUIDES_INDEX.md) - Complete overview of all user guides
+
 ## Getting Started
 
 ### Prerequisites
@@ -60,6 +70,16 @@ Facts are gathered directly and exported without intermediate storage:
 - **Memory Management**: Memory is automatically managed during export operations
 - **Cleanup**: No cleanup required - memory is freed automatically
 
+### Integration with Other Systems
+
+Facts integrate with other spooky systems:
+
+- **SSH**: Use [SSH connectivity](SSH_USER_GUIDE.md) for fact collection
+- **Machines**: Collect facts from [machine inventory](MACHINES_USER_GUIDE.md)
+- **Variables**: Use facts as [variables](VARIABLES_USER_GUIDE.md) in other systems
+- **Templates**: Reference facts in [template rendering](TEMPLATES_USER_GUIDE.md)
+- **Actions**: Use facts in [action definitions](ACTIONS_USER_GUIDE.md)
+
 ## Current Implementation Status
 
 ### ✅ Working Features
@@ -76,6 +96,10 @@ Facts are gathered directly and exported without intermediate storage:
 - **Remote Facts Reading**: Cannot reliably read `/etc/spooky/facts.*` files from remote machines
 - **Parallel Processing**: Sequential collection only, no multi-machine parallel processing
 - **SSH Integration**: Cannot fully leverage existing SSH infrastructure and machine inventory
+
+> **Note**: While the SSH system itself is fully implemented (see [SSH User Guide](SSH_USER_GUIDE.md)), the integration between facts collection and SSH-based gathering has known issues. Basic SSH connectivity works, but automated fact collection over SSH requires additional development.
+
+> **See also**: [Known Issues](KNOWN_ISSUES.md#facts-system-ssh-issues) - Detailed information about SSH-based fact collection issues and workarounds
 
 ### 🔧 Current Workarounds
 

@@ -6,6 +6,16 @@ The SSH system in spooky provides comprehensive functionality for SSH connection
 
 **Status: Fully Implemented** - All SSH functionality is implemented and ready for production use.
 
+## Related Documentation
+
+- [Machines User Guide](MACHINES_USER_GUIDE.md) - Machine inventory and connectivity testing
+- [Actions User Guide](ACTIONS_USER_GUIDE.md) - SSH-based action orchestration
+- [Facts User Guide](FACTS_USER_GUIDE.md) - SSH-based fact collection
+- [Templates User Guide](TEMPLATES_USER_GUIDE.md) - SSH-based template rendering
+- [Variables User Guide](VARIABLES_USER_GUIDE.md) - Variable usage in SSH operations
+
+> **See also**: [User Guides Index](USER_GUIDES_INDEX.md) - Complete overview of all user guides
+
 ## Quick Start
 
 ### Basic SSH Configuration
@@ -39,6 +49,8 @@ spooky machines ping my-project
 # Test specific machine
 spooky machines ping my-project --machine web-server
 ```
+
+> **Note**: SSH connectivity testing is integrated with the [Machines User Guide](MACHINES_USER_GUIDE.md) system. The `spooky machines ping` command uses SSH to test connectivity to target machines.
 
 ## Configuration
 

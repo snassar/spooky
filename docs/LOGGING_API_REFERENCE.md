@@ -6,6 +6,8 @@ This document provides a comprehensive API reference for the spooky logging syst
 
 **Status: Partially Implemented** - The logging system has basic functionality but the interface definitions and implementation details have known issues that need to be addressed.
 
+> **See also**: [Known Issues](KNOWN_ISSUES.md#documentation-issues) - Comprehensive documentation of all known issues and workarounds
+
 ## Core Interfaces
 
 ### LogManager Interface

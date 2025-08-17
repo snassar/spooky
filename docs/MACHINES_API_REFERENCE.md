@@ -69,6 +69,8 @@ type MachineManager interface {
 
 ### ⚠️ Known Issues
 
+> **See also**: [Known Issues](KNOWN_ISSUES.md#ssh-integration-issues) - Comprehensive documentation of all known issues and workarounds
+
 1. **SSH-Based Connectivity**: SSH-based machine connectivity has implementation issues
 2. **Ping Functionality**: Machine ping functionality has connectivity problems
 3. **Authentication Testing**: SSH authentication testing has issues

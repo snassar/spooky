@@ -701,6 +701,8 @@ crontab -e
 
 ## Known Issues and Workarounds
 
+> **See also**: [Known Issues](KNOWN_ISSUES.md#facts-system-ssh-issues) - Comprehensive documentation of all known issues and workarounds
+
 ### SSH-Based Collection Issues
 
 **Issue:** SSH-based fact collection has implementation problems.

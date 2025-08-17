@@ -6,6 +6,8 @@ This document provides a comprehensive API reference for the spooky integrations
 
 **Status: Partially Implemented** - The integrations system has basic functionality but the interface definitions and implementation details have known issues that need to be addressed.
 
+> **See also**: [Known Issues](KNOWN_ISSUES.md#integrations-system-issues) - Comprehensive documentation of all known issues and workarounds
+
 ## Core Interfaces
 
 ### IntegrationManager Interface

@@ -6,6 +6,15 @@ The spooky integrations system provides comprehensive integration capabilities f
 
 **Status: Partially Implemented** - The integrations system has basic functionality but many advanced features are still in development.
 
+## Related Documentation
+
+- [Actions User Guide](ACTIONS_USER_GUIDE.md) - Using integrations in actions
+- [Variables User Guide](VARIABLES_USER_GUIDE.md) - Integration variables and configuration
+- [Logging User Guide](LOGGING_USER_GUIDE.md) - Integration logging and monitoring
+- [Secrets User Guide](SECRETS_USER_GUIDE.md) - Secure integration credentials
+
+> **See also**: [User Guides Index](USER_GUIDES_INDEX.md) - Complete overview of all user guides
+
 ## Getting Started
 
 ### Prerequisites
@@ -61,6 +70,15 @@ Key features include:
 - **Request/Response Handling** - Structured request and response processing
 - **Data Transformation** - Convert between different data formats
 - **Event Processing** - Handle real-time events and webhooks
+
+### Integration with Other Systems
+
+The integrations system works with other spooky systems:
+
+- **Actions**: Use integrations in [action orchestration](ACTIONS_USER_GUIDE.md)
+- **Variables**: Store integration credentials as [variables](VARIABLES_USER_GUIDE.md)
+- **Logging**: Monitor integration operations through [logging](LOGGING_USER_GUIDE.md)
+- **Secrets**: Secure integration credentials with [encryption](SECRETS_USER_GUIDE.md)
 
 ## Configuration
 

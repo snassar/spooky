@@ -6,6 +6,16 @@ The spooky variables system provides comprehensive variable management, resoluti
 
 **Status: Production Ready** - The variables system is fully implemented with comprehensive variable management, resolution, and validation capabilities.
 
+## Related Documentation
+
+- [Actions User Guide](ACTIONS_USER_GUIDE.md) - Using variables in actions
+- [Templates User Guide](TEMPLATES_USER_GUIDE.md) - Variable resolution in templates
+- [Facts User Guide](FACTS_USER_GUIDE.md) - Using facts as variables
+- [Secrets User Guide](SECRETS_USER_GUIDE.md) - Encrypted variable management
+- [Machines User Guide](MACHINES_USER_GUIDE.md) - Machine-specific variables
+
+> **See also**: [User Guides Index](USER_GUIDES_INDEX.md) - Complete overview of all user guides
+
 ## Getting Started
 
 ### Prerequisites
@@ -64,6 +74,15 @@ Variables follow a specific resolution order:
 2. **Project Variables** (from variables.hcl and variables/*.hcl)
 3. **Facts Variables** (from machine facts)
 4. **Default Variables** (lowest priority)
+
+### Integration with Other Systems
+
+Variables integrate with other spooky systems:
+
+- **Actions**: Use variables in [action definitions](ACTIONS_USER_GUIDE.md)
+- **Templates**: Resolve variables in [template rendering](TEMPLATES_USER_GUIDE.md)
+- **Facts**: Reference [machine facts](FACTS_USER_GUIDE.md) as variables
+- **Secrets**: Use [encrypted variables](SECRETS_USER_GUIDE.md) for sensitive data
 
 ## Current Implementation Status
 
@@ -193,21 +212,16 @@ Use advanced variable features:
 
 ```hcl
 variables {
-  # String variable with validation
+  # String variable
   variable "app_name" {
     value = "my-application"
     description = "Application name"
-    required = true
   }
   
-  # Number variable with range validation
+  # Number variable
   variable "api_port" {
     value = 8080
     description = "API server port"
-    validation {
-      min = 1024
-      max = 65535
-    }
   }
   
   # Boolean variable
@@ -247,7 +261,6 @@ variables {
   
   variable "node_env" {
     value = "{{.env.NODE_ENV}}"
-    default = "development"
     description = "Node.js environment"
   }
   

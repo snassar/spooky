@@ -881,6 +881,8 @@ tar -czf project-backup-$(date +%Y%m%d).tar.gz ./
 
 ## Known Issues and Workarounds
 
+> **See also**: [Known Issues](KNOWN_ISSUES.md#actions-system-ssh-issues) - Comprehensive documentation of all known issues and workarounds
+
 ### SSH-Based Orchestration Issues
 
 **Issue:** SSH-based action orchestration has implementation problems.

@@ -44,6 +44,8 @@ This document provides a comprehensive overview of the spooky facts system docum
 **What it covers:**
 - Common error messages and solutions
 - SSH-based collection issues and workarounds
+
+> **See also**: [Known Issues](KNOWN_ISSUES.md#facts-system-ssh-issues) - Comprehensive documentation of all known issues and workarounds
 - Performance issues and optimization
 - Export format issues
 - Configuration problems and debugging

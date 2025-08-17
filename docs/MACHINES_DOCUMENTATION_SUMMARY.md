@@ -45,6 +45,8 @@ This document provides a comprehensive overview of the spooky machines system do
 **What it covers:**
 - Common error messages and solutions
 - SSH connectivity issues and workarounds
+
+> **See also**: [Known Issues](KNOWN_ISSUES.md#ssh-integration-issues) - Comprehensive documentation of all known issues and workarounds
 - Authentication problems and debugging
 - Export and filtering issues
 - Configuration problems and debugging

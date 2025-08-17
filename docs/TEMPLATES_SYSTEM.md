@@ -2,576 +2,578 @@
 
 ## Overview
 
-The Templates System provides comprehensive template rendering, validation, and management capabilities for the spooky codebase. It enables dynamic content generation through secure template processing with integration to facts, variables, machines, and other system components.
+The spooky templates system provides comprehensive template management including loading, rendering, validation, and discovery capabilities. Templates are used to generate dynamic content for configuration files, scripts, and other resources based on project variables, facts, and machine data.
 
-**Status**: **Implemented** - Complete template system with rendering, validation, security, and CLI integration.
+## Related Systems
 
-## Architecture
+This system integrates with and depends on several other spooky systems:
 
-### Core Components
+- **[Variables System](VARIABLES_SYSTEM.md)** - Templates use variables for dynamic content rendering
+- **[Facts System](FACTS_SYSTEM.md)** - Templates can use facts as data for rendering
+- **[Actions System](ACTIONS_SYSTEM.md)** - Templates are used by actions for dynamic content generation
+- **[Logging System](LOGGING_SYSTEM.md)** - Template rendering generates comprehensive logs for monitoring and debugging
+- **[Projects System](PROJECTS_SYSTEM.md)** - Templates are organized within projects
+- **[Machines System](MACHINES_SYSTEM.md)** - Templates can use machine information for rendering
+- **[Integrations System](INTEGRATIONS_SYSTEM.md)** - Templates integrate with other systems through the IntegrationManager
+- **[SSH System](SSH_SYSTEM.md)** - Templates can be rendered and deployed via SSH
 
-#### Template Manager
-- **File**: `internal/templates/manager.go`
-- **Purpose**: Central template management with caching, security, and performance optimization
-- **Features**:
-  - Template loading and caching
-  - Template rendering with context resolution
-  - Template validation with schema support
-  - Template metadata management
-  - Security sandboxing and pattern filtering
-  - Performance optimization and metrics
+## Core Concepts
 
-#### Template Functions Registry
-- **File**: `internal/templates/functions.go`
-- **Purpose**: Secure template function management with built-in functions and security restrictions
-- **Features**:
-  - 50+ built-in template functions
-  - Function security manager with restrictions
-  - Function result caching
-  - Category-based function organization
-  - Performance monitoring and limits
+### Template Definition
+Templates are defined using Go's text/template package and can include:
 
-#### Template Integration
-- **File**: `internal/templates/integration.go`
-- **Purpose**: Interface implementation for system integration
-- **Features**:
-  - LoadTemplate - Load templates from paths
-  - RenderTemplate - Render templates with data
-  - ValidateTemplate - Validate templates with comprehensive results
+- **Variable Substitution**: Replace variables with actual values
+- **Conditional Logic**: Include/exclude content based on conditions
+- **Loops and Iteration**: Generate content for multiple items
+- **Function Calls**: Use built-in and custom functions
+- **Nested Templates**: Include other templates
 
-### Integration Points
+### Template Rendering
+The system supports multiple rendering modes:
 
-#### Facts Integration
-- Provides machine facts data to templates
-- Supports custom and system fact collections
-- Enables dynamic fact-based template rendering
+- **Variable-based Rendering**: Render with project variables
+- **Fact-based Rendering**: Render with machine facts
+- **Context-based Rendering**: Render with combined context
+- **Validation Rendering**: Render for validation purposes
 
-#### Variables Integration
-- Provides project variables to templates
-- Supports variable resolution and validation
-- Enables dynamic variable-based template rendering
+### Template Validation
+Templates are validated before use:
 
-#### Machines Integration
-- Provides machine inventory data to templates
-- Supports machine-specific template rendering
-- Enables dynamic machine-based template rendering
-
-#### Secrets Integration
-- Provides secure secret management for templates
-- Supports encrypted template variables
-- Enables secure template rendering
-
-## Template Types
-
-### Template Structure
-```go
-type Template struct {
-    ID              string                 // Template identifier
-    SourcePath      string                 // Template file path
-    DestinationPath string                 // Output destination
-    Type            string                 // Template type
-    Scope           string                 // Usage scope
-    SecurityLevel   string                 // Security level
-    Engine          string                 // Rendering engine
-    Variables       map[string]interface{} // Template variables
-    ContextData     map[string]interface{} // Context data
-    Functions       map[string]interface{} // Available functions
-    Metadata        *TemplateMetadata      // Template metadata
-    Content         string                 // Template content
-    CreatedAt       time.Time              // Creation timestamp
-    UpdatedAt       time.Time              // Update timestamp
-}
-```
-
-### Template Context
-```go
-type TemplateContext struct {
-    Project     map[string]interface{}   // Project information
-    Facts       map[string]interface{}   // Machine facts
-    Machines    []map[string]interface{} // Inventory data
-    Environment map[string]string        // Environment variables
-    CustomData  map[string]interface{}   // Custom data
-    Variables   map[string]interface{}   // Project variables
-}
-```
-
-### Template Metadata
-```go
-type TemplateMetadata struct {
-    Name        string   // Template name
-    Description string   // Template description
-    Author      string   // Template author
-    Version     string   // Template version
-    Tags        []string // Template tags
-    License     string   // Template license
-}
-```
-
-## Template Functions
-
-### String Functions
-- `upper(s)` - Convert string to uppercase
-- `lower(s)` - Convert string to lowercase
-- `title(s)` - Convert string to title case
-- `trim(s)` - Trim whitespace
-- `trimLeft(s)` - Trim left whitespace
-- `trimRight(s)` - Trim right whitespace
-- `replace(s, old, new, n)` - Replace substrings
-- `replaceAll(s, old, new)` - Replace all occurrences
-- `split(s, sep)` - Split string by separator
-- `join(slice, sep)` - Join slice with separator
-- `contains(s, substr)` - Check if string contains substring
-- `hasPrefix(s, prefix)` - Check if string has prefix
-- `hasSuffix(s, suffix)` - Check if string has suffix
-- `repeat(s, n)` - Repeat string n times
-- `substr(s, start, length)` - Extract substring
-- `len(v)` - Get length of string, array, or map
-
-### Mathematical Functions
-- `add(a, b)` - Add two numbers
-- `sub(a, b)` - Subtract two numbers
-- `mul(a, b)` - Multiply two numbers
-- `div(a, b)` - Divide two numbers
-- `mod(a, b)` - Modulo operation
-- `abs(x)` - Absolute value
-- `ceil(x)` - Ceiling function
-- `floor(x)` - Floor function
-- `round(x)` - Round to nearest integer
-- `min(...)` - Minimum value
-- `max(...)` - Maximum value
-- `pow(x, y)` - Power function
-- `sqrt(x)` - Square root
-
-### Array Functions
-- `first(slice)` - Get first element
-- `last(slice)` - Get last element
-- `index(slice, i)` - Get element at index
-- `slice(slice, start, end)` - Extract slice
-- `append(slice, ...)` - Append elements
-- `prepend(slice, ...)` - Prepend elements
-- `reverse(slice)` - Reverse array
-- `sort(slice)` - Sort array
-- `uniq(slice)` - Remove duplicates
-- `containsItem(slice, item)` - Check if array contains item
-
-### Hash and Encoding Functions
-- `md5(s)` - MD5 hash
-- `sha256(s)` - SHA256 hash
-- `base64(s)` - Base64 encode
-- `base64Decode(s)` - Base64 decode
-- `hex(s)` - Hex encode
-- `hexDecode(s)` - Hex decode
-
-### Type Conversion Functions
-- `toString(v)` - Convert to string
-- `toInt(v)` - Convert to integer
-- `toFloat(v)` - Convert to float
-- `toBool(v)` - Convert to boolean
-
-### JSON Functions
-- `toJSON(v)` - Convert to JSON
-- `fromJSON(s)` - Parse JSON
-- `prettyJSON(v)` - Pretty print JSON
-
-### Date and Time Functions
-- `now()` - Current time
-- `formatTime(t, layout)` - Format time
-- `parseTime(s, layout)` - Parse time
-- `addDays(t, days)` - Add days
-- `addHours(t, hours)` - Add hours
-
-### Utility Functions
-- `default(value, defaultValue)` - Default value
-- `coalesce(...)` - First non-empty value
-- `ternary(condition, trueValue, falseValue)` - Conditional value
-- `regexMatch(pattern, s)` - Regex match
-- `regexReplace(pattern, replacement, s)` - Regex replace
-- `random(min, max)` - Random number
-- `uuid()` - Generate UUID
-
-## Security Features
-
-### Template Sandboxing
-- Execution time limits
-- Memory usage limits
-- Function access restrictions
-- Resource monitoring
-
-### Pattern Filtering
-- Dangerous pattern detection
-- Security violation logging
-- Access control enforcement
-- Audit trail maintenance
-
-### Security Levels
-- **Restricted**: Minimal function access, strict limits
-- **Standard**: Normal function access, standard limits
-- **Elevated**: Extended function access, relaxed limits
-- **Trusted**: Full function access, minimal restrictions
-
-## Performance Features
-
-### Caching
-- Template caching with TTL
-- Result caching for rendered templates
-- Function result caching
-- Context resolution caching
-
-### Optimization
-- Template compilation optimization
-- Parallel processing support
-- Memory usage optimization
-- Performance metrics collection
-
-### Monitoring
-- Template render time tracking
-- Memory usage monitoring
-- Cache hit rate tracking
-- Performance bottleneck detection
+- **Syntax Validation**: Ensures valid template syntax
+- **Variable Validation**: Validates required variables
+- **Function Validation**: Validates template functions
+- **Context Validation**: Validates rendering context
 
 ## CLI Commands
 
-### Template Rendering
+### Template Management Commands
+
+#### `spooky templates render [project] [template]`
+Render a template with the given data and output to a file.
+
+**Flags:**
+- `--data` - Data file (JSON)
+- `--output` - Output file path
+- `--dry-run` - Show rendering result without writing to file
+- `--preview` - Preview rendering result
+
+**Examples:**
 ```bash
-# Basic template rendering
-spooky templates render <project> <template>
+# Render template with data file
+spooky templates render ./my-project templates/nginx.conf.tmpl --data data.json --output nginx.conf
 
-# Render with data file
-spooky templates render <project> <template> --data <file>
+# Render with preview
+spooky templates render ./my-project templates/nginx.conf.tmpl --data data.json --preview
 
-# Render with output file
-spooky templates render <project> <template> --output <file>
-
-# Preview mode
-spooky templates render <project> <template> --preview
-
-# Dry run mode
-spooky templates render <project> <template> --dry-run
+# Render with dry-run
+spooky templates render ./my-project templates/nginx.conf.tmpl --data data.json --dry-run
 ```
 
-### Template Validation
+#### `spooky templates validate [project-path]`
+Validate template syntax and variables.
+
+**Flags:**
+- `--template` - Validate specific template file
+- `--data` - Data file for validation context
+
+**Examples:**
 ```bash
-# Validate all templates in project
-spooky templates validate <project>
+# Validate all templates
+spooky templates validate ./my-project
 
 # Validate specific template
-spooky templates validate <project> --template <path>
+spooky templates validate ./my-project --template templates/nginx.conf.tmpl
+
+# Validate with data context
+spooky templates validate ./my-project --template templates/nginx.conf.tmpl --data data.json
 ```
 
-### Template Listing
+#### `spooky templates list [project-path]`
+List all available templates in the project.
+
+**Examples:**
 ```bash
 # List all templates
-spooky templates list <project>
-
-# List with specific format
-spooky templates list <project> --format json
-spooky templates list <project> --format hcl
+spooky templates list ./my-project
 ```
 
-### Template Search
+#### `spooky templates search [project-path]`
+Search for templates by content or metadata.
+
+**Flags:**
+- `--query` - Search query
+- `--type` - Template type filter
+
+**Examples:**
 ```bash
-# Search templates by query
-spooky templates search <project> <query>
+# Search for templates
+spooky templates search ./my-project --query "nginx"
 
-# Search with tags
-spooky templates search <project> <query> --tags <tags>
-
-# Search by category
-spooky templates search <project> <query> --category <category>
+# Search by type
+spooky templates search ./my-project --type "config"
 ```
 
-## Configuration
+## Template Configuration
 
-### Template Configuration
+### Basic Template Structure
 ```hcl
-# templates/config.hcl
-template_config {
-  # Security settings
-  security {
-    default_level = "standard"
-    max_execution_time = 30000  # milliseconds
-    max_memory_usage = 104857600  # 100MB
-    restricted_patterns = [
-      "{{.*os\\.Run.*}}",
-      "{{.*system.*}}",
-      "{{.*eval.*}}"
-    ]
-  }
-  
-  # Performance settings
-  performance {
-    cache_ttl = 300  # seconds
-    max_cache_size = 1000
-    parallel_workers = 4
-  }
-  
-  # Function settings
-  functions {
-    allowed_categories = ["string", "math", "array", "utility"]
-    restricted_functions = ["system", "eval", "exec"]
-  }
-}
-```
-
-### Template Metadata
-```hcl
-# templates/metadata.hcl
-template_metadata {
-  name = "nginx-config"
-  description = "Nginx configuration template"
-  author = "spooky-user"
-  version = "1.0.0"
-  tags = ["web", "nginx", "config"]
-  license = "MIT"
-  
-  # Template properties
-  type = "config"
-  scope = "project"
-  security_level = "standard"
-  engine = "go-template"
-  
-  # Required variables
-  required_variables = [
-    "server_name",
-    "port",
-    "root_path"
-  ]
-  
-  # Output format
-  output_format = "nginx.conf"
-}
-```
-
-## Examples
-
-### Basic Template
-```bash
 # templates/nginx.conf.tmpl
 server {
-    listen {{.port}};
-    server_name {{.server_name}};
-    root {{.root_path}};
+    listen {{ .port | default 80 }};
+    server_name {{ .server_name }};
     
     location / {
-        try_files $uri $uri/ /index.html;
+        root {{ .document_root | default "/var/www/html" }};
+        index index.html index.htm;
     }
     
-    # Logging
-    access_log /var/log/nginx/{{.server_name}}.access.log;
-    error_log /var/log/nginx/{{.server_name}}.error.log;
+    {{ if .ssl_enabled }}
+    listen 443 ssl;
+    ssl_certificate {{ .ssl_certificate }};
+    ssl_certificate_key {{ .ssl_certificate_key }};
+    {{ end }}
 }
 ```
 
 ### Template with Functions
-```bash
-# templates/deployment.yaml.tmpl
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: {{.app_name | lower}}
-  labels:
-    app: {{.app_name | lower}}
-    version: {{.version}}
-spec:
-  replicas: {{.replicas | default 3}}
-  selector:
-    matchLabels:
-      app: {{.app_name | lower}}
-  template:
-    metadata:
-      labels:
-        app: {{.app_name | lower}}
-    spec:
-      containers:
-      - name: {{.app_name | lower}}
-        image: {{.image}}
-        ports:
-        - containerPort: {{.port}}
-        env:
-        - name: APP_NAME
-          value: {{.app_name | upper}}
-        - name: VERSION
-          value: {{.version}}
-```
-
-### Template with Facts Integration
-```bash
-# templates/system-info.sh.tmpl
+```hcl
+# templates/deploy.sh.tmpl
 #!/bin/bash
 
-# System Information for {{.facts.hostname}}
-echo "=== System Information ==="
-echo "Hostname: {{.facts.hostname}}"
-echo "OS: {{.facts.os.name}} {{.facts.os.version}}"
-echo "Architecture: {{.facts.architecture}}"
-echo "CPU Cores: {{.facts.cpu.cores}}"
-echo "Memory: {{.facts.memory.total | div 1024 | div 1024}} GB"
-echo "Disk Usage: {{.facts.disk.usage_percent}}%"
+# Deploy script for {{ .app_name }}
+set -e
 
-# Network Information
-echo "=== Network Information ==="
-{{range .facts.network.interfaces}}
-echo "Interface {{.name}}: {{.ip}}"
-{{end}}
+echo "Deploying {{ .app_name }} version {{ .version }}"
 
-# Process Information
-echo "=== Process Information ==="
-echo "Total Processes: {{.facts.processes.total}}"
-echo "Running Processes: {{.facts.processes.running}}"
+{{ range .servers }}
+echo "Deploying to {{ .hostname }}"
+ssh {{ .user }}@{{ .hostname }} "cd {{ .deploy_path }} && git pull origin {{ $.branch }}"
+{{ end }}
+
+echo "Deployment completed successfully"
 ```
 
-## Integration Examples
+### Template with Conditions
+```hcl
+# templates/config.yaml.tmpl
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .app_name }}-config
+data:
+  {{ if eq .environment "production" }}
+  log_level: "info"
+  debug: "false"
+  {{ else }}
+  log_level: "debug"
+  debug: "true"
+  {{ end }}
+  
+  database_url: {{ .database_url }}
+  redis_url: {{ .redis_url }}
+```
 
-### Actions Integration
-```go
-// Use templates in actions
-action := &spookytypes.Action{
-    Name: "deploy-config",
-    Template: "templates/nginx.conf.tmpl",
-    Variables: map[string]interface{}{
-        "server_name": "example.com",
-        "port": 80,
-        "root_path": "/var/www/html",
-    },
+## Template Rendering Process
+
+### Rendering Workflow
+1. **Load Template**: Load template file from project
+2. **Parse Template**: Parse template syntax
+3. **Load Context**: Load variables, facts, and machine data
+4. **Validate Context**: Validate required variables
+5. **Render Template**: Generate final content
+6. **Validate Output**: Validate rendered content
+7. **Write Output**: Write to file or display
+
+### Context Loading
+The system loads context from multiple sources:
+
+```bash
+# Load context from data file
+spooky templates render ./my-project template.tmpl --data context.json
+
+# Load context from project variables
+spooky templates render ./my-project template.tmpl
+
+# Load context from facts
+spooky templates render ./my-project template.tmpl --facts facts.json
+```
+
+### Variable Resolution
+Variables are resolved in the following order:
+
+1. **Data File Variables**: Variables from `--data` file
+2. **Project Variables**: Variables from `variables.hcl`
+3. **Environment Variables**: System environment variables
+4. **Default Values**: Template default values
+
+## Template Functions
+
+### Built-in Functions
+The system provides several built-in functions:
+
+**String Functions:**
+```hcl
+{{ .name | upper }}           # Convert to uppercase
+{{ .name | lower }}           # Convert to lowercase
+{{ .name | title }}           # Convert to title case
+{{ .name | trim }}            # Trim whitespace
+{{ .name | replace "old" "new" }}  # Replace text
+```
+
+**Number Functions:**
+```hcl
+{{ .count | add 1 }}          # Add numbers
+{{ .count | sub 1 }}          # Subtract numbers
+{{ .count | mul 2 }}          # Multiply numbers
+{{ .count | div 2 }}          # Divide numbers
+```
+
+**List Functions:**
+```hcl
+{{ .items | len }}            # Get list length
+{{ .items | first }}          # Get first item
+{{ .items | last }}           # Get last item
+{{ .items | join "," }}       # Join list items
+```
+
+**Conditional Functions:**
+```hcl
+{{ .value | default "default" }}  # Default value
+{{ .value | empty | not }}    # Check if not empty
+{{ .value | eq "test" }}      # Equality check
+```
+
+### Custom Functions
+The system supports custom template functions:
+
+```hcl
+# Custom function definition
+{{ define "format_size" }}
+{{ if gt . 1073741824 }}
+{{ div . 1073741824 }}GB
+{{ else if gt . 1048576 }}
+{{ div . 1048576 }}MB
+{{ else if gt . 1024 }}
+{{ div . 1024 }}KB
+{{ else }}
+{{ . }}B
+{{ end }}
+{{ end }}
+
+# Usage
+{{ .file_size | format_size }}
+```
+
+## Template Validation
+
+### Validation Process
+The template validation system performs:
+
+1. **Syntax Validation**: Validates template syntax
+2. **Variable Validation**: Checks for undefined variables
+3. **Function Validation**: Validates function calls
+4. **Context Validation**: Validates rendering context
+5. **Output Validation**: Validates rendered output
+
+### Validation Output
+```bash
+# Validate template
+spooky templates validate ./my-project --template templates/nginx.conf.tmpl
+```
+
+**Output:**
+```
+🔍 Validating template: templates/nginx.conf.tmpl
+✅ Template validation passed
+📋 Syntax validation: Valid ✅
+📋 Variable validation: Valid ✅
+📋 Function validation: Valid ✅
+```
+
+### Context Validation
+```bash
+# Validate with context
+spooky templates validate ./my-project --template templates/nginx.conf.tmpl --data context.json
+```
+
+**Output:**
+```
+🔍 Validating template with context: templates/nginx.conf.tmpl
+✅ Template validation passed
+📋 Context validation: Valid ✅
+📋 Variable resolution: Valid ✅
+📋 Output validation: Valid ✅
+```
+
+## Template Discovery
+
+### Template Listing
+```bash
+# List all templates
+spooky templates list ./my-project
+```
+
+**Output:**
+```
+📋 Available templates in ./my-project:
+templates/
+├── nginx.conf.tmpl
+├── deploy.sh.tmpl
+├── config.yaml.tmpl
+└── docker-compose.yml.tmpl
+```
+
+### Template Search
+```bash
+# Search for templates
+spooky templates search ./my-project --query "nginx"
+```
+
+**Output:**
+```
+🔍 Search results for "nginx":
+templates/nginx.conf.tmpl - Nginx configuration template
+templates/nginx-ssl.conf.tmpl - Nginx SSL configuration template
+```
+
+## Template Context
+
+### Context Structure
+The template context includes:
+
+```json
+{
+  "variables": {
+    "app_name": "my-app",
+    "version": "1.0.0",
+    "environment": "production"
+  },
+  "facts": {
+    "machine": "web-server",
+    "os": "Ubuntu 22.04",
+    "memory": "8GB"
+  },
+  "machines": [
+    {
+      "hostname": "web-server",
+      "ip": "192.168.1.10",
+      "user": "admin"
+    }
+  ],
+  "project": {
+    "name": "my-project",
+    "path": "./my-project"
+  }
 }
+```
+
+### Context Loading
+```bash
+# Load context from multiple sources
+spooky templates render ./my-project template.tmpl \
+  --data variables.json \
+  --facts facts.json \
+  --machines machines.json
+```
+
+## Template Examples
+
+### Configuration Templates
+```hcl
+# templates/application.conf.tmpl
+[application]
+name = {{ .app_name }}
+version = {{ .version }}
+environment = {{ .environment }}
+
+[database]
+host = {{ .database.host }}
+port = {{ .database.port | default 5432 }}
+name = {{ .database.name }}
+user = {{ .database.user }}
+
+[logging]
+level = {{ .log_level | default "info" }}
+file = {{ .log_file | default "/var/log/app.log" }}
+```
+
+### Script Templates
+```hcl
+# templates/backup.sh.tmpl
+#!/bin/bash
+
+# Backup script for {{ .app_name }}
+set -e
+
+BACKUP_DIR="{{ .backup_dir | default "/backups" }}"
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE="$BACKUP_DIR/{{ .app_name }}_$DATE.tar.gz"
+
+echo "Creating backup: $BACKUP_FILE"
+
+{{ range .databases }}
+echo "Backing up database: {{ .name }}"
+pg_dump -h {{ .host }} -p {{ .port | default 5432 }} -U {{ .user }} {{ .name }} > {{ .name }}.sql
+{{ end }}
+
+tar -czf "$BACKUP_FILE" *.sql
+rm *.sql
+
+echo "Backup completed: $BACKUP_FILE"
+```
+
+### Docker Templates
+```hcl
+# templates/docker-compose.yml.tmpl
+version: '3.8'
+
+services:
+  {{ .app_name }}:
+    image: {{ .image }}:{{ .version }}
+    container_name: {{ .app_name }}
+    ports:
+      - "{{ .port }}:{{ .port }}"
+    environment:
+      - NODE_ENV={{ .environment }}
+      - DATABASE_URL={{ .database_url }}
+    volumes:
+      - {{ .data_dir }}:/app/data
+    {{ if .restart_policy }}
+    restart: {{ .restart_policy }}
+    {{ end }}
+```
+
+## Integration with Other Systems
+
+### Variables Integration
+Templates use project variables for dynamic content:
+
+```bash
+# Render with project variables
+spooky templates render ./my-project template.tmpl
 ```
 
 ### Facts Integration
-```go
-// Use facts in templates
-facts, err := factsManager.CollectFacts("web-server")
-if err != nil {
-    return err
-}
+Templates can use machine facts:
 
-template, err := templatesManager.LoadTemplate(ctx, "templates/system-info.sh.tmpl")
-if err != nil {
-    return err
+```hcl
+# Template using facts
+server {
+    listen {{ .facts.port | default 80 }};
+    server_name {{ .facts.hostname }};
 }
-
-result, err := templatesManager.RenderTemplate(ctx, template, map[string]interface{}{
-    "facts": facts,
-})
 ```
 
-### Variables Integration
-```go
-// Use variables in templates
-variables, err := variablesManager.LoadVariables(ctx, "")
-if err != nil {
-    return err
-}
+### Actions Integration
+Templates are used in actions for dynamic scripts:
 
-template, err := templatesManager.LoadTemplate(ctx, "templates/config.yaml.tmpl")
-if err != nil {
-    return err
+```hcl
+# Action using template
+action "deploy" {
+  description = "Deploy application"
+  
+  template {
+    source = "templates/deploy.sh.tmpl"
+    destination = "/tmp/deploy.sh"
+    permissions = "0755"
+  }
+  
+  command = "/tmp/deploy.sh"
 }
-
-result, err := templatesManager.RenderTemplate(ctx, template, map[string]interface{}{
-    "variables": variables,
-})
 ```
 
-## Best Practices
+## Error Handling
 
-### Security
-- Use appropriate security levels for templates
-- Validate all template inputs
-- Avoid dangerous patterns in templates
-- Use restricted mode for untrusted templates
+### Common Template Errors
+- **Syntax Errors**: Invalid template syntax
+- **Variable Errors**: Undefined or invalid variables
+- **Function Errors**: Invalid function calls
+- **Context Errors**: Missing or invalid context data
 
-### Performance
-- Cache frequently used templates
-- Use appropriate TTL values
-- Monitor template performance
-- Optimize template complexity
+### Error Recovery
+```bash
+# Validate template for errors
+spooky templates validate ./my-project --template template.tmpl
 
-### Maintainability
-- Use descriptive template names
-- Document template variables
-- Version template metadata
-- Use consistent naming conventions
-
-### Integration
-- Leverage facts for dynamic content
-- Use variables for configuration
-- Integrate with machine inventory
-- Use secrets for sensitive data
+# Check template syntax
+spooky templates render ./my-project template.tmpl --preview
+```
 
 ## Troubleshooting
 
 ### Common Issues
 
-#### Template Not Found
+#### Template Syntax Issues
 ```bash
-# Check template path
-ls -la templates/
+# Validate template syntax
+spooky templates validate ./my-project --template template.tmpl
 
-# Validate template file
-spooky templates validate <project> --template <path>
+# Check for syntax errors
+spooky templates render ./my-project template.tmpl --preview
 ```
 
-#### Template Rendering Errors
+#### Variable Issues
 ```bash
-# Check template syntax
-spooky templates validate <project> --template <path>
+# Check available variables
+spooky variables list ./my-project
 
-# Check required variables
-spooky templates render <project> <template> --preview
+# Validate variable context
+spooky templates validate ./my-project --template template.tmpl --data context.json
 ```
 
-#### Performance Issues
+#### Rendering Issues
 ```bash
-# Check template size
-wc -l templates/<template>
+# Preview rendering result
+spooky templates render ./my-project template.tmpl --preview
 
-# Monitor render time
-spooky templates render <project> <template> --verbose
+# Check template functions
+spooky templates validate ./my-project --template template.tmpl
 ```
 
-#### Security Violations
+### Debug Information
 ```bash
-# Check security level
-cat templates/metadata.hcl
+# Enable debug logging
+export SPOOKY_LOG_LEVEL=debug
 
-# Review restricted patterns
-spooky templates validate <project> --strict
+# Render with debug output
+spooky templates render ./my-project template.tmpl --preview
 ```
 
-## API Reference
+## Best Practices
 
-### TemplatesIntegration Interface
-```go
-type TemplatesIntegration interface {
-    LoadTemplate(ctx context.Context, templatePath string) (*spookytypes.Template, error)
-    RenderTemplate(ctx context.Context, template *spookytypes.Template, data map[string]interface{}) (string, error)
-    ValidateTemplate(ctx context.Context, template *spookytypes.Template) (*spookytypes.ValidationResult, error)
-}
-```
+### Template Design
+1. **Use Descriptive Names**: Choose clear, descriptive template names
+2. **Include Comments**: Add comments for complex templates
+3. **Use Default Values**: Provide sensible default values
+4. **Validate Inputs**: Validate template inputs
+5. **Keep Templates Simple**: Avoid overly complex templates
 
-### Template Manager Methods
-```go
-// Load and render templates
-LoadTemplate(ctx context.Context, templatePath string) (*spookytypes.Template, error)
-RenderTemplate(ctx context.Context, template *spookytypes.Template, data map[string]interface{}) (string, error)
-ValidateTemplate(ctx context.Context, template *spookytypes.Template) (*spookytypes.ValidationResult, error)
+### Variable Management
+1. **Use Consistent Naming**: Use consistent variable naming conventions
+2. **Document Variables**: Document all template variables
+3. **Provide Defaults**: Provide default values for optional variables
+4. **Validate Variables**: Validate required variables
+5. **Use Type Safety**: Use appropriate variable types
 
-// Context resolution
-ResolveTemplateContext(ctx context.Context, template *spookytypes.Template, data map[string]interface{}) (*spookytypes.TemplateContext, error)
+### Security Practices
+1. **Validate Inputs**: Validate all template inputs
+2. **Escape Output**: Escape user-provided content
+3. **Limit Functions**: Limit available template functions
+4. **Audit Templates**: Regularly audit template content
+5. **Secure Context**: Secure template context data
 
-// Function management
-RegisterTemplateFunctions(functions map[string]interface{}) error
+## Future Enhancements
 
-// Metadata management
-GetTemplateMetadata(ctx context.Context, templatePath string) (*spookytypestemplates.TemplateMetadata, error)
-```
+### Planned Features
+- **Template Caching**: Cache parsed templates for performance
+- **Template Versioning**: Version control for templates
+- **Template Inheritance**: Template inheritance and composition
+- **Template Testing**: Automated template testing
+- **Template Analytics**: Template usage analytics
 
-## Related Documentation
-
-- [Templates API Reference](TEMPLATES_API_REFERENCE.md) - Complete API documentation
-- [Template System Design](design/systems/template-system.md) - Design documentation
-- [Template Enhanced Composition](design/TEMPLATE_ENHANCED_COMPOSITION.md) - Composition patterns
-- [Schema System](../schema-system.md) - Schema validation and configuration
-- [Facts System](FACTS_SYSTEM.md) - Facts integration
-- [Variables System](VARIABLES_SYSTEM.md) - Variables integration
-- [Machines System](MACHINES_SYSTEM.md) - Machines integration
+### Extension Points
+- **Custom Functions**: User-defined template functions
+- **Template Plugins**: Pluggable template engines
+- **External Integrations**: Integration with external template systems
+- **Template APIs**: REST API for template management
+- **Template Webhooks**: Webhook notifications for template events

@@ -124,6 +124,8 @@ This document provides a comprehensive overview of the current implementation st
 
 ### ⚠️ Partially Implemented Systems
 
+> **See also**: [Known Issues](KNOWN_ISSUES.md) - Comprehensive documentation of all known issues and workarounds
+
 #### Facts System
 **Working Components:**
 - Fact loading from HCL configuration files

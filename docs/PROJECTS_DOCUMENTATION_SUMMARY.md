@@ -45,10 +45,12 @@ project {
     tags = ["web", "deployment", "production"]
   }
   
-  settings {
-    parallel_workers = 4
-    timeout_seconds = 300
-    log_level = "info"
+  run {
+    default_timeout = 300
+    max_parallel = 4
+    dry_run_default = false
+    validate_before_run = true
+    backup_before_changes = false
   }
 }
 ```
@@ -58,24 +60,25 @@ project {
 Machine inventory configuration:
 
 ```hcl
-machines {
-  machine "web-server" {
-    hostname = "web.example.com"
-    host = "192.168.1.100"
-    port = 22
-    user = "admin"
-    
-    authentication {
-      method = "ssh_key"
-      key_path = "~/.ssh/id_rsa"
+machines_inventory {
+  machines {
+    machine "web-server" {
+      hostname = "web.example.com"
+      port = 22
+      user = "admin"
+      
+      authentication {
+        method = "ssh_key"
+        key_path = "~/.ssh/id_rsa"
+      }
+      
+      tags = ["production", "web"]
+      
+      metadata {
+        environment = "production"
+        role = "web"
+      }
     }
-    
-    tags = {
-      environment = "production"
-      role = "web"
-    }
-    
-    groups = ["webservers", "production"]
   }
 }
 ```
@@ -110,13 +113,12 @@ Project variables and configuration:
 ```hcl
 variables {
   variable "app_version" {
-    type = "string"
+    value = "1.0.0"
     description = "Application version to deploy"
-    default = "1.0.0"
   }
   
   variable "database_url" {
-    type = "string"
+    value = "postgresql://user:pass@localhost:5432/mydb"
     description = "Database connection URL"
     sensitive = true
     encrypted = true

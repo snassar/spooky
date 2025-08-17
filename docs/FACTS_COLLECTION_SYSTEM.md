@@ -323,12 +323,10 @@ Fact collection can be configured through project settings:
 project {
   name = "my-project"
   
-  settings {
-    fact_collection {
-      timeout = 300
-      parallel_workers = 4
-      retry_attempts = 3
-    }
+  facts {
+    timeout = 300
+    parallel_collection = 4
+    retry_attempts = 3
   }
 }
 ```
