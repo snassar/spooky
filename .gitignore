@@ -49,6 +49,16 @@ spooky.exe
 spooky
 build/*
 
+# Tool binaries
+tools/*/dependency-graph
+tools/*/focused-adr-analyzer
+tools/*/todo-linter
+tools/*/adr-generator
+tools/*/git-adr-analyzer
+tools/*/simple-adr-generator
+tools/*/terminology-checker
+tools/*/pre-commit
+
 # Facts exports (facts are stored in memory during export operations)
 *.facts.json
 *.facts.hcl
