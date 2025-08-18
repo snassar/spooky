@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -31,6 +32,100 @@ type ADRRecommendation struct {
 	Priority       string // "High", "Medium", "Low"
 	Reason         string
 	SuggestedTitle string
+}
+
+// LineType represents the type of line in git log output
+type LineType int
+
+const (
+	LineTypeEmpty LineType = iota
+	LineTypeFileStats
+	LineTypeCommit
+)
+
+// getLineType determines the type of line in git log output
+func getLineType(line string) LineType {
+	if strings.HasPrefix(line, " ") && strings.Contains(line, "|") {
+		return LineTypeFileStats
+	} else if len(line) > 0 && !strings.HasPrefix(line, " ") {
+		return LineTypeCommit
+	}
+	return LineTypeEmpty
+}
+
+// parseFileStats parses file statistics from a git log line
+func parseFileStats(line string, commit *SignificantCommit) error {
+	parts := strings.Split(line, "|")
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid file stats format")
+	}
+
+	stats := strings.TrimSpace(parts[1])
+	if !strings.Contains(stats, "insertions") {
+		return nil // Not a stats line we care about
+	}
+
+	return extractInsertionDeletionCounts(stats, commit)
+}
+
+// extractInsertionDeletionCounts extracts insertion and deletion counts from stats string
+func extractInsertionDeletionCounts(stats string, commit *SignificantCommit) error {
+	re := regexp.MustCompile(`(\d+) insertions?.*?(\d+) deletions?`)
+	matches := re.FindStringSubmatch(stats)
+	if len(matches) < 3 {
+		return fmt.Errorf("failed to parse insertion/deletion counts")
+	}
+
+	if additions, err := strconv.Atoi(matches[1]); err == nil {
+		commit.Additions = additions
+	} else {
+		fmt.Printf("Warning: failed to parse additions: %v\n", err)
+	}
+
+	if deletions, err := strconv.Atoi(matches[2]); err == nil {
+		commit.Deletions = deletions
+	} else {
+		fmt.Printf("Warning: failed to parse deletions: %v\n", err)
+	}
+
+	return nil
+}
+
+// parseCommitLine parses a commit line and creates a SignificantCommit
+func parseCommitLine(line string, pattern string) SignificantCommit {
+	parts := strings.SplitN(line, " ", 2)
+	if len(parts) < 2 {
+		return SignificantCommit{}
+	}
+
+	return SignificantCommit{
+		Hash:     parts[0],
+		Message:  parts[1],
+		Category: getCategoryFromPattern(pattern),
+		Reason:   fmt.Sprintf("Matches pattern: %s", pattern),
+		Date:     time.Now(), // Default to now, will be updated
+	}
+}
+
+// finalizeCommit adds the commit date to a commit
+func finalizeCommit(commit *SignificantCommit) {
+	if commit.Hash == "" {
+		return
+	}
+
+	if date, err := getCommitDate(commit.Hash); err == nil {
+		commit.Date = date
+	}
+}
+
+// collectCommit finalizes and adds a commit to the collection
+func collectCommit(commits *[]SignificantCommit, currentCommit *SignificantCommit) {
+	if currentCommit.Hash == "" {
+		return
+	}
+
+	finalizeCommit(currentCommit)
+	*commits = append(*commits, *currentCommit)
 }
 
 func main() {
@@ -103,61 +198,25 @@ func getSignificantCommits() []SignificantCommit {
 
 func parseSignificantCommits(output, pattern string) []SignificantCommit {
 	var commits []SignificantCommit
+	var currentCommit SignificantCommit
+
 	lines := strings.Split(output, "\n")
 
-	var currentCommit SignificantCommit
 	for _, line := range lines {
-		if strings.HasPrefix(line, " ") && strings.Contains(line, "|") {
-			// Parse file stats
-			parts := strings.Split(line, "|")
-			if len(parts) >= 2 {
-				stats := strings.TrimSpace(parts[1])
-				if strings.Contains(stats, "insertions") {
-					// Extract numbers
-					re := regexp.MustCompile(`(\d+) insertions?.*?(\d+) deletions?`)
-					matches := re.FindStringSubmatch(stats)
-					if len(matches) >= 3 {
-						if _, err := fmt.Sscanf(matches[1], "%d", &currentCommit.Additions); err != nil {
-							// Log error but continue
-							fmt.Printf("Warning: failed to parse additions: %v\n", err)
-						}
-						if _, err := fmt.Sscanf(matches[2], "%d", &currentCommit.Deletions); err != nil {
-							// Log error but continue
-							fmt.Printf("Warning: failed to parse deletions: %v\n", err)
-						}
-					}
-				}
-			}
-		} else if len(line) > 0 && !strings.HasPrefix(line, " ") {
-			// New commit
-			if currentCommit.Hash != "" {
-				// Get commit date
-				if date, err := getCommitDate(currentCommit.Hash); err == nil {
-					currentCommit.Date = date
-				}
-				commits = append(commits, currentCommit)
-			}
+		lineType := getLineType(line)
 
-			parts := strings.SplitN(line, " ", 2)
-			if len(parts) >= 2 {
-				currentCommit = SignificantCommit{
-					Hash:     parts[0],
-					Message:  parts[1],
-					Category: getCategoryFromPattern(pattern),
-					Reason:   fmt.Sprintf("Matches pattern: %s", pattern),
-					Date:     time.Now(), // Default to now, will be updated
-				}
+		switch lineType {
+		case LineTypeFileStats:
+			if err := parseFileStats(line, &currentCommit); err != nil {
+				fmt.Printf("Warning: failed to parse file stats line: %v\n", err)
 			}
+		case LineTypeCommit:
+			collectCommit(&commits, &currentCommit)
+			currentCommit = parseCommitLine(line, pattern)
 		}
 	}
 
-	if currentCommit.Hash != "" {
-		// Get commit date for last commit
-		if date, err := getCommitDate(currentCommit.Hash); err == nil {
-			currentCommit.Date = date
-		}
-		commits = append(commits, currentCommit)
-	}
+	collectCommit(&commits, &currentCommit)
 
 	return commits
 }
@@ -168,84 +227,37 @@ func findLargeArchitecturalCommits(output string) []SignificantCommit {
 
 	var currentCommit SignificantCommit
 	for _, line := range lines {
-		if isFileStatsLine(line) {
-			parseFileStats(line, &currentCommit)
-		} else if isNewCommitLine(line) {
+		lineType := getLineType(line)
+
+		switch lineType {
+		case LineTypeFileStats:
+			// For large commits, we need to check if the stats indicate a large change
+			if err := parseFileStats(line, &currentCommit); err == nil {
+				// Check if this is a large commit
+				if currentCommit.Additions > 1000 || currentCommit.Deletions > 500 {
+					currentCommit.Category = "Large Change"
+					currentCommit.Reason = fmt.Sprintf("Large commit: +%d -%d lines", currentCommit.Additions, currentCommit.Deletions)
+				}
+			}
+		case LineTypeCommit:
 			if shouldIncludeCommit(currentCommit) {
+				finalizeCommit(&currentCommit)
 				commits = append(commits, currentCommit)
 			}
-			currentCommit = parseCommitLine(line)
+			currentCommit = parseCommitLine(line, "") // No specific pattern for large commits
 		}
 	}
 
 	if shouldIncludeCommit(currentCommit) {
+		finalizeCommit(&currentCommit)
 		commits = append(commits, currentCommit)
 	}
 
 	return commits
 }
 
-func isFileStatsLine(line string) bool {
-	return strings.HasPrefix(line, " ") && strings.Contains(line, "|")
-}
-
-func isNewCommitLine(line string) bool {
-	return len(line) > 0 && !strings.HasPrefix(line, " ")
-}
-
 func shouldIncludeCommit(commit SignificantCommit) bool {
 	return commit.Hash != "" && (commit.Additions > 1000 || commit.Deletions > 500)
-}
-
-func parseFileStats(line string, commit *SignificantCommit) {
-	parts := strings.Split(line, "|")
-	if len(parts) < 2 {
-		return
-	}
-
-	stats := strings.TrimSpace(parts[1])
-	if !strings.Contains(stats, "insertions") {
-		return
-	}
-
-	additions, deletions := extractStatsFromLine(stats)
-	if additions > 1000 || deletions > 500 {
-		commit.Additions = additions
-		commit.Deletions = deletions
-		commit.Category = "Large Change"
-		commit.Reason = fmt.Sprintf("Large commit: +%d -%d lines", additions, deletions)
-	}
-}
-
-func extractStatsFromLine(stats string) (int, int) {
-	re := regexp.MustCompile(`(\d+) insertions?.*?(\d+) deletions?`)
-	matches := re.FindStringSubmatch(stats)
-	if len(matches) < 3 {
-		return 0, 0
-	}
-
-	var additions, deletions int
-	if _, err := fmt.Sscanf(matches[1], "%d", &additions); err != nil {
-		fmt.Printf("Warning: failed to parse additions: %v\n", err)
-		return 0, 0
-	}
-	if _, err := fmt.Sscanf(matches[2], "%d", &deletions); err != nil {
-		fmt.Printf("Warning: failed to parse deletions: %v\n", err)
-		return 0, 0
-	}
-
-	return additions, deletions
-}
-
-func parseCommitLine(line string) SignificantCommit {
-	parts := strings.SplitN(line, " ", 2)
-	if len(parts) >= 2 {
-		return SignificantCommit{
-			Hash:    parts[0],
-			Message: parts[1],
-		}
-	}
-	return SignificantCommit{}
 }
 
 func getCategoryFromPattern(pattern string) string {
