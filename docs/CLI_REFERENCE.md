@@ -17,13 +17,8 @@ spooky [global-options] <command> [command-options] <arguments>
 ### Global Options
 
 ```bash
---config <file>           # Specify configuration file path
---log-level <level>       # Set logging level (debug, info, warn, error)
---log-format <format>     # Set logging format (json, text)
---quiet                   # Suppress output
---verbose                 # Enable verbose output
---version                 # Show version information
---help                    # Show help information
+-h, --help      # Show help information
+-v, --version   # Show version information
 ```
 
 ## Basic Commands
@@ -33,7 +28,7 @@ spooky [global-options] <command> [command-options] <arguments>
 ```bash
 # Check version
 $ spooky --version
-0.20250817.0-dev-d3c8409
+dev
 
 # Get help
 $ spooky --help
@@ -150,15 +145,6 @@ $ spooky project init my-project
 
 # Initialize with specific metadata
 $ spooky project init my-project --name "Test Project" --description "A test project for documentation examples"
-
-✅ Project initialized successfully: /home/sn/Workshop/go/spooky/my-project
-📁 Project structure created according to project-directory.schema.hcl
-📄 Configuration files generated using project.schema.hcl
-💡 Next steps:
-   - Edit project.hcl to customize your project
-   - Add machines.hcl for machine inventory
-   - Add actions.hcl for automation tasks
-   - Add variables.hcl for project variables
 ```
 
 **Options:**
@@ -176,19 +162,6 @@ Validate a spooky project structure and configuration.
 ```bash
 # Validate project
 $ spooky project validate ./my-project
-
-🔍 Validating project: /path/to/my-project
-
-❌ Validation issues found:
-   - Project version must be in ScalVer format (MAJOR.DATE.PATCH)
-⚠️  Warnings:
-   - Optional file not found: machines.hcl
-   - Optional file not found: actions.hcl
-   - Optional file not found: variables.hcl
-   - Optional directory not found: machines
-   - Optional directory not found: actions
-   - Optional directory not found: variables
-   - Optional directory not found: templates
 ```
 
 This command validates that the project follows the project-directory.schema.hcl schema and that all configuration files are properly formatted.
@@ -217,8 +190,6 @@ List available actions in a project.
 ```bash
 # List all actions
 $ spooky actions list ./my-project
-
-No actions found in project
 ```
 
 #### `spooky actions run <project-path>`
@@ -243,12 +214,12 @@ spooky actions run ./my-project --decrypt
 ```
 
 **Options:**
-- `--machine <list>` - Target specific machines
-- `--tags <list>` - Target machines by tags
-- `--filter <query>` - Use complex filter query
-- `--parallel <number>` - Number of parallel workers (minimum 2)
-- `--dry-run` - Simulate running without making changes
-- `--plan` - Show running plan without running
+- `-m, --machine <strings>` - Target specific machines
+- `-t, --tags <strings>` - Target machines by tags
+- `-f, --filter <string>` - Use complex filter expression
+- `-j, --parallel <int>` - Number of parallel workers (minimum 2) [default: 1]
+- `-d, --dry-run` - Simulate running without making changes
+- `-p, --plan` - Show running plan without running
 - `--decrypt` - Decrypt encrypted variables and facts in-memory for debugging
 
 #### `spooky actions validate <project-path>`
@@ -287,9 +258,9 @@ spooky facts export ./my-project --tags environment=production --output prod-fac
 - `--format <string>` - Export format (hcl, json) [default: hcl]
 - `--output <string>` - Output file path (required)
 - `--machine <string>` - Filter to specific machine
-- `--tags <list>` - Filter by tags (supports key=value or key-only)
-- `--groups <list>` - Filter by groups
-- `--parallel <number>` - Number of parallel workers [default: 1]
+- `--tags <strings>` - Filter by tags (supports key=value or key-only)
+- `--groups <strings>` - Filter by groups
+- `--parallel <int>` - Number of parallel workers [default: 1]
 - `--verbose` - Verbose output
 
 ### Machines Commands
@@ -353,7 +324,7 @@ spooky machines export ./my-project --tags environment=production --output prod-
 **Options:**
 - `--output <string>` - Output file path (required)
 - `--machine <string>` - Export specific machine by hostname
-- `--tags <list>` - Filter machines by tags (key=value or key-only)
+- `--tags <stringArray>` - Filter machines by tags (key=value or key-only)
 
 #### `spooky machines encrypt <project-path>`
 
@@ -519,7 +490,7 @@ spooky templates search ./my-project "deploy" --category deployment
 ```
 
 **Options:**
-- `--tags <list>` - Filter by tags
+- `--tags <strings>` - Filter by tags
 - `--category <string>` - Filter by category
 
 ### Schemas Commands
@@ -613,11 +584,8 @@ spooky project init my-automation
 # Validate project structure
 spooky project validate my-automation
 
-# Show project information
-spooky project info my-automation
-
-# Check project status
-spooky project status my-automation
+# Encrypt project data
+spooky project encrypt my-automation
 ```
 
 ### Action Management
@@ -713,6 +681,9 @@ spooky machines ping my-automation --auth
 
 # Export machine inventory
 spooky machines export my-automation --output inventory.hcl
+
+# Encrypt machine credentials
+spooky machines encrypt my-automation
 ```
 
 ### Template Management
@@ -729,6 +700,9 @@ spooky templates render my-automation templates/nginx.conf.tmpl --output nginx.c
 
 # Preview template rendering
 spooky templates render my-automation templates/deploy.sh.tmpl --preview
+
+# Search templates
+spooky templates search my-automation "nginx"
 ```
 
 ### Schema Validation

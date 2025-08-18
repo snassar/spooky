@@ -260,3 +260,26 @@ dev: build test version
 release: clean check build test version
     @echo "Release build complete!"
     @echo "Binary ready: build/spooky"
+
+# Create GitHub issue from markdown file
+create-issue file:
+    @echo "Creating GitHub issue from {{file}}..."
+    @test -f "{{file}}" || (echo "Error: Issue file '{{file}}' not found" && exit 1)
+    @gh issue create --title "$(head -n 1 {{file}} | sed 's/^# //')" --body-file "{{file}}"
+    @echo ""
+    @echo "Issue created successfully!"
+    @echo "You can now add labels with: gh issue edit <number> --add-label <label1,label2>"
+
+# Create GitHub issue as draft from markdown file
+create-issue-draft file:
+    @echo "Creating GitHub issue draft from {{file}}..."
+    @test -f "{{file}}" || (echo "Error: Issue file '{{file}}' not found" && exit 1)
+    @gh issue create --title "$(head -n 1 {{file}} | sed 's/^# //')" --body-file "{{file}}" --draft
+    @echo ""
+    @echo "Issue draft created successfully!"
+    @echo "You can now add labels with: gh issue edit <number> --add-label <label1,label2>"
+
+# List available issue files
+list-issues:
+    @echo "Available issue files:"
+    @ls -1 docs/issues/*.md 2>/dev/null | grep -v "00-issue-template.md" || echo "No issue files found"
