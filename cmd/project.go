@@ -8,6 +8,7 @@ import (
 	spookyinterfaces "spooky/internal/interfaces"
 	spookylogging "spooky/internal/logging"
 	spookyproject "spooky/internal/project"
+	spookytypes "spooky/internal/types"
 	spookytypeslogging "spooky/internal/types/logging"
 
 	"github.com/spf13/cobra"
@@ -104,48 +105,68 @@ Examples:
 	},
 }
 
-// handleProjectInit handles project initialization using the ProjectManager interface
-func handleProjectInit(projectPath, name, description, version, author, _, url string) error {
-	ctx := context.Background()
-
-	// Initialize dependencies if not already done
+// Helper function for dependency initialization
+func initializeProjectDependenciesIfNeeded() error {
 	if projectManager == nil {
 		if err := InitializeProjectDependencies(); err != nil {
 			return fmt.Errorf("failed to initialize project dependencies: %w", err)
 		}
 	}
+	return nil
+}
 
-	// Initialize the project using the manager
+// Helper function for project initialization
+func createProject(ctx context.Context, projectPath string) (*spookytypes.Project, error) {
 	project, err := projectManager.Initialize(ctx, projectPath)
 	if err != nil {
-		return fmt.Errorf("failed to initialize project: %w", err)
+		return nil, fmt.Errorf("failed to initialize project: %w", err)
+	}
+	return project, nil
+}
+
+// Helper function to check if configuration updates are needed
+func hasConfigurationUpdates(name, description, version, author, url string) bool {
+	return name != "" || description != "" || version != "" || author != "" || url != ""
+}
+
+// Helper function for updating project configuration
+func updateProjectConfiguration(project *spookytypes.Project, name, description string) {
+	if name != "" {
+		project.Config.Name = name
+	}
+	if description != "" {
+		project.Config.Description = description
+	}
+}
+
+// Helper function for updating project metadata
+func updateProjectMetadata(project *spookytypes.Project, version, author, url string) {
+	if project.Config.Metadata == nil {
+		project.Config.Metadata = &spookytypes.ProjectMetadata{}
 	}
 
-	// Update project configuration with provided values if they were specified
-	if name != "" || description != "" || version != "" || author != "" || url != "" {
-		if name != "" {
-			project.Config.Name = name
-		}
-		if description != "" {
-			project.Config.Description = description
-		}
-		if version != "" && project.Config.Metadata != nil {
-			project.Config.Metadata.Version = version
-		}
-		if author != "" && project.Config.Metadata != nil {
-			project.Config.Metadata.Author = author
-		}
-		if url != "" && project.Config.Metadata != nil {
-			project.Config.Metadata.URL = url
-		}
-
-		// Save the updated project configuration
-		if err := projectManager.Save(ctx, project); err != nil {
-			return fmt.Errorf("failed to save updated project configuration: %w", err)
-		}
+	if version != "" {
+		project.Config.Metadata.Version = version
 	}
+	if author != "" {
+		project.Config.Metadata.Author = author
+	}
+	if url != "" {
+		project.Config.Metadata.URL = url
+	}
+}
 
-	fmt.Printf("✅ Project initialized successfully: %s\n", project.Path)
+// Helper function for saving project configuration
+func saveProjectConfiguration(ctx context.Context, project *spookytypes.Project) error {
+	if err := projectManager.Save(ctx, project); err != nil {
+		return fmt.Errorf("failed to save updated project configuration: %w", err)
+	}
+	return nil
+}
+
+// Helper function for displaying success output
+func displayProjectInitSuccess(projectPath string) {
+	fmt.Printf("✅ Project initialized successfully: %s\n", projectPath)
 	fmt.Printf("📁 Project structure created according to project-directory.schema.hcl\n")
 	fmt.Printf("📄 Configuration files generated using project.schema.hcl\n")
 	fmt.Printf("💡 Next steps:\n")
@@ -153,6 +174,35 @@ func handleProjectInit(projectPath, name, description, version, author, _, url s
 	fmt.Printf("   - Add machines.hcl for machine inventory\n")
 	fmt.Printf("   - Add actions.hcl for automation tasks\n")
 	fmt.Printf("   - Add variables.hcl for project variables\n")
+}
+
+// handleProjectInit handles project initialization using the ProjectManager interface
+func handleProjectInit(projectPath, name, description, version, author, _, url string) error {
+	ctx := context.Background()
+
+	// Initialize dependencies
+	if err := initializeProjectDependenciesIfNeeded(); err != nil {
+		return err
+	}
+
+	// Create project
+	project, err := createProject(ctx, projectPath)
+	if err != nil {
+		return err
+	}
+
+	// Update configuration if needed
+	if hasConfigurationUpdates(name, description, version, author, url) {
+		updateProjectConfiguration(project, name, description)
+		updateProjectMetadata(project, version, author, url)
+
+		if err := saveProjectConfiguration(ctx, project); err != nil {
+			return err
+		}
+	}
+
+	// Display success output
+	displayProjectInitSuccess(projectPath)
 
 	return nil
 }
