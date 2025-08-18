@@ -574,16 +574,6 @@ func isIPAddress(host string) bool {
 	return false
 }
 
-// getMachineHostnames returns a list of machine hostnames
-func getMachineHostnames(machines []spookytypes.Machine) []string {
-	var hostnames []string
-	for idx := range machines {
-		machine := &machines[idx]
-		hostnames = append(hostnames, machine.Hostname)
-	}
-	return hostnames
-}
-
 // validateMachineCollection validates the entire machine collection
 func (m *Manager) validateMachineCollection(machines []spookytypes.Machine) error {
 	var errors []string

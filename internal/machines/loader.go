@@ -17,6 +17,255 @@ import (
 	spookytypesmachines "spooky/internal/types/machines"
 )
 
+// AttributeParser defines the interface for parsing individual attributes
+type AttributeParser interface {
+	Parse(attr *hcl.Attribute, machine *spookytypes.Machine) error
+	GetFieldName() string
+}
+
+// AttributeParserRegistry manages all attribute parsers
+type AttributeParserRegistry struct {
+	parsers map[string]AttributeParser
+}
+
+// NewAttributeParserRegistry creates a new attribute parser registry
+func NewAttributeParserRegistry() *AttributeParserRegistry {
+	return &AttributeParserRegistry{
+		parsers: map[string]AttributeParser{
+			"hostname":           &StringAttributeParser{fieldName: "Host"},
+			"host":               &StringAttributeParser{fieldName: "Host"},
+			"port":               &IntAttributeParser{fieldName: "Port"},
+			"user":               &StringAttributeParser{fieldName: "User"},
+			"key_file":           &StringAttributeParser{fieldName: "KeyFile"},
+			"passphrase":         &StringAttributeParser{fieldName: "Passphrase"},
+			"tags":               &ObjectAttributeParser{fieldName: "Tags"},
+			"groups":             &ArrayAttributeParser{fieldName: "Groups"},
+			"roles":              &ArrayAttributeParser{fieldName: "Roles"},
+			"classes":            &ArrayAttributeParser{fieldName: "Classes"},
+			"connection_timeout": &IntAttributeParser{fieldName: "ConnectionTimeout"},
+			"command_timeout":    &IntAttributeParser{fieldName: "CommandTimeout"},
+			"max_connections":    &IntAttributeParser{fieldName: "MaxConnections"},
+			"retry_attempts":     &IntAttributeParser{fieldName: "RetryAttempts"},
+			"retry_delay":        &IntAttributeParser{fieldName: "RetryDelay"},
+		},
+	}
+}
+
+// StringAttributeParser handles string attributes
+type StringAttributeParser struct {
+	fieldName string
+}
+
+func (s *StringAttributeParser) Parse(attr *hcl.Attribute, machine *spookytypes.Machine) error {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return fmt.Errorf("invalid %s: %s", s.fieldName, diags.Error())
+	}
+	if val.Type() == cty.String {
+		return s.setField(machine, val.AsString())
+	}
+	return fmt.Errorf("expected string for %s, got %s", s.fieldName, val.Type().FriendlyName())
+}
+
+func (s *StringAttributeParser) setField(machine *spookytypes.Machine, value string) error {
+	switch s.fieldName {
+	case "Hostname":
+		machine.Hostname = value
+	case "Host":
+		machine.Host = value
+	case "User":
+		machine.User = value
+	case "KeyFile":
+		machine.KeyFile = value
+	case "Passphrase":
+		machine.Passphrase = value
+	default:
+		return fmt.Errorf("unknown string field: %s", s.fieldName)
+	}
+	return nil
+}
+
+func (s *StringAttributeParser) GetFieldName() string {
+	return s.fieldName
+}
+
+// IntAttributeParser handles integer attributes
+type IntAttributeParser struct {
+	fieldName string
+}
+
+func (i *IntAttributeParser) Parse(attr *hcl.Attribute, machine *spookytypes.Machine) error {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return fmt.Errorf("invalid %s: %s", i.fieldName, diags.Error())
+	}
+	if val.Type() == cty.Number {
+		intVal, _ := val.AsBigFloat().Int64()
+		return i.setField(machine, int(intVal))
+	}
+	return fmt.Errorf("expected number for %s, got %s", i.fieldName, val.Type().FriendlyName())
+}
+
+func (i *IntAttributeParser) setField(machine *spookytypes.Machine, value int) error {
+	switch i.fieldName {
+	case "Port":
+		machine.Port = value
+	case "ConnectionTimeout":
+		machine.ConnectionTimeout = value
+	case "CommandTimeout":
+		machine.CommandTimeout = value
+	case "MaxConnections":
+		machine.MaxConnections = value
+	case "RetryAttempts":
+		machine.RetryAttempts = value
+	case "RetryDelay":
+		machine.RetryDelay = value
+	default:
+		return fmt.Errorf("unknown int field: %s", i.fieldName)
+	}
+	return nil
+}
+
+func (i *IntAttributeParser) GetFieldName() string {
+	return i.fieldName
+}
+
+// ObjectAttributeParser handles object attributes (maps)
+type ObjectAttributeParser struct {
+	fieldName string
+}
+
+func (o *ObjectAttributeParser) Parse(attr *hcl.Attribute, machine *spookytypes.Machine) error {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return fmt.Errorf("failed to parse %s: %s", o.fieldName, diags.Error())
+	}
+
+	if val.Type() != cty.Map(cty.String) {
+		return fmt.Errorf("expected map of strings for %s, got %s", o.fieldName, val.Type().FriendlyName())
+	}
+
+	result := make(map[string]string)
+	val.ForEachElement(func(key, value cty.Value) bool {
+		result[key.AsString()] = value.AsString()
+		return false
+	})
+
+	return o.setField(machine, result)
+}
+
+func (o *ObjectAttributeParser) setField(machine *spookytypes.Machine, value map[string]string) error {
+	switch o.fieldName {
+	case "Tags":
+		machine.Tags = value
+	default:
+		return fmt.Errorf("unknown object field: %s", o.fieldName)
+	}
+	return nil
+}
+
+func (o *ObjectAttributeParser) GetFieldName() string {
+	return o.fieldName
+}
+
+// ArrayAttributeParser handles array attributes (lists)
+type ArrayAttributeParser struct {
+	fieldName string
+}
+
+func (a *ArrayAttributeParser) Parse(attr *hcl.Attribute, machine *spookytypes.Machine) error {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return fmt.Errorf("failed to parse %s: %s", a.fieldName, diags.Error())
+	}
+
+	if val.Type() != cty.List(cty.String) {
+		return fmt.Errorf("expected list of strings for %s, got %s", a.fieldName, val.Type().FriendlyName())
+	}
+
+	var result []string
+	for _, item := range val.AsValueSlice() {
+		result = append(result, item.AsString())
+	}
+
+	return a.setField(machine, result)
+}
+
+func (a *ArrayAttributeParser) setField(machine *spookytypes.Machine, value []string) error {
+	switch a.fieldName {
+	case "Groups":
+		machine.Groups = value
+	case "Roles":
+		machine.Roles = value
+	case "Classes":
+		machine.Classes = value
+	default:
+		return fmt.Errorf("unknown array field: %s", a.fieldName)
+	}
+	return nil
+}
+
+func (a *ArrayAttributeParser) GetFieldName() string {
+	return a.fieldName
+}
+
+// BlockParser defines the interface for parsing blocks
+type BlockParser interface {
+	Parse(block *hcl.Block, machine *spookytypes.Machine) error
+	GetBlockType() string
+}
+
+// BlockParserRegistry manages all block parsers
+type BlockParserRegistry struct {
+	parsers map[string]BlockParser
+}
+
+// NewBlockParserRegistry creates a new block parser registry
+func NewBlockParserRegistry(loader *Loader) *BlockParserRegistry {
+	return &BlockParserRegistry{
+		parsers: map[string]BlockParser{
+			"resources": &ResourcesBlockParser{loader: loader},
+			"metadata":  &MetadataBlockParser{loader: loader},
+		},
+	}
+}
+
+// ResourcesBlockParser handles resources blocks
+type ResourcesBlockParser struct {
+	loader *Loader
+}
+
+func (r *ResourcesBlockParser) Parse(block *hcl.Block, machine *spookytypes.Machine) error {
+	resources, err := r.loader.parseResourcesBlock(block)
+	if err != nil {
+		return fmt.Errorf("failed to parse resources block: %w", err)
+	}
+	machine.Resources = resources
+	return nil
+}
+
+func (r *ResourcesBlockParser) GetBlockType() string {
+	return "resources"
+}
+
+// MetadataBlockParser handles metadata blocks
+type MetadataBlockParser struct {
+	loader *Loader
+}
+
+func (m *MetadataBlockParser) Parse(block *hcl.Block, machine *spookytypes.Machine) error {
+	metadata, err := m.loader.parseMetadataBlock(block)
+	if err != nil {
+		return fmt.Errorf("failed to parse metadata block: %w", err)
+	}
+	machine.MachineMetadata = metadata
+	return nil
+}
+
+func (m *MetadataBlockParser) GetBlockType() string {
+	return "metadata"
+}
+
 // Loader provides functionality to load machine inventory from HCL files
 type Loader struct {
 	logger spookytypeslogging.Logger
@@ -109,227 +358,24 @@ func (l *Loader) parseMachinesBlock(block *hcl.Block, sourceFile string) ([]spoo
 }
 
 // parseMachineBlock parses a single machine block
-// The complexity of 49 is justified and acceptable for this type of configuration parsing function.
-//
-//nolint:gocyclo // This is a parsing function that needs to handle many different attribute types and maintain detailed error context.
 func (l *Loader) parseMachineBlock(block *hcl.Block, sourceFile string) (*spookytypes.Machine, error) {
-	machineName := block.Labels[0]
-
-	// Parse both attributes and blocks
-	content, diags := block.Body.Content(&hcl.BodySchema{
-		Attributes: []hcl.AttributeSchema{
-			{Name: "hostname", Required: false},
-			{Name: "host", Required: false},
-			{Name: "port", Required: false},
-			{Name: "user", Required: false},
-			{Name: "key_file", Required: false},
-			{Name: "passphrase", Required: false},
-			{Name: "tags", Required: false},
-			{Name: "groups", Required: false},
-			{Name: "roles", Required: false},
-			{Name: "classes", Required: false},
-			{Name: "connection_timeout", Required: false},
-			{Name: "command_timeout", Required: false},
-			{Name: "max_connections", Required: false},
-			{Name: "retry_attempts", Required: false},
-			{Name: "retry_delay", Required: false},
-		},
-		Blocks: []hcl.BlockHeaderSchema{
-			{Type: "resources"},
-			{Type: "metadata"},
-		},
-	})
-	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to parse machine block: %s", diags.Error())
+	// Step 1: Parse HCL content
+	content, err := l.parseBlockContent(block)
+	if err != nil {
+		return nil, err
 	}
 
-	machine := &spookytypes.Machine{
-		Hostname: machineName,
-		Port:     22, // Default SSH port
+	// Step 2: Create base machine
+	machine := l.createBaseMachine(block.Labels[0], sourceFile)
+
+	// Step 3: Parse attributes using registry
+	if err := l.parseAttributes(content.Attributes, machine); err != nil {
+		return nil, err
 	}
 
-	// Add source file information to machine metadata
-	if machine.MachineMetadata == nil {
-		machine.MachineMetadata = &spookytypesmachines.MachineMetadata{}
-	}
-	machine.MachineMetadata.CustomFields = make(map[string]string)
-	machine.MachineMetadata.CustomFields["source_file"] = sourceFile
-
-	// Parse attributes
-	attrs := content.Attributes
-
-	// Parse basic attributes
-	if attr, exists := attrs["hostname"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid hostname: %s", diags.Error())
-		}
-		if val.Type() == cty.String {
-			machine.Hostname = val.AsString()
-		}
-	}
-
-	if attr, exists := attrs["host"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid host: %s", diags.Error())
-		}
-		if val.Type() == cty.String {
-			machine.Host = val.AsString()
-		}
-	}
-
-	if attr, exists := attrs["port"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid port: %s", diags.Error())
-		}
-		if val.Type() == cty.Number {
-			portInt, _ := val.AsBigFloat().Int64()
-			machine.Port = int(portInt)
-		}
-	}
-
-	if attr, exists := attrs["user"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid user: %s", diags.Error())
-		}
-		if val.Type() == cty.String {
-			machine.User = val.AsString()
-		}
-	}
-
-	// Parse SSH authentication
-	if attr, exists := attrs["key_file"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid key_file: %s", diags.Error())
-		}
-		if val.Type() == cty.String {
-			machine.KeyFile = val.AsString()
-		}
-	}
-
-	if attr, exists := attrs["passphrase"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid passphrase: %s", diags.Error())
-		}
-		if val.Type() == cty.String {
-			machine.Passphrase = val.AsString()
-		}
-	}
-
-	// Parse tags
-	if attr, exists := attrs["tags"]; exists {
-		tags, err := l.parseObjectAttribute(attr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid tags: %w", err)
-		}
-		machine.Tags = tags
-	}
-
-	// Parse groups
-	if attr, exists := attrs["groups"]; exists {
-		groups, err := l.parseArrayAttribute(attr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid groups: %w", err)
-		}
-		machine.Groups = groups
-	}
-
-	// Parse roles
-	if attr, exists := attrs["roles"]; exists {
-		roles, err := l.parseArrayAttribute(attr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid roles: %w", err)
-		}
-		machine.Roles = roles
-	}
-
-	// Parse classes
-	if attr, exists := attrs["classes"]; exists {
-		classes, err := l.parseArrayAttribute(attr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid classes: %w", err)
-		}
-		machine.Classes = classes
-	}
-
-	// Parse timeouts
-	if attr, exists := attrs["connection_timeout"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid connection_timeout: %s", diags.Error())
-		}
-		if val.Type() == cty.Number {
-			timeoutInt, _ := val.AsBigFloat().Int64()
-			machine.ConnectionTimeout = int(timeoutInt)
-		}
-	}
-
-	if attr, exists := attrs["command_timeout"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid command_timeout: %s", diags.Error())
-		}
-		if val.Type() == cty.Number {
-			timeoutInt, _ := val.AsBigFloat().Int64()
-			machine.CommandTimeout = int(timeoutInt)
-		}
-	}
-
-	// Parse connection settings
-	if attr, exists := attrs["max_connections"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid max_connections: %s", diags.Error())
-		}
-		if val.Type() == cty.Number {
-			maxConnInt, _ := val.AsBigFloat().Int64()
-			machine.MaxConnections = int(maxConnInt)
-		}
-	}
-
-	if attr, exists := attrs["retry_attempts"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid retry_attempts: %s", diags.Error())
-		}
-		if val.Type() == cty.Number {
-			retryInt, _ := val.AsBigFloat().Int64()
-			machine.RetryAttempts = int(retryInt)
-		}
-	}
-
-	if attr, exists := attrs["retry_delay"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid retry_delay: %s", diags.Error())
-		}
-		if val.Type() == cty.Number {
-			delayInt, _ := val.AsBigFloat().Int64()
-			machine.RetryDelay = int(delayInt)
-		}
-	}
-
-	// Parse blocks
-	for _, block := range content.Blocks {
-		switch block.Type {
-		case "resources":
-			resources, err := l.parseResourcesBlock(block)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse resources block: %w", err)
-			}
-			machine.Resources = resources
-		case "metadata":
-			metadata, err := l.parseMetadataBlock(block)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse metadata block: %w", err)
-			}
-			machine.MachineMetadata = metadata
-		}
+	// Step 4: Parse blocks using registry
+	if err := l.parseBlocks(content.Blocks, machine); err != nil {
+		return nil, err
 	}
 
 	return machine, nil
@@ -355,23 +401,13 @@ func (l *Loader) parseObjectAttribute(attr *hcl.Attribute) (map[string]string, e
 	return result, nil
 }
 
-// parseArrayAttribute parses an array attribute into a []string
-func (l *Loader) parseArrayAttribute(attr *hcl.Attribute) ([]string, error) {
-	val, diags := attr.Expr.Value(nil)
-	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to parse array attribute: %s", diags.Error())
+// getMachineHostnames extracts hostnames from a slice of machines for logging
+func getMachineHostnames(machines []spookytypes.Machine) []string {
+	hostnames := make([]string, len(machines))
+	for i, machine := range machines {
+		hostnames[i] = machine.Hostname
 	}
-
-	if val.Type() != cty.List(cty.String) {
-		return nil, fmt.Errorf("expected list of strings, got %s", val.Type().FriendlyName())
-	}
-
-	var result []string
-	for _, item := range val.AsValueSlice() {
-		result = append(result, item.AsString())
-	}
-
-	return result, nil
+	return hostnames
 }
 
 // parseResourcesBlock parses a resources block
@@ -548,6 +584,95 @@ func (l *Loader) parseMetadataCustomFields(attr *hcl.Attribute, metadata *spooky
 		return fmt.Errorf("invalid custom_fields: %w", err)
 	}
 	metadata.CustomFields = customFields
+	return nil
+}
+
+// getMachineBlockSchema returns the schema for machine blocks
+func (l *Loader) getMachineBlockSchema() *hcl.BodySchema {
+	return &hcl.BodySchema{
+		Attributes: []hcl.AttributeSchema{
+			{Name: "hostname", Required: false},
+			{Name: "host", Required: false},
+			{Name: "port", Required: false},
+			{Name: "user", Required: false},
+			{Name: "key_file", Required: false},
+			{Name: "passphrase", Required: false},
+			{Name: "tags", Required: false},
+			{Name: "groups", Required: false},
+			{Name: "roles", Required: false},
+			{Name: "classes", Required: false},
+			{Name: "connection_timeout", Required: false},
+			{Name: "command_timeout", Required: false},
+			{Name: "max_connections", Required: false},
+			{Name: "retry_attempts", Required: false},
+			{Name: "retry_delay", Required: false},
+		},
+		Blocks: []hcl.BlockHeaderSchema{
+			{Type: "resources"},
+			{Type: "metadata"},
+		},
+	}
+}
+
+// parseBlockContent parses the HCL content of a block
+func (l *Loader) parseBlockContent(block *hcl.Block) (*hcl.BodyContent, error) {
+	content, diags := block.Body.Content(l.getMachineBlockSchema())
+	if diags.HasErrors() {
+		return nil, fmt.Errorf("failed to parse machine block: %s", diags.Error())
+	}
+	return content, nil
+}
+
+// createBaseMachine creates a base machine with default values
+func (l *Loader) createBaseMachine(machineName, sourceFile string) *spookytypes.Machine {
+	machine := &spookytypes.Machine{
+		Hostname: machineName,
+		Port:     22, // Default SSH port
+	}
+
+	// Initialize metadata
+	if machine.MachineMetadata == nil {
+		machine.MachineMetadata = &spookytypesmachines.MachineMetadata{}
+	}
+	machine.MachineMetadata.CustomFields = make(map[string]string)
+	machine.MachineMetadata.CustomFields["source_file"] = sourceFile
+
+	return machine
+}
+
+// parseAttributes parses all attributes using the attribute parser registry
+func (l *Loader) parseAttributes(attrs hcl.Attributes, machine *spookytypes.Machine) error {
+	registry := NewAttributeParserRegistry()
+
+	for attrName, attr := range attrs {
+		parser, exists := registry.parsers[attrName]
+		if !exists {
+			return fmt.Errorf("unknown attribute: %s", attrName)
+		}
+
+		if err := parser.Parse(attr, machine); err != nil {
+			return fmt.Errorf("failed to parse %s: %w", attrName, err)
+		}
+	}
+
+	return nil
+}
+
+// parseBlocks parses all blocks using the block parser registry
+func (l *Loader) parseBlocks(blocks hcl.Blocks, machine *spookytypes.Machine) error {
+	registry := NewBlockParserRegistry(l)
+
+	for _, block := range blocks {
+		parser, exists := registry.parsers[block.Type]
+		if !exists {
+			return fmt.Errorf("unknown block type: %s", block.Type)
+		}
+
+		if err := parser.Parse(block, machine); err != nil {
+			return fmt.Errorf("failed to parse %s block: %w", block.Type, err)
+		}
+	}
+
 	return nil
 }
 
