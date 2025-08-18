@@ -377,52 +377,13 @@ func (aam *AdvancedAuthManager) loadCertificateChain(certPaths []string, caKeyPa
 		Extensions:   make(map[string]string),
 	}
 
-	// Load CA key if provided
-	var caSigner ssh.Signer
-	if caKeyPath != "" {
-		var err error
-		caSigner, err = aam.loadPrivateKey(caKeyPath, caKeyPass)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load CA key: %w", err)
-		}
+	caSigner, err := aam.loadCASigner(caKeyPath, caKeyPass)
+	if err != nil {
+		return nil, err
 	}
 
-	// Load certificates
-	for i, certPath := range certPaths {
-		certData, err := os.ReadFile(certPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read certificate file %s: %w", certPath, err)
-		}
-
-		// Parse certificate
-		pubKey, _, _, _, err := ssh.ParseAuthorizedKey(certData)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse certificate %s: %w", certPath, err)
-		}
-
-		cert, ok := pubKey.(*ssh.Certificate)
-		if !ok {
-			return nil, fmt.Errorf("file %s does not contain an SSH certificate", certPath)
-		}
-
-		chain.Certificates = append(chain.Certificates, cert)
-
-		// Use CA signer for all certificates
-		if caSigner != nil {
-			chain.Signers = append(chain.Signers, caSigner)
-		}
-
-		// Update chain metadata
-		if i == 0 {
-			// Convert uint64 timestamps to time.Time safely
-			if cert.ValidAfter <= uint64(1<<63-1) {
-				chain.ValidFrom = time.Unix(int64(cert.ValidAfter), 0)
-			}
-			if cert.ValidBefore <= uint64(1<<63-1) {
-				chain.ValidUntil = time.Unix(int64(cert.ValidBefore), 0)
-			}
-			chain.Principals = cert.ValidPrincipals
-		}
+	if err := aam.loadCertificatesIntoChain(chain, certPaths, caSigner); err != nil {
+		return nil, err
 	}
 
 	aam.logger.Info("Loaded certificate chain", map[string]interface{}{
@@ -433,6 +394,69 @@ func (aam *AdvancedAuthManager) loadCertificateChain(certPaths []string, caKeyPa
 	})
 
 	return chain, nil
+}
+
+func (aam *AdvancedAuthManager) loadCASigner(caKeyPath, caKeyPass string) (ssh.Signer, error) {
+	if caKeyPath == "" {
+		return nil, nil
+	}
+
+	caSigner, err := aam.loadPrivateKey(caKeyPath, caKeyPass)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load CA key: %w", err)
+	}
+
+	return caSigner, nil
+}
+
+func (aam *AdvancedAuthManager) loadCertificatesIntoChain(chain *CertificateChain, certPaths []string, caSigner ssh.Signer) error {
+	for i, certPath := range certPaths {
+		cert, err := aam.loadSingleCertificate(certPath)
+		if err != nil {
+			return err
+		}
+
+		chain.Certificates = append(chain.Certificates, cert)
+
+		if caSigner != nil {
+			chain.Signers = append(chain.Signers, caSigner)
+		}
+
+		if i == 0 {
+			aam.updateChainMetadata(chain, cert)
+		}
+	}
+
+	return nil
+}
+
+func (aam *AdvancedAuthManager) loadSingleCertificate(certPath string) (*ssh.Certificate, error) {
+	certData, err := os.ReadFile(certPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read certificate file %s: %w", certPath, err)
+	}
+
+	pubKey, _, _, _, err := ssh.ParseAuthorizedKey(certData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse certificate %s: %w", certPath, err)
+	}
+
+	cert, ok := pubKey.(*ssh.Certificate)
+	if !ok {
+		return nil, fmt.Errorf("file %s does not contain an SSH certificate", certPath)
+	}
+
+	return cert, nil
+}
+
+func (aam *AdvancedAuthManager) updateChainMetadata(chain *CertificateChain, cert *ssh.Certificate) {
+	if cert.ValidAfter <= uint64(1<<63-1) {
+		chain.ValidFrom = time.Unix(int64(cert.ValidAfter), 0)
+	}
+	if cert.ValidBefore <= uint64(1<<63-1) {
+		chain.ValidUntil = time.Unix(int64(cert.ValidBefore), 0)
+	}
+	chain.Principals = cert.ValidPrincipals
 }
 
 // createAgentAuth creates SSH agent authentication

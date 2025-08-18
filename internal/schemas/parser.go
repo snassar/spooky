@@ -297,56 +297,7 @@ func (p *SchemaParser) parseFieldValidationBlock(block *hclsyntax.ObjectConsExpr
 		}
 
 		keyStr := key.AsString()
-		switch keyStr {
-		case parserValidationType:
-			fieldValidation.Type = value.AsString()
-		case parserValidationRequired:
-			fieldValidation.Required = value.True()
-		case "description":
-			fieldValidation.Description = value.AsString()
-		case "default":
-			fieldValidation.Default = p.convertCtyValue(value)
-		case "min_length":
-			if value.Type() == cty.Number {
-				if intVal, acc := value.AsBigFloat().Int64(); acc == big.Exact {
-					minLength := int(intVal)
-					fieldValidation.Constraints.MinLength = &minLength
-				}
-			}
-		case "max_length":
-			if value.Type() == cty.Number {
-				if intVal, acc := value.AsBigFloat().Int64(); acc == big.Exact {
-					maxLength := int(intVal)
-					fieldValidation.Constraints.MaxLength = &maxLength
-				}
-			}
-		case "pattern":
-			pattern := value.AsString()
-			fieldValidation.Constraints.Pattern = &pattern
-		case "format":
-			format := value.AsString()
-			fieldValidation.Constraints.Format = &format
-		case "min":
-			if value.Type() == cty.Number {
-				if floatVal, acc := value.AsBigFloat().Float64(); acc == big.Exact || acc == big.Below {
-					fieldValidation.Constraints.Min = &floatVal
-				}
-			}
-		case "max":
-			if value.Type() == cty.Number {
-				if floatVal, acc := value.AsBigFloat().Float64(); acc == big.Exact || acc == big.Above {
-					fieldValidation.Constraints.Max = &floatVal
-				}
-			}
-		case "enum":
-			if value.Type().IsListType() {
-				var enumValues []interface{}
-				for _, enumVal := range value.AsValueSlice() {
-					enumValues = append(enumValues, p.convertCtyValue(enumVal))
-				}
-				fieldValidation.Constraints.Enum = enumValues
-			}
-		}
+		p.parseFieldValidationItem(keyStr, value, fieldValidation)
 	}
 
 	// Set default type if not specified
@@ -355,6 +306,93 @@ func (p *SchemaParser) parseFieldValidationBlock(block *hclsyntax.ObjectConsExpr
 	}
 
 	return fieldValidation, nil
+}
+
+// parseFieldValidationItem parses a single field validation item
+func (p *SchemaParser) parseFieldValidationItem(keyStr string, value cty.Value, fieldValidation *spookytypesschemas.FieldValidation) {
+	switch keyStr {
+	case parserValidationType:
+		fieldValidation.Type = value.AsString()
+	case parserValidationRequired:
+		fieldValidation.Required = value.True()
+	case "description":
+		fieldValidation.Description = value.AsString()
+	case "default":
+		fieldValidation.Default = p.convertCtyValue(value)
+	case "min_length", "max_length", "pattern", "format", "min", "max", "enum":
+		p.parseFieldConstraint(keyStr, value, fieldValidation.Constraints)
+	}
+}
+
+// parseFieldConstraint parses field constraints
+func (p *SchemaParser) parseFieldConstraint(keyStr string, value cty.Value, constraints *spookytypesschemas.FieldConstraints) {
+	switch keyStr {
+	case "min_length":
+		p.parseMinLengthConstraint(value, constraints)
+	case "max_length":
+		p.parseMaxLengthConstraint(value, constraints)
+	case "pattern":
+		pattern := value.AsString()
+		constraints.Pattern = &pattern
+	case "format":
+		format := value.AsString()
+		constraints.Format = &format
+	case "min":
+		p.parseMinConstraint(value, constraints)
+	case "max":
+		p.parseMaxConstraint(value, constraints)
+	case "enum":
+		p.parseEnumConstraint(value, constraints)
+	}
+}
+
+// parseMinLengthConstraint parses min_length constraint
+func (p *SchemaParser) parseMinLengthConstraint(value cty.Value, constraints *spookytypesschemas.FieldConstraints) {
+	if value.Type() == cty.Number {
+		if intVal, acc := value.AsBigFloat().Int64(); acc == big.Exact {
+			minLength := int(intVal)
+			constraints.MinLength = &minLength
+		}
+	}
+}
+
+// parseMaxLengthConstraint parses max_length constraint
+func (p *SchemaParser) parseMaxLengthConstraint(value cty.Value, constraints *spookytypesschemas.FieldConstraints) {
+	if value.Type() == cty.Number {
+		if intVal, acc := value.AsBigFloat().Int64(); acc == big.Exact {
+			maxLength := int(intVal)
+			constraints.MaxLength = &maxLength
+		}
+	}
+}
+
+// parseMinConstraint parses min constraint
+func (p *SchemaParser) parseMinConstraint(value cty.Value, constraints *spookytypesschemas.FieldConstraints) {
+	if value.Type() == cty.Number {
+		if floatVal, acc := value.AsBigFloat().Float64(); acc == big.Exact || acc == big.Below {
+			constraints.Min = &floatVal
+		}
+	}
+}
+
+// parseMaxConstraint parses max constraint
+func (p *SchemaParser) parseMaxConstraint(value cty.Value, constraints *spookytypesschemas.FieldConstraints) {
+	if value.Type() == cty.Number {
+		if floatVal, acc := value.AsBigFloat().Float64(); acc == big.Exact || acc == big.Above {
+			constraints.Max = &floatVal
+		}
+	}
+}
+
+// parseEnumConstraint parses enum constraint
+func (p *SchemaParser) parseEnumConstraint(value cty.Value, constraints *spookytypesschemas.FieldConstraints) {
+	if value.Type().IsListType() {
+		var enumValues []interface{}
+		for _, enumVal := range value.AsValueSlice() {
+			enumValues = append(enumValues, p.convertCtyValue(enumVal))
+		}
+		constraints.Enum = enumValues
+	}
 }
 
 // parseFieldValidationValue parses a simple field validation value

@@ -349,21 +349,41 @@ func parseLintOutput(output, _ string) []LintIssue {
 }
 
 func categorizeSeverity(errorType, _ string) string {
-	// High priority - ONLY truly build-breaking errors
-	if errorType == "typecheck" {
+	// Define severity mappings
+	highPriorityTypes := map[string]bool{
+		"typecheck": true,
+	}
+
+	mediumPriorityTypes := map[string]bool{
+		"gocritic":    true,
+		"govet":       true,
+		"errcheck":    true,
+		"gosec":       true,
+		"ineffassign": true,
+		"deadcode":    true,
+	}
+
+	lowPriorityTypes := map[string]bool{
+		"gofmt":     true,
+		"goimports": true,
+		"misspell":  true,
+		"gosimple":  true,
+		"revive":    true,
+		"unused":    true,
+		"gocyclo":   true,
+		"dupl":      true,
+	}
+
+	// Check priority levels
+	if highPriorityTypes[errorType] {
 		return "High"
 	}
 
-	// Medium priority - code quality and potential issues
-	if errorType == "gocritic" || errorType == "govet" || errorType == "errcheck" ||
-		errorType == "gosec" || errorType == "ineffassign" || errorType == "deadcode" {
+	if mediumPriorityTypes[errorType] {
 		return priorityMedium
 	}
 
-	// Low priority - style and formatting
-	if errorType == "gofmt" || errorType == "goimports" || errorType == "misspell" ||
-		errorType == "gosimple" || errorType == "revive" || errorType == "unused" ||
-		errorType == "gocyclo" || errorType == "dupl" {
+	if lowPriorityTypes[errorType] {
 		return priorityLow
 	}
 
@@ -595,58 +615,62 @@ func writeFileBreakdown(writer *bufio.Writer, results []LintResult, config *Conf
 			continue
 		}
 
-		fmt.Fprintf(writer, "### %s\n\n", result.File)
-		fmt.Fprintf(writer, "**Issues found:** %d\n\n", result.IssueCount)
-
-		// Categorize issues by severity
-		highIssues := []LintIssue{}
-		mediumIssues := []LintIssue{}
-		lowIssues := []LintIssue{}
-
-		for _, issue := range result.Issues {
-			switch issue.Severity {
-			case "High":
-				highIssues = append(highIssues, issue)
-			case "Medium":
-				mediumIssues = append(mediumIssues, issue)
-			case "Low":
-				lowIssues = append(lowIssues, issue)
-			}
-		}
-
-		if len(highIssues) > 0 {
-			fmt.Fprintf(writer, "#### 🔴 High Priority Issues\n\n")
-			for _, issue := range highIssues {
-				fmt.Fprintf(writer, "- **%s** (%s): %s\n", issue.ErrorType, issue.Severity, issue.Message)
-			}
-			fmt.Fprintf(writer, "\n")
-		}
-
-		if len(mediumIssues) > 0 {
-			fmt.Fprintf(writer, "#### 🟡 Medium Priority Issues\n\n")
-			for _, issue := range mediumIssues {
-				fmt.Fprintf(writer, "- **%s** (%s): %s\n", issue.ErrorType, issue.Severity, issue.Message)
-			}
-			fmt.Fprintf(writer, "\n")
-		}
-
-		if len(lowIssues) > 0 {
-			fmt.Fprintf(writer, "#### 🟢 Low Priority Issues\n\n")
-			for _, issue := range lowIssues {
-				fmt.Fprintf(writer, "- **%s** (%s): %s\n", issue.ErrorType, issue.Severity, issue.Message)
-			}
-			fmt.Fprintf(writer, "\n")
-		}
-
-		fmt.Fprintf(writer, "```bash\n")
-		fmt.Fprintf(writer, "# TODO: Fix linting issues in %s\n", result.File)
-		if result.File == "." {
-			fmt.Fprintf(writer, "# Run: golangci-lint run --config=%s .\n", config.LintConfig)
-		} else {
-			fmt.Fprintf(writer, "# Run: golangci-lint run --config=%s ./%s\n", config.LintConfig, result.File)
-		}
-		fmt.Fprintf(writer, "```\n\n")
+		writeFileBreakdownSection(writer, result, config)
 	}
+}
+
+func writeFileBreakdownSection(writer *bufio.Writer, result LintResult, config *Config) {
+	fmt.Fprintf(writer, "### %s\n\n", result.File)
+	fmt.Fprintf(writer, "**Issues found:** %d\n\n", result.IssueCount)
+
+	// Categorize issues by severity
+	highIssues, mediumIssues, lowIssues := categorizeIssuesBySeverity(result.Issues)
+
+	writeSeveritySection(writer, "🔴 High Priority Issues", highIssues)
+	writeSeveritySection(writer, "🟡 Medium Priority Issues", mediumIssues)
+	writeSeveritySection(writer, "🟢 Low Priority Issues", lowIssues)
+
+	writeFileCommands(writer, result, config)
+}
+
+func categorizeIssuesBySeverity(issues []LintIssue) ([]LintIssue, []LintIssue, []LintIssue) {
+	highIssues := []LintIssue{}
+	mediumIssues := []LintIssue{}
+	lowIssues := []LintIssue{}
+
+	for _, issue := range issues {
+		switch issue.Severity {
+		case "High":
+			highIssues = append(highIssues, issue)
+		case "Medium":
+			mediumIssues = append(mediumIssues, issue)
+		case "Low":
+			lowIssues = append(lowIssues, issue)
+		}
+	}
+
+	return highIssues, mediumIssues, lowIssues
+}
+
+func writeSeveritySection(writer *bufio.Writer, title string, issues []LintIssue) {
+	if len(issues) > 0 {
+		fmt.Fprintf(writer, "#### %s\n\n", title)
+		for _, issue := range issues {
+			fmt.Fprintf(writer, "- **%s** (%s): %s\n", issue.ErrorType, issue.Severity, issue.Message)
+		}
+		fmt.Fprintf(writer, "\n")
+	}
+}
+
+func writeFileCommands(writer *bufio.Writer, result LintResult, config *Config) {
+	fmt.Fprintf(writer, "```bash\n")
+	fmt.Fprintf(writer, "# TODO: Fix linting issues in %s\n", result.File)
+	if result.File == "." {
+		fmt.Fprintf(writer, "# Run: golangci-lint run --config=%s .\n", config.LintConfig)
+	} else {
+		fmt.Fprintf(writer, "# Run: golangci-lint run --config=%s ./%s\n", config.LintConfig, result.File)
+	}
+	fmt.Fprintf(writer, "```\n\n")
 }
 
 func writeBatchFixes(writer *bufio.Writer, allIssues []LintIssue) {

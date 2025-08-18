@@ -136,34 +136,65 @@ func (sv *ScalVer) Equal(other *ScalVer) bool {
 
 // isValidDateComponent checks if a date component is valid
 func isValidDateComponent(date string) bool {
-	if len(date) != 4 && len(date) != 6 && len(date) != 8 {
+	if !isValidDateLength(date) {
 		return false
 	}
 
-	// Check that all characters are digits
+	if !isValidDateDigits(date) {
+		return false
+	}
+
+	return validateDateComponents(date)
+}
+
+// isValidDateLength checks if the date string has a valid length
+func isValidDateLength(date string) bool {
+	return len(date) == 4 || len(date) == 6 || len(date) == 8
+}
+
+// isValidDateDigits checks if all characters in the date string are digits
+func isValidDateDigits(date string) bool {
 	for _, char := range date {
 		if char < '0' || char > '9' {
 			return false
 		}
 	}
+	return true
+}
 
-	// Validate the date components
+// validateDateComponents validates the date components based on length
+func validateDateComponents(date string) bool {
 	switch len(date) {
 	case 4: // YYYY
-		year, _ := strconv.Atoi(date)
-		return year >= 1900 && year <= 2100
+		return validateYear(date)
 	case 6: // YYYYMM
-		year, _ := strconv.Atoi(date[:4])
-		month, _ := strconv.Atoi(date[4:])
-		return year >= 1900 && year <= 2100 && month >= 1 && month <= 12
+		return validateYearMonth(date)
 	case 8: // YYYYMMDD
-		year, _ := strconv.Atoi(date[:4])
-		month, _ := strconv.Atoi(date[4:6])
-		day, _ := strconv.Atoi(date[6:])
-		return year >= 1900 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31
+		return validateYearMonthDay(date)
 	default:
 		return false
 	}
+}
+
+// validateYear validates a 4-digit year
+func validateYear(date string) bool {
+	year, _ := strconv.Atoi(date)
+	return year >= 1900 && year <= 2100
+}
+
+// validateYearMonth validates a 6-digit year-month
+func validateYearMonth(date string) bool {
+	year, _ := strconv.Atoi(date[:4])
+	month, _ := strconv.Atoi(date[4:])
+	return year >= 1900 && year <= 2100 && month >= 1 && month <= 12
+}
+
+// validateYearMonthDay validates an 8-digit year-month-day
+func validateYearMonthDay(date string) bool {
+	year, _ := strconv.Atoi(date[:4])
+	month, _ := strconv.Atoi(date[4:6])
+	day, _ := strconv.Atoi(date[6:])
+	return year >= 1900 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31
 }
 
 // IsValidScalVerFormat checks if a string is in valid ScalVer format

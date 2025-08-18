@@ -11,7 +11,23 @@ func main() {
 	fmt.Println("ScalVer (Scalable Versioning) Examples")
 	fmt.Println("======================================")
 
-	// Example 1: Parse existing ScalVer versions
+	runParsingExamples()
+	runGenerationExamples()
+	runComparisonExamples()
+	runCompatibilityExamples()
+	runDetailedInfoExamples()
+	runValidationExamples()
+
+	fmt.Println("\nScalVer provides:")
+	fmt.Println("- Calendar-aware versioning (YYYY, YYYYMM, YYYYMMDD)")
+	fmt.Println("- Semantic versioning compatibility")
+	fmt.Println("- Adjustable release cadence")
+	fmt.Println("- Date-Only-Grows (DOG) principle")
+	fmt.Println("- Development and stable version support")
+}
+
+func runParsingExamples() {
+	fmt.Println("\n1. Parsing ScalVer versions:")
 	examples := []string{
 		"0.2025.0",                // Yearly cadence
 		"0.202508.0",              // Monthly cadence
@@ -20,7 +36,6 @@ func main() {
 		"1.2025.0",                // Stable version
 	}
 
-	fmt.Println("\n1. Parsing ScalVer versions:")
 	for _, version := range examples {
 		scalver, err := spookytypescommon.ParseScalVer(version)
 		if err != nil {
@@ -32,43 +47,38 @@ func main() {
 			version, scalver.Major, scalver.Date, scalver.Patch,
 			scalver.GetDatePrecision(), scalver.IsDevelopment())
 	}
+}
 
-	// Example 2: Generate new ScalVer versions
+func runGenerationExamples() {
 	fmt.Println("\n2. Generating ScalVer versions:")
 
-	// Generate yearly version
-	yearly, err := spookytypescommon.GenerateScalVer(0, "yearly", 0)
-	if err != nil {
-		log.Printf("Error generating yearly version: %v", err)
-	} else {
-		fmt.Printf("  Yearly: %s\n", yearly)
-	}
+	generateVersion("Yearly", func() (string, error) {
+		return spookytypescommon.GenerateScalVer(0, "yearly", 0)
+	})
 
-	// Generate monthly version
-	monthly, err := spookytypescommon.GenerateScalVer(0, "monthly", 0)
-	if err != nil {
-		log.Printf("Error generating monthly version: %v", err)
-	} else {
-		fmt.Printf("  Monthly: %s\n", monthly)
-	}
+	generateVersion("Monthly", func() (string, error) {
+		return spookytypescommon.GenerateScalVer(0, "monthly", 0)
+	})
 
-	// Generate daily version
-	daily, err := spookytypescommon.GenerateScalVer(0, "daily", 0)
-	if err != nil {
-		log.Printf("Error generating daily version: %v", err)
-	} else {
-		fmt.Printf("  Daily: %s\n", daily)
-	}
+	generateVersion("Daily", func() (string, error) {
+		return spookytypescommon.GenerateScalVer(0, "daily", 0)
+	})
 
-	// Generate development version
-	devVersion, err := spookytypescommon.GenerateDevelopmentScalVer("abc123")
-	if err != nil {
-		log.Printf("Error generating development version: %v", err)
-	} else {
-		fmt.Printf("  Development: %s\n", devVersion)
-	}
+	generateVersion("Development", func() (string, error) {
+		return spookytypescommon.GenerateDevelopmentScalVer("abc123")
+	})
+}
 
-	// Example 3: Version comparison
+func generateVersion(name string, generator func() (string, error)) {
+	version, err := generator()
+	if err != nil {
+		log.Printf("Error generating %s version: %v", name, err)
+	} else {
+		fmt.Printf("  %s: %s\n", name, version)
+	}
+}
+
+func runComparisonExamples() {
 	fmt.Println("\n3. Version comparison:")
 	versions := []string{"0.2025.0", "0.2025.1", "0.2026.0", "1.2025.0"}
 
@@ -77,20 +87,26 @@ func main() {
 		v2, _ := spookytypescommon.ParseScalVer(versions[i+1])
 
 		comparison := v1.Compare(v2)
-		var result string
-		switch comparison {
-		case -1:
-			result = "less than"
-		case 0:
-			result = "equal to"
-		case 1:
-			result = "greater than"
-		}
+		result := getComparisonResult(comparison)
 
 		fmt.Printf("  %s is %s %s\n", versions[i], result, versions[i+1])
 	}
+}
 
-	// Example 4: Version compatibility
+func getComparisonResult(comparison int) string {
+	switch comparison {
+	case -1:
+		return "less than"
+	case 0:
+		return "equal to"
+	case 1:
+		return "greater than"
+	default:
+		return "unknown"
+	}
+}
+
+func runCompatibilityExamples() {
 	fmt.Println("\n4. Version compatibility:")
 	compatibilityTests := [][]string{
 		{"0.2025.0", "0.2025.1"}, // Compatible development versions
@@ -106,8 +122,9 @@ func main() {
 			fmt.Printf("  %s vs %s: Compatible = %t\n", test[0], test[1], compatible)
 		}
 	}
+}
 
-	// Example 5: Get detailed version information
+func runDetailedInfoExamples() {
 	fmt.Println("\n5. Detailed version information:")
 	infoVersion := "0.20250812.0-dev-abc123"
 	info, err := spookytypescommon.GetScalVerInfo(infoVersion)
@@ -123,8 +140,9 @@ func main() {
 		fmt.Printf("  Date Precision: %s\n", info["date_precision"])
 		fmt.Printf("  Format: %s\n", info["format"])
 	}
+}
 
-	// Example 6: Validation
+func runValidationExamples() {
 	fmt.Println("\n6. Version validation:")
 	validationTests := []string{
 		"0.2025.0",                // Valid
@@ -141,11 +159,4 @@ func main() {
 		valid := spookytypescommon.IsValidScalVerFormat(test)
 		fmt.Printf("  %s: %t\n", test, valid)
 	}
-
-	fmt.Println("\nScalVer provides:")
-	fmt.Println("- Calendar-aware versioning (YYYY, YYYYMM, YYYYMMDD)")
-	fmt.Println("- Semantic versioning compatibility")
-	fmt.Println("- Adjustable release cadence")
-	fmt.Println("- Date-Only-Grows (DOG) principle")
-	fmt.Println("- Development and stable version support")
 }

@@ -389,73 +389,114 @@ func (ft *FileTransferManager) downloadViaSCP(_ context.Context, session *ssh.Se
 	}
 	defer localFile.Close()
 
+	// Set up SCP command and pipes
+	stdout, stdin, err := ft.setupSCPDownload(session, transfer)
+	if err != nil {
+		return ft.createFailedResult(transfer, err, startTime), nil
+	}
+
+	// Parse SCP header
+	permissions, err := ft.parseSCPHeader(stdout, stdin)
+	if err != nil {
+		return ft.createFailedResult(transfer, err, startTime), nil
+	}
+
+	// Transfer file content
+	bytesTransferred, err := ft.transferSCPContent(localFile, stdout, stdin, session)
+	if err != nil {
+		return ft.createFailedResult(transfer, err, startTime), nil
+	}
+
+	// Set file permissions
+	ft.setLocalFilePermissions(localFile, permissions, transfer)
+
+	// Create result
+	return ft.createSCPDownloadResult(transfer, startTime, bytesTransferred, permissions), nil
+}
+
+// setupSCPDownload sets up the SCP download command and pipes
+func (ft *FileTransferManager) setupSCPDownload(session *ssh.Session, transfer *spookytypesssh.FileTransfer) (io.Reader, io.Writer, error) {
 	// Set up SCP command
 	scpCommand := fmt.Sprintf("scp -f %s", transfer.RemotePath)
 	if err := session.Start(scpCommand); err != nil {
-		return ft.createFailedResult(transfer, fmt.Errorf("failed to start SCP command: %w", err), startTime), nil
+		return nil, nil, fmt.Errorf("failed to start SCP command: %w", err)
 	}
 
 	// Get stdout and stdin pipes
 	stdout, err := session.StdoutPipe()
 	if err != nil {
-		return ft.createFailedResult(transfer, fmt.Errorf("failed to get stdout pipe: %w", err), startTime), nil
+		return nil, nil, fmt.Errorf("failed to get stdout pipe: %w", err)
 	}
 
 	stdin, err := session.StdinPipe()
 	if err != nil {
-		return ft.createFailedResult(transfer, fmt.Errorf("failed to get stdin pipe: %w", err), startTime), nil
+		return nil, nil, fmt.Errorf("failed to get stdin pipe: %w", err)
 	}
 
+	return stdout, stdin, nil
+}
+
+// parseSCPHeader parses the SCP header and sends acknowledgment
+func (ft *FileTransferManager) parseSCPHeader(stdout io.Reader, stdin io.Writer) (uint32, error) {
 	// Read file header
 	header, err := bufio.NewReader(stdout).ReadString('\n')
 	if err != nil {
-		return ft.createFailedResult(transfer, fmt.Errorf("failed to read SCP header: %w", err), startTime), nil
+		return 0, fmt.Errorf("failed to read SCP header: %w", err)
 	}
 
 	// Parse header (format: C<permissions> <size> <filename>)
 	if !strings.HasPrefix(header, "C") {
-		return ft.createFailedResult(transfer, fmt.Errorf("invalid SCP header format"), startTime), nil
+		return 0, fmt.Errorf("invalid SCP header format")
 	}
 
 	header = strings.TrimPrefix(header, "C")
 	parts := strings.Fields(header)
 	if len(parts) < 2 {
-		return ft.createFailedResult(transfer, fmt.Errorf("invalid SCP header: insufficient parts"), startTime), nil
+		return 0, fmt.Errorf("invalid SCP header: insufficient parts")
 	}
 
 	// Parse permissions and size
 	permissions, err := strconv.ParseUint(parts[0], 8, 32)
 	if err != nil {
-		return ft.createFailedResult(transfer, fmt.Errorf("failed to parse permissions: %w", err), startTime), nil
+		return 0, fmt.Errorf("failed to parse permissions: %w", err)
 	}
 
 	_, err = strconv.ParseInt(parts[1], 10, 64)
 	if err != nil {
-		return ft.createFailedResult(transfer, fmt.Errorf("failed to parse file size: %w", err), startTime), nil
+		return 0, fmt.Errorf("failed to parse file size: %w", err)
 	}
 
 	// Send acknowledgment
 	if _, err := stdin.Write([]byte{0}); err != nil {
-		return ft.createFailedResult(transfer, fmt.Errorf("failed to send SCP acknowledgment: %w", err), startTime), nil
+		return 0, fmt.Errorf("failed to send SCP acknowledgment: %w", err)
 	}
 
+	return uint32(permissions), nil
+}
+
+// transferSCPContent transfers the file content via SCP
+func (ft *FileTransferManager) transferSCPContent(localFile *os.File, stdout io.Reader, stdin io.Writer, session *ssh.Session) (int64, error) {
 	// Read file content
 	bytesTransferred, err := io.Copy(localFile, stdout)
 	if err != nil {
-		return ft.createFailedResult(transfer, fmt.Errorf("failed to read file content: %w", err), startTime), nil
+		return 0, fmt.Errorf("failed to read file content: %w", err)
 	}
 
 	// Send completion acknowledgment
 	if _, err := stdin.Write([]byte{0}); err != nil {
-		return ft.createFailedResult(transfer, fmt.Errorf("failed to send completion acknowledgment: %w", err), startTime), nil
+		return 0, fmt.Errorf("failed to send completion acknowledgment: %w", err)
 	}
 
 	// Wait for completion
 	if err := session.Wait(); err != nil {
-		return ft.createFailedResult(transfer, fmt.Errorf("SCP command failed: %w", err), startTime), nil
+		return 0, fmt.Errorf("SCP command failed: %w", err)
 	}
 
-	// Set file permissions
+	return bytesTransferred, nil
+}
+
+// setLocalFilePermissions sets the local file permissions
+func (ft *FileTransferManager) setLocalFilePermissions(localFile *os.File, permissions uint32, transfer *spookytypesssh.FileTransfer) {
 	if err := localFile.Chmod(os.FileMode(permissions)); err != nil {
 		ft.logger.Warn("Failed to set local file permissions", map[string]interface{}{
 			"local_path":  transfer.LocalPath,
@@ -463,7 +504,10 @@ func (ft *FileTransferManager) downloadViaSCP(_ context.Context, session *ssh.Se
 			"error":       err.Error(),
 		})
 	}
+}
 
+// createSCPDownloadResult creates the SCP download result
+func (ft *FileTransferManager) createSCPDownloadResult(transfer *spookytypesssh.FileTransfer, startTime time.Time, bytesTransferred int64, permissions uint32) *spookytypesssh.FileTransferResult {
 	endTime := time.Now()
 	duration := endTime.Sub(startTime)
 	transferRate := float64(bytesTransferred) / duration.Seconds()
@@ -487,7 +531,7 @@ func (ft *FileTransferManager) downloadViaSCP(_ context.Context, session *ssh.Se
 		LocalPath:        transfer.LocalPath,
 		RemotePath:       transfer.RemotePath,
 		Permissions:      os.FileMode(permissions),
-	}, nil
+	}
 }
 
 // ProgressTracker tracks file transfer progress

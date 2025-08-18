@@ -194,40 +194,7 @@ func (lm *LogManager) configureOutput(config *spookytypeslogging.LogConfig) erro
 	case "stderr":
 		lm.writer = os.Stderr
 	case "file":
-		if config.File == nil || config.File.Path == "" {
-			return fmt.Errorf("file output requires file.path configuration")
-		}
-
-		// Ensure directory exists
-		dir := filepath.Dir(config.File.Path)
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return fmt.Errorf("failed to create log directory: %w", err)
-		}
-
-		// Determine file mode
-		flag := os.O_CREATE | os.O_WRONLY
-		if config.File.Append {
-			flag |= os.O_APPEND
-		} else {
-			flag |= os.O_TRUNC
-		}
-
-		// Parse permissions
-		perm := os.FileMode(0o644)
-		if config.File.Permissions != "" {
-			if parsed, err := parseOctalPermissions(config.File.Permissions); err == nil {
-				perm = parsed
-			}
-		}
-
-		file, err := os.OpenFile(config.File.Path, flag, perm)
-		if err != nil {
-			return fmt.Errorf("failed to open log file: %w", err)
-		}
-
-		lm.outputFile = file
-		lm.writer = file
-
+		return lm.configureFileOutput(config)
 	case "null":
 		lm.writer = io.Discard
 	default:
@@ -235,6 +202,70 @@ func (lm *LogManager) configureOutput(config *spookytypeslogging.LogConfig) erro
 	}
 
 	return nil
+}
+
+// configureFileOutput configures file output destination
+func (lm *LogManager) configureFileOutput(config *spookytypeslogging.LogConfig) error {
+	if config.File == nil || config.File.Path == "" {
+		return fmt.Errorf("file output requires file.path configuration")
+	}
+
+	if err := lm.ensureLogDirectory(config.File.Path); err != nil {
+		return err
+	}
+
+	file, err := lm.openLogFile(config.File)
+	if err != nil {
+		return err
+	}
+
+	lm.outputFile = file
+	lm.writer = file
+	return nil
+}
+
+// ensureLogDirectory ensures the log directory exists
+func (lm *LogManager) ensureLogDirectory(filePath string) error {
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("failed to create log directory: %w", err)
+	}
+	return nil
+}
+
+// openLogFile opens the log file with appropriate flags and permissions
+func (lm *LogManager) openLogFile(fileConfig *spookytypeslogging.LogFileConfig) (*os.File, error) {
+	flag := lm.determineFileFlags(fileConfig)
+	perm := lm.determineFilePermissions(fileConfig)
+
+	file, err := os.OpenFile(fileConfig.Path, flag, perm)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file: %w", err)
+	}
+
+	return file, nil
+}
+
+// determineFileFlags determines the file open flags
+func (lm *LogManager) determineFileFlags(fileConfig *spookytypeslogging.LogFileConfig) int {
+	flag := os.O_CREATE | os.O_WRONLY
+	if fileConfig.Append {
+		flag |= os.O_APPEND
+	} else {
+		flag |= os.O_TRUNC
+	}
+	return flag
+}
+
+// determineFilePermissions determines the file permissions
+func (lm *LogManager) determineFilePermissions(fileConfig *spookytypeslogging.LogFileConfig) os.FileMode {
+	perm := os.FileMode(0o644)
+	if fileConfig.Permissions != "" {
+		if parsed, err := parseOctalPermissions(fileConfig.Permissions); err == nil {
+			perm = parsed
+		}
+	}
+	return perm
 }
 
 // updateSlogLogger updates the slog logger with current configuration
@@ -246,8 +277,9 @@ func (lm *LogManager) updateSlogLogger() {
 
 	// Create handler based on format
 	var handler slog.Handler
+	const jsonFormat = "json"
 	switch lm.config.Format {
-	case "json":
+	case jsonFormat:
 		handler = slog.NewJSONHandler(lm.writer, opts)
 	case "text":
 		handler = slog.NewTextHandler(lm.writer, opts)
@@ -262,6 +294,7 @@ func (lm *LogManager) updateSlogLogger() {
 
 // createStructuredHandler creates a custom structured handler
 func (lm *LogManager) createStructuredHandler(opts *slog.HandlerOptions) slog.Handler {
+	const jsonFormat = "json"
 	if lm.config.Structured == nil {
 		return slog.NewJSONHandler(lm.writer, opts)
 	}
@@ -574,36 +607,64 @@ func (l *Logger) shouldFilter(msg string, _ ...map[string]interface{}) bool {
 		return false
 	}
 
-	// Check component-specific filtering
-	if l.manager.config.Filtering.Components != nil {
-		if componentLevel, exists := l.manager.config.Filtering.Components[l.component]; exists {
-			if !l.shouldLog(componentLevel) {
-				return true
-			}
+	if l.shouldFilterByComponent() {
+		return true
+	}
+
+	if l.shouldFilterByPatterns(msg) {
+		return true
+	}
+
+	return false
+}
+
+// shouldFilterByComponent checks component-specific filtering
+func (l *Logger) shouldFilterByComponent() bool {
+	if l.manager.config.Filtering.Components == nil {
+		return false
+	}
+
+	componentLevel, exists := l.manager.config.Filtering.Components[l.component]
+	if !exists {
+		return false
+	}
+
+	return !l.shouldLog(componentLevel)
+}
+
+// shouldFilterByPatterns checks pattern-based filtering
+func (l *Logger) shouldFilterByPatterns(msg string) bool {
+	if l.manager.config.Filtering.Patterns == nil {
+		return false
+	}
+
+	if l.shouldFilterByIncludePatterns(msg) {
+		return true
+	}
+
+	return l.shouldFilterByExcludePatterns(msg)
+}
+
+// shouldFilterByIncludePatterns checks include pattern filtering
+func (l *Logger) shouldFilterByIncludePatterns(msg string) bool {
+	if len(l.manager.config.Filtering.Patterns.Include) == 0 {
+		return false
+	}
+
+	for _, pattern := range l.manager.config.Filtering.Patterns.Include {
+		if isMatch, _ := regexp.MatchString(pattern, msg); isMatch {
+			return false // Don't filter if pattern matches
 		}
 	}
 
-	// Check pattern-based filtering
-	if l.manager.config.Filtering.Patterns != nil {
-		// Check include patterns
-		if len(l.manager.config.Filtering.Patterns.Include) > 0 {
-			matched := false
-			for _, pattern := range l.manager.config.Filtering.Patterns.Include {
-				if isMatch, _ := regexp.MatchString(pattern, msg); isMatch {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				return true
-			}
-		}
+	return true // Filter if no patterns match
+}
 
-		// Check exclude patterns
-		for _, pattern := range l.manager.config.Filtering.Patterns.Exclude {
-			if matched, _ := regexp.MatchString(pattern, msg); matched {
-				return true
-			}
+// shouldFilterByExcludePatterns checks exclude pattern filtering
+func (l *Logger) shouldFilterByExcludePatterns(msg string) bool {
+	for _, pattern := range l.manager.config.Filtering.Patterns.Exclude {
+		if matched, _ := regexp.MatchString(pattern, msg); matched {
+			return true // Filter if pattern matches
 		}
 	}
 
@@ -706,10 +767,11 @@ func (h *StructuredHandler) buildLogEntry(r *slog.Record) *spookytypeslogging.Lo
 func (h *StructuredHandler) formatEntry(entry *spookytypeslogging.LogEntry) string {
 	// Use default JSON format since format is not available in LogStructuredConfig
 	// The format is typically set in the main LogConfig
-	format := "json" // default format
+	const jsonFormat = "json"
+	format := jsonFormat // default format
 
 	switch format {
-	case "json":
+	case jsonFormat:
 		return h.formatJSON(entry)
 	case "text":
 		return h.formatText(entry)

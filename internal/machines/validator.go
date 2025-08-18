@@ -268,88 +268,54 @@ func (v *Validator) validateAuthentication(machine *spookytypes.Machine) error {
 
 // validateSSHConfig validates the SSH configuration
 func (v *Validator) validateSSHConfig(machine *spookytypes.Machine) error {
-	// Validate connection timeout
+	validators := []func(*spookytypes.Machine) error{
+		v.validateConnectionTimeout,
+		v.validateCommandTimeout,
+		v.validateMaxConnections,
+		v.validateRetryAttempts,
+		v.validateRetryDelay,
+	}
+
+	for _, validator := range validators {
+		if err := validator(machine); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (v *Validator) validateConnectionTimeout(machine *spookytypes.Machine) error {
 	if machine.ConnectionTimeout < 1 || machine.ConnectionTimeout > 300 {
 		return spookytypesmachines.NewMachineValidationError(machine.Hostname, "connection_timeout", machine.ConnectionTimeout, "range", "connection_timeout must be between 1 and 300 seconds")
 	}
+	return nil
+}
 
-	// Validate command timeout
+func (v *Validator) validateCommandTimeout(machine *spookytypes.Machine) error {
 	if machine.CommandTimeout < 1 || machine.CommandTimeout > 3600 {
 		return spookytypesmachines.NewMachineValidationError(machine.Hostname, "command_timeout", machine.CommandTimeout, "range", "command_timeout must be between 1 and 3600 seconds")
 	}
+	return nil
+}
 
-	// Validate max connections
+func (v *Validator) validateMaxConnections(machine *spookytypes.Machine) error {
 	if machine.MaxConnections < 1 || machine.MaxConnections > 100 {
 		return spookytypesmachines.NewMachineValidationError(machine.Hostname, "max_connections", machine.MaxConnections, "range", "max_connections must be between 1 and 100")
 	}
+	return nil
+}
 
-	// Validate retry attempts
+func (v *Validator) validateRetryAttempts(machine *spookytypes.Machine) error {
 	if machine.RetryAttempts < 0 || machine.RetryAttempts > 10 {
 		return spookytypesmachines.NewMachineValidationError(machine.Hostname, "retry_attempts", machine.RetryAttempts, "range", "retry_attempts must be between 0 and 10")
 	}
+	return nil
+}
 
-	// Validate retry delay
+func (v *Validator) validateRetryDelay(machine *spookytypes.Machine) error {
 	if machine.RetryDelay < 1 || machine.RetryDelay > 60 {
 		return spookytypesmachines.NewMachineValidationError(machine.Hostname, "retry_delay", machine.RetryDelay, "range", "retry_delay must be between 1 and 60 seconds")
 	}
-
 	return nil
-}
-
-// validateResources validates the resource specifications
-func (v *Validator) validateResources(resources *spookytypesmachines.MachineResources) error {
-	if resources == nil {
-		return nil // Resources are optional
-	}
-
-	// Validate CPU cores
-	if resources.CPUCores < 1 || resources.CPUCores > 1024 {
-		return spookytypesmachines.NewMachineValidationError("", "cpu_cores", resources.CPUCores, "range", "cpu_cores must be between 1 and 1024")
-	}
-
-	// Validate memory
-	if resources.MemoryGB < 1 || resources.MemoryGB > 32768 {
-		return spookytypesmachines.NewMachineValidationError("", "memory_gb", resources.MemoryGB, "range", "memory_gb must be between 1 and 32768")
-	}
-
-	// Validate disk
-	if resources.DiskGB < 1 || resources.DiskGB > 1048576 {
-		return spookytypesmachines.NewMachineValidationError("", "disk_gb", resources.DiskGB, "range", "disk_gb must be between 1 and 1048576")
-	}
-
-	// Validate network speed
-	if resources.NetworkSpeed != "" {
-		networkSpeedRegex := regexp.MustCompile(`^\d+(Gbps|Mbps)$`)
-		if !networkSpeedRegex.MatchString(resources.NetworkSpeed) {
-			return spookytypesmachines.NewMachineValidationError("", "network_speed", resources.NetworkSpeed, "format", "network_speed must be in format '10Gbps' or '1Mbps'")
-		}
-	}
-
-	return nil
-}
-
-// convertErrorToSchemaError converts a machine error to a schema error
-func (v *Validator) convertErrorToSchemaError(err error, field string) spookytypesschemas.SchemaError {
-	if machineErr, ok := err.(*spookytypesmachines.MachineValidationError); ok {
-		return spookytypesschemas.SchemaError{
-			Code:        "machine_validation_error",
-			Message:     machineErr.Message,
-			Recoverable: machineErr.Recoverable,
-			SchemaName:  "machine",
-			SchemaType:  "validation",
-			FieldPath:   field,
-			Value:       machineErr.Value,
-			Severity:    "error",
-		}
-	}
-
-	return spookytypesschemas.SchemaError{
-		Code:        "machine_validation_error",
-		Message:     err.Error(),
-		Recoverable: true,
-		SchemaName:  "machine",
-		SchemaType:  "validation",
-		FieldPath:   field,
-		Severity:    "error",
-	}
 }

@@ -390,52 +390,77 @@ func (l *Loader) parseResourcesBlock(block *hcl.Block) (*spookytypesmachines.Mac
 
 	resources := &spookytypesmachines.MachineResources{}
 
-	attrs := content.Attributes
-
-	if attr, exists := attrs["cpu_cores"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid cpu_cores: %s", diags.Error())
-		}
-		if val.Type() == cty.Number {
-			cpuInt, _ := val.AsBigFloat().Int64()
-			resources.CPUCores = int(cpuInt)
-		}
-	}
-
-	if attr, exists := attrs["memory_gb"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid memory_gb: %s", diags.Error())
-		}
-		if val.Type() == cty.Number {
-			memInt, _ := val.AsBigFloat().Int64()
-			resources.MemoryGB = int(memInt)
-		}
-	}
-
-	if attr, exists := attrs["disk_gb"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid disk_gb: %s", diags.Error())
-		}
-		if val.Type() == cty.Number {
-			diskInt, _ := val.AsBigFloat().Int64()
-			resources.DiskGB = int(diskInt)
-		}
-	}
-
-	if attr, exists := attrs["network_speed"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid network_speed: %s", diags.Error())
-		}
-		if val.Type() == cty.String {
-			resources.NetworkSpeed = val.AsString()
-		}
+	if err := l.parseResourceAttributes(content.Attributes, resources); err != nil {
+		return nil, err
 	}
 
 	return resources, nil
+}
+
+func (l *Loader) parseResourceAttributes(attrs hcl.Attributes, resources *spookytypesmachines.MachineResources) error {
+	parsers := map[string]func(*hcl.Attribute, *spookytypesmachines.MachineResources) error{
+		"cpu_cores":     l.parseCPUCores,
+		"memory_gb":     l.parseMemoryGB,
+		"disk_gb":       l.parseDiskGB,
+		"network_speed": l.parseNetworkSpeed,
+	}
+
+	for name, parser := range parsers {
+		if attr, exists := attrs[name]; exists {
+			if err := parser(attr, resources); err != nil {
+				return fmt.Errorf("failed to parse %s: %w", name, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (l *Loader) parseCPUCores(attr *hcl.Attribute, resources *spookytypesmachines.MachineResources) error {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return fmt.Errorf("invalid cpu_cores: %s", diags.Error())
+	}
+	if val.Type() == cty.Number {
+		cpuInt, _ := val.AsBigFloat().Int64()
+		resources.CPUCores = int(cpuInt)
+	}
+	return nil
+}
+
+func (l *Loader) parseMemoryGB(attr *hcl.Attribute, resources *spookytypesmachines.MachineResources) error {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return fmt.Errorf("invalid memory_gb: %s", diags.Error())
+	}
+	if val.Type() == cty.Number {
+		memInt, _ := val.AsBigFloat().Int64()
+		resources.MemoryGB = int(memInt)
+	}
+	return nil
+}
+
+func (l *Loader) parseDiskGB(attr *hcl.Attribute, resources *spookytypesmachines.MachineResources) error {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return fmt.Errorf("invalid disk_gb: %s", diags.Error())
+	}
+	if val.Type() == cty.Number {
+		diskInt, _ := val.AsBigFloat().Int64()
+		resources.DiskGB = int(diskInt)
+	}
+	return nil
+}
+
+func (l *Loader) parseNetworkSpeed(attr *hcl.Attribute, resources *spookytypesmachines.MachineResources) error {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return fmt.Errorf("invalid network_speed: %s", diags.Error())
+	}
+	if val.Type() == cty.String {
+		resources.NetworkSpeed = val.AsString()
+	}
+	return nil
 }
 
 // parseMetadataBlock parses a metadata block
@@ -458,47 +483,72 @@ func (l *Loader) parseMetadataBlock(block *hcl.Block) (*spookytypesmachines.Mach
 		CustomFields: make(map[string]string),
 	}
 
-	attrs := content.Attributes
-
-	if attr, exists := attrs["environment"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid environment: %s", diags.Error())
-		}
-		if val.Type() == cty.String {
-			metadata.Environment = val.AsString()
-		}
-	}
-
-	if attr, exists := attrs["location"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid location: %s", diags.Error())
-		}
-		if val.Type() == cty.String {
-			metadata.Location = val.AsString()
-		}
-	}
-
-	if attr, exists := attrs["owner"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid owner: %s", diags.Error())
-		}
-		if val.Type() == cty.String {
-			metadata.Owner = val.AsString()
-		}
-	}
-
-	if attr, exists := attrs["custom_fields"]; exists {
-		customFields, err := l.parseObjectAttribute(attr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid custom_fields: %w", err)
-		}
-		metadata.CustomFields = customFields
+	if err := l.parseMetadataAttributes(content.Attributes, metadata); err != nil {
+		return nil, err
 	}
 
 	return metadata, nil
+}
+
+func (l *Loader) parseMetadataAttributes(attrs hcl.Attributes, metadata *spookytypesmachines.MachineMetadata) error {
+	parsers := map[string]func(*hcl.Attribute, *spookytypesmachines.MachineMetadata) error{
+		"environment":   l.parseMetadataEnvironment,
+		"location":      l.parseMetadataLocation,
+		"owner":         l.parseMetadataOwner,
+		"custom_fields": l.parseMetadataCustomFields,
+	}
+
+	for name, parser := range parsers {
+		if attr, exists := attrs[name]; exists {
+			if err := parser(attr, metadata); err != nil {
+				return fmt.Errorf("failed to parse %s: %w", name, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func (l *Loader) parseMetadataEnvironment(attr *hcl.Attribute, metadata *spookytypesmachines.MachineMetadata) error {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return fmt.Errorf("invalid environment: %s", diags.Error())
+	}
+	if val.Type() == cty.String {
+		metadata.Environment = val.AsString()
+	}
+	return nil
+}
+
+func (l *Loader) parseMetadataLocation(attr *hcl.Attribute, metadata *spookytypesmachines.MachineMetadata) error {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return fmt.Errorf("invalid location: %s", diags.Error())
+	}
+	if val.Type() == cty.String {
+		metadata.Location = val.AsString()
+	}
+	return nil
+}
+
+func (l *Loader) parseMetadataOwner(attr *hcl.Attribute, metadata *spookytypesmachines.MachineMetadata) error {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return fmt.Errorf("invalid owner: %s", diags.Error())
+	}
+	if val.Type() == cty.String {
+		metadata.Owner = val.AsString()
+	}
+	return nil
+}
+
+func (l *Loader) parseMetadataCustomFields(attr *hcl.Attribute, metadata *spookytypesmachines.MachineMetadata) error {
+	customFields, err := l.parseObjectAttribute(attr)
+	if err != nil {
+		return fmt.Errorf("invalid custom_fields: %w", err)
+	}
+	metadata.CustomFields = customFields
+	return nil
 }
 
 // LoadMachinesFromDirectory loads machine inventory from all HCL files in a directory

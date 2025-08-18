@@ -14,6 +14,7 @@ import (
 
 	spookyinterfaces "spooky/internal/interfaces"
 	spookytypes "spooky/internal/types"
+	spookytypesconfig "spooky/internal/types/config"
 	spookytypeslogging "spooky/internal/types/logging"
 	spookytypesschemas "spooky/internal/types/schemas"
 )
@@ -257,35 +258,50 @@ func (i *Integration) addSSHConfig(rootBody *hclwrite.Body, config *spookytypes.
 	sshBlock := rootBody.AppendNewBlock("ssh", nil)
 	sshBody := sshBlock.Body()
 
-	if config.SSH.DefaultPort > 0 {
-		sshBody.SetAttributeValue("default_port", cty.NumberIntVal(int64(config.SSH.DefaultPort)))
+	i.addSSHBasicConfig(sshBody, config.SSH)
+	i.addSSHConnectionConfig(sshBody, config.SSH)
+	i.addSSHSecurityConfig(sshBody, config.SSH)
+}
+
+// addSSHBasicConfig adds basic SSH configuration
+func (i *Integration) addSSHBasicConfig(sshBody *hclwrite.Body, sshConfig *spookytypesconfig.SSHConfig) {
+	if sshConfig.DefaultPort > 0 {
+		sshBody.SetAttributeValue("default_port", cty.NumberIntVal(int64(sshConfig.DefaultPort)))
 	}
-	if config.SSH.DefaultUser != "" {
-		sshBody.SetAttributeValue("default_user", cty.StringVal(config.SSH.DefaultUser))
+	if sshConfig.DefaultUser != "" {
+		sshBody.SetAttributeValue("default_user", cty.StringVal(sshConfig.DefaultUser))
 	}
-	if config.SSH.DefaultKeyPath != "" {
-		sshBody.SetAttributeValue("default_key_path", cty.StringVal(config.SSH.DefaultKeyPath))
+	if sshConfig.DefaultKeyPath != "" {
+		sshBody.SetAttributeValue("default_key_path", cty.StringVal(sshConfig.DefaultKeyPath))
 	}
-	if config.SSH.ConnectionTimeout > 0 {
-		sshBody.SetAttributeValue("connection_timeout", cty.NumberIntVal(int64(config.SSH.ConnectionTimeout)))
+}
+
+// addSSHConnectionConfig adds SSH connection configuration
+func (i *Integration) addSSHConnectionConfig(sshBody *hclwrite.Body, sshConfig *spookytypesconfig.SSHConfig) {
+	if sshConfig.ConnectionTimeout > 0 {
+		sshBody.SetAttributeValue("connection_timeout", cty.NumberIntVal(int64(sshConfig.ConnectionTimeout)))
 	}
-	if config.SSH.CommandTimeout > 0 {
-		sshBody.SetAttributeValue("command_timeout", cty.NumberIntVal(int64(config.SSH.CommandTimeout)))
+	if sshConfig.CommandTimeout > 0 {
+		sshBody.SetAttributeValue("command_timeout", cty.NumberIntVal(int64(sshConfig.CommandTimeout)))
 	}
-	if config.SSH.ConnectionPoolSize > 0 {
-		sshBody.SetAttributeValue("connection_pool_size", cty.NumberIntVal(int64(config.SSH.ConnectionPoolSize)))
+	if sshConfig.ConnectionPoolSize > 0 {
+		sshBody.SetAttributeValue("connection_pool_size", cty.NumberIntVal(int64(sshConfig.ConnectionPoolSize)))
 	}
-	if config.SSH.ConnectionPoolTimeout > 0 {
-		sshBody.SetAttributeValue("connection_pool_timeout", cty.NumberIntVal(int64(config.SSH.ConnectionPoolTimeout)))
+	if sshConfig.ConnectionPoolTimeout > 0 {
+		sshBody.SetAttributeValue("connection_pool_timeout", cty.NumberIntVal(int64(sshConfig.ConnectionPoolTimeout)))
 	}
-	if config.SSH.EnableConnectionPool {
-		sshBody.SetAttributeValue("enable_connection_pool", cty.BoolVal(config.SSH.EnableConnectionPool))
+	if sshConfig.EnableConnectionPool {
+		sshBody.SetAttributeValue("enable_connection_pool", cty.BoolVal(sshConfig.EnableConnectionPool))
 	}
-	if config.SSH.EnableHostKeyVerification {
-		sshBody.SetAttributeValue("enable_host_key_verification", cty.BoolVal(config.SSH.EnableHostKeyVerification))
+}
+
+// addSSHSecurityConfig adds SSH security configuration
+func (i *Integration) addSSHSecurityConfig(sshBody *hclwrite.Body, sshConfig *spookytypesconfig.SSHConfig) {
+	if sshConfig.EnableHostKeyVerification {
+		sshBody.SetAttributeValue("enable_host_key_verification", cty.BoolVal(sshConfig.EnableHostKeyVerification))
 	}
-	if config.SSH.KnownHostsPath != "" {
-		sshBody.SetAttributeValue("known_hosts_path", cty.StringVal(config.SSH.KnownHostsPath))
+	if sshConfig.KnownHostsPath != "" {
+		sshBody.SetAttributeValue("known_hosts_path", cty.StringVal(sshConfig.KnownHostsPath))
 	}
 }
 

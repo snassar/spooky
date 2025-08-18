@@ -118,99 +118,11 @@ func (d *HCLProcessor) encryptValue(ctx context.Context, value interface{}, secr
 
 	switch v.Kind() {
 	case reflect.String:
-		// Handle string values - check if they need encryption
-		if strValue := v.String(); strValue != "" && !strings.HasPrefix(strValue, "age1") {
-			if dryRun {
-				d.logger.Info("Would encrypt string value", map[string]interface{}{
-					"value_length": len(strValue),
-				})
-				*encryptedCount++
-			} else {
-				encryptedBytes, err := secretsIntegration.EncryptWithAge(ctx, []byte(strValue), recipients)
-				if err != nil {
-					errorMsg := fmt.Sprintf("failed to encrypt string value: %v", err)
-					*errors = append(*errors, errorMsg)
-					d.logger.Error("Failed to encrypt string value", err, map[string]interface{}{
-						"value_length": len(strValue),
-					})
-					return nil // Continue processing other values
-				}
-
-				// Update the string value
-				if reflect.ValueOf(value).Kind() == reflect.Ptr {
-					reflect.ValueOf(value).Elem().SetString(string(encryptedBytes))
-				} else {
-					d.logger.Warn("Cannot modify non-pointer string value", map[string]interface{}{
-						"value_type": fmt.Sprintf("%T", value),
-					})
-				}
-
-				*encryptedCount++
-				d.logger.Debug("Encrypted string value", map[string]interface{}{
-					"value_length": len(strValue),
-				})
-			}
-		}
-
+		return d.encryptStringValue(ctx, value, v, secretsIntegration, recipients, dryRun, encryptedCount, errors)
 	case reflect.Map, reflect.Struct, reflect.Slice, reflect.Array:
-		// Encrypt entire objects as JSON
-		jsonBytes, err := json.Marshal(value)
-		if err != nil {
-			errorMsg := fmt.Sprintf("failed to serialize object for encryption: %v", err)
-			*errors = append(*errors, errorMsg)
-			d.logger.Error("Failed to serialize object for encryption", err, map[string]interface{}{
-				"value_type": fmt.Sprintf("%T", value),
-			})
-			return nil // Continue processing other values
-		}
-
-		if dryRun {
-			d.logger.Info("Would encrypt entire object", map[string]interface{}{
-				"value_type":  fmt.Sprintf("%T", value),
-				"json_length": len(jsonBytes),
-			})
-			*encryptedCount++
-		} else {
-			// Encrypt the entire object
-			encryptedBytes, err := secretsIntegration.EncryptWithAge(ctx, jsonBytes, recipients)
-			if err != nil {
-				errorMsg := fmt.Sprintf("failed to encrypt object: %v", err)
-				*errors = append(*errors, errorMsg)
-				d.logger.Error("Failed to encrypt object", err, map[string]interface{}{
-					"value_type":  fmt.Sprintf("%T", value),
-					"json_length": len(jsonBytes),
-				})
-				return nil // Continue processing other values
-			}
-
-			// Replace the entire object with the encrypted string
-			if reflect.ValueOf(value).Kind() == reflect.Ptr {
-				reflect.ValueOf(value).Elem().SetString(string(encryptedBytes))
-			} else {
-				d.logger.Warn("Cannot modify non-pointer object value", map[string]interface{}{
-					"value_type": fmt.Sprintf("%T", value),
-				})
-			}
-
-			*encryptedCount++
-			d.logger.Debug("Encrypted entire object", map[string]interface{}{
-				"value_type":  fmt.Sprintf("%T", value),
-				"json_length": len(jsonBytes),
-			})
-		}
-
+		return d.encryptObjectValue(ctx, value, v, secretsIntegration, recipients, dryRun, encryptedCount, errors)
 	case reflect.Interface:
-		// Handle interface values - get the underlying value and process it
-		if v.IsNil() {
-			return nil
-		}
-		underlyingValue := v.Elem()
-		if underlyingValue.IsValid() {
-			if err := d.encryptValue(ctx, underlyingValue.Interface(), secretsIntegration, recipients, dryRun, encryptedCount, errors); err != nil {
-				return fmt.Errorf("failed to encrypt interface value: %w", err)
-			}
-		}
-
+		return d.encryptInterfaceValue(ctx, v, secretsIntegration, recipients, dryRun, encryptedCount, errors)
 	default:
 		// For other types (int, float, bool, etc.), no encryption needed
 		d.logger.Debug("Skipping encryption for non-string/object type", map[string]interface{}{
@@ -218,6 +130,125 @@ func (d *HCLProcessor) encryptValue(ctx context.Context, value interface{}, secr
 		})
 	}
 
+	return nil
+}
+
+// encryptStringValue encrypts string values
+func (d *HCLProcessor) encryptStringValue(ctx context.Context, value interface{}, v reflect.Value, secretsIntegration spookyinterfaces.SecretsIntegration, recipients []string, dryRun bool, encryptedCount *int, errors *[]string) error {
+	// Handle string values - check if they need encryption
+	if strValue := v.String(); strValue != "" && !strings.HasPrefix(strValue, "age1") {
+		if dryRun {
+			d.logger.Info("Would encrypt string value", map[string]interface{}{
+				"value_length": len(strValue),
+			})
+			*encryptedCount++
+		} else {
+			if err := d.performStringEncryption(ctx, value, strValue, secretsIntegration, recipients, encryptedCount, errors); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// encryptObjectValue encrypts object values
+func (d *HCLProcessor) encryptObjectValue(ctx context.Context, value interface{}, v reflect.Value, secretsIntegration spookyinterfaces.SecretsIntegration, recipients []string, dryRun bool, encryptedCount *int, errors *[]string) error {
+	// Encrypt entire objects as JSON
+	jsonBytes, err := json.Marshal(value)
+	if err != nil {
+		errorMsg := fmt.Sprintf("failed to serialize object for encryption: %v", err)
+		*errors = append(*errors, errorMsg)
+		d.logger.Error("Failed to serialize object for encryption", err, map[string]interface{}{
+			"value_type": fmt.Sprintf("%T", value),
+		})
+		return nil // Continue processing other values
+	}
+
+	if dryRun {
+		d.logger.Info("Would encrypt entire object", map[string]interface{}{
+			"value_type":  fmt.Sprintf("%T", value),
+			"json_length": len(jsonBytes),
+		})
+		*encryptedCount++
+	} else {
+		if err := d.performObjectEncryption(ctx, value, jsonBytes, secretsIntegration, recipients, encryptedCount, errors); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// encryptInterfaceValue encrypts interface values
+func (d *HCLProcessor) encryptInterfaceValue(ctx context.Context, v reflect.Value, secretsIntegration spookyinterfaces.SecretsIntegration, recipients []string, dryRun bool, encryptedCount *int, errors *[]string) error {
+	// Handle interface values - get the underlying value and process it
+	if v.IsNil() {
+		return nil
+	}
+	underlyingValue := v.Elem()
+	if underlyingValue.IsValid() {
+		if err := d.encryptValue(ctx, underlyingValue.Interface(), secretsIntegration, recipients, dryRun, encryptedCount, errors); err != nil {
+			return fmt.Errorf("failed to encrypt interface value: %w", err)
+		}
+	}
+	return nil
+}
+
+// performStringEncryption performs the actual string encryption
+func (d *HCLProcessor) performStringEncryption(ctx context.Context, value interface{}, strValue string, secretsIntegration spookyinterfaces.SecretsIntegration, recipients []string, encryptedCount *int, errors *[]string) error {
+	encryptedBytes, err := secretsIntegration.EncryptWithAge(ctx, []byte(strValue), recipients)
+	if err != nil {
+		errorMsg := fmt.Sprintf("failed to encrypt string value: %v", err)
+		*errors = append(*errors, errorMsg)
+		d.logger.Error("Failed to encrypt string value", err, map[string]interface{}{
+			"value_length": len(strValue),
+		})
+		return nil // Continue processing other values
+	}
+
+	// Update the string value
+	if reflect.ValueOf(value).Kind() == reflect.Ptr {
+		reflect.ValueOf(value).Elem().SetString(string(encryptedBytes))
+	} else {
+		d.logger.Warn("Cannot modify non-pointer string value", map[string]interface{}{
+			"value_type": fmt.Sprintf("%T", value),
+		})
+	}
+
+	*encryptedCount++
+	d.logger.Debug("Encrypted string value", map[string]interface{}{
+		"value_length": len(strValue),
+	})
+	return nil
+}
+
+// performObjectEncryption performs the actual object encryption
+func (d *HCLProcessor) performObjectEncryption(ctx context.Context, value interface{}, jsonBytes []byte, secretsIntegration spookyinterfaces.SecretsIntegration, recipients []string, encryptedCount *int, errors *[]string) error {
+	// Encrypt the entire object
+	encryptedBytes, err := secretsIntegration.EncryptWithAge(ctx, jsonBytes, recipients)
+	if err != nil {
+		errorMsg := fmt.Sprintf("failed to encrypt object: %v", err)
+		*errors = append(*errors, errorMsg)
+		d.logger.Error("Failed to encrypt object", err, map[string]interface{}{
+			"value_type":  fmt.Sprintf("%T", value),
+			"json_length": len(jsonBytes),
+		})
+		return nil // Continue processing other values
+	}
+
+	// Replace the entire object with the encrypted string
+	if reflect.ValueOf(value).Kind() == reflect.Ptr {
+		reflect.ValueOf(value).Elem().SetString(string(encryptedBytes))
+	} else {
+		d.logger.Warn("Cannot modify non-pointer object value", map[string]interface{}{
+			"value_type": fmt.Sprintf("%T", value),
+		})
+	}
+
+	*encryptedCount++
+	d.logger.Debug("Encrypted entire object", map[string]interface{}{
+		"value_type":  fmt.Sprintf("%T", value),
+		"json_length": len(jsonBytes),
+	})
 	return nil
 }
 
@@ -238,70 +269,89 @@ func (d *HCLProcessor) decryptValue(ctx context.Context, value interface{}, secr
 
 	switch v.Kind() {
 	case reflect.String:
-		// Handle string values - check if they need decryption
-		if strValue := v.String(); strValue != "" && strings.HasPrefix(strValue, "age1") {
-			// Try to decrypt as a simple string first
-			decryptedBytes, err := secretsIntegration.DecryptWithAge(ctx, []byte(strValue), identityPath)
-			if err != nil {
-				// If simple decryption fails, try as JSON object
-				var jsonData interface{}
-				if jsonErr := json.Unmarshal(decryptedBytes, &jsonData); jsonErr != nil {
-					errorMsg := fmt.Sprintf("failed to decrypt string value: %v", err)
-					*errors = append(*errors, errorMsg)
-					d.logger.Error("Failed to decrypt string value", err, map[string]interface{}{
-						"value_length": len(strValue),
-					})
-					return nil // Continue processing other values
-				}
-
-				// Update the string value with the decrypted JSON
-				if reflect.ValueOf(value).Kind() == reflect.Ptr {
-					reflect.ValueOf(value).Elem().Set(reflect.ValueOf(jsonData))
-				} else {
-					d.logger.Warn("Cannot modify non-pointer string value", map[string]interface{}{
-						"value_type": fmt.Sprintf("%T", value),
-					})
-				}
-
-				*decryptedCount++
-				d.logger.Debug("Decrypted string value to object", map[string]interface{}{
-					"value_length": len(strValue),
-				})
-			} else {
-				// Simple string decryption succeeded
-				if reflect.ValueOf(value).Kind() == reflect.Ptr {
-					reflect.ValueOf(value).Elem().SetString(string(decryptedBytes))
-				} else {
-					d.logger.Warn("Cannot modify non-pointer string value", map[string]interface{}{
-						"value_type": fmt.Sprintf("%T", value),
-					})
-				}
-
-				*decryptedCount++
-				d.logger.Debug("Decrypted string value", map[string]interface{}{
-					"value_length": len(strValue),
-				})
-			}
-		}
-
+		return d.decryptStringValue(ctx, value, v, secretsIntegration, identityPath, decryptedCount, errors)
 	case reflect.Interface:
-		// Handle interface values - get the underlying value and process it
-		if v.IsNil() {
-			return nil
-		}
-		underlyingValue := v.Elem()
-		if underlyingValue.IsValid() {
-			if err := d.decryptValue(ctx, underlyingValue.Interface(), secretsIntegration, identityPath, decryptedCount, errors); err != nil {
-				return fmt.Errorf("failed to decrypt interface value: %w", err)
-			}
-		}
-
+		return d.decryptInterfaceValue(ctx, value, v, secretsIntegration, identityPath, decryptedCount, errors)
 	default:
 		// For other types (int, float, bool, etc.), no decryption needed
 		d.logger.Debug("Skipping decryption for non-string type", map[string]interface{}{
 			"type": v.Kind().String(),
 		})
+		return nil
+	}
+}
+
+// decryptStringValue handles decryption of string values
+func (d *HCLProcessor) decryptStringValue(ctx context.Context, value interface{}, v reflect.Value, secretsIntegration spookyinterfaces.SecretsIntegration, identityPath string, decryptedCount *int, errors *[]string) error {
+	strValue := v.String()
+	if strValue == "" || !strings.HasPrefix(strValue, "age1") {
+		return nil
 	}
 
+	// Try to decrypt as a simple string first
+	decryptedBytes, err := secretsIntegration.DecryptWithAge(ctx, []byte(strValue), identityPath)
+	if err != nil {
+		return d.handleDecryptionError(ctx, value, decryptedBytes, strValue, errors)
+	}
+
+	return d.handleSuccessfulStringDecryption(value, decryptedBytes, strValue, decryptedCount)
+}
+
+// decryptInterfaceValue handles decryption of interface values
+func (d *HCLProcessor) decryptInterfaceValue(ctx context.Context, value interface{}, v reflect.Value, secretsIntegration spookyinterfaces.SecretsIntegration, identityPath string, decryptedCount *int, errors *[]string) error {
+	if v.IsNil() {
+		return nil
+	}
+	underlyingValue := v.Elem()
+	if underlyingValue.IsValid() {
+		if err := d.decryptValue(ctx, underlyingValue.Interface(), secretsIntegration, identityPath, decryptedCount, errors); err != nil {
+			return fmt.Errorf("failed to decrypt interface value: %w", err)
+		}
+	}
+	return nil
+}
+
+// handleDecryptionError handles decryption errors
+func (d *HCLProcessor) handleDecryptionError(ctx context.Context, value interface{}, decryptedBytes []byte, strValue string, errors *[]string) error {
+	// If simple decryption fails, try as JSON object
+	var jsonData interface{}
+	if jsonErr := json.Unmarshal(decryptedBytes, &jsonData); jsonErr != nil {
+		errorMsg := fmt.Sprintf("failed to decrypt string value: %v", jsonErr)
+		*errors = append(*errors, errorMsg)
+		d.logger.Error("Failed to decrypt string value", jsonErr, map[string]interface{}{
+			"value_length": len(strValue),
+		})
+		return nil // Continue processing other values
+	}
+
+	// Update the string value with the decrypted JSON
+	if reflect.ValueOf(value).Kind() == reflect.Ptr {
+		reflect.ValueOf(value).Elem().Set(reflect.ValueOf(jsonData))
+	} else {
+		d.logger.Warn("Cannot modify non-pointer string value", map[string]interface{}{
+			"value_type": fmt.Sprintf("%T", value),
+		})
+	}
+
+	d.logger.Debug("Decrypted string value to object", map[string]interface{}{
+		"value_length": len(strValue),
+	})
+	return nil
+}
+
+// handleSuccessfulStringDecryption handles successful string decryption
+func (d *HCLProcessor) handleSuccessfulStringDecryption(value interface{}, decryptedBytes []byte, strValue string, decryptedCount *int) error {
+	if reflect.ValueOf(value).Kind() == reflect.Ptr {
+		reflect.ValueOf(value).Elem().SetString(string(decryptedBytes))
+	} else {
+		d.logger.Warn("Cannot modify non-pointer string value", map[string]interface{}{
+			"value_type": fmt.Sprintf("%T", value),
+		})
+	}
+
+	*decryptedCount++
+	d.logger.Debug("Decrypted string value", map[string]interface{}{
+		"value_length": len(strValue),
+	})
 	return nil
 }

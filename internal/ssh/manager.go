@@ -20,6 +20,12 @@ import (
 	spookytypesssh "spooky/internal/types/ssh"
 )
 
+// Status constants for action results
+const (
+	StatusSuccess = "success"
+	StatusFailed  = "failed"
+)
+
 // Manager implements the SSHManager interface
 type Manager struct {
 	client *ReusableSSHClient
@@ -332,13 +338,13 @@ func (m *Manager) RunAction(ctx context.Context, session *spookytypesactions.Act
 			"recoverable":        actionError.BaseError.Recoverable,
 		})
 
-		actingResult.Status = "failed"
+		actingResult.Status = StatusFailed
 		actingResult.Error = actionError.Error()
 		actingResult.ExitCode = actionError.ExitCode
 		actingResult.Stdout = actionError.Stdout
 		actingResult.Stderr = actionError.Stderr
 	} else {
-		actingResult.Status = "success"
+		actingResult.Status = StatusSuccess
 		actingResult.ExitCode = 0
 		actingResult.Stdout = stdout
 	}

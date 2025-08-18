@@ -265,33 +265,58 @@ func (v *Validator) validateActionType(actionType string) error {
 
 // validateActionParameters validates action parameters based on type
 func (v *Validator) validateActionParameters(action *spookytypes.Action) error {
-	switch action.Type {
-	case string(spookytypesactions.ActionTypeCommand):
-		if action.Command == nil {
-			return fmt.Errorf("command action requires a command")
-		}
-
-	case string(spookytypesactions.ActionTypeScript):
-		if action.Script == nil {
-			return fmt.Errorf("script action requires a script path")
-		}
-
-	case string(spookytypesactions.ActionTypeTemplateDeploy):
-		if action.Template == nil {
-			return fmt.Errorf("template action requires template configuration")
-		}
-
-	case string(spookytypesactions.ActionTypeFileCopy):
-		if action.FileCopy == nil {
-			return fmt.Errorf("file copy action requires file copy configuration")
-		}
-
-	case string(spookytypesactions.ActionTypeServiceControl):
-		if action.ServiceControl == nil {
-			return fmt.Errorf("service control action requires service control configuration")
-		}
+	validationMap := map[string]func(*spookytypes.Action) error{
+		string(spookytypesactions.ActionTypeCommand):        v.validateCommandAction,
+		string(spookytypesactions.ActionTypeScript):         v.validateScriptAction,
+		string(spookytypesactions.ActionTypeTemplateDeploy): v.validateTemplateAction,
+		string(spookytypesactions.ActionTypeFileCopy):       v.validateFileCopyAction,
+		string(spookytypesactions.ActionTypeServiceControl): v.validateServiceControlAction,
 	}
 
+	if validator, exists := validationMap[action.Type]; exists {
+		return validator(action)
+	}
+
+	return fmt.Errorf("unknown action type: %s", action.Type)
+}
+
+// validateCommandAction validates command action parameters
+func (v *Validator) validateCommandAction(action *spookytypes.Action) error {
+	if action.Command == nil {
+		return fmt.Errorf("command action requires a command")
+	}
+	return nil
+}
+
+// validateScriptAction validates script action parameters
+func (v *Validator) validateScriptAction(action *spookytypes.Action) error {
+	if action.Script == nil {
+		return fmt.Errorf("script action requires a script path")
+	}
+	return nil
+}
+
+// validateTemplateAction validates template action parameters
+func (v *Validator) validateTemplateAction(action *spookytypes.Action) error {
+	if action.Template == nil {
+		return fmt.Errorf("template action requires template configuration")
+	}
+	return nil
+}
+
+// validateFileCopyAction validates file copy action parameters
+func (v *Validator) validateFileCopyAction(action *spookytypes.Action) error {
+	if action.FileCopy == nil {
+		return fmt.Errorf("file copy action requires file copy configuration")
+	}
+	return nil
+}
+
+// validateServiceControlAction validates service control action parameters
+func (v *Validator) validateServiceControlAction(action *spookytypes.Action) error {
+	if action.ServiceControl == nil {
+		return fmt.Errorf("service control action requires service control configuration")
+	}
 	return nil
 }
 

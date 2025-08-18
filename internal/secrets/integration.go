@@ -66,15 +66,43 @@ func (i *Integration) ValidateKey(_ context.Context, _ []byte) error {
 
 // EncryptWithAge encrypts data with age using recipient public keys
 func (i *Integration) EncryptWithAge(_ context.Context, data []byte, recipients []string) ([]byte, error) {
+	if err := i.validateEncryptInputs(data, recipients); err != nil {
+		return nil, err
+	}
+
+	ageRecipients, err := i.parseAgeRecipients(recipients)
+	if err != nil {
+		return nil, err
+	}
+
+	output, err := i.performAgeEncryption(data, ageRecipients)
+	if err != nil {
+		return nil, err
+	}
+
+	i.logger.Info("Data encrypted with age successfully", map[string]interface{}{
+		"data_size":       len(data),
+		"ciphertext_size": len(output),
+		"recipients":      len(recipients),
+		"armored":         i.config != nil && i.config.Encryption.Armor,
+	})
+
+	return output, nil
+}
+
+func (i *Integration) validateEncryptInputs(data []byte, recipients []string) error {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("data cannot be empty")
+		return fmt.Errorf("data cannot be empty")
 	}
 
 	if len(recipients) == 0 {
-		return nil, fmt.Errorf("at least one recipient is required")
+		return fmt.Errorf("at least one recipient is required")
 	}
 
-	// Parse recipients
+	return nil
+}
+
+func (i *Integration) parseAgeRecipients(recipients []string) ([]age.Recipient, error) {
 	var ageRecipients []age.Recipient
 	for _, recipient := range recipients {
 		parsed, err := age.ParseX25519Recipient(recipient)
@@ -83,49 +111,55 @@ func (i *Integration) EncryptWithAge(_ context.Context, data []byte, recipients 
 		}
 		ageRecipients = append(ageRecipients, parsed)
 	}
+	return ageRecipients, nil
+}
 
-	// Create output buffer
+func (i *Integration) performAgeEncryption(data []byte, ageRecipients []age.Recipient) ([]byte, error) {
 	var output strings.Builder
-	var writer io.WriteCloser
+	writer := i.createOutputWriter(&output)
 
-	// Use armored output if configured
-	if i.config != nil && i.config.Encryption.Armor {
-		writer = armor.NewWriter(&stringWriter{builder: &output})
-	} else {
-		writer = &stringWriter{builder: &output}
-	}
-
-	// Create age encryptor
 	encryptor, err := age.Encrypt(writer, ageRecipients...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create age encryptor: %w", err)
 	}
 
-	// Write data
-	if _, err := encryptor.Write(data); err != nil {
-		return nil, fmt.Errorf("failed to write data to encryptor: %w", err)
+	if err := i.writeAndCloseEncryptor(encryptor, data); err != nil {
+		return nil, err
 	}
 
-	// Close encryptor
-	if err := encryptor.Close(); err != nil {
-		return nil, fmt.Errorf("failed to close encryptor: %w", err)
+	if err := i.closeWriterIfNeeded(writer); err != nil {
+		return nil, err
 	}
-
-	// Close writer if armored
-	if i.config != nil && i.config.Encryption.Armor {
-		if err := writer.Close(); err != nil {
-			return nil, fmt.Errorf("failed to close armored writer: %w", err)
-		}
-	}
-
-	i.logger.Info("Data encrypted with age successfully", map[string]interface{}{
-		"data_size":       len(data),
-		"ciphertext_size": len(output.String()),
-		"recipients":      len(recipients),
-		"armored":         i.config != nil && i.config.Encryption.Armor,
-	})
 
 	return []byte(output.String()), nil
+}
+
+func (i *Integration) createOutputWriter(output *strings.Builder) io.WriteCloser {
+	if i.config != nil && i.config.Encryption.Armor {
+		return armor.NewWriter(&stringWriter{builder: output})
+	}
+	return &stringWriter{builder: output}
+}
+
+func (i *Integration) writeAndCloseEncryptor(encryptor io.WriteCloser, data []byte) error {
+	if _, err := encryptor.Write(data); err != nil {
+		return fmt.Errorf("failed to write data to encryptor: %w", err)
+	}
+
+	if err := encryptor.Close(); err != nil {
+		return fmt.Errorf("failed to close encryptor: %w", err)
+	}
+
+	return nil
+}
+
+func (i *Integration) closeWriterIfNeeded(writer io.WriteCloser) error {
+	if i.config != nil && i.config.Encryption.Armor {
+		if err := writer.Close(); err != nil {
+			return fmt.Errorf("failed to close armored writer: %w", err)
+		}
+	}
+	return nil
 }
 
 // DecryptWithAge decrypts age-encrypted data using identity file
@@ -181,59 +215,65 @@ func (i *Integration) DecryptWithAge(_ context.Context, data []byte, identityPat
 
 // EncryptWithPassphrase encrypts data with age using a passphrase
 func (i *Integration) EncryptWithPassphrase(_ context.Context, data []byte, passphrase string) ([]byte, error) {
+	if err := i.validatePassphraseInputs(data, passphrase); err != nil {
+		return nil, err
+	}
+
+	recipient, err := i.createPassphraseRecipient(passphrase)
+	if err != nil {
+		return nil, err
+	}
+
+	output, err := i.performPassphraseEncryption(data, recipient)
+	if err != nil {
+		return nil, err
+	}
+
+	i.logger.Info("Data encrypted with passphrase successfully", map[string]interface{}{
+		"data_size":       len(data),
+		"ciphertext_size": len(output),
+		"armored":         i.config != nil && i.config.Encryption.Armor,
+	})
+
+	return output, nil
+}
+
+func (i *Integration) validatePassphraseInputs(data []byte, passphrase string) error {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("data cannot be empty")
+		return fmt.Errorf("data cannot be empty")
 	}
 
 	if passphrase == "" {
-		return nil, fmt.Errorf("passphrase cannot be empty")
+		return fmt.Errorf("passphrase cannot be empty")
 	}
 
-	// Create passphrase recipient
+	return nil
+}
+
+func (i *Integration) createPassphraseRecipient(passphrase string) (age.Recipient, error) {
 	recipient, err := age.NewScryptRecipient(passphrase)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create passphrase recipient: %w", err)
 	}
+	return recipient, nil
+}
 
-	// Create output buffer
+func (i *Integration) performPassphraseEncryption(data []byte, recipient age.Recipient) ([]byte, error) {
 	var output strings.Builder
-	var writer io.WriteCloser
+	writer := i.createOutputWriter(&output)
 
-	// Use armored output if configured
-	if i.config != nil && i.config.Encryption.Armor {
-		writer = armor.NewWriter(&stringWriter{builder: &output})
-	} else {
-		writer = &stringWriter{builder: &output}
-	}
-
-	// Create age encryptor
 	encryptor, err := age.Encrypt(writer, recipient)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create age encryptor: %w", err)
 	}
 
-	// Write data
-	if _, err := encryptor.Write(data); err != nil {
-		return nil, fmt.Errorf("failed to write data to encryptor: %w", err)
+	if err := i.writeAndCloseEncryptor(encryptor, data); err != nil {
+		return nil, err
 	}
 
-	// Close encryptor
-	if err := encryptor.Close(); err != nil {
-		return nil, fmt.Errorf("failed to close encryptor: %w", err)
+	if err := i.closeWriterIfNeeded(writer); err != nil {
+		return nil, err
 	}
-
-	// Close writer if armored
-	if i.config != nil && i.config.Encryption.Armor {
-		if err := writer.Close(); err != nil {
-			return nil, fmt.Errorf("failed to close armored writer: %w", err)
-		}
-	}
-
-	i.logger.Info("Data encrypted with passphrase successfully", map[string]interface{}{
-		"data_size":       len(data),
-		"ciphertext_size": len(output.String()),
-		"armored":         i.config != nil && i.config.Encryption.Armor,
-	})
 
 	return []byte(output.String()), nil
 }

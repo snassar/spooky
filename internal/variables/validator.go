@@ -299,6 +299,21 @@ func (v *Validator) validateStringConstraints(variable *spookytypesvariables.Var
 
 	constraints := variable.Constraints
 
+	// Validate length constraints
+	if err := v.validateStringLengthConstraints(constraints); err != nil {
+		return err
+	}
+
+	// Validate pattern constraint
+	if err := v.validateStringPatternConstraint(constraints); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateStringLengthConstraints validates string length constraints
+func (v *Validator) validateStringLengthConstraints(constraints *spookytypesvariables.VariableConstraints) error {
 	if constraints.MinLength != nil && constraints.MaxLength != nil {
 		if *constraints.MinLength > *constraints.MaxLength {
 			return fmt.Errorf("min_length cannot be greater than max_length")
@@ -313,6 +328,11 @@ func (v *Validator) validateStringConstraints(variable *spookytypesvariables.Var
 		return fmt.Errorf("max_length must be at least 1")
 	}
 
+	return nil
+}
+
+// validateStringPatternConstraint validates string pattern constraint
+func (v *Validator) validateStringPatternConstraint(constraints *spookytypesvariables.VariableConstraints) error {
 	if constraints.Pattern != nil {
 		if _, err := regexp.Compile(*constraints.Pattern); err != nil {
 			return fmt.Errorf("invalid pattern: %w", err)
@@ -376,60 +396,6 @@ func (v *Validator) validateFileConstraints(variable *spookytypesvariables.Varia
 		if err := v.validateFileSizeConstraint(*constraints.FileSizeMax); err != nil {
 			return fmt.Errorf("invalid file_size_max: %w", err)
 		}
-	}
-
-	return nil
-}
-
-// validateVariableValidation validates variable validation rules
-func (v *Validator) validateVariableValidation(variable *spookytypesvariables.Variable) error {
-	validation := variable.Validation
-
-	if validation.Condition == "" {
-		return fmt.Errorf("validation condition cannot be empty")
-	}
-
-	if validation.ErrorMessage == "" {
-		return fmt.Errorf("validation error_message cannot be empty")
-	}
-
-	if len(validation.Condition) > 1000 {
-		return fmt.Errorf("validation condition cannot exceed 1000 characters")
-	}
-
-	if len(validation.ErrorMessage) > 500 {
-		return fmt.Errorf("validation error_message cannot exceed 500 characters")
-	}
-
-	if validation.WarningMessage != "" && len(validation.WarningMessage) > 500 {
-		return fmt.Errorf("validation warning_message cannot exceed 500 characters")
-	}
-
-	return nil
-}
-
-// validateRequiredVariable validates required variables
-func (v *Validator) validateRequiredVariable(variable *spookytypesvariables.Variable) error {
-	// Check if variable has a default value
-	if variable.Default != nil {
-		return nil
-	}
-
-	// Check if variable can be resolved through dependencies
-	if len(variable.Dependencies) > 0 {
-		return nil
-	}
-
-	// Check if variable can be provided via environment variable
-	// This is a warning rather than an error since environment variables are runtime
-	return fmt.Errorf("required variable must have a default value or be resolved through dependencies")
-}
-
-// validateSensitiveVariable validates sensitive variables
-func (v *Validator) validateSensitiveVariable(variable *spookytypesvariables.Variable) error {
-	// Check if sensitive variable is encrypted
-	if !variable.Encrypted {
-		return fmt.Errorf("sensitive variables should be encrypted")
 	}
 
 	return nil
@@ -547,14 +513,4 @@ func (v *Validator) validateFileSizeConstraint(sizeStr string) error {
 	}
 
 	return nil
-}
-
-// convertErrorToSchemaError converts a regular error to a SchemaError
-func (v *Validator) convertErrorToSchemaError(err error, field string) spookytypesschemas.SchemaError {
-	schemaError := spookytypesschemas.NewSchemaError(
-		"Variable",
-		field,
-		err.Error(),
-	)
-	return *schemaError
 }

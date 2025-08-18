@@ -288,87 +288,6 @@ func (v *SchemaDrivenValidator) validateWithEnhancedValidator(schema *spookytype
 	return nil
 }
 
-// validateStructure validates data against a structure schema
-func (v *SchemaDrivenValidator) validateStructure(data interface{}, structureType string, result *spookytypesschemas.ValidationResult) error {
-	schema, err := v.getStructureSchema(structureType)
-	if err != nil {
-		return fmt.Errorf("failed to get %s structure schema: %w", structureType, err)
-	}
-
-	return v.validateWithEnhancedValidator(schema, data, fmt.Sprintf("%s structure", structureType), result)
-}
-
-// Generic schema validation method
-func (v *SchemaDrivenValidator) validateSchema(data interface{}, schemaType string, result *spookytypesschemas.ValidationResult) error {
-	// Get schema
-	schema, err := v.getEmbeddedSchema(schemaType)
-	if err != nil {
-		return fmt.Errorf("failed to get %s schema: %w", schemaType, err)
-	}
-
-	return v.validateWithEnhancedValidator(schema, data, schemaType, result)
-}
-
-// Generic custom validation rule application
-func (v *SchemaDrivenValidator) applyCustomValidationRule(schemaName string, data interface{}, result *spookytypesschemas.ValidationResult) error {
-	_, err := v.getValidationSchema(schemaName)
-	if err != nil {
-		// No custom validation rules defined, that's okay
-		return nil
-	}
-
-	// Apply custom validation rules
-	v.logger.Debug("Applying custom validation rules", map[string]interface{}{
-		"schema_name": schemaName,
-	})
-
-	return nil
-}
-
-// Generic combined validation method
-func (v *SchemaDrivenValidator) validateWithStructureAndRules(data interface{}, schemaType SchemaType, result *spookytypesschemas.ValidationResult) error {
-	// 1. Validate structure
-	if err := v.validateStructure(data, string(schemaType), result); err != nil {
-		return err
-	}
-
-	// 2. Apply custom validation rules
-	ruleSchemaName := fmt.Sprintf("%s-rules", schemaType)
-	if err := v.applyCustomValidationRule(ruleSchemaName, data, result); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Specific validation methods that use the generic approach
-
-// Structure validation methods
-func (v *SchemaDrivenValidator) validateProjectStructure(data interface{}, result *spookytypesschemas.ValidationResult) error {
-	return v.validateStructure(data, "project", result)
-}
-
-func (v *SchemaDrivenValidator) validateMachinesStructure(data interface{}, result *spookytypesschemas.ValidationResult) error {
-	return v.validateStructure(data, "machines", result)
-}
-
-func (v *SchemaDrivenValidator) validateActionsStructure(data interface{}, result *spookytypesschemas.ValidationResult) error {
-	return v.validateStructure(data, "actions", result)
-}
-
-// Combined validation methods using the generic approach
-func (v *SchemaDrivenValidator) validateProject(data interface{}, result *spookytypesschemas.ValidationResult) error {
-	return v.validateWithStructureAndRules(data, SchemaTypeProject, result)
-}
-
-func (v *SchemaDrivenValidator) validateMachines(data interface{}, result *spookytypesschemas.ValidationResult) error {
-	return v.validateWithStructureAndRules(data, SchemaTypeMachines, result)
-}
-
-func (v *SchemaDrivenValidator) validateActions(data interface{}, result *spookytypesschemas.ValidationResult) error {
-	return v.validateWithStructureAndRules(data, SchemaTypeActions, result)
-}
-
 // Helper methods
 
 // validateFileAccess validates file existence and readability
@@ -650,67 +569,139 @@ func (v *SchemaDrivenValidator) validateMachinesSchema(data interface{}, result 
 		return nil
 	}
 
-	// Basic validation: check if data has required machines fields
-	if dataMap, ok := data.(map[string]interface{}); ok {
-		if machinesData, exists := dataMap["machines"]; exists {
-			if machinesMap, ok := machinesData.(map[string]interface{}); ok {
-				// Check for machine blocks
-				if machineData, exists := machinesMap["machine"]; exists {
-					if machineMap, ok := machineData.(map[string]interface{}); ok {
-						// Check for required fields
-						if hostname, exists := machineMap["hostname"]; !exists || hostname == "" {
-							v.addError(result, "machine_hostname_required", "Machine hostname is required", "Add a 'hostname' field to the machine block", "error")
-							result.Statistics.InvalidFields++
-						} else {
-							result.Statistics.ValidFields++
-						}
-						result.Statistics.TotalFields++
+	// Validate machines data structure
+	return v.validateMachinesDataStructure(data, result)
+}
 
-						// Check port (optional but recommended)
-						if port, exists := machineMap["port"]; exists && port != nil {
-							result.Statistics.ValidFields++
-						}
-						result.Statistics.TotalFields++
-
-						// Check user (optional but recommended)
-						if user, exists := machineMap["user"]; exists && user != "" {
-							result.Statistics.ValidFields++
-						}
-						result.Statistics.TotalFields++
-
-						result.Statistics.RulesProcessed += 3
-					} else {
-						v.addError(result, "invalid_machine_structure", "Machine data must be an object", "Ensure machine block contains valid fields", "error")
-						result.Statistics.InvalidFields++
-						result.Statistics.TotalFields++
-						result.Statistics.RulesProcessed++
-					}
-				} else {
-					v.addError(result, "machine_block_missing", "Machine block is required", "Add a 'machine' block to your machines configuration", "error")
-					result.Statistics.InvalidFields++
-					result.Statistics.TotalFields++
-					result.Statistics.RulesProcessed++
-				}
-			} else {
-				v.addError(result, "invalid_machines_structure", "Machines data must be an object", "Ensure machines block contains valid fields", "error")
-				result.Statistics.InvalidFields++
-				result.Statistics.TotalFields++
-				result.Statistics.RulesProcessed++
-			}
-		} else {
-			v.addError(result, "machines_block_missing", "Machines block is required", "Add a 'machines' block to your configuration", "error")
-			result.Statistics.InvalidFields++
-			result.Statistics.TotalFields++
-			result.Statistics.RulesProcessed++
-		}
-	} else {
+// validateDataStructure validates the basic data structure for any schema type
+func (v *SchemaDrivenValidator) validateDataStructure(data interface{}, blockName string, result *spookytypesschemas.ValidationResult) (interface{}, error) {
+	dataMap, ok := data.(map[string]interface{})
+	if !ok {
 		v.addError(result, "invalid_data_structure", "Data must be a map", "Ensure configuration has proper structure", "error")
 		result.Statistics.InvalidFields++
 		result.Statistics.TotalFields++
 		result.Statistics.RulesProcessed++
+		return nil, nil
 	}
 
+	blockData, exists := dataMap[blockName]
+	if !exists {
+		v.addError(result, blockName+"_block_missing", blockName+" block is required", "Add a '"+blockName+"' block to your configuration", "error")
+		result.Statistics.InvalidFields++
+		result.Statistics.TotalFields++
+		result.Statistics.RulesProcessed++
+		return nil, nil
+	}
+
+	return blockData, nil
+}
+
+// validateBlockStructure validates the block structure for any schema type
+func (v *SchemaDrivenValidator) validateBlockStructure(blockData interface{}, blockName string, result *spookytypesschemas.ValidationResult) (map[string]interface{}, error) {
+	blockMap, ok := blockData.(map[string]interface{})
+	if !ok {
+		v.addError(result, "invalid_"+blockName+"_structure", blockName+" data must be an object", "Ensure "+blockName+" block contains valid fields", "error")
+		result.Statistics.InvalidFields++
+		result.Statistics.TotalFields++
+		result.Statistics.RulesProcessed++
+		return nil, nil
+	}
+
+	return blockMap, nil
+}
+
+// validateDataStructureWithBlock validates data structure and extracts a specific block
+func (v *SchemaDrivenValidator) validateDataStructureWithBlock(data interface{}, blockName string, innerBlockName string, result *spookytypesschemas.ValidationResult) (interface{}, error) {
+	blockData, err := v.validateDataStructure(data, blockName, result)
+	if err != nil || blockData == nil {
+		return nil, err
+	}
+
+	blockMap, err := v.validateBlockStructure(blockData, blockName, result)
+	if err != nil || blockMap == nil {
+		return nil, err
+	}
+
+	innerBlockData, exists := blockMap[innerBlockName]
+	if !exists {
+		v.addError(result, innerBlockName+"_block_missing", innerBlockName+" block is required", "Add a '"+innerBlockName+"' block to your "+blockName+" configuration", "error")
+		result.Statistics.InvalidFields++
+		result.Statistics.TotalFields++
+		result.Statistics.RulesProcessed++
+		return nil, nil
+	}
+
+	return innerBlockData, nil
+}
+
+// validateActionsDataStructure validates the structure of actions data
+func (v *SchemaDrivenValidator) validateActionsDataStructure(data interface{}, result *spookytypesschemas.ValidationResult) error {
+	actionData, err := v.validateDataStructureWithBlock(data, "actions", "action", result)
+	if err != nil || actionData == nil {
+		return err
+	}
+
+	return v.validateActionBlock(actionData, result)
+}
+
+// validateMachinesDataStructure validates the structure of machines data
+func (v *SchemaDrivenValidator) validateMachinesDataStructure(data interface{}, result *spookytypesschemas.ValidationResult) error {
+	machineData, err := v.validateDataStructureWithBlock(data, "machines", "machine", result)
+	if err != nil || machineData == nil {
+		return err
+	}
+
+	return v.validateMachineBlock(machineData, result)
+}
+
+// validateMachineBlock validates individual machine blocks
+func (v *SchemaDrivenValidator) validateMachineBlock(machineData interface{}, result *spookytypesschemas.ValidationResult) error {
+	machineMap, ok := machineData.(map[string]interface{})
+	if !ok {
+		v.addError(result, "invalid_machine_structure", "Machine data must be an object", "Ensure machine block contains valid fields", "error")
+		result.Statistics.InvalidFields++
+		result.Statistics.TotalFields++
+		result.Statistics.RulesProcessed++
+		return nil
+	}
+
+	// Validate required fields
+	v.validateMachineRequiredFields(machineMap, result)
+
+	// Validate optional fields
+	v.validateMachineOptionalFields(machineMap, result)
+
 	return nil
+}
+
+// validateMachineRequiredFields validates required machine fields
+func (v *SchemaDrivenValidator) validateMachineRequiredFields(machineMap map[string]interface{}, result *spookytypesschemas.ValidationResult) {
+	// Check for required hostname field
+	if hostname, exists := machineMap["hostname"]; !exists || hostname == "" {
+		v.addError(result, "machine_hostname_required", "Machine hostname is required", "Add a 'hostname' field to the machine block", "error")
+		result.Statistics.InvalidFields++
+	} else {
+		result.Statistics.ValidFields++
+	}
+	result.Statistics.TotalFields++
+	result.Statistics.RulesProcessed++
+}
+
+// validateMachineOptionalFields validates optional machine fields
+func (v *SchemaDrivenValidator) validateMachineOptionalFields(machineMap map[string]interface{}, result *spookytypesschemas.ValidationResult) {
+	// Check port (optional but recommended)
+	if port, exists := machineMap["port"]; exists && port != nil {
+		result.Statistics.ValidFields++
+	}
+	result.Statistics.TotalFields++
+
+	// Check user (optional but recommended)
+	if user, exists := machineMap["user"]; exists && user != "" {
+		result.Statistics.ValidFields++
+	}
+	result.Statistics.TotalFields++
+
+	result.Statistics.RulesProcessed += 2
 }
 
 func (v *SchemaDrivenValidator) validateActionsSchema(data interface{}, result *spookytypesschemas.ValidationResult) error {
@@ -726,84 +717,91 @@ func (v *SchemaDrivenValidator) validateActionsSchema(data interface{}, result *
 		return nil
 	}
 
-	// Basic validation: check if data has required actions fields
-	if dataMap, ok := data.(map[string]interface{}); ok {
-		if actionsData, exists := dataMap["actions"]; exists {
-			if actionsMap, ok := actionsData.(map[string]interface{}); ok {
-				// Check for action blocks
-				if actionData, exists := actionsMap["action"]; exists {
-					if actionMap, ok := actionData.(map[string]interface{}); ok {
-						// Check for required fields
-						if name, exists := actionMap["name"]; !exists || name == "" {
-							v.addError(result, "action_name_required", "Action name is required", "Add a 'name' field to the action block", "error")
-							result.Statistics.InvalidFields++
-						} else {
-							result.Statistics.ValidFields++
-						}
-						result.Statistics.TotalFields++
+	// Validate actions data structure
+	return v.validateActionsDataStructure(data, result)
+}
 
-						// Check description (optional but recommended)
-						if description, exists := actionMap["description"]; exists && description != "" {
-							result.Statistics.ValidFields++
-						}
-						result.Statistics.TotalFields++
-
-						// Check command (optional but recommended)
-						if command, exists := actionMap["command"]; exists && command != "" {
-							result.Statistics.ValidFields++
-						}
-						result.Statistics.TotalFields++
-
-						result.Statistics.RulesProcessed += 3
-					} else {
-						v.addError(result, "invalid_action_structure", "Action data must be an object", "Ensure action block contains valid fields", "error")
-						result.Statistics.InvalidFields++
-						result.Statistics.TotalFields++
-						result.Statistics.RulesProcessed++
-					}
-				} else {
-					v.addError(result, "action_block_missing", "Action block is required", "Add an 'action' block to your actions configuration", "error")
-					result.Statistics.InvalidFields++
-					result.Statistics.TotalFields++
-					result.Statistics.RulesProcessed++
-				}
-			} else {
-				v.addError(result, "invalid_actions_structure", "Actions data must be an object", "Ensure actions block contains valid fields", "error")
-				result.Statistics.InvalidFields++
-				result.Statistics.TotalFields++
-				result.Statistics.RulesProcessed++
-			}
-		} else {
-			v.addError(result, "actions_block_missing", "Actions block is required", "Add an 'actions' block to your configuration", "error")
-			result.Statistics.InvalidFields++
-			result.Statistics.TotalFields++
-			result.Statistics.RulesProcessed++
-		}
-	} else {
-		v.addError(result, "invalid_data_structure", "Data must be a map", "Ensure configuration has proper structure", "error")
+// validateActionBlock validates individual action blocks
+func (v *SchemaDrivenValidator) validateActionBlock(actionData interface{}, result *spookytypesschemas.ValidationResult) error {
+	actionMap, ok := actionData.(map[string]interface{})
+	if !ok {
+		v.addError(result, "invalid_action_structure", "Action data must be an object", "Ensure action block contains valid fields", "error")
 		result.Statistics.InvalidFields++
 		result.Statistics.TotalFields++
 		result.Statistics.RulesProcessed++
+		return nil
 	}
+
+	// Validate required fields
+	v.validateActionRequiredFields(actionMap, result)
+
+	// Validate optional fields
+	v.validateActionOptionalFields(actionMap, result)
 
 	return nil
 }
 
+// validateActionRequiredFields validates required action fields
+func (v *SchemaDrivenValidator) validateActionRequiredFields(actionMap map[string]interface{}, result *spookytypesschemas.ValidationResult) {
+	// Check for required name field
+	if name, exists := actionMap["name"]; !exists || name == "" {
+		v.addError(result, "action_name_required", "Action name is required", "Add a 'name' field to the action block", "error")
+		result.Statistics.InvalidFields++
+	} else {
+		result.Statistics.ValidFields++
+	}
+	result.Statistics.TotalFields++
+	result.Statistics.RulesProcessed++
+}
+
+// validateActionOptionalFields validates optional action fields
+func (v *SchemaDrivenValidator) validateActionOptionalFields(actionMap map[string]interface{}, result *spookytypesschemas.ValidationResult) {
+	// Check description (optional but recommended)
+	if description, exists := actionMap["description"]; exists && description != "" {
+		result.Statistics.ValidFields++
+	}
+	result.Statistics.TotalFields++
+
+	// Check command (optional but recommended)
+	if command, exists := actionMap["command"]; exists && command != "" {
+		result.Statistics.ValidFields++
+	}
+	result.Statistics.TotalFields++
+
+	result.Statistics.RulesProcessed += 2
+}
+
 // Schema validation methods using the generic approach
 func (v *SchemaDrivenValidator) validateVariablesSchema(data interface{}, result *spookytypesschemas.ValidationResult) error {
-	return v.validateSchema(data, "variables", result)
+	schema, err := v.getEmbeddedSchema("variables")
+	if err != nil {
+		return fmt.Errorf("failed to get variables schema: %w", err)
+	}
+	return v.validateWithEnhancedValidator(schema, data, "variables", result)
 }
 
 func (v *SchemaDrivenValidator) validateTemplatesSchema(data interface{}, result *spookytypesschemas.ValidationResult) error {
-	return v.validateSchema(data, "templates", result)
+	schema, err := v.getEmbeddedSchema("templates")
+	if err != nil {
+		return fmt.Errorf("failed to get templates schema: %w", err)
+	}
+	return v.validateWithEnhancedValidator(schema, data, "templates", result)
 }
 
 func (v *SchemaDrivenValidator) validateLoggingSchema(data interface{}, result *spookytypesschemas.ValidationResult) error {
-	return v.validateSchema(data, "logging", result)
+	schema, err := v.getEmbeddedSchema("logging")
+	if err != nil {
+		return fmt.Errorf("failed to get logging schema: %w", err)
+	}
+	return v.validateWithEnhancedValidator(schema, data, "logging", result)
 }
 
 func (v *SchemaDrivenValidator) validateSSHSchema(data interface{}, result *spookytypesschemas.ValidationResult) error {
-	return v.validateSchema(data, "ssh", result)
+	schema, err := v.getEmbeddedSchema("ssh")
+	if err != nil {
+		return fmt.Errorf("failed to get ssh schema: %w", err)
+	}
+	return v.validateWithEnhancedValidator(schema, data, "ssh", result)
 }
 
 func (v *SchemaDrivenValidator) validateBasicSchema(data interface{}, result *spookytypesschemas.ValidationResult) error {
@@ -929,80 +927,91 @@ func capitalizeFirstLetterValidator(s string) string {
 func (v *SchemaDrivenValidator) loadSchemasFromDirectory(dirPath, schemaType string, logErrorOnNotFound bool,
 	loadFunc func(string) (*spookytypesschemas.Schema, error), schemaMap map[string]*spookytypesschemas.Schema) {
 
-	// Get current working directory for debugging
-	if wd, err := os.Getwd(); err == nil {
-		if v.logger != nil {
-			v.logger.Debug(fmt.Sprintf("Current working directory: %s", wd),
-				map[string]interface{}{
-					"working_dir": wd,
-				})
-		}
-	}
+	v.logDirectoryInfo(dirPath, schemaType)
 
-	// Try to get absolute path
-	absPath, err := filepath.Abs(dirPath)
-	if err == nil {
-		if v.logger != nil {
-			v.logger.Debug(fmt.Sprintf("Absolute path for %s: %s", dirPath, absPath),
-				map[string]interface{}{
-					"absolute_path": absPath,
-					"relative_path": dirPath,
-				})
-		}
-	}
-
-	if v.logger != nil {
-		v.logger.Debug(fmt.Sprintf("Attempting to load %s schemas from: %s", schemaType, dirPath),
-			map[string]interface{}{
-				"dir_path":    dirPath,
-				"schema_type": schemaType,
-			})
-	}
-
-	if info, err := os.Stat(dirPath); err != nil || !info.IsDir() {
-		if logErrorOnNotFound {
-			if v.logger != nil {
-				v.logger.Error(fmt.Sprintf("%s schemas directory not found", capitalizeFirstLetterValidator(schemaType)),
-					fmt.Errorf("directory %s does not exist or is not a directory", dirPath),
-					map[string]interface{}{
-						"dir_path":           dirPath,
-						"schema_type":        schemaType,
-						"error_on_not_found": logErrorOnNotFound,
-					})
-			}
-		} else {
-			if v.logger != nil {
-				v.logger.Debug(fmt.Sprintf("%s schemas directory not found", capitalizeFirstLetterValidator(schemaType)),
-					map[string]interface{}{
-						"dir_path":           dirPath,
-						"schema_type":        schemaType,
-						"error_on_not_found": logErrorOnNotFound,
-					})
-			}
-		}
+	if !v.validateDirectoryExists(dirPath, schemaType, logErrorOnNotFound) {
 		return
 	}
 
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
-		if v.logger != nil {
-			v.logger.Error(fmt.Sprintf("Failed to read %s schemas directory", capitalizeFirstLetterValidator(schemaType)),
-				err,
-				map[string]interface{}{
-					"dir_path":    dirPath,
-					"schema_type": schemaType,
-				})
-		}
+		v.logDirectoryReadError(dirPath, schemaType, err)
 		return
 	}
 
-	if v.logger != nil {
-		v.logger.Debug(fmt.Sprintf("Found %d entries in %s directory", len(entries), schemaType),
-			map[string]interface{}{
-				"dir_path":    dirPath,
-				"entry_count": len(entries),
-			})
+	v.logDirectoryEntries(dirPath, schemaType, len(entries))
+	v.processSchemaFiles(entries, dirPath, schemaType, loadFunc, schemaMap)
+}
+
+// logDirectoryInfo logs directory information for debugging
+func (v *SchemaDrivenValidator) logDirectoryInfo(dirPath, schemaType string) {
+	// Get current working directory for debugging
+	if wd, err := os.Getwd(); err == nil {
+		v.logDebug("Current working directory", map[string]interface{}{
+			"working_dir": wd,
+		})
 	}
+
+	// Try to get absolute path
+	if absPath, err := filepath.Abs(dirPath); err == nil {
+		v.logDebug("Absolute path", map[string]interface{}{
+			"absolute_path": absPath,
+			"relative_path": dirPath,
+		})
+	}
+
+	v.logDebug("Attempting to load schemas", map[string]interface{}{
+		"dir_path":    dirPath,
+		"schema_type": schemaType,
+	})
+}
+
+// validateDirectoryExists checks if the directory exists and logs appropriate messages
+func (v *SchemaDrivenValidator) validateDirectoryExists(dirPath, schemaType string, logErrorOnNotFound bool) bool {
+	if info, err := os.Stat(dirPath); err != nil || !info.IsDir() {
+		if logErrorOnNotFound {
+			v.logError(fmt.Sprintf("%s schemas directory not found", capitalizeFirstLetterValidator(schemaType)),
+				fmt.Errorf("directory %s does not exist or is not a directory", dirPath),
+				map[string]interface{}{
+					"dir_path":           dirPath,
+					"schema_type":        schemaType,
+					"error_on_not_found": logErrorOnNotFound,
+				})
+		} else {
+			v.logDebug(fmt.Sprintf("%s schemas directory not found", capitalizeFirstLetterValidator(schemaType)),
+				map[string]interface{}{
+					"dir_path":           dirPath,
+					"schema_type":        schemaType,
+					"error_on_not_found": logErrorOnNotFound,
+				})
+		}
+		return false
+	}
+	return true
+}
+
+// logDirectoryReadError logs directory read errors
+func (v *SchemaDrivenValidator) logDirectoryReadError(dirPath, schemaType string, err error) {
+	v.logError(fmt.Sprintf("Failed to read %s schemas directory", capitalizeFirstLetterValidator(schemaType)),
+		err,
+		map[string]interface{}{
+			"dir_path":    dirPath,
+			"schema_type": schemaType,
+		})
+}
+
+// logDirectoryEntries logs the number of entries found in the directory
+func (v *SchemaDrivenValidator) logDirectoryEntries(dirPath, schemaType string, entryCount int) {
+	v.logDebug(fmt.Sprintf("Found %d entries in %s directory", entryCount, schemaType),
+		map[string]interface{}{
+			"dir_path":    dirPath,
+			"entry_count": entryCount,
+		})
+}
+
+// processSchemaFiles processes schema files in the directory
+func (v *SchemaDrivenValidator) processSchemaFiles(entries []os.DirEntry, dirPath, schemaType string,
+	loadFunc func(string) (*spookytypesschemas.Schema, error), schemaMap map[string]*spookytypesschemas.Schema) {
 
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".hcl") {
@@ -1014,50 +1023,54 @@ func (v *SchemaDrivenValidator) loadSchemasFromDirectory(dirPath, schemaType str
 
 		schema, err := loadFunc(schemaPath)
 		if err != nil {
-			if v.logger != nil {
-				v.logger.Error(fmt.Sprintf("Failed to load %s schema", capitalizeFirstLetterValidator(schemaType)),
-					err,
-					map[string]interface{}{
-						"schema_path": schemaPath,
-						"schema_name": schemaName,
-						"schema_type": schemaType,
-					})
-			}
+			v.logSchemaLoadError(schemaType, err, schemaPath, schemaName)
 			continue
 		}
 
-		if v.logger != nil {
-			v.logger.Info(fmt.Sprintf("Loaded %s schema", capitalizeFirstLetterValidator(schemaType)),
-				map[string]interface{}{
-					"schema_name": schemaName,
-					"schema_path": schemaPath,
-				})
-		}
-
+		v.logSchemaLoaded(schemaType, schemaName, schemaPath)
 		schemaMap[schemaName] = schema
 	}
 }
 
-// Helper methods to get schemas by type
-func (v *SchemaDrivenValidator) getStructureSchema(name string) (*spookytypesschemas.Schema, error) {
-	if schema, exists := v.structureSchemas[name]; exists {
-		return schema, nil
-	}
-	return nil, fmt.Errorf("structure schema not found: %s", name)
+// logSchemaLoadError logs schema loading errors
+func (v *SchemaDrivenValidator) logSchemaLoadError(schemaType string, err error, schemaPath, schemaName string) {
+	v.logError(fmt.Sprintf("Failed to load %s schema", capitalizeFirstLetterValidator(schemaType)),
+		err,
+		map[string]interface{}{
+			"schema_path": schemaPath,
+			"schema_name": schemaName,
+			"schema_type": schemaType,
+		})
 }
 
-func (v *SchemaDrivenValidator) getValidationSchema(name string) (*spookytypesschemas.Schema, error) {
-	if schema, exists := v.validationSchemas[name]; exists {
-		return schema, nil
-	}
-	return nil, fmt.Errorf("validation schema not found: %s", name)
+// logSchemaLoaded logs successful schema loading
+func (v *SchemaDrivenValidator) logSchemaLoaded(schemaType, schemaName, schemaPath string) {
+	v.logInfo(fmt.Sprintf("Loaded %s schema", capitalizeFirstLetterValidator(schemaType)),
+		map[string]interface{}{
+			"schema_name": schemaName,
+			"schema_path": schemaPath,
+		})
 }
 
-func (v *SchemaDrivenValidator) getMetadataSchema(name string) (*spookytypesschemas.Schema, error) {
-	if schema, exists := v.metadataSchemas[name]; exists {
-		return schema, nil
+// logDebug logs debug messages
+func (v *SchemaDrivenValidator) logDebug(message string, fields map[string]interface{}) {
+	if v.logger != nil {
+		v.logger.Debug(message, fields)
 	}
-	return nil, fmt.Errorf("metadata schema not found: %s", name)
+}
+
+// logInfo logs info messages
+func (v *SchemaDrivenValidator) logInfo(message string, fields map[string]interface{}) {
+	if v.logger != nil {
+		v.logger.Info(message, fields)
+	}
+}
+
+// logError logs error messages
+func (v *SchemaDrivenValidator) logError(message string, err error, fields map[string]interface{}) {
+	if v.logger != nil {
+		v.logger.Error(message, err, fields)
+	}
 }
 
 // loadStructureSchema loads a structure schema from file

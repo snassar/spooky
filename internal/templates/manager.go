@@ -101,7 +101,6 @@ type TemplateContextResolver struct {
 	variablesManager spookyinterfaces.VariablesIntegration
 	machinesManager  spookyinterfaces.MachinesIntegration
 	cache            ContextCache
-	validator        ContextValidator
 	mu               sync.RWMutex
 }
 
@@ -120,7 +119,6 @@ type ContextCacheEntry struct {
 
 // ContextValidator validates template contexts
 type ContextValidator struct {
-	logger spookytypeslogging.Logger
 }
 
 // ResolveContext resolves template context with facts, variables, and machines data
@@ -262,7 +260,6 @@ type TemplateMetadataManager struct {
 
 // MetadataValidator validates template metadata
 type MetadataValidator struct {
-	logger spookytypeslogging.Logger
 }
 
 // LoadMetadata loads template metadata
@@ -425,13 +422,9 @@ type MetadataCacheEntry struct {
 
 // TemplateValidator provides comprehensive template validation
 type TemplateValidator struct {
-	schemaValidator   spookytypesschemas.SchemaValidator
-	schemaManager     *spookyschemas.Manager
-	functionValidator FunctionValidator
-	contextValidator  ContextValidator
-	metadataValidator MetadataValidator
-	cache             ValidationCache
-	logger            spookytypeslogging.Logger
+	schemaValidator spookytypesschemas.SchemaValidator
+	schemaManager   *spookyschemas.Manager
+	logger          spookytypeslogging.Logger
 }
 
 // ValidateTemplateComprehensive validates template against schemas
@@ -689,19 +682,6 @@ func (v *TemplateValidator) templateMetadataToMap(template *spookytypes.Template
 
 // FunctionValidator validates template functions
 type FunctionValidator struct {
-	logger spookytypeslogging.Logger
-}
-
-// ValidationCache caches validation results
-type ValidationCache struct {
-	cache map[string]ValidationCacheEntry
-	ttl   time.Duration
-}
-
-// ValidationCacheEntry represents cached validation results
-type ValidationCacheEntry struct {
-	Result    *spookytypesschemas.ValidationResult
-	ExpiresAt time.Time
 }
 
 // TemplateSecurityManager provides template security and sandboxing
@@ -1024,7 +1004,7 @@ func NewManager(logger spookytypeslogging.Logger) *Manager {
 			},
 		},
 		metadataManager: TemplateMetadataManager{
-			validator: MetadataValidator{logger: logger},
+			validator: MetadataValidator{},
 			indexer:   NewEnhancedMetadataIndexer(),
 			cache: MetadataCache{
 				cache: make(map[string]MetadataCacheEntry),
@@ -1809,40 +1789,33 @@ func (i *EnhancedMetadataIndexer) IndexMetadata(metadata *spookytypestemplates.T
 
 // buildFullTextIndex builds full-text search index
 func (i *EnhancedMetadataIndexer) buildFullTextIndex(metadata *spookytypestemplates.TemplateMetadata) {
-	// Index name
-	if metadata.Name != "" {
-		words := strings.Fields(strings.ToLower(metadata.Name))
-		for _, word := range words {
-			i.fullTextIndex[word] = append(i.fullTextIndex[word], metadata)
-		}
-	}
+	// Index text fields
+	i.indexText(metadata.Name, metadata)
+	i.indexText(metadata.Description, metadata)
 
-	// Index description
-	if metadata.Description != "" {
-		words := strings.Fields(strings.ToLower(metadata.Description))
-		for _, word := range words {
-			i.fullTextIndex[word] = append(i.fullTextIndex[word], metadata)
-		}
-	}
-
-	// Index tags
+	// Index slice fields
 	if metadata.Tags != nil {
 		for _, tag := range metadata.Tags {
-			words := strings.Fields(strings.ToLower(tag))
-			for _, word := range words {
-				i.fullTextIndex[word] = append(i.fullTextIndex[word], metadata)
-			}
+			i.indexText(tag, metadata)
 		}
 	}
 
-	// Index keywords
 	if metadata.Keywords != nil {
 		for _, keyword := range metadata.Keywords {
-			words := strings.Fields(strings.ToLower(keyword))
-			for _, word := range words {
-				i.fullTextIndex[word] = append(i.fullTextIndex[word], metadata)
-			}
+			i.indexText(keyword, metadata)
 		}
+	}
+}
+
+// indexText indexes a text field for full-text search
+func (i *EnhancedMetadataIndexer) indexText(text string, metadata *spookytypestemplates.TemplateMetadata) {
+	if text == "" {
+		return
+	}
+
+	words := strings.Fields(strings.ToLower(text))
+	for _, word := range words {
+		i.fullTextIndex[word] = append(i.fullTextIndex[word], metadata)
 	}
 }
 
@@ -1858,58 +1831,53 @@ func (i *EnhancedMetadataIndexer) Search(query string, filters *SearchFilters) (
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 
+	results := i.performAllSearches(query)
+	results = i.applyFilters(results, filters)
+	results = i.sortResultsByScore(results)
+
+	return results, nil
+}
+
+// performAllSearches performs all search types and deduplicates results
+func (i *EnhancedMetadataIndexer) performAllSearches(query string) []SearchResult {
 	var results []SearchResult
 	seen := make(map[string]bool)
 
-	// Search by name (exact and partial)
-	if nameResults := i.searchByName(query); len(nameResults) > 0 {
-		for _, result := range nameResults {
-			if !seen[result.Metadata.Name] {
-				results = append(results, result)
-				seen[result.Metadata.Name] = true
-			}
-		}
+	searchTypes := []struct {
+		name   string
+		search func(string) []SearchResult
+	}{
+		{"name", i.searchByName},
+		{"tags", i.searchByTags},
+		{"keywords", i.searchByKeywords},
+		{"full-text", i.searchByFullText},
 	}
 
-	// Search by tags
-	if tagResults := i.searchByTags(query); len(tagResults) > 0 {
-		for _, result := range tagResults {
-			if !seen[result.Metadata.Name] {
-				results = append(results, result)
-				seen[result.Metadata.Name] = true
-			}
-		}
+	for _, searchType := range searchTypes {
+		searchResults := searchType.search(query)
+		results = i.addUniqueResults(results, searchResults, seen)
 	}
 
-	// Search by keywords
-	if keywordResults := i.searchByKeywords(query); len(keywordResults) > 0 {
-		for _, result := range keywordResults {
-			if !seen[result.Metadata.Name] {
-				results = append(results, result)
-				seen[result.Metadata.Name] = true
-			}
+	return results
+}
+
+// addUniqueResults adds unique search results to the main results slice
+func (i *EnhancedMetadataIndexer) addUniqueResults(results, searchResults []SearchResult, seen map[string]bool) []SearchResult {
+	for _, result := range searchResults {
+		if !seen[result.Metadata.Name] {
+			results = append(results, result)
+			seen[result.Metadata.Name] = true
 		}
 	}
+	return results
+}
 
-	// Search by full-text
-	if fullTextResults := i.searchByFullText(query); len(fullTextResults) > 0 {
-		for _, result := range fullTextResults {
-			if !seen[result.Metadata.Name] {
-				results = append(results, result)
-				seen[result.Metadata.Name] = true
-			}
-		}
-	}
-
-	// Apply filters
-	results = i.applyFilters(results, filters)
-
-	// Sort by score
+// sortResultsByScore sorts results by score in descending order
+func (i *EnhancedMetadataIndexer) sortResultsByScore(results []SearchResult) []SearchResult {
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Score > results[j].Score
 	})
-
-	return results, nil
+	return results
 }
 
 // SearchFilters represents search filters
@@ -2025,42 +1993,7 @@ func (i *EnhancedMetadataIndexer) applyFilters(results []SearchResult, filters *
 	var filtered []SearchResult
 
 	for _, result := range results {
-		// Apply tag filter
-		if len(filters.Tags) > 0 {
-			hasTag := false
-			for _, filterTag := range filters.Tags {
-				for _, templateTag := range result.Metadata.Tags {
-					if filterTag == templateTag {
-						hasTag = true
-						break
-					}
-				}
-				if hasTag {
-					break
-				}
-			}
-			if !hasTag {
-				continue
-			}
-		}
-
-		// Apply category filter
-		if filters.Category != "" && result.Metadata.Category != filters.Category {
-			continue
-		}
-
-		// Apply subcategory filter
-		if filters.Subcategory != "" && result.Metadata.Subcategory != filters.Subcategory {
-			continue
-		}
-
-		// Apply author filter
-		if filters.Author != "" && result.Metadata.Author != filters.Author {
-			continue
-		}
-
-		// Apply minimum score filter
-		if result.Score < filters.MinScore {
+		if !i.passesAllFilters(result, filters) {
 			continue
 		}
 
@@ -2073,4 +2006,79 @@ func (i *EnhancedMetadataIndexer) applyFilters(results []SearchResult, filters *
 	}
 
 	return filtered
+}
+
+// passesAllFilters checks if a result passes all filters
+func (i *EnhancedMetadataIndexer) passesAllFilters(result SearchResult, filters *SearchFilters) bool {
+	// Apply tag filter
+	if !i.passesTagFilter(result, filters) {
+		return false
+	}
+
+	// Apply category filter
+	if !i.passesCategoryFilter(result, filters) {
+		return false
+	}
+
+	// Apply subcategory filter
+	if !i.passesSubcategoryFilter(result, filters) {
+		return false
+	}
+
+	// Apply author filter
+	if !i.passesAuthorFilter(result, filters) {
+		return false
+	}
+
+	// Apply minimum score filter
+	if !i.passesScoreFilter(result, filters) {
+		return false
+	}
+
+	return true
+}
+
+// passesTagFilter checks if a result passes the tag filter
+func (i *EnhancedMetadataIndexer) passesTagFilter(result SearchResult, filters *SearchFilters) bool {
+	if len(filters.Tags) == 0 {
+		return true
+	}
+
+	for _, filterTag := range filters.Tags {
+		for _, templateTag := range result.Metadata.Tags {
+			if filterTag == templateTag {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// passesCategoryFilter checks if a result passes the category filter
+func (i *EnhancedMetadataIndexer) passesCategoryFilter(result SearchResult, filters *SearchFilters) bool {
+	if filters.Category == "" {
+		return true
+	}
+	return result.Metadata.Category == filters.Category
+}
+
+// passesSubcategoryFilter checks if a result passes the subcategory filter
+func (i *EnhancedMetadataIndexer) passesSubcategoryFilter(result SearchResult, filters *SearchFilters) bool {
+	if filters.Subcategory == "" {
+		return true
+	}
+	return result.Metadata.Subcategory == filters.Subcategory
+}
+
+// passesAuthorFilter checks if a result passes the author filter
+func (i *EnhancedMetadataIndexer) passesAuthorFilter(result SearchResult, filters *SearchFilters) bool {
+	if filters.Author == "" {
+		return true
+	}
+	return result.Metadata.Author == filters.Author
+}
+
+// passesScoreFilter checks if a result passes the score filter
+func (i *EnhancedMetadataIndexer) passesScoreFilter(result SearchResult, filters *SearchFilters) bool {
+	return result.Score >= filters.MinScore
 }

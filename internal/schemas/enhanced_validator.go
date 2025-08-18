@@ -132,7 +132,22 @@ func (v *EnhancedValidator) ValidateWithEnhancedFeatures(ctx context.Context, sc
 	start := time.Now()
 
 	// Create validation result
-	result := &spookytypesschemas.ValidationResult{
+	result := v.createValidationResult()
+
+	// Perform validation steps
+	if err := v.performValidationSteps(ctx, schema, data, result); err != nil {
+		return result, err
+	}
+
+	// Finalize validation result
+	v.finalizeValidationResult(result, start)
+
+	return result, nil
+}
+
+// createValidationResult creates a new validation result with default values
+func (v *EnhancedValidator) createValidationResult() *spookytypesschemas.ValidationResult {
+	return &spookytypesschemas.ValidationResult{
 		Valid:       true,
 		ValidatedAt: time.Now(),
 		Errors:      []spookytypesschemas.SchemaError{},
@@ -147,81 +162,59 @@ func (v *EnhancedValidator) ValidateWithEnhancedFeatures(ctx context.Context, sc
 			RulesFailed:    0,
 		},
 	}
+}
 
-	// Validate schema configuration
-	v.validateSchemaConfiguration(schema, result)
-
-	// Check for early termination
-	if v.shouldStopValidation(result) {
-		return result, nil
+// performValidationSteps executes all validation steps in sequence
+func (v *EnhancedValidator) performValidationSteps(ctx context.Context, schema *spookytypesschemas.Schema, data interface{}, result *spookytypesschemas.ValidationResult) error {
+	validationSteps := []struct {
+		name string
+		fn   func() error
+	}{
+		{"schema configuration", func() error { return v.validateSchemaConfiguration(schema, result) }},
+		{"data structure", func() error { return v.validateDataStructure(schema, data, result) }},
+		{"field constraints", func() error { return v.validateFieldConstraints(schema, v.parseData(data, result), result) }},
+		{"cross-field rules", func() error { return v.validateCrossFieldRules(schema, v.parseData(data, result), result) }},
+		{"custom rules", func() error { return v.validateCustomRules(ctx, schema, v.parseData(data, result), result) }},
+		{"schema evolution", func() error { return v.validateSchemaEvolution(schema, v.parseData(data, result), result) }},
 	}
 
-	// Validate data structure
-	if err := v.validateDataStructure(schema, data, result); err != nil {
-		return result, err
+	for _, step := range validationSteps {
+		if err := step.fn(); err != nil {
+			return fmt.Errorf("%s validation failed: %w", step.name, err)
+		}
+
+		if v.shouldStopValidation(result) {
+			break
+		}
 	}
 
-	// Check for early termination
-	if v.shouldStopValidation(result) {
-		return result, nil
-	}
+	return nil
+}
 
-	// Parse HCL if data is HCL
-	var parsedData interface{}
+// parseData parses HCL data if needed, otherwise returns the original data
+func (v *EnhancedValidator) parseData(data interface{}, result *spookytypesschemas.ValidationResult) interface{} {
 	switch dataVal := data.(type) {
 	case []byte:
 		parsed, err := v.parseHCLData(dataVal, "data")
 		if err != nil {
 			v.addError(result, "hcl_parse_error", "Failed to parse HCL data", err.Error(), validationError)
-			return result, nil
+			return nil
 		}
-		parsedData = parsed
+		return parsed
 	case string:
 		parsed, err := v.parseHCLData([]byte(dataVal), "data")
 		if err != nil {
 			v.addError(result, "hcl_parse_error", "Failed to parse HCL string", err.Error(), validationError)
-			return result, nil
+			return nil
 		}
-		parsedData = parsed
+		return parsed
 	default:
-		parsedData = data
+		return data
 	}
+}
 
-	// Validate field constraints
-	if err := v.validateFieldConstraints(schema, parsedData, result); err != nil {
-		return result, err
-	}
-
-	// Check for early termination
-	if v.shouldStopValidation(result) {
-		return result, nil
-	}
-
-	// Validate cross-field rules
-	if err := v.validateCrossFieldRules(schema, parsedData, result); err != nil {
-		return result, err
-	}
-
-	// Check for early termination
-	if v.shouldStopValidation(result) {
-		return result, nil
-	}
-
-	// Validate custom rules
-	if err := v.validateCustomRules(ctx, schema, parsedData, result); err != nil {
-		return result, err
-	}
-
-	// Check for early termination
-	if v.shouldStopValidation(result) {
-		return result, nil
-	}
-
-	// Validate schema evolution
-	if err := v.validateSchemaEvolution(schema, parsedData, result); err != nil {
-		return result, err
-	}
-
+// finalizeValidationResult completes the validation result with final statistics and recommendations
+func (v *EnhancedValidator) finalizeValidationResult(result *spookytypesschemas.ValidationResult, start time.Time) {
 	// Update statistics
 	result.Statistics.Duration = time.Since(start)
 	result.Statistics.ValidFields = result.Statistics.TotalFields - result.Statistics.InvalidFields
@@ -230,9 +223,7 @@ func (v *EnhancedValidator) ValidateWithEnhancedFeatures(ctx context.Context, sc
 	result.Valid = len(result.Errors) == 0
 
 	// Generate recommendations
-	v.generateEnhancedRecommendations(schema, result)
-
-	return result, nil
+	v.generateEnhancedRecommendations(nil, result)
 }
 
 // ValidateFileWithEnhancedFeatures validates a file with enhanced features
@@ -368,42 +359,69 @@ func (v *EnhancedValidator) validateFieldValue(fieldValidation *spookytypesschem
 func (v *EnhancedValidator) validateFieldConstraintsValue(constraints *spookytypesschemas.FieldConstraints, value interface{}, fieldPath string, result *spookytypesschemas.ValidationResult) error {
 	// String constraints
 	if strValue, ok := value.(string); ok {
-		if constraints.MinLength != nil && len(strValue) < *constraints.MinLength {
-			v.addError(result, "string_too_short", fmt.Sprintf("Field '%s' length %d is less than minimum %d", fieldPath, len(strValue), *constraints.MinLength), fmt.Sprintf("Increase the length of field '%s' to at least %d characters", fieldPath, *constraints.MinLength), validationError)
-		}
-
-		if constraints.MaxLength != nil && len(strValue) > *constraints.MaxLength {
-			v.addError(result, "string_too_long", fmt.Sprintf("Field '%s' length %d exceeds maximum %d", fieldPath, len(strValue), *constraints.MaxLength), fmt.Sprintf("Reduce the length of field '%s' to at most %d characters", fieldPath, *constraints.MaxLength), validationError)
-		}
-
-		if constraints.Pattern != nil {
-			matched, err := regexp.MatchString(*constraints.Pattern, strValue)
-			if err != nil {
-				v.addError(result, "invalid_regex", fmt.Sprintf("Invalid regex pattern for field '%s': %v", fieldPath, err), "", validationError)
-			} else if !matched {
-				v.addError(result, "pattern_mismatch", fmt.Sprintf("Field '%s' value '%s' does not match pattern '%s'", fieldPath, strValue, *constraints.Pattern), fmt.Sprintf("Ensure field '%s' matches the required pattern", fieldPath), validationError)
-			}
-		}
-
-		if constraints.Format != nil {
-			if err := v.validateFormat(*constraints.Format, strValue, fieldPath, result); err != nil {
-				return err
-			}
+		if err := v.validateStringConstraintsEnhanced(constraints, strValue, fieldPath, result); err != nil {
+			return err
 		}
 	}
 
 	// Numeric constraints
 	if numValue, ok := v.toFloat64(value); ok {
-		if constraints.Min != nil && numValue < *constraints.Min {
-			v.addError(result, "number_too_small", fmt.Sprintf("Field '%s' value %f is less than minimum %f", fieldPath, numValue, *constraints.Min), fmt.Sprintf("Increase the value of field '%s' to at least %f", fieldPath, *constraints.Min), validationError)
-		}
-
-		if constraints.Max != nil && numValue > *constraints.Max {
-			v.addError(result, "number_too_large", fmt.Sprintf("Field '%s' value %f exceeds maximum %f", fieldPath, numValue, *constraints.Max), fmt.Sprintf("Reduce the value of field '%s' to at most %f", fieldPath, *constraints.Max), validationError)
+		if err := v.validateNumericConstraintsEnhanced(constraints, numValue, fieldPath, result); err != nil {
+			return err
 		}
 	}
 
 	// Enum constraints
+	if err := v.validateEnumConstraintsEnhanced(constraints, value, fieldPath, result); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateStringConstraintsEnhanced validates string-specific constraints
+func (v *EnhancedValidator) validateStringConstraintsEnhanced(constraints *spookytypesschemas.FieldConstraints, strValue string, fieldPath string, result *spookytypesschemas.ValidationResult) error {
+	// Length constraints
+	if constraints.MinLength != nil && len(strValue) < *constraints.MinLength {
+		v.addError(result, "string_too_short", fmt.Sprintf("Field '%s' length %d is less than minimum %d", fieldPath, len(strValue), *constraints.MinLength), fmt.Sprintf("Increase the length of field '%s' to at least %d characters", fieldPath, *constraints.MinLength), validationError)
+	}
+
+	if constraints.MaxLength != nil && len(strValue) > *constraints.MaxLength {
+		v.addError(result, "string_too_long", fmt.Sprintf("Field '%s' length %d exceeds maximum %d", fieldPath, len(strValue), *constraints.MaxLength), fmt.Sprintf("Reduce the length of field '%s' to at most %d characters", fieldPath, *constraints.MaxLength), validationError)
+	}
+
+	// Pattern constraint
+	if constraints.Pattern != nil {
+		if err := v.validatePatternConstraintEnhanced(constraints.Pattern, strValue, fieldPath, result); err != nil {
+			return err
+		}
+	}
+
+	// Format constraint
+	if constraints.Format != nil {
+		if err := v.validateFormat(*constraints.Format, strValue, fieldPath, result); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateNumericConstraintsEnhanced validates numeric-specific constraints
+func (v *EnhancedValidator) validateNumericConstraintsEnhanced(constraints *spookytypesschemas.FieldConstraints, numValue float64, fieldPath string, result *spookytypesschemas.ValidationResult) error {
+	if constraints.Min != nil && numValue < *constraints.Min {
+		v.addError(result, "number_too_small", fmt.Sprintf("Field '%s' value %f is less than minimum %f", fieldPath, numValue, *constraints.Min), fmt.Sprintf("Increase the value of field '%s' to at least %f", fieldPath, *constraints.Min), validationError)
+	}
+
+	if constraints.Max != nil && numValue > *constraints.Max {
+		v.addError(result, "number_too_large", fmt.Sprintf("Field '%s' value %f exceeds maximum %f", fieldPath, numValue, *constraints.Max), fmt.Sprintf("Reduce the value of field '%s' to at most %f", fieldPath, *constraints.Max), validationError)
+	}
+
+	return nil
+}
+
+// validateEnumConstraintsEnhanced validates enum constraints
+func (v *EnhancedValidator) validateEnumConstraintsEnhanced(constraints *spookytypesschemas.FieldConstraints, value interface{}, fieldPath string, result *spookytypesschemas.ValidationResult) error {
 	if len(constraints.Enum) > 0 {
 		found := false
 		for _, enumValue := range constraints.Enum {
@@ -415,6 +433,21 @@ func (v *EnhancedValidator) validateFieldConstraintsValue(constraints *spookytyp
 		if !found {
 			v.addError(result, "invalid_enum_value", fmt.Sprintf("Field '%s' value '%v' is not in allowed enum values", fieldPath, value), fmt.Sprintf("Use one of the allowed values for field '%s': %v", fieldPath, constraints.Enum), validationError)
 		}
+	}
+
+	return nil
+}
+
+// validatePatternConstraintEnhanced validates pattern constraint
+func (v *EnhancedValidator) validatePatternConstraintEnhanced(pattern *string, strValue string, fieldPath string, result *spookytypesschemas.ValidationResult) error {
+	matched, err := regexp.MatchString(*pattern, strValue)
+	if err != nil {
+		v.addError(result, "invalid_regex", fmt.Sprintf("Invalid regex pattern for field '%s': %v", fieldPath, err), "", validationError)
+		return err
+	}
+
+	if !matched {
+		v.addError(result, "pattern_mismatch", fmt.Sprintf("Field '%s' value '%s' does not match pattern '%s'", fieldPath, strValue, *pattern), fmt.Sprintf("Ensure field '%s' matches the required pattern", fieldPath), validationError)
 	}
 
 	return nil

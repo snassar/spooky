@@ -17,6 +17,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Machine status constants
+const (
+	MachineStatusOnline        = "online"
+	MachineStatusOffline       = "offline"
+	MachineStatusError         = "error"
+	MachineStatusAuthenticated = "authenticated"
+	MachineStatusAuthFailed    = "auth_failed"
+)
+
 // Global instances for machine dependency injection
 var (
 	machinesManager spookyinterfaces.MachinesIntegration
@@ -327,14 +336,14 @@ func handleMachinesPing(cmd *cobra.Command, projectPath string) error {
 	if auth {
 		fmt.Printf("🔑 Testing authentication...\n")
 		for i := range statuses {
-			if statuses[i].Status == "online" {
+			if statuses[i].Status == MachineStatusOnline {
 				// Test authentication for this machine
 				err := testMachineAuthentication(ctx, &machines[i])
 				if err != nil {
-					statuses[i].Status = "auth_failed"
+					statuses[i].Status = MachineStatusAuthFailed
 					statuses[i].Error = fmt.Sprintf("Authentication failed: %v", err)
 				} else {
-					statuses[i].Status = "authenticated"
+					statuses[i].Status = MachineStatusAuthenticated
 					statuses[i].Error = "" // Clear any previous errors
 				}
 			}
@@ -453,7 +462,7 @@ func outputPingResultsText(statuses []spookytypes.MachineStatus, verbose bool) e
 
 	for _, status := range statuses {
 		switch status.Status {
-		case "online":
+		case MachineStatusOnline:
 			online++
 			if verbose {
 				fmt.Printf("%s: %s (latency: %dms)\n",
@@ -461,7 +470,7 @@ func outputPingResultsText(statuses []spookytypes.MachineStatus, verbose bool) e
 			} else {
 				fmt.Printf("%s: %s\n", status.Machine.Hostname, status.Status)
 			}
-		case "offline":
+		case MachineStatusOffline:
 			offline++
 			if verbose {
 				fmt.Printf("%s: %s (latency: %dms; Error: %s)\n",
@@ -470,7 +479,7 @@ func outputPingResultsText(statuses []spookytypes.MachineStatus, verbose bool) e
 			} else {
 				fmt.Printf("%s: %s\n", status.Machine.Hostname, status.Status)
 			}
-		case "error":
+		case MachineStatusError:
 			errors++
 			if verbose {
 				fmt.Printf("%s: %s (latency: %dms; Error: %s)\n",
@@ -502,9 +511,9 @@ func outputPingResultsJSON(statuses []spookytypes.MachineStatus, verbose bool) e
 		}
 
 		// Add details only for problematic machines or verbose mode
-		if status.Status != "online" || verbose {
+		if status.Status != MachineStatusOnline || verbose {
 			machineJSON["latency_ms"] = status.Latency
-			if status.Status != "online" {
+			if status.Status != MachineStatusOnline {
 				machineJSON["error"] = getErrorMessage(&status)
 			}
 		}

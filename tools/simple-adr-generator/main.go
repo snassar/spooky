@@ -73,47 +73,13 @@ func getGitHistory() []GitCommit {
 
 	var currentCommit GitCommit
 	for _, line := range lines {
-		if strings.HasPrefix(line, " ") && strings.Contains(line, "|") {
-			// Parse file stats
-			parts := strings.Split(line, "|")
-			if len(parts) >= 2 {
-				stats := strings.TrimSpace(parts[1])
-				if strings.Contains(stats, "insertions") {
-					re := regexp.MustCompile(`(\d+) insertions?.*?(\d+) deletions?`)
-					matches := re.FindStringSubmatch(stats)
-					if len(matches) >= 3 {
-						var additions, deletions int
-						if _, err := fmt.Sscanf(matches[1], "%d", &additions); err != nil {
-							// Log error but continue
-							fmt.Printf("Warning: failed to parse additions: %v\n", err)
-						}
-						if _, err := fmt.Sscanf(matches[2], "%d", &deletions); err != nil {
-							// Log error but continue
-							fmt.Printf("Warning: failed to parse deletions: %v\n", err)
-						}
-
-						currentCommit.Files = append(currentCommit.Files, parts[0])
-						currentCommit.Additions += additions
-						currentCommit.Deletions += deletions
-					}
-				}
-			}
-		} else if len(line) > 0 && !strings.HasPrefix(line, " ") {
-			// New commit
+		if isFileStatsLine(line) {
+			parseFileStatsForCommit(line, &currentCommit)
+		} else if isNewCommitLine(line) {
 			if currentCommit.Hash != "" {
 				commits = append(commits, currentCommit)
 			}
-
-			parts := strings.Split(line, "|")
-			if len(parts) >= 4 {
-				date, _ := time.Parse("2006-01-02 15:04:05 -0700", parts[2])
-				currentCommit = GitCommit{
-					Hash:    parts[0],
-					Author:  parts[1],
-					Date:    date,
-					Message: parts[3],
-				}
-			}
+			currentCommit = parseCommitLine(line)
 		}
 	}
 
@@ -122,6 +88,63 @@ func getGitHistory() []GitCommit {
 	}
 
 	return commits
+}
+
+func isFileStatsLine(line string) bool {
+	return strings.HasPrefix(line, " ") && strings.Contains(line, "|")
+}
+
+func isNewCommitLine(line string) bool {
+	return len(line) > 0 && !strings.HasPrefix(line, " ")
+}
+
+func parseFileStatsForCommit(line string, commit *GitCommit) {
+	parts := strings.Split(line, "|")
+	if len(parts) < 2 {
+		return
+	}
+
+	stats := strings.TrimSpace(parts[1])
+	if !strings.Contains(stats, "insertions") {
+		return
+	}
+
+	additions, deletions := extractStatsFromLine(stats)
+	commit.Files = append(commit.Files, parts[0])
+	commit.Additions += additions
+	commit.Deletions += deletions
+}
+
+func extractStatsFromLine(stats string) (int, int) {
+	re := regexp.MustCompile(`(\d+) insertions?.*?(\d+) deletions?`)
+	matches := re.FindStringSubmatch(stats)
+	if len(matches) < 3 {
+		return 0, 0
+	}
+
+	var additions, deletions int
+	if _, err := fmt.Sscanf(matches[1], "%d", &additions); err != nil {
+		fmt.Printf("Warning: failed to parse additions: %v\n", err)
+	}
+	if _, err := fmt.Sscanf(matches[2], "%d", &deletions); err != nil {
+		fmt.Printf("Warning: failed to parse deletions: %v\n", err)
+	}
+
+	return additions, deletions
+}
+
+func parseCommitLine(line string) GitCommit {
+	parts := strings.Split(line, "|")
+	if len(parts) >= 4 {
+		date, _ := time.Parse("2006-01-02 15:04:05 -0700", parts[2])
+		return GitCommit{
+			Hash:    parts[0],
+			Author:  parts[1],
+			Date:    date,
+			Message: parts[3],
+		}
+	}
+	return GitCommit{}
 }
 
 func generateADRs(commits []GitCommit) []ADR {

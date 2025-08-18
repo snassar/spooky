@@ -215,37 +215,58 @@ func (l *Loader) parseVariableBlock(block *hcl.Block, sourceFile string) (*spook
 
 // parseVariableAttributes parses variable attributes to reduce cyclomatic complexity
 func (l *Loader) parseVariableAttributes(attrs hcl.Attributes, variable *spookytypesvariables.Variable) error {
-	// Parse type
-	if attr, exists := attrs["type"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return fmt.Errorf("invalid type: %s", diags.Error())
-		}
-		if val.Type() == cty.String {
-			variable.Type = spookytypesvariables.VariableType(val.AsString())
-		}
+	// Parse string attributes
+	if err := l.parseStringAttributes(attrs, variable); err != nil {
+		return err
 	}
 
-	// Parse default value
-	if attr, exists := attrs["default"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return fmt.Errorf("invalid default: %s", diags.Error())
+	// Parse boolean attributes
+	if err := l.parseBooleanAttributes(attrs, variable); err != nil {
+		return err
+	}
+
+	// Parse complex attributes
+	if err := l.parseComplexAttributes(attrs, variable); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// parseStringAttributes parses string-based variable attributes
+func (l *Loader) parseStringAttributes(attrs hcl.Attributes, variable *spookytypesvariables.Variable) error {
+	// Parse type
+	if attr, exists := attrs["type"]; exists {
+		if val, err := l.parseStringAttribute(attr, "type"); err != nil {
+			return err
+		} else {
+			variable.Type = spookytypesvariables.VariableType(val)
 		}
-		variable.Default = val
 	}
 
 	// Parse description
 	if attr, exists := attrs["description"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return fmt.Errorf("invalid description: %s", diags.Error())
-		}
-		if val.Type() == cty.String {
-			variable.Description = val.AsString()
+		if val, err := l.parseStringAttribute(attr, "description"); err != nil {
+			return err
+		} else {
+			variable.Description = val
 		}
 	}
 
+	// Parse scope
+	if attr, exists := attrs["scope"]; exists {
+		if val, err := l.parseStringAttribute(attr, "scope"); err != nil {
+			return err
+		} else {
+			variable.Scope = spookytypesvariables.VariableScope(val)
+		}
+	}
+
+	return nil
+}
+
+// parseBooleanAttributes parses boolean variable attributes
+func (l *Loader) parseBooleanAttributes(attrs hcl.Attributes, variable *spookytypesvariables.Variable) error {
 	// Parse sensitive flag
 	if attr, exists := attrs["sensitive"]; exists {
 		val, diags := attr.Expr.Value(nil)
@@ -257,15 +278,18 @@ func (l *Loader) parseVariableAttributes(attrs hcl.Attributes, variable *spookyt
 		}
 	}
 
-	// Parse scope
-	if attr, exists := attrs["scope"]; exists {
+	return nil
+}
+
+// parseComplexAttributes parses complex variable attributes
+func (l *Loader) parseComplexAttributes(attrs hcl.Attributes, variable *spookytypesvariables.Variable) error {
+	// Parse default value
+	if attr, exists := attrs["default"]; exists {
 		val, diags := attr.Expr.Value(nil)
 		if diags.HasErrors() {
-			return fmt.Errorf("invalid scope: %s", diags.Error())
+			return fmt.Errorf("invalid default: %s", diags.Error())
 		}
-		if val.Type() == cty.String {
-			variable.Scope = spookytypesvariables.VariableScope(val.AsString())
-		}
+		variable.Default = val
 	}
 
 	// Parse dependencies
@@ -387,67 +411,112 @@ func (l *Loader) parseConstraintsBlock(block *hcl.Block) (*spookytypesvariables.
 	}
 
 	constraints := &spookytypesvariables.VariableConstraints{}
-
 	attrs := content.Attributes
 
-	if attr, exists := attrs["min_length"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid min_length: %s", diags.Error())
-		}
-		if val.Type() == cty.Number {
-			minInt, _ := val.AsBigFloat().Int64()
-			minLength := int(minInt)
-			constraints.MinLength = &minLength
-		}
+	// Parse numeric constraints
+	if err := l.parseNumericConstraints(attrs, constraints); err != nil {
+		return nil, err
 	}
 
-	if attr, exists := attrs["max_length"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid max_length: %s", diags.Error())
-		}
-		if val.Type() == cty.Number {
-			maxInt, _ := val.AsBigFloat().Int64()
-			maxLength := int(maxInt)
-			constraints.MaxLength = &maxLength
-		}
-	}
-
-	if attr, exists := attrs["min_value"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid min_value: %s", diags.Error())
-		}
-		if val.Type() == cty.Number {
-			minFloat, _ := val.AsBigFloat().Float64()
-			constraints.MinValue = &minFloat
-		}
-	}
-
-	if attr, exists := attrs["max_value"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid max_value: %s", diags.Error())
-		}
-		if val.Type() == cty.Number {
-			maxFloat, _ := val.AsBigFloat().Float64()
-			constraints.MaxValue = &maxFloat
-		}
-	}
-
-	if attr, exists := attrs["pattern"]; exists {
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("invalid pattern: %s", diags.Error())
-		}
-		if val.Type() == cty.String {
-			pattern := val.AsString()
-			constraints.Pattern = &pattern
-		}
+	// Parse string constraints
+	if err := l.parseStringConstraints(attrs, constraints); err != nil {
+		return nil, err
 	}
 
 	return constraints, nil
+}
+
+// parseNumericConstraints parses numeric constraint attributes
+func (l *Loader) parseNumericConstraints(attrs hcl.Attributes, constraints *spookytypesvariables.VariableConstraints) error {
+	// Parse min_length
+	if attr, exists := attrs["min_length"]; exists {
+		if val, err := l.parseIntAttribute(attr, "min_length"); err != nil {
+			return err
+		} else {
+			constraints.MinLength = &val
+		}
+	}
+
+	// Parse max_length
+	if attr, exists := attrs["max_length"]; exists {
+		if val, err := l.parseIntAttribute(attr, "max_length"); err != nil {
+			return err
+		} else {
+			constraints.MaxLength = &val
+		}
+	}
+
+	// Parse min_value
+	if attr, exists := attrs["min_value"]; exists {
+		if val, err := l.parseFloatAttribute(attr, "min_value"); err != nil {
+			return err
+		} else {
+			constraints.MinValue = &val
+		}
+	}
+
+	// Parse max_value
+	if attr, exists := attrs["max_value"]; exists {
+		if val, err := l.parseFloatAttribute(attr, "max_value"); err != nil {
+			return err
+		} else {
+			constraints.MaxValue = &val
+		}
+	}
+
+	return nil
+}
+
+// parseStringConstraints parses string constraint attributes
+func (l *Loader) parseStringConstraints(attrs hcl.Attributes, constraints *spookytypesvariables.VariableConstraints) error {
+	// Parse pattern
+	if attr, exists := attrs["pattern"]; exists {
+		if val, err := l.parseStringAttribute(attr, "pattern"); err != nil {
+			return err
+		} else {
+			constraints.Pattern = &val
+		}
+	}
+
+	return nil
+}
+
+// parseIntAttribute parses an integer attribute
+func (l *Loader) parseIntAttribute(attr *hcl.Attribute, name string) (int, error) {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return 0, fmt.Errorf("invalid %s: %s", name, diags.Error())
+	}
+	if val.Type() == cty.Number {
+		intVal, _ := val.AsBigFloat().Int64()
+		return int(intVal), nil
+	}
+	return 0, fmt.Errorf("invalid %s: expected number", name)
+}
+
+// parseFloatAttribute parses a float attribute
+func (l *Loader) parseFloatAttribute(attr *hcl.Attribute, name string) (float64, error) {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return 0, fmt.Errorf("invalid %s: %s", name, diags.Error())
+	}
+	if val.Type() == cty.Number {
+		floatVal, _ := val.AsBigFloat().Float64()
+		return floatVal, nil
+	}
+	return 0, fmt.Errorf("invalid %s: expected number", name)
+}
+
+// parseStringAttribute parses a string attribute
+func (l *Loader) parseStringAttribute(attr *hcl.Attribute, name string) (string, error) {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return "", fmt.Errorf("invalid %s: %s", name, diags.Error())
+	}
+	if val.Type() == cty.String {
+		return val.AsString(), nil
+	}
+	return "", fmt.Errorf("invalid %s: expected string", name)
 }
 
 // getVariableNames extracts variable names from a map of variables

@@ -13,8 +13,15 @@ import (
 	spookytypes "spooky/internal/types"
 	spookytypesactions "spooky/internal/types/actions"
 	spookytypeslogging "spooky/internal/types/logging"
+	spookytypesmachines "spooky/internal/types/machines"
 
 	"github.com/hashicorp/hcl/v2/hclsimple"
+)
+
+// Status constants for action results
+const (
+	StatusSuccess = "success"
+	StatusFailed  = "failed"
 )
 
 // Manager implements the ActionsIntegration interface
@@ -473,12 +480,12 @@ func (m *Manager) runCommandAction(ctx context.Context, action *spookytypesactio
 	result.Duration = endTime.Sub(startTime)
 
 	if err != nil {
-		result.Status = "failed"
+		result.Status = StatusFailed
 		result.Error = err.Error()
 		return err
 	}
 
-	result.Status = "success"
+	result.Status = StatusSuccess
 	result.ExitCode = commandResult.ExitCode
 	result.Stdout = commandResult.Stdout
 	result.Stderr = commandResult.Stderr
@@ -542,12 +549,12 @@ func (m *Manager) runScriptAction(ctx context.Context, action *spookytypesaction
 	result.Duration = endTime.Sub(startTime)
 
 	if err != nil {
-		result.Status = "failed"
+		result.Status = StatusFailed
 		result.Error = err.Error()
 		return err
 	}
 
-	result.Status = "success"
+	result.Status = StatusSuccess
 	result.ExitCode = commandResult.ExitCode
 	result.Stdout = commandResult.Stdout
 	result.Stderr = commandResult.Stderr
@@ -614,7 +621,7 @@ func (m *Manager) runFileTransferAction(ctx context.Context, action *spookytypes
 	result.Duration = endTime.Sub(startTime)
 
 	if err != nil {
-		result.Status = "failed"
+		result.Status = StatusFailed
 		result.Error = err.Error()
 		return err
 	}
@@ -622,13 +629,13 @@ func (m *Manager) runFileTransferAction(ctx context.Context, action *spookytypes
 	// Set file permissions if specified
 	if permissions != "" {
 		if err := m.setFilePermissions(ctx, session, machine, destination, permissions, action); err != nil {
-			result.Status = "failed"
+			result.Status = StatusFailed
 			result.Error = fmt.Sprintf("file transfer succeeded but permission setting failed: %v", err)
 			return err
 		}
 	}
 
-	result.Status = "success"
+	result.Status = StatusSuccess
 	result.ExitCode = 0
 	result.Stdout = fmt.Sprintf("%s successfully: %s -> %s", successMessage, source, destination)
 
@@ -688,12 +695,12 @@ func (m *Manager) runServiceControlAction(ctx context.Context, action *spookytyp
 	result.Duration = endTime.Sub(startTime)
 
 	if err != nil {
-		result.Status = "failed"
+		result.Status = StatusFailed
 		result.Error = err.Error()
 		return err
 	}
 
-	result.Status = "success"
+	result.Status = StatusSuccess
 	result.ExitCode = commandResult.ExitCode
 	result.Stdout = commandResult.Stdout
 	result.Stderr = commandResult.Stderr
@@ -709,120 +716,96 @@ func (m *Manager) getTargetMachines(action *spookytypesactions.Action, session *
 	}
 
 	// Fallback to the passed availableMachines parameter
+	return m.filterMachinesByAction(action, availableMachines)
+}
+
+// filterMachinesByAction filters machines based on action targeting criteria
+func (m *Manager) filterMachinesByAction(action *spookytypesactions.Action, availableMachines []spookytypes.Machine) []spookytypes.Machine {
 	// If action has specific machines defined, filter by name
 	if len(action.Machines) > 0 {
-		var targetMachines []spookytypes.Machine
-		var missingMachines []string
-
-		for _, targetName := range action.Machines {
-			found := false
-			for i := range availableMachines {
-				if availableMachines[i].Hostname == targetName {
-					targetMachines = append(targetMachines, availableMachines[i])
-					found = true
-					break
-				}
-			}
-			if !found {
-				missingMachines = append(missingMachines, targetName)
-			}
-		}
-
-		// Log warning for missing machines
-		if len(missingMachines) > 0 {
-			m.logger.Warn("Some target machines not found in inventory", map[string]interface{}{
-				"missing_machines": missingMachines,
-				"action":           action.Name,
-			})
-		}
-
-		return targetMachines
+		return m.filterMachinesByName(action, availableMachines)
 	}
 
 	// If action has tags defined, filter machines by tags
 	if len(action.Tags) > 0 {
-		var targetMachines []spookytypes.Machine
-		for i := range availableMachines {
-			if m.machineHasTags(&availableMachines[i], action.Tags) {
-				targetMachines = append(targetMachines, availableMachines[i])
-			}
-		}
-
-		// Log warning if no machines match tags
-		if len(targetMachines) == 0 {
-			m.logger.Warn("No machines found matching action tags", map[string]interface{}{
-				"action_tags": action.Tags,
-				"action":      action.Name,
-			})
-		}
-
-		return targetMachines
+		return m.filterMachinesByTags(action, availableMachines)
 	}
 
 	// If no specific targeting, return all available machines
 	return availableMachines
 }
 
+// filterMachinesByName filters machines by specific machine names
+func (m *Manager) filterMachinesByName(action *spookytypesactions.Action, availableMachines []spookytypes.Machine) []spookytypes.Machine {
+	var targetMachines []spookytypes.Machine
+	var missingMachines []string
+
+	for _, targetName := range action.Machines {
+		if machine := m.findMachineByName(availableMachines, targetName); machine != nil {
+			targetMachines = append(targetMachines, *machine)
+		} else {
+			missingMachines = append(missingMachines, targetName)
+		}
+	}
+
+	// Log warning for missing machines
+	if len(missingMachines) > 0 {
+		m.logger.Warn("Some target machines not found in inventory", map[string]interface{}{
+			"missing_machines": missingMachines,
+			"action":           action.Name,
+		})
+	}
+
+	return targetMachines
+}
+
+// filterMachinesByTags filters machines by action tags
+func (m *Manager) filterMachinesByTags(action *spookytypesactions.Action, availableMachines []spookytypes.Machine) []spookytypes.Machine {
+	var targetMachines []spookytypes.Machine
+
+	for i := range availableMachines {
+		if m.machineHasTags(&availableMachines[i], action.Tags) {
+			targetMachines = append(targetMachines, availableMachines[i])
+		}
+	}
+
+	// Log warning if no machines match tags
+	if len(targetMachines) == 0 {
+		m.logger.Warn("No machines found matching action tags", map[string]interface{}{
+			"action_tags": action.Tags,
+			"action":      action.Name,
+		})
+	}
+
+	return targetMachines
+}
+
+// findMachineByName finds a machine by hostname in the available machines list
+func (m *Manager) findMachineByName(availableMachines []spookytypes.Machine, targetName string) *spookytypes.Machine {
+	for i := range availableMachines {
+		if availableMachines[i].Hostname == targetName {
+			return &availableMachines[i]
+		}
+	}
+	return nil
+}
+
 // getTargetMachinesFromSession uses the session's machine inventory for efficient lookup
 func (m *Manager) getTargetMachinesFromSession(action *spookytypesactions.Action, session *spookytypesactions.ActingSession) []spookytypes.Machine {
 	// Convert session machine inventory to the expected type
-	availableMachines := make([]spookytypes.Machine, len(session.MachineInventory))
-	for i := range session.MachineInventory {
-		machine := &session.MachineInventory[i]
+	availableMachines := m.convertSessionMachines(session.MachineInventory)
+
+	// Use the same filtering logic as getTargetMachines but with session inventory
+	return m.filterMachinesByAction(action, availableMachines)
+}
+
+// convertSessionMachines converts session machine inventory to the standard machine type
+func (m *Manager) convertSessionMachines(sessionMachines []spookytypesmachines.Machine) []spookytypes.Machine {
+	availableMachines := make([]spookytypes.Machine, len(sessionMachines))
+	for i := range sessionMachines {
+		machine := &sessionMachines[i]
 		availableMachines[i] = spookytypes.Machine(*machine)
 	}
-
-	// Use the same logic as getTargetMachines but with session inventory
-	if len(action.Machines) > 0 {
-		var targetMachines []spookytypes.Machine
-		var missingMachines []string
-
-		for _, targetName := range action.Machines {
-			found := false
-			for i := range availableMachines {
-				if availableMachines[i].Hostname == targetName {
-					targetMachines = append(targetMachines, availableMachines[i])
-					found = true
-					break
-				}
-			}
-			if !found {
-				missingMachines = append(missingMachines, targetName)
-			}
-		}
-
-		// Log warning for missing machines
-		if len(missingMachines) > 0 {
-			m.logger.Warn("Some target machines not found in session inventory", map[string]interface{}{
-				"missing_machines": missingMachines,
-				"action":           action.Name,
-			})
-		}
-
-		return targetMachines
-	}
-
-	// If action has tags defined, filter machines by tags
-	if len(action.Tags) > 0 {
-		var targetMachines []spookytypes.Machine
-		for i := range availableMachines {
-			if m.machineHasTags(&availableMachines[i], action.Tags) {
-				targetMachines = append(targetMachines, availableMachines[i])
-			}
-		}
-
-		// Log warning if no machines match tags
-		if len(targetMachines) == 0 {
-			m.logger.Warn("No machines found matching action tags in session inventory", map[string]interface{}{
-				"action_tags": action.Tags,
-				"action":      action.Name,
-			})
-		}
-
-		return targetMachines
-	}
-
-	// If no specific targeting, return all available machines
 	return availableMachines
 }
 

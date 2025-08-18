@@ -13,6 +13,13 @@ import (
 	spookytypeslogging "spooky/internal/types/logging"
 )
 
+// Machine connectivity status constants
+const (
+	MachineConnectivityReachable      = "reachable"
+	MachineConnectivityUnreachable    = "unreachable"
+	MachineConnectivitySSHUnreachable = "ssh_unreachable"
+)
+
 // Integration implements the MachinesIntegration interface
 type Integration struct {
 	manager    spookyinterfaces.MachinesIntegration
@@ -138,21 +145,21 @@ func (i *Integration) PingMachines(ctx context.Context, machines []spookytypes.M
 		// Attempt SSH connection
 		connectionResult, err := i.sshManager.Connect(ctx, request)
 		if err != nil {
-			status.Status = "unreachable"
+			status.Status = MachineConnectivityUnreachable
 			status.Error = fmt.Sprintf("SSH connection failed: %v", err)
 			statuses = append(statuses, status)
 			continue
 		}
 
 		if !connectionResult.Success {
-			status.Status = "unreachable"
+			status.Status = MachineConnectivityUnreachable
 			status.Error = connectionResult.Error
 			statuses = append(statuses, status)
 			continue
 		}
 
 		// Connection successful
-		status.Status = "reachable"
+		status.Status = MachineConnectivityReachable
 		status.Latency = int(connectionResult.ConnectTime.Milliseconds())
 		statuses = append(statuses, status)
 	}
@@ -330,7 +337,7 @@ func (i *Integration) DecryptMachines(ctx context.Context, machines []spookytype
 func countReachableMachines(statuses []spookytypes.MachineStatus) int {
 	count := 0
 	for _, status := range statuses {
-		if status.Status == "reachable" {
+		if status.Status == MachineConnectivityReachable {
 			count++
 		}
 	}
@@ -341,7 +348,7 @@ func countReachableMachines(statuses []spookytypes.MachineStatus) int {
 func countUnreachableMachines(statuses []spookytypes.MachineStatus) int {
 	count := 0
 	for _, status := range statuses {
-		if status.Status == "unreachable" {
+		if status.Status == MachineConnectivityUnreachable {
 			count++
 		}
 	}

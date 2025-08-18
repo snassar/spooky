@@ -38,11 +38,52 @@ func main() {
 
 // runPreCommitChecks performs the pre-commit coverage checks
 func runPreCommitChecks(cmdr Commander) error {
-	if _, err := stdPrintln("Running pre-commit coverage checks..."); err != nil {
-		return fmt.Errorf("failed to print status: %w", err)
+	if err := printStatus("Running pre-commit coverage checks..."); err != nil {
+		return err
 	}
 
-	// Check if we're in a git repository
+	if err := checkGitRepository(cmdr); err != nil {
+		return err
+	}
+
+	goFiles, err := getStagedGoFiles(cmdr)
+	if err != nil {
+		return err
+	}
+
+	if len(goFiles) == 0 {
+		return printStatus("No Go files staged, skipping coverage check")
+	}
+
+	if err := printStagedFiles(goFiles); err != nil {
+		return err
+	}
+
+	if err := runLinting(cmdr); err != nil {
+		return err
+	}
+
+	if err := generateCoverageProfile(cmdr); err != nil {
+		return err
+	}
+
+	if err := runCoverageCheck(cmdr); err != nil {
+		return err
+	}
+
+	return printStatus("✅ Linting and coverage checks passed")
+}
+
+// printStatus prints a status message
+func printStatus(message string) error {
+	if _, err := stdPrintln(message); err != nil {
+		return fmt.Errorf("failed to print status: %w", err)
+	}
+	return nil
+}
+
+// checkGitRepository verifies we're in a git repository
+func checkGitRepository(cmdr Commander) error {
 	if _, err := cmdr.Output("git", "rev-parse", "--git-dir"); err != nil {
 		errorMsg := "❌ Not in a git repository"
 		if _, printErr := stdPrintln(errorMsg); printErr != nil {
@@ -50,15 +91,18 @@ func runPreCommitChecks(cmdr Commander) error {
 		}
 		return errors.New(errorMsg)
 	}
+	return nil
+}
 
-	// Get staged Go files
+// getStagedGoFiles gets the list of staged Go files
+func getStagedGoFiles(cmdr Commander) ([]string, error) {
 	output, err := cmdr.Output("git", "diff", "--cached", "--name-only", "--diff-filter=ACM")
 	if err != nil {
 		errorMsg := fmt.Sprintf("❌ Failed to get staged files: %v", err)
 		if _, printErr := stdPrintln(errorMsg); printErr != nil {
-			return fmt.Errorf("failed to print error: %w", printErr)
+			return nil, fmt.Errorf("failed to print error: %w", printErr)
 		}
-		return errors.New(errorMsg)
+		return nil, errors.New(errorMsg)
 	}
 
 	stagedFiles := strings.Split(strings.TrimSpace(string(output)), "\n")
@@ -69,25 +113,26 @@ func runPreCommitChecks(cmdr Commander) error {
 		}
 	}
 
-	if len(goFiles) == 0 {
-		if _, err := stdPrintln("No Go files staged, skipping coverage check"); err != nil {
-			return fmt.Errorf("failed to print status: %w", err)
-		}
-		return nil
-	}
+	return goFiles, nil
+}
 
-	if _, err := stdPrintln("Staged Go files:"); err != nil {
-		return fmt.Errorf("failed to print status: %w", err)
+// printStagedFiles prints the list of staged Go files
+func printStagedFiles(goFiles []string) error {
+	if err := printStatus("Staged Go files:"); err != nil {
+		return err
 	}
 	for _, file := range goFiles {
 		if _, err := stdPrintf("  %s\n", file); err != nil {
 			return fmt.Errorf("failed to print file: %w", err)
 		}
 	}
+	return nil
+}
 
-	// Run golangci-lint
-	if _, err := stdPrintln("Running golangci-lint..."); err != nil {
-		return fmt.Errorf("failed to print status: %w", err)
+// runLinting runs golangci-lint
+func runLinting(cmdr Commander) error {
+	if err := printStatus("Running golangci-lint..."); err != nil {
+		return err
 	}
 	if err := cmdr.Run("golangci-lint", "run"); err != nil {
 		errorMsg := fmt.Sprintf("❌ Linting failed: %v", err)
@@ -96,10 +141,13 @@ func runPreCommitChecks(cmdr Commander) error {
 		}
 		return errors.New(errorMsg)
 	}
+	return nil
+}
 
-	// Generate coverage profile
-	if _, err := stdPrintln("Generating coverage profile..."); err != nil {
-		return fmt.Errorf("failed to print status: %w", err)
+// generateCoverageProfile generates the coverage profile
+func generateCoverageProfile(cmdr Commander) error {
+	if err := printStatus("Generating coverage profile..."); err != nil {
+		return err
 	}
 	if err := cmdr.Run("go", "test", "./...", "-coverprofile=./tests/coverage.out", "-covermode=atomic", "-coverpkg=./...", "-v"); err != nil {
 		errorMsg := fmt.Sprintf("❌ Test run failed: %v", err)
@@ -108,10 +156,13 @@ func runPreCommitChecks(cmdr Commander) error {
 		}
 		return errors.New(errorMsg)
 	}
+	return nil
+}
 
-	// Run coverage check
-	if _, err := stdPrintln("Running coverage check..."); err != nil {
-		return fmt.Errorf("failed to print status: %w", err)
+// runCoverageCheck runs the coverage check
+func runCoverageCheck(cmdr Commander) error {
+	if err := printStatus("Running coverage check..."); err != nil {
+		return err
 	}
 	if err := cmdr.Run("go", "run", "github.com/vladopajic/go-test-coverage/v2@latest", "--config=./tests/testcoverage.yml"); err != nil {
 		if _, printErr := stdPrintln("❌ Coverage thresholds not met"); printErr != nil {
@@ -124,10 +175,6 @@ func runPreCommitChecks(cmdr Commander) error {
 			return fmt.Errorf("failed to print error: %w", printErr)
 		}
 		return errors.New("coverage thresholds not met")
-	}
-
-	if _, err := stdPrintln("✅ Linting and coverage checks passed"); err != nil {
-		return fmt.Errorf("failed to print status: %w", err)
 	}
 	return nil
 }

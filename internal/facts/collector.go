@@ -305,40 +305,65 @@ func (c *SystemFactCollector) collectHardwareFactsViaSSH(_ context.Context, mach
 func (c *SystemFactCollector) parseMemInfo(content string) map[string]int64 {
 	result := make(map[string]int64)
 	lines := strings.Split(content, "\n")
+
 	for _, line := range lines {
-		switch {
-		case strings.Contains(line, "MemTotal:"):
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				if val, err := strconv.ParseInt(parts[1], 10, 64); err == nil {
-					result["total"] = val * 1024 // Convert KB to bytes
-				}
-			}
-		case strings.Contains(line, "MemAvailable:"):
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				if val, err := strconv.ParseInt(parts[1], 10, 64); err == nil {
-					result["available"] = val * 1024 // Convert KB to bytes
-				}
-			}
-		case strings.Contains(line, "MemFree:"):
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				if val, err := strconv.ParseInt(parts[1], 10, 64); err == nil {
-					result["free"] = val * 1024 // Convert KB to bytes
-				}
-			}
-		}
+		c.parseMemInfoLine(line, result)
 	}
 
 	// Calculate used memory
+	c.calculateUsedMemory(result)
+
+	return result
+}
+
+func (c *SystemFactCollector) parseMemInfoLine(line string, result map[string]int64) {
+	parsers := map[string]func(string, map[string]int64){
+		"MemTotal:":     c.parseMemTotal,
+		"MemAvailable:": c.parseMemAvailable,
+		"MemFree:":      c.parseMemFree,
+	}
+
+	for key, parser := range parsers {
+		if strings.Contains(line, key) {
+			parser(line, result)
+			return
+		}
+	}
+}
+
+func (c *SystemFactCollector) parseMemTotal(line string, result map[string]int64) {
+	parts := strings.Fields(line)
+	if len(parts) >= 2 {
+		if val, err := strconv.ParseInt(parts[1], 10, 64); err == nil {
+			result["total"] = val * 1024 // Convert KB to bytes
+		}
+	}
+}
+
+func (c *SystemFactCollector) parseMemAvailable(line string, result map[string]int64) {
+	parts := strings.Fields(line)
+	if len(parts) >= 2 {
+		if val, err := strconv.ParseInt(parts[1], 10, 64); err == nil {
+			result["available"] = val * 1024 // Convert KB to bytes
+		}
+	}
+}
+
+func (c *SystemFactCollector) parseMemFree(line string, result map[string]int64) {
+	parts := strings.Fields(line)
+	if len(parts) >= 2 {
+		if val, err := strconv.ParseInt(parts[1], 10, 64); err == nil {
+			result["free"] = val * 1024 // Convert KB to bytes
+		}
+	}
+}
+
+func (c *SystemFactCollector) calculateUsedMemory(result map[string]int64) {
 	if total, ok := result["total"]; ok {
 		if available, ok := result["available"]; ok {
 			result["used"] = total - available
 		}
 	}
-
-	return result
 }
 
 // parseNetworkInterfaces parses network interfaces from ip link show output

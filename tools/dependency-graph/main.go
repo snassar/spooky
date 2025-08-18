@@ -94,9 +94,15 @@ func analyzeAllDependencies(outputDir string) {
 
 	// Generate different types of graphs
 	generatePackageGraph(graphData, outputDir)
-	generateInterfaceGraph(graphData, outputDir)
-	generateTypeGraph(graphData, outputDir)
-	generateFunctionGraph(graphData, outputDir)
+	if err := generateInterfaceGraph(graphData, outputDir); err != nil {
+		fmt.Printf("Error generating interface graph: %v\n", err)
+	}
+	if err := generateTypeGraph(graphData, outputDir); err != nil {
+		fmt.Printf("Error generating type graph: %v\n", err)
+	}
+	if err := generateFunctionGraph(graphData, outputDir); err != nil {
+		fmt.Printf("Error generating function graph: %v\n", err)
+	}
 	generateSummary(graphData, outputDir)
 
 	fmt.Printf("Dependency analysis complete. Check %s/\n", outputDir)
@@ -248,124 +254,84 @@ func generatePackageGraph(graphData *GraphData, outputDir string) {
 	}
 }
 
-func generateInterfaceGraph(graphData *GraphData, outputDir string) {
-	filename := filepath.Join(outputDir, "interface-dependencies.md")
-	file, err := os.Create(filename)
+// Generic graph generator function to eliminate code duplication
+func generateGraph(
+	outputFile string,
+	sectionTitle string,
+	data map[string]*Package,
+	extractItems func(*Package) []string,
+) error {
+	// Create output file
+	file, err := os.Create(outputFile)
 	if err != nil {
-		fmt.Printf("Error creating file: %v\n", err)
-		return
+		return fmt.Errorf("failed to create %s: %w", outputFile, err)
 	}
 	defer file.Close()
 
 	writer := bufio.NewWriter(file)
 	defer writer.Flush()
 
-	fmt.Fprintf(writer, "# Interface Dependencies\n\n")
+	// Write header
+	fmt.Fprintf(writer, "# %s\n\n", sectionTitle)
 	fmt.Fprintf(writer, "Generated on: %s\n\n", getCurrentTime())
 
+	// Write graph description
 	fmt.Fprintf(writer, "```mermaid\ngraph TD\n")
 
-	// Add interface nodes
-	for pkgPath, pkg := range graphData.Packages {
-		for _, iface := range pkg.Interfaces {
-			nodeName := fmt.Sprintf("%s_%s", getNodeName(pkgPath), iface)
-			fmt.Fprintf(writer, "    %s[\"%s.%s\"]\n", nodeName, pkg.Name, iface)
+	// Process each package
+	for pkgPath, pkg := range data {
+		items := extractItems(pkg)
+		for _, item := range items {
+			nodeName := fmt.Sprintf("%s_%s", getNodeName(pkgPath), item)
+			fmt.Fprintf(writer, "    %s[\"%s.%s\"]\n", nodeName, pkg.Name, item)
 		}
 	}
 
+	// Write footer
 	fmt.Fprintf(writer, "```\n\n")
 
-	// Add interface details
-	fmt.Fprintf(writer, "## Interface Details\n\n")
-	for _, pkg := range graphData.Packages {
-		if len(pkg.Interfaces) > 0 {
+	// Write details section
+	fmt.Fprintf(writer, "## %s Details\n\n", sectionTitle)
+	for _, pkg := range data {
+		items := extractItems(pkg)
+		if len(items) > 0 {
 			fmt.Fprintf(writer, "### %s\n\n", pkg.Name)
-			for _, iface := range pkg.Interfaces {
-				fmt.Fprintf(writer, "- **%s**\n", iface)
+			for _, item := range items {
+				fmt.Fprintf(writer, "- **%s**\n", item)
 			}
 			fmt.Fprintf(writer, "\n")
 		}
 	}
+
+	return nil
 }
 
-func generateTypeGraph(graphData *GraphData, outputDir string) {
-	filename := filepath.Join(outputDir, "type-dependencies.md")
-	file, err := os.Create(filename)
-	if err != nil {
-		fmt.Printf("Error creating file: %v\n", err)
-		return
-	}
-	defer file.Close()
-
-	writer := bufio.NewWriter(file)
-	defer writer.Flush()
-
-	fmt.Fprintf(writer, "# Type Dependencies\n\n")
-	fmt.Fprintf(writer, "Generated on: %s\n\n", getCurrentTime())
-
-	fmt.Fprintf(writer, "```mermaid\ngraph TD\n")
-
-	// Add type nodes
-	for pkgPath, pkg := range graphData.Packages {
-		for _, typ := range pkg.Types {
-			nodeName := fmt.Sprintf("%s_%s", getNodeName(pkgPath), typ)
-			fmt.Fprintf(writer, "    %s[\"%s.%s\"]\n", nodeName, pkg.Name, typ)
-		}
-	}
-
-	fmt.Fprintf(writer, "```\n\n")
-
-	// Add type details
-	fmt.Fprintf(writer, "## Type Details\n\n")
-	for _, pkg := range graphData.Packages {
-		if len(pkg.Types) > 0 {
-			fmt.Fprintf(writer, "### %s\n\n", pkg.Name)
-			for _, typ := range pkg.Types {
-				fmt.Fprintf(writer, "- **%s**\n", typ)
-			}
-			fmt.Fprintf(writer, "\n")
-		}
-	}
+// Specific implementations using the generic function
+func generateInterfaceGraph(graphData *GraphData, outputDir string) error {
+	return generateGraph(
+		filepath.Join(outputDir, "interface-dependencies.md"),
+		"Interface Dependencies",
+		graphData.Packages,
+		func(pkg *Package) []string { return pkg.Interfaces },
+	)
 }
 
-func generateFunctionGraph(graphData *GraphData, outputDir string) {
-	filename := filepath.Join(outputDir, "function-dependencies.md")
-	file, err := os.Create(filename)
-	if err != nil {
-		fmt.Printf("Error creating file: %v\n", err)
-		return
-	}
-	defer file.Close()
+func generateTypeGraph(graphData *GraphData, outputDir string) error {
+	return generateGraph(
+		filepath.Join(outputDir, "type-dependencies.md"),
+		"Type Dependencies",
+		graphData.Packages,
+		func(pkg *Package) []string { return pkg.Types },
+	)
+}
 
-	writer := bufio.NewWriter(file)
-	defer writer.Flush()
-
-	fmt.Fprintf(writer, "# Function Dependencies\n\n")
-	fmt.Fprintf(writer, "Generated on: %s\n\n", getCurrentTime())
-
-	fmt.Fprintf(writer, "```mermaid\ngraph TD\n")
-
-	// Add function nodes
-	for pkgPath, pkg := range graphData.Packages {
-		for _, fn := range pkg.Functions {
-			nodeName := fmt.Sprintf("%s_%s", getNodeName(pkgPath), fn)
-			fmt.Fprintf(writer, "    %s[\"%s.%s\"]\n", nodeName, pkg.Name, fn)
-		}
-	}
-
-	fmt.Fprintf(writer, "```\n\n")
-
-	// Add function details
-	fmt.Fprintf(writer, "## Function Details\n\n")
-	for _, pkg := range graphData.Packages {
-		if len(pkg.Functions) > 0 {
-			fmt.Fprintf(writer, "### %s\n\n", pkg.Name)
-			for _, fn := range pkg.Functions {
-				fmt.Fprintf(writer, "- **%s**\n", fn)
-			}
-			fmt.Fprintf(writer, "\n")
-		}
-	}
+func generateFunctionGraph(graphData *GraphData, outputDir string) error {
+	return generateGraph(
+		filepath.Join(outputDir, "function-dependencies.md"),
+		"Function Dependencies",
+		graphData.Packages,
+		func(pkg *Package) []string { return pkg.Functions },
+	)
 }
 
 func generateSummary(graphData *GraphData, outputDir string) {
@@ -434,7 +400,9 @@ func analyzeInterfaceDependencies(outputDir string) {
 		analyzePackageForGraph(pkg, graphData)
 	}
 
-	generateInterfaceGraph(graphData, outputDir)
+	if err := generateInterfaceGraph(graphData, outputDir); err != nil {
+		fmt.Printf("Error generating interface graph: %v\n", err)
+	}
 	fmt.Printf("Interface analysis complete. Check %s/\n", outputDir)
 }
 
@@ -454,7 +422,9 @@ func analyzeTypeDependencies(outputDir string) {
 		analyzePackageForGraph(pkg, graphData)
 	}
 
-	generateTypeGraph(graphData, outputDir)
+	if err := generateTypeGraph(graphData, outputDir); err != nil {
+		fmt.Printf("Error generating type graph: %v\n", err)
+	}
 	fmt.Printf("Type analysis complete. Check %s/\n", outputDir)
 }
 
@@ -474,7 +444,9 @@ func analyzeFunctionDependencies(outputDir string) {
 		analyzePackageForGraph(pkg, graphData)
 	}
 
-	generateFunctionGraph(graphData, outputDir)
+	if err := generateFunctionGraph(graphData, outputDir); err != nil {
+		fmt.Printf("Error generating function graph: %v\n", err)
+	}
 	fmt.Printf("Function analysis complete. Check %s/\n", outputDir)
 }
 

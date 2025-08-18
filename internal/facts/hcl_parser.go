@@ -10,6 +10,11 @@ import (
 	spookytypesfacts "spooky/internal/types/facts"
 )
 
+// HCL type constants
+const (
+	HCLTypeNumber = "number"
+)
+
 // HCLParser provides functionality to parse HCL fact files
 type HCLParser struct{}
 
@@ -40,44 +45,64 @@ func (p *HCLParser) ParseCollectorFacts(content string) (*spookytypesfacts.Colle
 	// Parse the body
 	body := file.Body.(*hclsyntax.Body)
 
-	// Parse host block
-	if hostBlock := p.findBlock(body, "host"); hostBlock != nil {
-		if err := p.parseHostBlock(hostBlock, result.Host); err != nil {
-			return nil, fmt.Errorf("failed to parse host block: %w", err)
-		}
-	}
-
-	// Parse cpu block
-	if cpuBlock := p.findBlock(body, "cpu"); cpuBlock != nil {
-		if err := p.parseCPUBlock(cpuBlock, result.CPU); err != nil {
-			return nil, fmt.Errorf("failed to parse cpu block: %w", err)
-		}
-	}
-
-	// Parse memory block
-	if memoryBlock := p.findBlock(body, "memory"); memoryBlock != nil {
-		if err := p.parseMemoryBlock(memoryBlock, result.Memory); err != nil {
-			return nil, fmt.Errorf("failed to parse memory block: %w", err)
-		}
-	}
-
-	// Parse disks blocks
-	for _, diskBlock := range p.findBlocks(body, "disk") {
-		disk := &spookytypesfacts.DiskFacts{}
-		if err := p.parseDiskBlock(diskBlock, disk); err != nil {
-			return nil, fmt.Errorf("failed to parse disk block: %w", err)
-		}
-		result.Disks = append(result.Disks, disk)
-	}
-
-	// Parse network block
-	if networkBlock := p.findBlock(body, "network"); networkBlock != nil {
-		if err := p.parseNetworkBlock(networkBlock, result.Network); err != nil {
-			return nil, fmt.Errorf("failed to parse network block: %w", err)
-		}
+	// Parse all blocks
+	if err := p.parseAllBlocks(body, result); err != nil {
+		return nil, err
 	}
 
 	return result, nil
+}
+
+func (p *HCLParser) parseAllBlocks(body *hclsyntax.Body, result *spookytypesfacts.CollectorFacts) error {
+	blockParsers := map[string]func(*hclsyntax.Block, *spookytypesfacts.CollectorFacts) error{
+		"host":    p.parseHostBlockWrapper,
+		"cpu":     p.parseCPUBlockWrapper,
+		"memory":  p.parseMemoryBlockWrapper,
+		"network": p.parseNetworkBlockWrapper,
+	}
+
+	// Parse single blocks
+	for blockType, parser := range blockParsers {
+		if block := p.findBlock(body, blockType); block != nil {
+			if err := parser(block, result); err != nil {
+				return fmt.Errorf("failed to parse %s block: %w", blockType, err)
+			}
+		}
+	}
+
+	// Parse multiple disk blocks
+	if err := p.parseDiskBlocks(body, result); err != nil {
+		return fmt.Errorf("failed to parse disk blocks: %w", err)
+	}
+
+	return nil
+}
+
+func (p *HCLParser) parseHostBlockWrapper(block *hclsyntax.Block, result *spookytypesfacts.CollectorFacts) error {
+	return p.parseHostBlock(block, result.Host)
+}
+
+func (p *HCLParser) parseCPUBlockWrapper(block *hclsyntax.Block, result *spookytypesfacts.CollectorFacts) error {
+	return p.parseCPUBlock(block, result.CPU)
+}
+
+func (p *HCLParser) parseMemoryBlockWrapper(block *hclsyntax.Block, result *spookytypesfacts.CollectorFacts) error {
+	return p.parseMemoryBlock(block, result.Memory)
+}
+
+func (p *HCLParser) parseNetworkBlockWrapper(block *hclsyntax.Block, result *spookytypesfacts.CollectorFacts) error {
+	return p.parseNetworkBlock(block, result.Network)
+}
+
+func (p *HCLParser) parseDiskBlocks(body *hclsyntax.Body, result *spookytypesfacts.CollectorFacts) error {
+	for _, diskBlock := range p.findBlocks(body, "disk") {
+		disk := &spookytypesfacts.DiskFacts{}
+		if err := p.parseDiskBlock(diskBlock, disk); err != nil {
+			return fmt.Errorf("failed to parse disk block: %w", err)
+		}
+		result.Disks = append(result.Disks, disk)
+	}
+	return nil
 }
 
 // ParseCustomFacts parses custom facts from HCL content
@@ -141,74 +166,105 @@ func (p *HCLParser) parseBlockAttributes(block *hclsyntax.Block, handlers map[st
 
 // parseHostBlock parses host facts from a host block
 func (p *HCLParser) parseHostBlock(block *hclsyntax.Block, host *spookytypesfacts.HostFacts) error {
-	return p.parseBlockAttributes(block, map[string]func(hclsyntax.Expression) error{
-		"hostname": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseStringValue(expr); err == nil {
-				host.Hostname = val
+	parsers := map[string]func(hclsyntax.Expression, *spookytypesfacts.HostFacts) error{
+		"hostname":              p.parseHostHostname,
+		"uptime":                p.parseHostUptime,
+		"boot_time":             p.parseHostBootTime,
+		"os":                    p.parseHostOS,
+		"platform":              p.parseHostPlatform,
+		"platform_family":       p.parseHostPlatformFamily,
+		"platform_version":      p.parseHostPlatformVersion,
+		"kernel_version":        p.parseHostKernelVersion,
+		"kernel_arch":           p.parseHostKernelArch,
+		"virtualization_system": p.parseHostVirtualizationSystem,
+		"virtualization_role":   p.parseHostVirtualizationRole,
+	}
+
+	for name, attr := range block.Body.Attributes {
+		if parser, exists := parsers[name]; exists {
+			if err := parser(attr.Expr, host); err != nil {
+				return fmt.Errorf("failed to parse host attribute %s: %w", name, err)
 			}
-			return nil
-		},
-		"uptime": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseInt64Value(expr); err == nil {
-				host.Uptime = val
-			}
-			return nil
-		},
-		"boot_time": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseInt64Value(expr); err == nil {
-				host.BootTime = val
-			}
-			return nil
-		},
-		"os": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseStringValue(expr); err == nil {
-				host.OS = val
-			}
-			return nil
-		},
-		"platform": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseStringValue(expr); err == nil {
-				host.Platform = val
-			}
-			return nil
-		},
-		"platform_family": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseStringValue(expr); err == nil {
-				host.PlatformFamily = val
-			}
-			return nil
-		},
-		"platform_version": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseStringValue(expr); err == nil {
-				host.PlatformVersion = val
-			}
-			return nil
-		},
-		"kernel_version": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseStringValue(expr); err == nil {
-				host.KernelVersion = val
-			}
-			return nil
-		},
-		"kernel_arch": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseStringValue(expr); err == nil {
-				host.KernelArch = val
-			}
-			return nil
-		},
-		"virtualization_system": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseStringValue(expr); err == nil {
-				host.VirtualizationSystem = val
-			}
-			return nil
-		},
-		"virtualization_role": func(expr hclsyntax.Expression) error {
-			if val, err := p.parseStringValue(expr); err == nil {
-				host.VirtualizationRole = val
-			}
-			return nil
-		},
-	})
+		}
+	}
+	return nil
+}
+
+func (p *HCLParser) parseHostHostname(expr hclsyntax.Expression, host *spookytypesfacts.HostFacts) error {
+	if val, err := p.parseStringValue(expr); err == nil {
+		host.Hostname = val
+	}
+	return nil
+}
+
+func (p *HCLParser) parseHostUptime(expr hclsyntax.Expression, host *spookytypesfacts.HostFacts) error {
+	if val, err := p.parseInt64Value(expr); err == nil {
+		host.Uptime = val
+	}
+	return nil
+}
+
+func (p *HCLParser) parseHostBootTime(expr hclsyntax.Expression, host *spookytypesfacts.HostFacts) error {
+	if val, err := p.parseInt64Value(expr); err == nil {
+		host.BootTime = val
+	}
+	return nil
+}
+
+func (p *HCLParser) parseHostOS(expr hclsyntax.Expression, host *spookytypesfacts.HostFacts) error {
+	if val, err := p.parseStringValue(expr); err == nil {
+		host.OS = val
+	}
+	return nil
+}
+
+func (p *HCLParser) parseHostPlatform(expr hclsyntax.Expression, host *spookytypesfacts.HostFacts) error {
+	if val, err := p.parseStringValue(expr); err == nil {
+		host.Platform = val
+	}
+	return nil
+}
+
+func (p *HCLParser) parseHostPlatformFamily(expr hclsyntax.Expression, host *spookytypesfacts.HostFacts) error {
+	if val, err := p.parseStringValue(expr); err == nil {
+		host.PlatformFamily = val
+	}
+	return nil
+}
+
+func (p *HCLParser) parseHostPlatformVersion(expr hclsyntax.Expression, host *spookytypesfacts.HostFacts) error {
+	if val, err := p.parseStringValue(expr); err == nil {
+		host.PlatformVersion = val
+	}
+	return nil
+}
+
+func (p *HCLParser) parseHostKernelVersion(expr hclsyntax.Expression, host *spookytypesfacts.HostFacts) error {
+	if val, err := p.parseStringValue(expr); err == nil {
+		host.KernelVersion = val
+	}
+	return nil
+}
+
+func (p *HCLParser) parseHostKernelArch(expr hclsyntax.Expression, host *spookytypesfacts.HostFacts) error {
+	if val, err := p.parseStringValue(expr); err == nil {
+		host.KernelArch = val
+	}
+	return nil
+}
+
+func (p *HCLParser) parseHostVirtualizationSystem(expr hclsyntax.Expression, host *spookytypesfacts.HostFacts) error {
+	if val, err := p.parseStringValue(expr); err == nil {
+		host.VirtualizationSystem = val
+	}
+	return nil
+}
+
+func (p *HCLParser) parseHostVirtualizationRole(expr hclsyntax.Expression, host *spookytypesfacts.HostFacts) error {
+	if val, err := p.parseStringValue(expr); err == nil {
+		host.VirtualizationRole = val
+	}
+	return nil
 }
 
 // createParser creates a parser function for a specific field and type
@@ -246,32 +302,67 @@ func (p *HCLParser) parseMemoryBlock(block *hclsyntax.Block, memory *spookytypes
 // parseDiskBlock parses disk facts from a disk block
 func (p *HCLParser) parseDiskBlock(block *hclsyntax.Block, disk *spookytypesfacts.DiskFacts) error {
 	for _, attr := range block.Body.Attributes {
-		switch attr.Name {
-		case "device":
-			if val, err := p.parseStringValue(attr.Expr); err == nil {
-				disk.Device = val
-			}
-		case "mount_point":
-			if val, err := p.parseStringValue(attr.Expr); err == nil {
-				disk.MountPoint = val
-			}
-		case "filesystem":
-			if val, err := p.parseStringValue(attr.Expr); err == nil {
-				disk.Filesystem = val
-			}
-		case "total":
-			if val, err := p.parseInt64Value(attr.Expr); err == nil {
-				disk.Total = val
-			}
-		case "free":
-			if val, err := p.parseInt64Value(attr.Expr); err == nil {
-				disk.Free = val
-			}
-		case "used":
-			if val, err := p.parseInt64Value(attr.Expr); err == nil {
-				disk.Used = val
-			}
+		if err := p.parseDiskAttribute(attr, disk); err != nil {
+			return fmt.Errorf("failed to parse disk attribute %s: %w", attr.Name, err)
 		}
+	}
+	return nil
+}
+
+func (p *HCLParser) parseDiskAttribute(attr *hclsyntax.Attribute, disk *spookytypesfacts.DiskFacts) error {
+	parsers := map[string]func(hclsyntax.Expression, *spookytypesfacts.DiskFacts) error{
+		"device":      p.parseDiskDevice,
+		"mount_point": p.parseDiskMountPoint,
+		"filesystem":  p.parseDiskFilesystem,
+		"total":       p.parseDiskTotal,
+		"free":        p.parseDiskFree,
+		"used":        p.parseDiskUsed,
+	}
+
+	if parser, exists := parsers[attr.Name]; exists {
+		return parser(attr.Expr, disk)
+	}
+	return nil
+}
+
+func (p *HCLParser) parseDiskDevice(expr hclsyntax.Expression, disk *spookytypesfacts.DiskFacts) error {
+	if val, err := p.parseStringValue(expr); err == nil {
+		disk.Device = val
+	}
+	return nil
+}
+
+func (p *HCLParser) parseDiskMountPoint(expr hclsyntax.Expression, disk *spookytypesfacts.DiskFacts) error {
+	if val, err := p.parseStringValue(expr); err == nil {
+		disk.MountPoint = val
+	}
+	return nil
+}
+
+func (p *HCLParser) parseDiskFilesystem(expr hclsyntax.Expression, disk *spookytypesfacts.DiskFacts) error {
+	if val, err := p.parseStringValue(expr); err == nil {
+		disk.Filesystem = val
+	}
+	return nil
+}
+
+func (p *HCLParser) parseDiskTotal(expr hclsyntax.Expression, disk *spookytypesfacts.DiskFacts) error {
+	if val, err := p.parseInt64Value(expr); err == nil {
+		disk.Total = val
+	}
+	return nil
+}
+
+func (p *HCLParser) parseDiskFree(expr hclsyntax.Expression, disk *spookytypesfacts.DiskFacts) error {
+	if val, err := p.parseInt64Value(expr); err == nil {
+		disk.Free = val
+	}
+	return nil
+}
+
+func (p *HCLParser) parseDiskUsed(expr hclsyntax.Expression, disk *spookytypesfacts.DiskFacts) error {
+	if val, err := p.parseInt64Value(expr); err == nil {
+		disk.Used = val
 	}
 	return nil
 }
@@ -306,7 +397,7 @@ func (p *HCLParser) parseStringValue(expr hclsyntax.Expression) (string, error) 
 
 func (p *HCLParser) parseIntValue(expr hclsyntax.Expression) (int, error) {
 	if lit, ok := expr.(*hclsyntax.LiteralValueExpr); ok {
-		if lit.Val.Type().IsPrimitiveType() && lit.Val.Type().FriendlyName() == "number" {
+		if lit.Val.Type().IsPrimitiveType() && lit.Val.Type().FriendlyName() == HCLTypeNumber {
 			val, _ := lit.Val.AsBigFloat().Int64()
 			return int(val), nil
 		}
@@ -316,7 +407,7 @@ func (p *HCLParser) parseIntValue(expr hclsyntax.Expression) (int, error) {
 
 func (p *HCLParser) parseInt64Value(expr hclsyntax.Expression) (int64, error) {
 	if lit, ok := expr.(*hclsyntax.LiteralValueExpr); ok {
-		if lit.Val.Type().IsPrimitiveType() && lit.Val.Type().FriendlyName() == "number" {
+		if lit.Val.Type().IsPrimitiveType() && lit.Val.Type().FriendlyName() == HCLTypeNumber {
 			val, _ := lit.Val.AsBigFloat().Int64()
 			return val, nil
 		}
@@ -326,7 +417,7 @@ func (p *HCLParser) parseInt64Value(expr hclsyntax.Expression) (int64, error) {
 
 func (p *HCLParser) parseFloat64Value(expr hclsyntax.Expression) (float64, error) {
 	if lit, ok := expr.(*hclsyntax.LiteralValueExpr); ok {
-		if lit.Val.Type().IsPrimitiveType() && lit.Val.Type().FriendlyName() == "number" {
+		if lit.Val.Type().IsPrimitiveType() && lit.Val.Type().FriendlyName() == HCLTypeNumber {
 			val, _ := lit.Val.AsBigFloat().Float64()
 			return val, nil
 		}
@@ -341,7 +432,7 @@ func (p *HCLParser) parseCustomValue(expr hclsyntax.Expression) (interface{}, er
 			switch lit.Val.Type().FriendlyName() {
 			case "string":
 				return lit.Val.AsString(), nil
-			case "number":
+			case HCLTypeNumber:
 				val, _ := lit.Val.AsBigFloat().Int64()
 				return val, nil
 			case "bool":

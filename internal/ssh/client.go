@@ -28,6 +28,7 @@ const (
 	KeyTypeED25519   = "ed25519"
 	KeyTypeED25519SK = "ed25519-sk"
 	KeyTypeRSA4096   = "rsa-4096"
+	KeyTypeRSA       = "rsa"
 	MinRSAKeySize    = 4096
 )
 
@@ -567,26 +568,7 @@ func (h *HostKeyManager) parseKnownHostsLine(line string) (*spookytypesssh.HostK
 	fingerprint := ssh.FingerprintSHA256(pubKey)
 
 	// Determine key algorithm and size
-	var algorithm string
-	var keySize int
-
-	switch pubKey.Type() {
-	case ssh.KeyAlgoED25519:
-		algorithm = "ed25519"
-		keySize = 256
-	case ssh.KeyAlgoRSA:
-		algorithm = "rsa"
-		if rsaKey, ok := pubKey.(ssh.CryptoPublicKey); ok {
-			if cryptoKey := rsaKey.CryptoPublicKey(); cryptoKey != nil {
-				if rsaPubKey, ok := cryptoKey.(*rsa.PublicKey); ok {
-					keySize = rsaPubKey.Size() * 8
-				}
-			}
-		}
-	default:
-		algorithm = pubKey.Type()
-		keySize = 0
-	}
+	algorithm, keySize := h.determineKeyAlgorithmAndSize(pubKey)
 
 	now := time.Now()
 	hostKey := &spookytypesssh.HostKey{
@@ -606,6 +588,30 @@ func (h *HostKeyManager) parseKnownHostsLine(line string) (*spookytypesssh.HostK
 	}
 
 	return hostKey, nil
+}
+
+// determineKeyAlgorithmAndSize determines the algorithm and key size for a public key
+func (h *HostKeyManager) determineKeyAlgorithmAndSize(pubKey ssh.PublicKey) (string, int) {
+	switch pubKey.Type() {
+	case ssh.KeyAlgoED25519:
+		return "ed25519", 256
+	case ssh.KeyAlgoRSA:
+		return h.getRSAKeySize(pubKey)
+	default:
+		return pubKey.Type(), 0
+	}
+}
+
+// getRSAKeySize extracts the key size from an RSA public key
+func (h *HostKeyManager) getRSAKeySize(pubKey ssh.PublicKey) (string, int) {
+	if rsaKey, ok := pubKey.(ssh.CryptoPublicKey); ok {
+		if cryptoKey := rsaKey.CryptoPublicKey(); cryptoKey != nil {
+			if rsaPubKey, ok := cryptoKey.(*rsa.PublicKey); ok {
+				return KeyTypeRSA, rsaPubKey.Size() * 8
+			}
+		}
+	}
+	return KeyTypeRSA, 0
 }
 
 // SaveKnownHosts saves known hosts to file
@@ -1018,46 +1024,72 @@ func (c *Client) RunCommand(_ context.Context, connection *spookytypes.Connectio
 	startTime := time.Now()
 	connectionKey := fmt.Sprintf("%s:%d", connection.Host, connection.Port)
 
-	// For now, we'll use a simplified approach
-	// In a production system, you would want to implement proper connection pooling
-	// with authenticated connections
+	client, err := c.establishConnection(connection)
+	if err != nil {
+		return nil, fmt.Errorf("failed to establish SSH connection for %s: %w", connectionKey, err)
+	}
+	defer client.Close()
 
-	// Create SSH config with authentication
+	session, err := c.createSession(client, command)
+	if err != nil {
+		return nil, err
+	}
+	defer session.Close()
+
+	result, err := c.executeCommand(session, command, connectionKey, startTime)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (c *Client) establishConnection(connection *spookytypes.Connection) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
 		User:            connection.User,
 		HostKeyCallback: c.hostKeyManager.GetHostKeyCallback(),
 		Timeout:         connection.Timeout,
 	}
 
-	// Note: In a real implementation, you would need to pass authentication details
-	// from the calling context. For now, this is a placeholder that shows the structure.
-
-	// Establish connection
 	client, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", connection.Host, connection.Port), config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to establish SSH connection for %s: %w", connectionKey, err)
+		return nil, err
 	}
-	defer client.Close()
 
-	// Create session
+	return client, nil
+}
+
+func (c *Client) createSession(client *ssh.Client, command *spookytypes.SSHCommand) (*ssh.Session, error) {
 	session, err := client.NewSession()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SSH session: %w", err)
 	}
-	defer session.Close()
 
-	// Set up environment
+	if err := c.setupSessionEnvironment(session, command); err != nil {
+		return nil, err
+	}
+
+	if err := c.setupSessionIO(session, command); err != nil {
+		return nil, err
+	}
+
+	return session, nil
+}
+
+func (c *Client) setupSessionEnvironment(session *ssh.Session, command *spookytypes.SSHCommand) error {
 	if len(command.Environment) > 0 {
 		for key, value := range command.Environment {
 			if err := session.Setenv(key, value); err != nil {
-				return nil, fmt.Errorf("failed to set environment variable %s: %w", key, err)
+				return fmt.Errorf("failed to set environment variable %s: %w", key, err)
 			}
 		}
 	}
+	return nil
+}
 
-	// Set up input/output
-	var stdout, stderr strings.Builder
+func (c *Client) setupSessionIO(session *ssh.Session, command *spookytypes.SSHCommand) error {
 	if command.CaptureOutput {
+		var stdout, stderr strings.Builder
 		session.Stdout = &stdout
 		session.Stderr = &stderr
 	}
@@ -1066,29 +1098,44 @@ func (c *Client) RunCommand(_ context.Context, connection *spookytypes.Connectio
 		session.Stdin = strings.NewReader(command.Stdin)
 	}
 
-	// Run command
+	return nil
+}
+
+func (c *Client) executeCommand(session *ssh.Session, command *spookytypes.SSHCommand, connectionKey string, startTime time.Time) (*spookytypes.SSHCommandResult, error) {
+	cmd := c.buildCommandString(command)
+	err := session.Run(cmd)
+	endTime := time.Now()
+
+	result := c.createCommandResult(command, connectionKey, startTime, endTime)
+	c.setCommandResultStatus(result, err)
+
+	return result, nil
+}
+
+func (c *Client) buildCommandString(command *spookytypes.SSHCommand) string {
 	cmd := command.Command
 	if len(command.Args) > 0 {
 		cmd = cmd + " " + strings.Join(command.Args, " ")
 	}
+	return cmd
+}
 
-	err = session.Run(cmd)
-	endTime := time.Now()
-
-	result := &spookytypes.SSHCommandResult{
+func (c *Client) createCommandResult(command *spookytypes.SSHCommand, connectionKey string, startTime, endTime time.Time) *spookytypes.SSHCommandResult {
+	return &spookytypes.SSHCommandResult{
 		Command: command,
 		Session: &spookytypes.Session{
-			SessionID:  fmt.Sprintf("%s-%d", connectionKey, startTime.UnixNano()),
-			Connection: connection,
-			Status:     spookytypesssh.SessionStatusCompleted,
-			StartedAt:  startTime,
-			EndedAt:    &endTime,
+			SessionID: fmt.Sprintf("%s-%d", connectionKey, startTime.UnixNano()),
+			Status:    spookytypesssh.SessionStatusCompleted,
+			StartedAt: startTime,
+			EndedAt:   &endTime,
 		},
 		StartTime: startTime,
 		EndTime:   endTime,
 		Duration:  endTime.Sub(startTime),
 	}
+}
 
+func (c *Client) setCommandResultStatus(result *spookytypes.SSHCommandResult, err error) {
 	if err != nil {
 		result.Success = false
 		result.Error = err.Error()
@@ -1101,13 +1148,6 @@ func (c *Client) RunCommand(_ context.Context, connection *spookytypes.Connectio
 		result.Success = true
 		result.ExitCode = 0
 	}
-
-	if command.CaptureOutput {
-		result.Stdout = stdout.String()
-		result.Stderr = stderr.String()
-	}
-
-	return result, nil
 }
 
 // Close closes all SSH connections

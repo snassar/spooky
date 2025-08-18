@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -45,7 +46,10 @@ func main() {
 	recommendations := analyzeForADRs(significantCommits)
 
 	// Write focused recommendations
-	writeFocusedRecommendations(outputDir, recommendations)
+	if err := writeFocusedRecommendations(outputDir, recommendations); err != nil {
+		fmt.Printf("Error writing focused recommendations: %v\n", err)
+		return
+	}
 
 	fmt.Printf("Analysis complete. Found %d significant commits, %d ADR recommendations\n",
 		len(significantCommits), len(recommendations))
@@ -164,58 +168,84 @@ func findLargeArchitecturalCommits(output string) []SignificantCommit {
 
 	var currentCommit SignificantCommit
 	for _, line := range lines {
-		if strings.HasPrefix(line, " ") && strings.Contains(line, "|") {
-			// Parse file stats
-			parts := strings.Split(line, "|")
-			if len(parts) >= 2 {
-				stats := strings.TrimSpace(parts[1])
-				if strings.Contains(stats, "insertions") {
-					re := regexp.MustCompile(`(\d+) insertions?.*?(\d+) deletions?`)
-					matches := re.FindStringSubmatch(stats)
-					if len(matches) >= 3 {
-						var additions, deletions int
-						if _, err := fmt.Sscanf(matches[1], "%d", &additions); err != nil {
-							// Log error but continue
-							fmt.Printf("Warning: failed to parse additions: %v\n", err)
-							continue
-						}
-						if _, err := fmt.Sscanf(matches[2], "%d", &deletions); err != nil {
-							// Log error but continue
-							fmt.Printf("Warning: failed to parse deletions: %v\n", err)
-							continue
-						}
-
-						// Only consider very large commits
-						if additions > 1000 || deletions > 500 {
-							currentCommit.Additions = additions
-							currentCommit.Deletions = deletions
-							currentCommit.Category = "Large Change"
-							currentCommit.Reason = fmt.Sprintf("Large commit: +%d -%d lines", additions, deletions)
-						}
-					}
-				}
-			}
-		} else if len(line) > 0 && !strings.HasPrefix(line, " ") {
-			// New commit
-			if currentCommit.Hash != "" && (currentCommit.Additions > 1000 || currentCommit.Deletions > 500) {
+		if isFileStatsLine(line) {
+			parseFileStats(line, &currentCommit)
+		} else if isNewCommitLine(line) {
+			if shouldIncludeCommit(currentCommit) {
 				commits = append(commits, currentCommit)
 			}
-
-			parts := strings.SplitN(line, " ", 2)
-			if len(parts) >= 2 {
-				currentCommit = SignificantCommit{
-					Hash:    parts[0],
-					Message: parts[1],
-				}
-			}
+			currentCommit = parseCommitLine(line)
 		}
 	}
 
-	if currentCommit.Hash != "" && (currentCommit.Additions > 1000 || currentCommit.Deletions > 500) {
+	if shouldIncludeCommit(currentCommit) {
 		commits = append(commits, currentCommit)
 	}
 
 	return commits
+}
+
+func isFileStatsLine(line string) bool {
+	return strings.HasPrefix(line, " ") && strings.Contains(line, "|")
+}
+
+func isNewCommitLine(line string) bool {
+	return len(line) > 0 && !strings.HasPrefix(line, " ")
+}
+
+func shouldIncludeCommit(commit SignificantCommit) bool {
+	return commit.Hash != "" && (commit.Additions > 1000 || commit.Deletions > 500)
+}
+
+func parseFileStats(line string, commit *SignificantCommit) {
+	parts := strings.Split(line, "|")
+	if len(parts) < 2 {
+		return
+	}
+
+	stats := strings.TrimSpace(parts[1])
+	if !strings.Contains(stats, "insertions") {
+		return
+	}
+
+	additions, deletions := extractStatsFromLine(stats)
+	if additions > 1000 || deletions > 500 {
+		commit.Additions = additions
+		commit.Deletions = deletions
+		commit.Category = "Large Change"
+		commit.Reason = fmt.Sprintf("Large commit: +%d -%d lines", additions, deletions)
+	}
+}
+
+func extractStatsFromLine(stats string) (int, int) {
+	re := regexp.MustCompile(`(\d+) insertions?.*?(\d+) deletions?`)
+	matches := re.FindStringSubmatch(stats)
+	if len(matches) < 3 {
+		return 0, 0
+	}
+
+	var additions, deletions int
+	if _, err := fmt.Sscanf(matches[1], "%d", &additions); err != nil {
+		fmt.Printf("Warning: failed to parse additions: %v\n", err)
+		return 0, 0
+	}
+	if _, err := fmt.Sscanf(matches[2], "%d", &deletions); err != nil {
+		fmt.Printf("Warning: failed to parse deletions: %v\n", err)
+		return 0, 0
+	}
+
+	return additions, deletions
+}
+
+func parseCommitLine(line string) SignificantCommit {
+	parts := strings.SplitN(line, " ", 2)
+	if len(parts) >= 2 {
+		return SignificantCommit{
+			Hash:    parts[0],
+			Message: parts[1],
+		}
+	}
+	return SignificantCommit{}
 }
 
 func getCategoryFromPattern(pattern string) string {
@@ -318,12 +348,12 @@ func generateTitle(commit SignificantCommit) string {
 	return message
 }
 
-func writeFocusedRecommendations(outputDir string, recommendations []ADRRecommendation) {
+func writeFocusedRecommendations(outputDir string, recommendations []ADRRecommendation) error {
 	filename := filepath.Join(outputDir, "focused-adr-recommendations.md")
 	file, err := os.Create(filename)
 	if err != nil {
 		fmt.Printf("Error creating file: %v\n", err)
-		return
+		return err
 	}
 	defer file.Close()
 
@@ -342,40 +372,14 @@ func writeFocusedRecommendations(outputDir string, recommendations []ADRRecommen
 	highPriority := filterByPriority(recommendations, "High")
 	mediumPriority := filterByPriority(recommendations, "Medium")
 
-	if len(highPriority) > 0 {
-		fmt.Fprintf(writer, "## High Priority ADRs\n\n")
-		fmt.Fprintf(writer, "These commits represent significant architectural decisions that should be documented:\n\n")
-
-		for _, rec := range highPriority {
-			fmt.Fprintf(writer, "### %s\n\n", rec.SuggestedTitle)
-			hash := rec.Commit.Hash
-			if len(hash) >= 8 {
-				hash = hash[:8]
-			}
-			fmt.Fprintf(writer, "- **Commit:** %s\n", hash)
-			fmt.Fprintf(writer, "- **Date:** %s\n", rec.Commit.Date.Format("2006-01-02"))
-			fmt.Fprintf(writer, "- **Category:** %s\n", rec.Commit.Category)
-			fmt.Fprintf(writer, "- **Impact:** +%d -%d lines\n", rec.Commit.Additions, rec.Commit.Deletions)
-			fmt.Fprintf(writer, "- **Reason:** %s\n\n", rec.Reason)
-		}
+	// Write high priority ADRs
+	if err := writeDetailedPriorityADRs(writer, highPriority, "High", "These commits represent significant architectural decisions that should be documented:"); err != nil {
+		return err
 	}
 
-	if len(mediumPriority) > 0 {
-		fmt.Fprintf(writer, "## Medium Priority ADRs\n\n")
-		fmt.Fprintf(writer, "These commits may represent architectural decisions worth documenting:\n\n")
-
-		for _, rec := range mediumPriority {
-			fmt.Fprintf(writer, "### %s\n\n", rec.SuggestedTitle)
-			hash := rec.Commit.Hash
-			if len(hash) >= 8 {
-				hash = hash[:8]
-			}
-			fmt.Fprintf(writer, "- **Commit:** %s\n", hash)
-			fmt.Fprintf(writer, "- **Date:** %s\n", rec.Commit.Date.Format("2006-01-02"))
-			fmt.Fprintf(writer, "- **Category:** %s\n", rec.Commit.Category)
-			fmt.Fprintf(writer, "- **Impact:** +%d -%d lines\n", rec.Commit.Additions, rec.Commit.Deletions)
-			fmt.Fprintf(writer, "- **Reason:** %s\n\n", rec.Reason)
-		}
+	// Write medium priority ADRs
+	if err := writeDetailedPriorityADRs(writer, mediumPriority, "Medium", "These commits may represent architectural decisions worth documenting:"); err != nil {
+		return err
 	}
 
 	fmt.Fprintf(writer, "## Next Steps\n\n")
@@ -390,6 +394,8 @@ func writeFocusedRecommendations(outputDir string, recommendations []ADRRecommen
 	fmt.Fprintf(writer, "- Large commits (>1000 additions or >500 deletions)\n")
 	fmt.Fprintf(writer, "- Breaking changes and major refactors\n")
 	fmt.Fprintf(writer, "- Interface and system-level changes\n")
+
+	return nil
 }
 
 func countByPriority(recommendations []ADRRecommendation, priority string) int {
@@ -410,4 +416,51 @@ func filterByPriority(recommendations []ADRRecommendation, priority string) []AD
 		}
 	}
 	return filtered
+}
+
+// writeDetailedPriorityADRs is a helper function that extracts common logic for writing detailed ADR reports
+func writeDetailedPriorityADRs(writer io.Writer, adrs []ADRRecommendation, priority string, description string) error {
+	if len(adrs) == 0 {
+		return nil
+	}
+
+	// Write header
+	if _, err := fmt.Fprintf(writer, "## %s Priority ADRs\n\n", priority); err != nil {
+		return fmt.Errorf("failed to write %s priority header: %w", priority, err)
+	}
+
+	// Write description
+	if _, err := fmt.Fprintf(writer, "%s\n\n", description); err != nil {
+		return fmt.Errorf("failed to write %s priority description: %w", priority, err)
+	}
+
+	// Write detailed ADR entries
+	for _, rec := range adrs {
+		if _, err := fmt.Fprintf(writer, "### %s\n\n", rec.SuggestedTitle); err != nil {
+			return fmt.Errorf("failed to write %s priority ADR title: %w", priority, err)
+		}
+
+		hash := rec.Commit.Hash
+		if len(hash) >= 8 {
+			hash = hash[:8]
+		}
+
+		if _, err := fmt.Fprintf(writer, "- **Commit:** %s\n", hash); err != nil {
+			return fmt.Errorf("failed to write %s priority ADR commit: %w", priority, err)
+		}
+		if _, err := fmt.Fprintf(writer, "- **Date:** %s\n", rec.Commit.Date.Format("2006-01-02")); err != nil {
+			return fmt.Errorf("failed to write %s priority ADR date: %w", priority, err)
+		}
+		if _, err := fmt.Fprintf(writer, "- **Category:** %s\n", rec.Commit.Category); err != nil {
+			return fmt.Errorf("failed to write %s priority ADR category: %w", priority, err)
+		}
+		if _, err := fmt.Fprintf(writer, "- **Impact:** +%d -%d lines\n", rec.Commit.Additions, rec.Commit.Deletions); err != nil {
+			return fmt.Errorf("failed to write %s priority ADR impact: %w", priority, err)
+		}
+		if _, err := fmt.Fprintf(writer, "- **Reason:** %s\n\n", rec.Reason); err != nil {
+			return fmt.Errorf("failed to write %s priority ADR reason: %w", priority, err)
+		}
+	}
+
+	return nil
 }

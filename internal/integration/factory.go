@@ -113,7 +113,7 @@ func (s *SimpleSchemaValidator) ValidateField(_ *spookytypesschemas.Schema, _ st
 
 // SimpleSchemaManager implements SchemaManager interface for integration
 type SimpleSchemaManager struct {
-	_ spookytypeslogging.Logger // nolint:unused // Interface compliance
+	// logger field removed as it was unused
 }
 
 // LoadSchema loads a schema from the given path

@@ -525,7 +525,7 @@ func (m *Manager) pingMachine(ctx context.Context, machine *spookytypes.Machine)
 
 	_, err = sshManager.Connect(ctx, connectionRequest)
 	if err != nil {
-		sshStatus = "ssh_unreachable"
+		sshStatus = MachineConnectivitySSHUnreachable
 		sshError = err.Error()
 	} else {
 		sshStatus = "reachable"
@@ -541,8 +541,8 @@ func (m *Manager) pingMachine(ctx context.Context, machine *spookytypes.Machine)
 	switch sshStatus {
 	case "reachable":
 		status = "online"
-	case "ssh_unreachable":
-		status = "ssh_unreachable"
+	case MachineConnectivitySSHUnreachable:
+		status = MachineConnectivitySSHUnreachable
 		errorMsg = sshError
 	default:
 		status = "offline"
@@ -703,47 +703,77 @@ func (m *Manager) getUniqueSources(sources []string) []string {
 
 // validateEnvironmentConsistency validates environment-specific rules
 func (m *Manager) validateEnvironmentConsistency(machines []spookytypes.Machine) error {
-	productionMachines := make([]spookytypes.Machine, 0)
-	stagingMachines := make([]spookytypes.Machine, 0)
+	envGroups := m.groupMachinesByEnvironmentType(machines)
 
-	// Group machines by environment
+	if err := m.validateProductionMachines(envGroups["production"]); err != nil {
+		return err
+	}
+
+	if err := m.validateStagingMachines(envGroups["staging"]); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Manager) groupMachinesByEnvironmentType(machines []spookytypes.Machine) map[string][]spookytypes.Machine {
+	envGroups := map[string][]spookytypes.Machine{
+		"production": {},
+		"staging":    {},
+	}
+
 	for i := range machines {
 		if machines[i].MachineMetadata != nil {
 			switch machines[i].MachineMetadata.Environment {
 			case "production":
-				productionMachines = append(productionMachines, machines[i])
+				envGroups["production"] = append(envGroups["production"], machines[i])
 			case "staging":
-				stagingMachines = append(stagingMachines, machines[i])
+				envGroups["staging"] = append(envGroups["staging"], machines[i])
 			}
 		}
 	}
 
-	// Validate production machines
-	for i := range productionMachines {
-		// Production machines should have proper authentication
-		if productionMachines[i].KeyFile == "" {
-			return fmt.Errorf("production machine '%s' must use key-based authentication", productionMachines[i].Hostname)
-		}
+	return envGroups
+}
 
-		// Production machines should have reasonable timeouts
-		if productionMachines[i].ConnectionTimeout > 60 {
-			return fmt.Errorf("production machine '%s' has excessive connection timeout (%ds)", productionMachines[i].Hostname, productionMachines[i].ConnectionTimeout)
-		}
-
-		// Production machines should have proper resource specifications
-		if productionMachines[i].Resources == nil {
-			return fmt.Errorf("production machine '%s' should have resource specifications", productionMachines[i].Hostname)
+func (m *Manager) validateProductionMachines(machines []spookytypes.Machine) error {
+	for i := range machines {
+		if err := m.validateProductionMachine(&machines[i]); err != nil {
+			return err
 		}
 	}
+	return nil
+}
 
-	// Validate staging machines
-	for i := range stagingMachines {
-		// Staging machines should have reasonable timeouts
-		if stagingMachines[i].ConnectionTimeout > 120 {
-			return fmt.Errorf("staging machine '%s' has excessive connection timeout (%ds)", stagingMachines[i].Hostname, stagingMachines[i].ConnectionTimeout)
-		}
+func (m *Manager) validateProductionMachine(machine *spookytypes.Machine) error {
+	if machine.KeyFile == "" {
+		return fmt.Errorf("production machine '%s' must use key-based authentication", machine.Hostname)
 	}
 
+	if machine.ConnectionTimeout > 60 {
+		return fmt.Errorf("production machine '%s' has excessive connection timeout (%ds)", machine.Hostname, machine.ConnectionTimeout)
+	}
+
+	if machine.Resources == nil {
+		return fmt.Errorf("production machine '%s' should have resource specifications", machine.Hostname)
+	}
+
+	return nil
+}
+
+func (m *Manager) validateStagingMachines(machines []spookytypes.Machine) error {
+	for i := range machines {
+		if err := m.validateStagingMachine(&machines[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Manager) validateStagingMachine(machine *spookytypes.Machine) error {
+	if machine.ConnectionTimeout > 120 {
+		return fmt.Errorf("staging machine '%s' has excessive connection timeout (%ds)", machine.Hostname, machine.ConnectionTimeout)
+	}
 	return nil
 }
 
@@ -769,7 +799,22 @@ func (m *Manager) validateAuthenticationConsistency(machines []spookytypes.Machi
 
 // validateCrossFileConsistency validates consistency across multiple files
 func (m *Manager) validateCrossFileConsistency(machines []spookytypes.Machine) error {
-	// Group machines by environment and check for consistency
+	envGroups := m.groupMachinesByEnvironment(machines)
+
+	for env, envMachines := range envGroups {
+		if len(envMachines) < 2 {
+			continue // Need at least 2 machines to check consistency
+		}
+
+		if err := m.validateEnvironmentConsistencyForGroup(env, envMachines); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *Manager) groupMachinesByEnvironment(machines []spookytypes.Machine) map[string][]spookytypes.Machine {
 	envGroups := make(map[string][]spookytypes.Machine)
 
 	for i := range machines {
@@ -780,33 +825,44 @@ func (m *Manager) validateCrossFileConsistency(machines []spookytypes.Machine) e
 		envGroups[env] = append(envGroups[env], machines[i])
 	}
 
-	// Check for consistent authentication methods within environments
-	for env, envMachines := range envGroups {
-		if len(envMachines) < 2 {
-			continue // Need at least 2 machines to check consistency
-		}
+	return envGroups
+}
 
-		keyBasedCount := 0
-		for i := range envMachines {
-			if envMachines[i].KeyFile != "" {
-				keyBasedCount++
-			}
-		}
+func (m *Manager) validateEnvironmentConsistencyForGroup(env string, envMachines []spookytypes.Machine) error {
+	if err := m.validateAuthenticationConsistencyForGroup(env, envMachines); err != nil {
+		return err
+	}
 
-		// Check if authentication methods are consistent within environment
-		if keyBasedCount > 0 && keyBasedCount < len(envMachines) {
-			return fmt.Errorf("inconsistent authentication methods in %s environment (%d/%d use keys)", env, keyBasedCount, len(envMachines))
-		}
+	if err := m.validateTimeoutConsistencyForGroup(env, envMachines); err != nil {
+		return err
+	}
 
-		// Check for consistent timeout settings within environment
-		timeoutValues := make(map[int]int)
-		for i := range envMachines {
-			timeoutValues[envMachines[i].ConnectionTimeout]++
-		}
+	return nil
+}
 
-		if len(timeoutValues) > 1 {
-			return fmt.Errorf("inconsistent connection timeouts in %s environment: %v", env, timeoutValues)
+func (m *Manager) validateAuthenticationConsistencyForGroup(env string, envMachines []spookytypes.Machine) error {
+	keyBasedCount := 0
+	for i := range envMachines {
+		if envMachines[i].KeyFile != "" {
+			keyBasedCount++
 		}
+	}
+
+	if keyBasedCount > 0 && keyBasedCount < len(envMachines) {
+		return fmt.Errorf("inconsistent authentication methods in %s environment (%d/%d use keys)", env, keyBasedCount, len(envMachines))
+	}
+
+	return nil
+}
+
+func (m *Manager) validateTimeoutConsistencyForGroup(env string, envMachines []spookytypes.Machine) error {
+	timeoutValues := make(map[int]int)
+	for i := range envMachines {
+		timeoutValues[envMachines[i].ConnectionTimeout]++
+	}
+
+	if len(timeoutValues) > 1 {
+		return fmt.Errorf("inconsistent connection timeouts in %s environment: %v", env, timeoutValues)
 	}
 
 	return nil
@@ -978,39 +1034,62 @@ func (m *Manager) applyMapFilter(machines []spookytypes.Machine, filter map[stri
 
 	for i := range machines {
 		machine := &machines[i]
-		match := true
-
-		for key, value := range filter {
-			switch key {
-			case "hostname":
-				if expected, ok := value.(string); ok && machine.Hostname != expected {
-					match = false
-				}
-			case "host":
-				if expected, ok := value.(string); ok && machine.Host != expected {
-					match = false
-				}
-			case "user":
-				if expected, ok := value.(string); ok && machine.User != expected {
-					match = false
-				}
-			case "environment":
-				if machine.MachineMetadata != nil {
-					if expected, ok := value.(string); ok && machine.MachineMetadata.Environment != expected {
-						match = false
-					}
-				} else {
-					match = false
-				}
-			}
-		}
-
-		if match {
+		if m.machineMatchesMapFilter(machine, filter) {
 			filteredMachines = append(filteredMachines, *machine)
 		}
 	}
 
 	return filteredMachines, nil
+}
+
+func (m *Manager) machineMatchesMapFilter(machine *spookytypes.Machine, filter map[string]interface{}) bool {
+	filterHandlers := map[string]func(*spookytypes.Machine, interface{}) bool{
+		"hostname":    m.matchesHostname,
+		"host":        m.matchesHost,
+		"user":        m.matchesUser,
+		"environment": m.matchesEnvironment,
+	}
+
+	for key, value := range filter {
+		if handler, exists := filterHandlers[key]; exists {
+			if !handler(machine, value) {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+func (m *Manager) matchesHostname(machine *spookytypes.Machine, value interface{}) bool {
+	if expected, ok := value.(string); ok {
+		return machine.Hostname == expected
+	}
+	return true
+}
+
+func (m *Manager) matchesHost(machine *spookytypes.Machine, value interface{}) bool {
+	if expected, ok := value.(string); ok {
+		return machine.Host == expected
+	}
+	return true
+}
+
+func (m *Manager) matchesUser(machine *spookytypes.Machine, value interface{}) bool {
+	if expected, ok := value.(string); ok {
+		return machine.User == expected
+	}
+	return true
+}
+
+func (m *Manager) matchesEnvironment(machine *spookytypes.Machine, value interface{}) bool {
+	if machine.MachineMetadata == nil {
+		return false
+	}
+	if expected, ok := value.(string); ok {
+		return machine.MachineMetadata.Environment == expected
+	}
+	return true
 }
 
 // SaveMachines saves machines to the given destination
@@ -1053,52 +1132,9 @@ func (m *Manager) EncryptMachines(ctx context.Context, projectPath string, secre
 
 	for i := range machines {
 		machine := &machines[i]
-		machineModified := false
-
-		// Check password field
-		if machine.Password != "" && !strings.HasPrefix(machine.Password, "age1") {
-			if dryRun {
-				m.logger.Info("Would encrypt machine password", map[string]interface{}{
-					"hostname": machine.Hostname,
-				})
-				encryptedCount++
-			} else {
-				// Encrypt password
-				encryptedBytes, err := secretsIntegration.EncryptWithAge(ctx, []byte(machine.Password), recipients)
-				if err != nil {
-					return fmt.Errorf("failed to encrypt password for %s: %w", machine.Hostname, err)
-				}
-				machine.Password = string(encryptedBytes)
-				machineModified = true
-				m.logger.Info("Encrypted machine password", map[string]interface{}{
-					"hostname": machine.Hostname,
-				})
-			}
-		}
-
-		// Check passphrase field
-		if machine.Passphrase != "" && !strings.HasPrefix(machine.Passphrase, "age1") {
-			if dryRun {
-				m.logger.Info("Would encrypt machine passphrase", map[string]interface{}{
-					"hostname": machine.Hostname,
-				})
-				encryptedCount++
-			} else {
-				// Encrypt passphrase
-				encryptedBytes, err := secretsIntegration.EncryptWithAge(ctx, []byte(machine.Passphrase), recipients)
-				if err != nil {
-					return fmt.Errorf("failed to encrypt passphrase for %s: %w", machine.Hostname, err)
-				}
-				machine.Passphrase = string(encryptedBytes)
-				machineModified = true
-				m.logger.Info("Encrypted machine passphrase", map[string]interface{}{
-					"hostname": machine.Hostname,
-				})
-			}
-		}
-
-		if machineModified {
+		if modified, count := m.encryptMachineSecrets(ctx, machine, secretsIntegration, recipients, dryRun); modified {
 			machinesToSave = append(machinesToSave, *machine)
+			encryptedCount += count
 		}
 	}
 
@@ -1112,6 +1148,55 @@ func (m *Manager) EncryptMachines(ctx context.Context, projectPath string, secre
 	m.logger.Info("Machines encryption completed", map[string]interface{}{
 		"encrypted_count": encryptedCount,
 		"dry_run":         dryRun,
+	})
+
+	return nil
+}
+
+func (m *Manager) encryptMachineSecrets(ctx context.Context, machine *spookytypes.Machine, secretsIntegration spookyinterfaces.SecretsIntegration, recipients []string, dryRun bool) (bool, int) {
+	secretFields := []struct {
+		name  string
+		value *string
+	}{
+		{"password", &machine.Password},
+		{"passphrase", &machine.Passphrase},
+	}
+
+	machineModified := false
+	encryptedCount := 0
+
+	for _, field := range secretFields {
+		if *field.value != "" && !strings.HasPrefix(*field.value, "age1") {
+			if dryRun {
+				m.logger.Info("Would encrypt machine "+field.name, map[string]interface{}{
+					"hostname": machine.Hostname,
+				})
+				encryptedCount++
+			} else {
+				if err := m.encryptSecretField(ctx, field.name, field.value, machine.Hostname, secretsIntegration, recipients); err != nil {
+					m.logger.Error("Failed to encrypt "+field.name, err, map[string]interface{}{
+						"hostname": machine.Hostname,
+					})
+					continue
+				}
+				machineModified = true
+				encryptedCount++
+			}
+		}
+	}
+
+	return machineModified, encryptedCount
+}
+
+func (m *Manager) encryptSecretField(ctx context.Context, fieldName string, fieldValue *string, hostname string, secretsIntegration spookyinterfaces.SecretsIntegration, recipients []string) error {
+	encryptedBytes, err := secretsIntegration.EncryptWithAge(ctx, []byte(*fieldValue), recipients)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt %s for %s: %w", fieldName, hostname, err)
+	}
+
+	*fieldValue = string(encryptedBytes)
+	m.logger.Info("Encrypted machine "+fieldName, map[string]interface{}{
+		"hostname": hostname,
 	})
 
 	return nil

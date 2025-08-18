@@ -529,70 +529,89 @@ func (v *Validator) validateFieldValue(fieldValidation *spookytypesschemas.Field
 func (v *Validator) validateFieldConstraints(constraints *spookytypesschemas.FieldConstraints, value interface{}, fieldPath string, result *spookytypesschemas.ValidationResult) error {
 	// String constraints
 	if strValue, ok := value.(string); ok {
-		if constraints.MinLength != nil && len(strValue) < *constraints.MinLength {
-			schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' length %d is less than minimum %d", fieldPath, len(strValue), *constraints.MinLength))
-			schemaError.FieldPath = fieldPath
-			schemaError.Value = strValue
-			schemaError.Severity = validationError
-			schemaError.AddSuggestion(fmt.Sprintf("Increase the length of field '%s' to at least %d characters", fieldPath, *constraints.MinLength))
-			result.Errors = append(result.Errors, *schemaError)
-		}
-
-		if constraints.MaxLength != nil && len(strValue) > *constraints.MaxLength {
-			schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' length %d exceeds maximum %d", fieldPath, len(strValue), *constraints.MaxLength))
-			schemaError.FieldPath = fieldPath
-			schemaError.Value = strValue
-			schemaError.Severity = validationError
-			schemaError.AddSuggestion(fmt.Sprintf("Reduce the length of field '%s' to at most %d characters", fieldPath, *constraints.MaxLength))
-			result.Errors = append(result.Errors, *schemaError)
-		}
-
-		if constraints.Pattern != nil {
-			matched, err := regexp.MatchString(*constraints.Pattern, strValue)
-			if err != nil {
-				schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Invalid regex pattern for field '%s': %v", fieldPath, err))
-				schemaError.FieldPath = fieldPath
-				schemaError.Severity = validationError
-				result.Errors = append(result.Errors, *schemaError)
-			} else if !matched {
-				schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' value '%s' does not match pattern '%s'", fieldPath, strValue, *constraints.Pattern))
-				schemaError.FieldPath = fieldPath
-				schemaError.Value = strValue
-				schemaError.Severity = validationError
-				schemaError.AddSuggestion(fmt.Sprintf("Ensure field '%s' matches the required pattern", fieldPath))
-				result.Errors = append(result.Errors, *schemaError)
-			}
-		}
-
-		if constraints.Format != nil {
-			if err := v.validateFormat(*constraints.Format, strValue, fieldPath, result); err != nil {
-				return err
-			}
+		if err := v.validateStringConstraints(constraints, strValue, fieldPath, result); err != nil {
+			return err
 		}
 	}
 
 	// Numeric constraints
 	if numValue, ok := v.toFloat64(value); ok {
-		if constraints.Min != nil && numValue < *constraints.Min {
-			schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' value %f is less than minimum %f", fieldPath, numValue, *constraints.Min))
-			schemaError.FieldPath = fieldPath
-			schemaError.Value = numValue
-			schemaError.Severity = validationError
-			schemaError.AddSuggestion(fmt.Sprintf("Increase the value of field '%s' to at least %f", fieldPath, *constraints.Min))
-			result.Errors = append(result.Errors, *schemaError)
-		}
-
-		if constraints.Max != nil && numValue > *constraints.Max {
-			schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' value %f exceeds maximum %f", fieldPath, numValue, *constraints.Max))
-			schemaError.FieldPath = fieldPath
-			schemaError.Value = numValue
-			schemaError.Severity = validationError
-			schemaError.AddSuggestion(fmt.Sprintf("Reduce the value of field '%s' to at most %f", fieldPath, *constraints.Max))
-			result.Errors = append(result.Errors, *schemaError)
+		if err := v.validateNumericConstraints(constraints, numValue, fieldPath, result); err != nil {
+			return err
 		}
 	}
 
 	// Enum constraints
+	if err := v.validateEnumConstraints(constraints, value, fieldPath, result); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateStringConstraints validates string-specific constraints
+func (v *Validator) validateStringConstraints(constraints *spookytypesschemas.FieldConstraints, strValue string, fieldPath string, result *spookytypesschemas.ValidationResult) error {
+	// Length constraints
+	if constraints.MinLength != nil && len(strValue) < *constraints.MinLength {
+		schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' length %d is less than minimum %d", fieldPath, len(strValue), *constraints.MinLength))
+		schemaError.FieldPath = fieldPath
+		schemaError.Value = strValue
+		schemaError.Severity = validationError
+		schemaError.AddSuggestion(fmt.Sprintf("Increase the length of field '%s' to at least %d characters", fieldPath, *constraints.MinLength))
+		result.Errors = append(result.Errors, *schemaError)
+	}
+
+	if constraints.MaxLength != nil && len(strValue) > *constraints.MaxLength {
+		schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' length %d exceeds maximum %d", fieldPath, len(strValue), *constraints.MaxLength))
+		schemaError.FieldPath = fieldPath
+		schemaError.Value = strValue
+		schemaError.Severity = validationError
+		schemaError.AddSuggestion(fmt.Sprintf("Reduce the length of field '%s' to at most %d characters", fieldPath, *constraints.MaxLength))
+		result.Errors = append(result.Errors, *schemaError)
+	}
+
+	// Pattern constraint
+	if constraints.Pattern != nil {
+		if err := v.validatePatternConstraint(constraints.Pattern, strValue, fieldPath, result); err != nil {
+			return err
+		}
+	}
+
+	// Format constraint
+	if constraints.Format != nil {
+		if err := v.validateFormat(*constraints.Format, strValue, fieldPath, result); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateNumericConstraints validates numeric-specific constraints
+func (v *Validator) validateNumericConstraints(constraints *spookytypesschemas.FieldConstraints, numValue float64, fieldPath string, result *spookytypesschemas.ValidationResult) error {
+	if constraints.Min != nil && numValue < *constraints.Min {
+		schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' value %f is less than minimum %f", fieldPath, numValue, *constraints.Min))
+		schemaError.FieldPath = fieldPath
+		schemaError.Value = numValue
+		schemaError.Severity = validationError
+		schemaError.AddSuggestion(fmt.Sprintf("Increase the value of field '%s' to at least %f", fieldPath, *constraints.Min))
+		result.Errors = append(result.Errors, *schemaError)
+	}
+
+	if constraints.Max != nil && numValue > *constraints.Max {
+		schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' value %f exceeds maximum %f", fieldPath, numValue, *constraints.Max))
+		schemaError.FieldPath = fieldPath
+		schemaError.Value = numValue
+		schemaError.Severity = validationError
+		schemaError.AddSuggestion(fmt.Sprintf("Reduce the value of field '%s' to at most %f", fieldPath, *constraints.Max))
+		result.Errors = append(result.Errors, *schemaError)
+	}
+
+	return nil
+}
+
+// validateEnumConstraints validates enum constraints
+func (v *Validator) validateEnumConstraints(constraints *spookytypesschemas.FieldConstraints, value interface{}, fieldPath string, result *spookytypesschemas.ValidationResult) error {
 	if len(constraints.Enum) > 0 {
 		found := false
 		for _, enumValue := range constraints.Enum {
@@ -609,6 +628,29 @@ func (v *Validator) validateFieldConstraints(constraints *spookytypesschemas.Fie
 			schemaError.AddSuggestion(fmt.Sprintf("Use one of the allowed values for field '%s': %v", fieldPath, constraints.Enum))
 			result.Errors = append(result.Errors, *schemaError)
 		}
+	}
+
+	return nil
+}
+
+// validatePatternConstraint validates pattern constraint
+func (v *Validator) validatePatternConstraint(pattern *string, strValue string, fieldPath string, result *spookytypesschemas.ValidationResult) error {
+	matched, err := regexp.MatchString(*pattern, strValue)
+	if err != nil {
+		schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Invalid regex pattern for field '%s': %v", fieldPath, err))
+		schemaError.FieldPath = fieldPath
+		schemaError.Severity = validationError
+		result.Errors = append(result.Errors, *schemaError)
+		return err
+	}
+
+	if !matched {
+		schemaError := spookytypesschemas.NewSchemaError("", "", fmt.Sprintf("Field '%s' value '%s' does not match pattern '%s'", fieldPath, strValue, *pattern))
+		schemaError.FieldPath = fieldPath
+		schemaError.Value = strValue
+		schemaError.Severity = validationError
+		schemaError.AddSuggestion(fmt.Sprintf("Ensure field '%s' matches the required pattern", fieldPath))
+		result.Errors = append(result.Errors, *schemaError)
 	}
 
 	return nil
@@ -983,44 +1025,56 @@ func (v *Validator) executeCustomValidator(validator string, data interface{}) e
 
 	switch validator {
 	case "required":
-		// Check if data is not empty
-		if data == nil {
-			return fmt.Errorf("field is required")
-		}
-		if str, ok := data.(string); ok && str == "" {
-			return fmt.Errorf("field cannot be empty")
-		}
-		return nil
-
+		return v.validateRequired(data)
 	case "email":
-		// Basic email validation
-		if str, ok := data.(string); ok {
-			if !strings.Contains(str, "@") {
-				return fmt.Errorf("invalid email format")
-			}
-		}
-		return nil
-
+		return v.validateEmail(data)
 	case "url":
-		// Basic URL validation
-		if str, ok := data.(string); ok {
-			if !strings.HasPrefix(str, "http://") && !strings.HasPrefix(str, "https://") {
-				return fmt.Errorf("invalid URL format")
-			}
-		}
-		return nil
-
+		return v.validateURL(data)
 	case "positive":
-		// Check if numeric value is positive
-		if num, ok := data.(float64); ok {
-			if num <= 0 {
-				return fmt.Errorf("value must be positive")
-			}
-		}
-		return nil
-
+		return v.validatePositive(data)
 	default:
 		// Unknown validator - return success
 		return nil
 	}
+}
+
+// validateRequired checks if data is not empty
+func (v *Validator) validateRequired(data interface{}) error {
+	if data == nil {
+		return fmt.Errorf("field is required")
+	}
+	if str, ok := data.(string); ok && str == "" {
+		return fmt.Errorf("field cannot be empty")
+	}
+	return nil
+}
+
+// validateEmail performs basic email validation
+func (v *Validator) validateEmail(data interface{}) error {
+	if str, ok := data.(string); ok {
+		if !strings.Contains(str, "@") {
+			return fmt.Errorf("invalid email format")
+		}
+	}
+	return nil
+}
+
+// validateURL performs basic URL validation
+func (v *Validator) validateURL(data interface{}) error {
+	if str, ok := data.(string); ok {
+		if !strings.HasPrefix(str, "http://") && !strings.HasPrefix(str, "https://") {
+			return fmt.Errorf("invalid URL format")
+		}
+	}
+	return nil
+}
+
+// validatePositive checks if numeric value is positive
+func (v *Validator) validatePositive(data interface{}) error {
+	if num, ok := data.(float64); ok {
+		if num <= 0 {
+			return fmt.Errorf("value must be positive")
+		}
+	}
+	return nil
 }

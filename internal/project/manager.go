@@ -198,7 +198,7 @@ func (m *Manager) createFileFromSchema(projectPath string, file spookyschemas.Sc
 		return m.createRecipientsTXT(filePath)
 	default:
 		// Create empty file for other types
-		if err := os.WriteFile(filePath, []byte(""), 0o644); err != nil {
+		if err := os.WriteFile(filePath, []byte(""), 0o600); err != nil {
 			return fmt.Errorf("failed to create file %s: %w", file.Name, err)
 		}
 		m.logger.Debug("Created file from schema", map[string]interface{}{
@@ -231,7 +231,7 @@ machines {
   # }
 }
 `
-	return os.WriteFile(filePath, []byte(content), 0o644)
+	return os.WriteFile(filePath, []byte(content), 0o600)
 }
 
 // createActionsHCL creates a default actions.hcl file
@@ -257,7 +257,7 @@ actions {
   # }
 }
 `
-	return os.WriteFile(filePath, []byte(content), 0o644)
+	return os.WriteFile(filePath, []byte(content), 0o600)
 }
 
 // createVariablesHCL creates a default variables.hcl file
@@ -272,7 +272,7 @@ variables {
   # backup_retention_days = 30
 }
 `
-	return os.WriteFile(filePath, []byte(content), 0o644)
+	return os.WriteFile(filePath, []byte(content), 0o600)
 }
 
 // createRecipientsTXT creates a default recipients.txt file
@@ -281,7 +281,7 @@ func (m *Manager) createRecipientsTXT(filePath string) error {
 # Add your age public keys here (one per line)
 # Example: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
 `
-	return os.WriteFile(filePath, []byte(content), 0o644)
+	return os.WriteFile(filePath, []byte(content), 0o600)
 }
 
 // Load loads a project from the given path
