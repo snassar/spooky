@@ -143,75 +143,108 @@ Examples:
 }
 
 // handleMachinesList handles listing machines using the MachinesIntegration interface
-func handleMachinesList(projectPath string) error {
-	ctx := context.Background()
 
-	// Initialize dependencies if not already done
-	if machinesManager == nil {
-		if err := InitializeMachinesDependencies(); err != nil {
-			return fmt.Errorf("failed to initialize machines dependencies: %w", err)
+// Helper function for extracting source file information
+func extractSourceFile(machine *spookytypes.Machine) string {
+	sourceFile := "unknown"
+	if machine.MachineMetadata != nil && machine.MachineMetadata.CustomFields != nil {
+		if src, exists := machine.MachineMetadata.CustomFields["source_file"]; exists {
+			sourceFile = src
 		}
 	}
+	return sourceFile
+}
 
-	fmt.Printf("🔍 Loading machines from project: %s\n", projectPath)
-
-	// Load machines using the enhanced manager (supports both machines.hcl and machines/ directory)
-	machines, err := machinesManager.LoadMachines(ctx, projectPath)
-	if err != nil {
-		return fmt.Errorf("failed to load machines: %w", err)
-	}
-
-	fmt.Printf("📊 Found %d machines:\n\n", len(machines))
-
-	if len(machines) == 0 {
-		fmt.Printf("No machines found in inventory.\n")
-		return nil
-	}
-
-	// Group machines by source file for better display
+// Helper function for grouping machines by source
+func groupMachinesBySource(machines []spookytypes.Machine) map[string][]spookytypes.Machine {
 	machinesBySource := make(map[string][]spookytypes.Machine)
+
 	for idx := range machines {
 		machine := &machines[idx]
-		sourceFile := "unknown"
-		if machine.MachineMetadata != nil && machine.MachineMetadata.CustomFields != nil {
-			if src, exists := machine.MachineMetadata.CustomFields["source_file"]; exists {
-				sourceFile = src
-			}
-		}
+		sourceFile := extractSourceFile(machine)
 		machinesBySource[sourceFile] = append(machinesBySource[sourceFile], *machine)
 	}
 
-	// Display machines grouped by source
+	return machinesBySource
+}
+
+// Helper function for displaying empty state
+func displayEmptyState() {
+	fmt.Printf("No machines found in inventory.\n")
+}
+
+// Helper function for displaying a single machine
+func displayMachine(machine *spookytypes.Machine, index int) {
+	fmt.Printf("%d. %s (%s)\n", index+1, machine.Hostname, machine.Host)
+	fmt.Printf("   User: %s\n", machine.User)
+	fmt.Printf("   Port: %d\n", machine.Port)
+
+	// Show environment if available
+	if machine.MachineMetadata != nil && machine.MachineMetadata.Environment != "" {
+		fmt.Printf("   Environment: %s\n", machine.MachineMetadata.Environment)
+	}
+
+	if len(machine.Groups) > 0 {
+		fmt.Printf("   Groups: %v\n", machine.Groups)
+	}
+
+	if len(machine.Roles) > 0 {
+		fmt.Printf("   Roles: %v\n", machine.Roles)
+	}
+
+	if len(machine.Tags) > 0 {
+		fmt.Printf("   Tags: %v\n", machine.Tags)
+	}
+
+	fmt.Printf("\n")
+}
+
+// Helper function for displaying machines grouped by source
+func displayMachinesBySource(machinesBySource map[string][]spookytypes.Machine) {
 	for sourceFile, sourceMachines := range machinesBySource {
 		fmt.Printf("📁 Source: %s (%d machines)\n", sourceFile, len(sourceMachines))
 		fmt.Printf("%s\n", strings.Repeat("─", 50))
 
 		for i := range sourceMachines {
 			machine := &sourceMachines[i]
-			fmt.Printf("%d. %s (%s)\n", i+1, machine.Hostname, machine.Host)
-			fmt.Printf("   User: %s\n", machine.User)
-			fmt.Printf("   Port: %d\n", machine.Port)
-
-			// Show environment if available
-			if machine.MachineMetadata != nil && machine.MachineMetadata.Environment != "" {
-				fmt.Printf("   Environment: %s\n", machine.MachineMetadata.Environment)
-			}
-
-			if len(machine.Groups) > 0 {
-				fmt.Printf("   Groups: %v\n", machine.Groups)
-			}
-
-			if len(machine.Roles) > 0 {
-				fmt.Printf("   Roles: %v\n", machine.Roles)
-			}
-
-			if len(machine.Tags) > 0 {
-				fmt.Printf("   Tags: %v\n", machine.Tags)
-			}
-
-			fmt.Printf("\n")
+			displayMachine(machine, i)
 		}
 	}
+}
+
+// Helper function for displaying summary information
+func displayMachinesSummary(projectPath string, machineCount int) {
+	fmt.Printf("🔍 Loading machines from project: %s\n", projectPath)
+	fmt.Printf("📊 Found %d machines:\n\n", machineCount)
+}
+
+// handleMachinesList handles listing machines using the MachinesIntegration interface
+func handleMachinesList(projectPath string) error {
+	ctx := context.Background()
+
+	// Initialize dependencies
+	if err := initializeMachinesDependenciesIfNeeded(); err != nil {
+		return err
+	}
+
+	// Load machines
+	machines, err := loadProjectMachines(ctx, projectPath)
+	if err != nil {
+		return err
+	}
+
+	// Display summary
+	displayMachinesSummary(projectPath, len(machines))
+
+	// Handle empty state
+	if len(machines) == 0 {
+		displayEmptyState()
+		return nil
+	}
+
+	// Group and display machines
+	machinesBySource := groupMachinesBySource(machines)
+	displayMachinesBySource(machinesBySource)
 
 	return nil
 }
@@ -363,79 +396,163 @@ func handleMachinesPing(cmd *cobra.Command, projectPath string) error {
 	}
 }
 
-// handleMachinesExport handles exporting machines using the MachinesIntegration interface
-func handleMachinesExport(cmd *cobra.Command, projectPath string) error {
-	ctx := context.Background()
-
-	// Initialize dependencies if not already done
+// Helper function for dependency initialization
+func initializeMachinesDependenciesIfNeeded() error {
 	if machinesManager == nil {
 		if err := InitializeMachinesDependencies(); err != nil {
 			return fmt.Errorf("failed to initialize machine dependencies: %w", err)
 		}
 	}
+	return nil
+}
 
-	// Get output path from flags
+// Helper function for output path validation
+func validateOutputPath(cmd *cobra.Command) (string, error) {
 	outputPath, err := cmd.Flags().GetString("output")
 	if err != nil {
-		return fmt.Errorf("failed to get output flag: %w", err)
+		return "", fmt.Errorf("failed to get output flag: %w", err)
 	}
 	if outputPath == "" {
-		return fmt.Errorf("--output flag is required")
+		return "", fmt.Errorf("--output flag is required")
 	}
+	return outputPath, nil
+}
 
-	// Load machines from project
+// Helper function for loading machines
+func loadProjectMachines(ctx context.Context, projectPath string) ([]spookytypes.Machine, error) {
 	machines, err := machinesManager.LoadMachines(ctx, projectPath)
 	if err != nil {
-		return fmt.Errorf("failed to load machines from project: %w", err)
+		return nil, fmt.Errorf("failed to load machines from project: %w", err)
+	}
+	return machines, nil
+}
+
+// Helper function for filtering machines by name
+func filterMachinesByName(machines []spookytypes.Machine, machineName string) ([]spookytypes.Machine, error) {
+	if machineName == "" {
+		return machines, nil
 	}
 
-	// Apply filters if specified
-	filteredMachines := machines
+	var filtered []spookytypes.Machine
+	for idx := range machines {
+		machine := &machines[idx]
+		if machine.Hostname == machineName {
+			filtered = append(filtered, *machine)
+			break
+		}
+	}
 
-	// Filter by machine name if specified
-	if machineName, _ := cmd.Flags().GetString("machine"); machineName != "" {
-		var filtered []spookytypes.Machine
-		for idx := range machines {
-			machine := &machines[idx]
-			if machine.Hostname == machineName {
-				filtered = append(filtered, *machine)
+	if len(filtered) == 0 {
+		return nil, fmt.Errorf("machine '%s' not found in project", machineName)
+	}
+
+	return filtered, nil
+}
+
+// Helper function for filtering machines by tags
+func filterMachinesByTags(ctx context.Context, machines []spookytypes.Machine, tags []string) ([]spookytypes.Machine, error) {
+	if len(tags) == 0 {
+		return machines, nil
+	}
+
+	taggedMachines, err := machinesManager.GetMachinesByTags(ctx, tags)
+	if err != nil {
+		return nil, fmt.Errorf("failed to filter machines by tags: %w", err)
+	}
+
+	return intersectMachines(machines, taggedMachines), nil
+}
+
+// Helper function for intersecting machine lists
+func intersectMachines(list1, list2 []spookytypes.Machine) []spookytypes.Machine {
+	var intersection []spookytypes.Machine
+
+	for idx := range list2 {
+		tagged := &list2[idx]
+		for idx := range list1 {
+			filtered := &list1[idx]
+			if tagged.Hostname == filtered.Hostname {
+				intersection = append(intersection, *tagged)
 				break
 			}
 		}
-		if len(filtered) == 0 {
-			return fmt.Errorf("machine '%s' not found in project", machineName)
-		}
-		filteredMachines = filtered
 	}
 
-	// Filter by tags if specified
-	if tags, _ := cmd.Flags().GetStringArray("tags"); len(tags) > 0 {
-		taggedMachines, err := machinesManager.GetMachinesByTags(ctx, tags)
-		if err != nil {
-			return fmt.Errorf("failed to filter machines by tags: %w", err)
-		}
-		// Intersect with already filtered machines
-		var intersection []spookytypes.Machine
-		for idx := range taggedMachines {
-			tagged := &taggedMachines[idx]
-			for idx := range filteredMachines {
-				filtered := &filteredMachines[idx]
-				if tagged.Hostname == filtered.Hostname {
-					intersection = append(intersection, *tagged)
-					break
-				}
-			}
-		}
-		filteredMachines = intersection
-	}
+	return intersection
+}
 
-	// Export machines to HCL
-	if err := machinesManager.ExportMachines(ctx, filteredMachines, outputPath); err != nil {
+// Helper function for exporting machines
+func exportMachinesToFile(ctx context.Context, machines []spookytypes.Machine, outputPath string) error {
+	if err := machinesManager.ExportMachines(ctx, machines, outputPath); err != nil {
 		return fmt.Errorf("failed to export machines: %w", err)
 	}
+	return nil
+}
 
-	// Output success message
-	fmt.Printf("✅ Successfully exported %d machines to: %s\n", len(filteredMachines), outputPath)
+// Helper function for displaying success output
+func displayExportSuccess(machineCount int, outputPath string) {
+	fmt.Printf("✅ Successfully exported %d machines to: %s\n", machineCount, outputPath)
+}
+
+// Helper function for applying all filters
+func applyMachineFilters(ctx context.Context, machines []spookytypes.Machine, cmd *cobra.Command) ([]spookytypes.Machine, error) {
+	filteredMachines := machines
+
+	// Apply name filter
+	if machineName, _ := cmd.Flags().GetString("machine"); machineName != "" {
+		nameFiltered, err := filterMachinesByName(filteredMachines, machineName)
+		if err != nil {
+			return nil, err
+		}
+		filteredMachines = nameFiltered
+	}
+
+	// Apply tags filter
+	if tags, _ := cmd.Flags().GetStringArray("tags"); len(tags) > 0 {
+		tagsFiltered, err := filterMachinesByTags(ctx, filteredMachines, tags)
+		if err != nil {
+			return nil, err
+		}
+		filteredMachines = tagsFiltered
+	}
+
+	return filteredMachines, nil
+}
+
+// handleMachinesExport handles exporting machines using the MachinesIntegration interface
+func handleMachinesExport(cmd *cobra.Command, projectPath string) error {
+	ctx := context.Background()
+
+	// Initialize dependencies
+	if err := initializeMachinesDependenciesIfNeeded(); err != nil {
+		return err
+	}
+
+	// Validate output path
+	outputPath, err := validateOutputPath(cmd)
+	if err != nil {
+		return err
+	}
+
+	// Load machines from project
+	machines, err := loadProjectMachines(ctx, projectPath)
+	if err != nil {
+		return err
+	}
+
+	// Apply filters
+	filteredMachines, err := applyMachineFilters(ctx, machines, cmd)
+	if err != nil {
+		return err
+	}
+
+	// Export machines
+	if err := exportMachinesToFile(ctx, filteredMachines, outputPath); err != nil {
+		return err
+	}
+
+	// Display success
+	displayExportSuccess(len(filteredMachines), outputPath)
 
 	return nil
 }
