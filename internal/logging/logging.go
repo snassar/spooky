@@ -294,7 +294,6 @@ func (lm *LogManager) updateSlogLogger() {
 
 // createStructuredHandler creates a custom structured handler
 func (lm *LogManager) createStructuredHandler(opts *slog.HandlerOptions) slog.Handler {
-	const jsonFormat = "json"
 	if lm.config.Structured == nil {
 		return slog.NewJSONHandler(lm.writer, opts)
 	}

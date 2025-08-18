@@ -343,7 +343,8 @@ func TestErrorScenarios(t *testing.T) {
 
 	// Test with nil schema
 	result, err := validator.ValidateWithEnhancedFeatures(context.Background(), nil, map[string]interface{}{})
-	require.NoError(t, err)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "schema cannot be nil")
 	assert.False(t, result.Valid)
 	assert.Greater(t, len(result.Errors), 0)
 

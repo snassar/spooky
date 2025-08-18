@@ -39,7 +39,7 @@ func (h *SchemaHelpers) ValidateMigration(schema *spookytypesschemas.Schema, mig
 		schemaError := spookytypesschemas.NewSchemaError(schema.Name, schema.Type,
 			fmt.Sprintf("Migration from version %s cannot be applied to schema version %s",
 				migration.FromVersion, schema.Version))
-		schemaError.Severity = validationError
+		schemaError.Severity = ValidationError
 		result.Errors = append(result.Errors, *schemaError)
 		result.Valid = false
 	}

@@ -68,7 +68,7 @@ func (t *TemplateSchemaValidator) ValidateField(schema *spookytypesschemas.Schem
 
 // SimpleSchemaValidator implements SchemaValidator interface for facts validation
 type SimpleSchemaValidator struct {
-	logger spookytypeslogging.Logger
+	// logger field removed as it was unused
 }
 
 // Validate validates data against a schema
