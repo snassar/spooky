@@ -1006,10 +1006,10 @@ func (c *Client) validateRSAKey(pubKey ssh.PublicKey) error {
 		return fmt.Errorf("failed to cast to RSA public key")
 	}
 
-	// Check key size (minimum 2048 bits for security)
-	if rsaKey.Size()*8 < 2048 {
-		return fmt.Errorf("RSA key size %d bits is less than minimum required 2048 bits",
-			rsaKey.Size()*8)
+	// Check key size (minimum 4096 bits for security)
+	if rsaKey.Size()*8 < MinRSAKeySize {
+		return fmt.Errorf("RSA key size %d bits is less than minimum required %d bits",
+			rsaKey.Size()*8, MinRSAKeySize)
 	}
 
 	return nil
