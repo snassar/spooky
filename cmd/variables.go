@@ -256,25 +256,28 @@ func handleVariablesValidate(projectPath string) error {
 	return nil
 }
 
-// handleVariablesResolve handles resolving variables using the VariablesIntegration interface
-func handleVariablesResolve(_ *cobra.Command, projectPath string) error {
-	ctx := context.Background()
-
-	// Initialize dependencies if not already done
+// Helper function for dependency initialization
+func initializeVariablesDependenciesIfNeeded() error {
 	if variablesManager == nil {
 		if err := InitializeVariablesDependencies(); err != nil {
 			return fmt.Errorf("failed to initialize variables dependencies: %w", err)
 		}
 	}
+	return nil
+}
 
-	// Load variables from project
+// Helper function for loading variables
+func loadProjectVariables(ctx context.Context, projectPath string) (map[string]*spookytypesvariables.Variable, error) {
 	variables, err := variablesManager.LoadVariables(ctx, projectPath)
 	if err != nil {
-		return fmt.Errorf("failed to load variables: %w", err)
+		return nil, fmt.Errorf("failed to load variables: %w", err)
 	}
+	return variables, nil
+}
 
-	// Create variable context
-	variableContext := &spookytypesvariables.VariableContext{
+// Helper function for creating variable context
+func createVariableContext(projectPath string) *spookytypesvariables.VariableContext {
+	return &spookytypesvariables.VariableContext{
 		ProjectPath: projectPath,
 		Environment: make(map[string]interface{}),
 		Facts:       make(map[string]interface{}),
@@ -282,20 +285,27 @@ func handleVariablesResolve(_ *cobra.Command, projectPath string) error {
 		UserData:    make(map[string]interface{}),
 		Timestamp:   time.Now(),
 	}
+}
 
-	// Resolve variables
+// Helper function for resolving variables
+func resolveProjectVariables(ctx context.Context, variables map[string]*spookytypesvariables.Variable, variableContext *spookytypesvariables.VariableContext) (*spookytypesvariables.VariableResolutionResult, error) {
 	resolutionResult, err := variablesManager.ResolveVariables(ctx, variables, variableContext)
 	if err != nil {
-		return fmt.Errorf("failed to resolve variables: %w", err)
+		return nil, fmt.Errorf("failed to resolve variables: %w", err)
 	}
+	return resolutionResult, nil
+}
 
-	// Display resolution results
+// Helper function for displaying resolution summary
+func displayResolutionSummary(projectPath string, variables map[string]*spookytypesvariables.Variable, resolutionResult *spookytypesvariables.VariableResolutionResult) {
 	fmt.Printf("Variable resolution for project: %s\n", projectPath)
 	fmt.Printf("Total variables: %d\n", len(variables))
 	fmt.Printf("Resolved variables: %d\n", len(resolutionResult.Resolved))
 	fmt.Printf("Resolution time: %v\n", resolutionResult.Duration)
+}
 
-	// Display errors
+// Helper function for displaying errors
+func displayResolutionErrors(resolutionResult *spookytypesvariables.VariableResolutionResult) {
 	if len(resolutionResult.Errors) > 0 {
 		fmt.Printf("\n❌ Resolution errors (%d):\n", len(resolutionResult.Errors))
 		for i := range resolutionResult.Errors {
@@ -303,8 +313,10 @@ func handleVariablesResolve(_ *cobra.Command, projectPath string) error {
 			fmt.Printf("  %d. %s: %s\n", i+1, err.VariableName, err.ErrorDetails.Message)
 		}
 	}
+}
 
-	// Display warnings
+// Helper function for displaying warnings
+func displayResolutionWarnings(resolutionResult *spookytypesvariables.VariableResolutionResult) {
 	if len(resolutionResult.Warnings) > 0 {
 		fmt.Printf("\n⚠️  Resolution warnings (%d):\n", len(resolutionResult.Warnings))
 		for i := range resolutionResult.Warnings {
@@ -312,8 +324,10 @@ func handleVariablesResolve(_ *cobra.Command, projectPath string) error {
 			fmt.Printf("  %d. %s: %s\n", i+1, warning.VariableName, warning.ErrorDetails.Message)
 		}
 	}
+}
 
-	// Display resolved values
+// Helper function for displaying resolved values
+func displayResolvedValues(resolutionResult *spookytypesvariables.VariableResolutionResult) {
 	if len(resolutionResult.Resolved) > 0 {
 		fmt.Println("\nResolved values:")
 		fmt.Println(strings.Repeat("-", 80))
@@ -326,37 +340,78 @@ func handleVariablesResolve(_ *cobra.Command, projectPath string) error {
 		sort.Strings(names)
 
 		for _, name := range names {
-			value := resolutionResult.Resolved[name]
-			variable := resolutionResult.Variables[name]
-
-			fmt.Printf("  %s = ", name)
-			if variable.Sensitive {
-				fmt.Print("[SENSITIVE]")
-			} else {
-				// Format value based on type
-				switch v := value.(type) {
-				case string:
-					fmt.Printf("%q", v)
-				case nil:
-					fmt.Print("null")
-				default:
-					fmt.Printf("%v", v)
-				}
-			}
-			fmt.Printf(" (%s)", variable.Type)
-			if variable.Description != "" {
-				fmt.Printf(" - %s", variable.Description)
-			}
-			fmt.Println()
+			displaySingleVariable(name, resolutionResult.Resolved[name], resolutionResult.Variables[name])
 		}
 	}
+}
 
-	// Return error if resolution had errors
+// Helper function for displaying a single variable
+func displaySingleVariable(name string, value interface{}, variable *spookytypesvariables.Variable) {
+	fmt.Printf("  %s = ", name)
+	if variable.Sensitive {
+		fmt.Print("[SENSITIVE]")
+	} else {
+		displayFormattedValue(value)
+	}
+	fmt.Printf(" (%s)", variable.Type)
+	if variable.Description != "" {
+		fmt.Printf(" - %s", variable.Description)
+	}
+	fmt.Println()
+}
+
+// Helper function for formatting values
+func displayFormattedValue(value interface{}) {
+	switch v := value.(type) {
+	case string:
+		fmt.Printf("%q", v)
+	case nil:
+		fmt.Print("null")
+	default:
+		fmt.Printf("%v", v)
+	}
+}
+
+// Helper function for checking resolution errors
+func checkResolutionErrors(resolutionResult *spookytypesvariables.VariableResolutionResult) error {
 	if len(resolutionResult.Errors) > 0 {
 		return fmt.Errorf("variable resolution completed with errors")
 	}
-
 	return nil
+}
+
+// handleVariablesResolve handles resolving variables using the VariablesIntegration interface
+func handleVariablesResolve(_ *cobra.Command, projectPath string) error {
+	ctx := context.Background()
+
+	// Initialize dependencies
+	if err := initializeVariablesDependenciesIfNeeded(); err != nil {
+		return err
+	}
+
+	// Load variables from project
+	variables, err := loadProjectVariables(ctx, projectPath)
+	if err != nil {
+		return err
+	}
+
+	// Create variable context
+	variableContext := createVariableContext(projectPath)
+
+	// Resolve variables
+	resolutionResult, err := resolveProjectVariables(ctx, variables, variableContext)
+	if err != nil {
+		return err
+	}
+
+	// Display results
+	displayResolutionSummary(projectPath, variables, resolutionResult)
+	displayResolutionErrors(resolutionResult)
+	displayResolutionWarnings(resolutionResult)
+	displayResolvedValues(resolutionResult)
+
+	// Check for errors
+	return checkResolutionErrors(resolutionResult)
 }
 
 // handleVariablesEncrypt handles variables encryption
