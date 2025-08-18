@@ -248,9 +248,9 @@ func (l *Loader) parseMetadataBlock(block *hcl.Block) (*spookytypesproject.Metad
 	return metadata, nil
 }
 
-// parseSettingsBlock parses a settings block from HCL
-func (l *Loader) parseSettingsBlock(block *hcl.Block) (*spookytypesproject.Settings, error) {
-	content, diags := block.Body.Content(&hcl.BodySchema{
+// getSettingsBlockSchema returns the HCL schema for settings blocks
+func getSettingsBlockSchema() *hcl.BodySchema {
+	return &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{Name: "parallel_workers", Required: false},
 			{Name: "timeout_seconds", Required: false},
@@ -260,78 +260,129 @@ func (l *Loader) parseSettingsBlock(block *hcl.Block) (*spookytypesproject.Setti
 			{Name: "max_retries", Required: false},
 			{Name: "retry_delay_seconds", Required: false},
 		},
-	})
+	}
+}
+
+// parseBlockContent parses the content of a settings block
+func parseBlockContent(block *hcl.Block) (*hcl.BodyContent, error) {
+	schema := getSettingsBlockSchema()
+	content, diags := block.Body.Content(schema)
 	if diags.HasErrors() {
 		return nil, fmt.Errorf("failed to parse settings block: %v", diags)
 	}
+	return content, nil
+}
 
+// parseIntegerAttribute parses an integer attribute from HCL content
+func parseIntegerAttribute(content *hcl.BodyContent, attrName string) (int, error) {
+	attr, exists := content.Attributes[attrName]
+	if !exists {
+		return 0, nil // Return default value if attribute doesn't exist
+	}
+
+	value, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return 0, fmt.Errorf("failed to parse %s: %v", attrName, diags)
+	}
+
+	intValue, _ := value.AsBigFloat().Int64()
+	return int(intValue), nil
+}
+
+// parseStringAttribute parses a string attribute from HCL content
+func parseStringAttribute(content *hcl.BodyContent, attrName string) (string, error) {
+	attr, exists := content.Attributes[attrName]
+	if !exists {
+		return "", nil // Return default value if attribute doesn't exist
+	}
+
+	value, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return "", fmt.Errorf("failed to parse %s: %v", attrName, diags)
+	}
+
+	return value.AsString(), nil
+}
+
+// parseBooleanAttribute parses a boolean attribute from HCL content
+func parseBooleanAttribute(content *hcl.BodyContent, attrName string) (bool, error) {
+	attr, exists := content.Attributes[attrName]
+	if !exists {
+		return false, nil // Return default value if attribute doesn't exist
+	}
+
+	value, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return false, fmt.Errorf("failed to parse %s: %v", attrName, diags)
+	}
+
+	return value.True(), nil
+}
+
+// populateSettings populates settings with parsed values from HCL content
+func populateSettings(settings *spookytypesproject.Settings, content *hcl.BodyContent) error {
+	// Parse integer attributes
+	if parallelWorkers, err := parseIntegerAttribute(content, "parallel_workers"); err != nil {
+		return err
+	} else {
+		settings.ParallelWorkers = parallelWorkers
+	}
+
+	if timeoutSeconds, err := parseIntegerAttribute(content, "timeout_seconds"); err != nil {
+		return err
+	} else {
+		settings.TimeoutSeconds = timeoutSeconds
+	}
+
+	if maxRetries, err := parseIntegerAttribute(content, "max_retries"); err != nil {
+		return err
+	} else {
+		settings.MaxRetries = maxRetries
+	}
+
+	if retryDelaySeconds, err := parseIntegerAttribute(content, "retry_delay_seconds"); err != nil {
+		return err
+	} else {
+		settings.RetryDelaySeconds = retryDelaySeconds
+	}
+
+	// Parse string attributes
+	if logLevel, err := parseStringAttribute(content, "log_level"); err != nil {
+		return err
+	} else {
+		settings.LogLevel = logLevel
+	}
+
+	// Parse boolean attributes
+	if defaultDryRun, err := parseBooleanAttribute(content, "default_dry_run"); err != nil {
+		return err
+	} else {
+		settings.DefaultDryRun = defaultDryRun
+	}
+
+	if validateBeforeRun, err := parseBooleanAttribute(content, "validate_before_run"); err != nil {
+		return err
+	} else {
+		settings.ValidateBeforeRun = validateBeforeRun
+	}
+
+	return nil
+}
+
+// parseSettingsBlock parses a settings block from HCL
+func (l *Loader) parseSettingsBlock(block *hcl.Block) (*spookytypesproject.Settings, error) {
+	// Parse block content
+	content, err := parseBlockContent(block)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create default settings
 	settings := l.createDefaultSettings()
 
-	// Parse parallel_workers
-	if workersAttr, exists := content.Attributes["parallel_workers"]; exists {
-		workers, diags := workersAttr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse parallel_workers: %v", diags)
-		}
-		workersInt, _ := workers.AsBigFloat().Int64()
-		settings.ParallelWorkers = int(workersInt)
-	}
-
-	// Parse timeout_seconds
-	if timeoutAttr, exists := content.Attributes["timeout_seconds"]; exists {
-		timeout, diags := timeoutAttr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse timeout_seconds: %v", diags)
-		}
-		timeoutInt, _ := timeout.AsBigFloat().Int64()
-		settings.TimeoutSeconds = int(timeoutInt)
-	}
-
-	// Parse log_level
-	if logLevelAttr, exists := content.Attributes["log_level"]; exists {
-		logLevel, diags := logLevelAttr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse log_level: %v", diags)
-		}
-		settings.LogLevel = logLevel.AsString()
-	}
-
-	// Parse default_dry_run
-	if dryRunAttr, exists := content.Attributes["default_dry_run"]; exists {
-		dryRun, diags := dryRunAttr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse default_dry_run: %v", diags)
-		}
-		settings.DefaultDryRun = dryRun.True()
-	}
-
-	// Parse validate_before_run
-	if validateAttr, exists := content.Attributes["validate_before_run"]; exists {
-		validate, diags := validateAttr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse validate_before_run: %v", diags)
-		}
-		settings.ValidateBeforeRun = validate.True()
-	}
-
-	// Parse max_retries
-	if retriesAttr, exists := content.Attributes["max_retries"]; exists {
-		retries, diags := retriesAttr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse max_retries: %v", diags)
-		}
-		retriesInt, _ := retries.AsBigFloat().Int64()
-		settings.MaxRetries = int(retriesInt)
-	}
-
-	// Parse retry_delay_seconds
-	if delayAttr, exists := content.Attributes["retry_delay_seconds"]; exists {
-		delay, diags := delayAttr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to parse retry_delay_seconds: %v", diags)
-		}
-		delayInt, _ := delay.AsBigFloat().Int64()
-		settings.RetryDelaySeconds = int(delayInt)
+	// Populate settings with parsed values
+	if err := populateSettings(settings, content); err != nil {
+		return nil, err
 	}
 
 	return settings, nil
