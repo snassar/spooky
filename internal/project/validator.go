@@ -221,20 +221,19 @@ func (v *Validator) ValidateProjectDirectory(_ context.Context, projectPath stri
 	return result, nil
 }
 
-// ValidateProjectConfig validates project configuration
-func (v *Validator) ValidateProjectConfig(_ context.Context, config *spookytypes.ProjectConfig) (*spookytypesschemas.ValidationResult, error) {
-	v.logger.Info("Validating project configuration", map[string]interface{}{
-		"project_name": config.Name,
-	})
-
-	result := &spookytypesschemas.ValidationResult{
+// createValidationResult creates a new validation result with default values
+func createValidationResult() *spookytypesschemas.ValidationResult {
+	return &spookytypesschemas.ValidationResult{
 		Valid:       true,
 		ValidatedAt: time.Now(),
 		Errors:      []spookytypesschemas.SchemaError{},
 		Warnings:    []spookytypesschemas.SchemaError{},
 	}
+}
 
-	// Validate project name
+// validateProjectName validates the project name field
+func validateProjectName(config *spookytypes.ProjectConfig, result *spookytypesschemas.ValidationResult) {
+	// Validate required project name
 	if config.Name == "" {
 		result.Valid = false
 		result.Errors = append(result.Errors, spookytypesschemas.SchemaError{
@@ -242,22 +241,22 @@ func (v *Validator) ValidateProjectConfig(_ context.Context, config *spookytypes
 			Message:  "Project name is required",
 			Severity: "error",
 		})
+		return
 	}
 
-	// Validate project name pattern (alphanumeric, dots, underscores, hyphens)
-	if config.Name != "" {
-		// Basic validation - could be enhanced with regex
-		if len(config.Name) > 128 {
-			result.Valid = false
-			result.Errors = append(result.Errors, spookytypesschemas.SchemaError{
-				Code:     "project_name_too_long",
-				Message:  "Project name must be 128 characters or less",
-				Severity: "error",
-			})
-		}
+	// Validate project name length
+	if len(config.Name) > 128 {
+		result.Valid = false
+		result.Errors = append(result.Errors, spookytypesschemas.SchemaError{
+			Code:     "project_name_too_long",
+			Message:  "Project name must be 128 characters or less",
+			Severity: "error",
+		})
 	}
+}
 
-	// Validate description length
+// validateProjectDescription validates the project description field
+func validateProjectDescription(config *spookytypes.ProjectConfig, result *spookytypesschemas.ValidationResult) {
 	if config.Description != "" && len(config.Description) > 1024 {
 		result.Warnings = append(result.Warnings, spookytypesschemas.SchemaError{
 			Code:     "description_too_long",
@@ -265,56 +264,108 @@ func (v *Validator) ValidateProjectConfig(_ context.Context, config *spookytypes
 			Severity: "warning",
 		})
 	}
+}
 
-	// Validate metadata if present
-	if config.Metadata != nil {
-		if config.Metadata.Version != "" {
-			// Use centralized ScalVer validation
-			if !spookytypescommon.IsValidScalVerFormat(config.Metadata.Version) {
-				result.Valid = false
-				result.Errors = append(result.Errors, spookytypesschemas.SchemaError{
-					Code:     "invalid_version_format",
-					Message:  "Project version must be in ScalVer format (MAJOR.DATE.PATCH)",
-					Severity: "error",
-				})
-			}
-		}
-
-		if config.Metadata.Author != "" && len(config.Metadata.Author) > 128 {
-			result.Warnings = append(result.Warnings, spookytypesschemas.SchemaError{
-				Code:     "author_too_long",
-				Message:  "Project author should be 128 characters or less",
-				Severity: "warning",
-			})
-		}
+// validateMetadataVersion validates the metadata version field
+func validateMetadataVersion(metadata *spookytypes.ProjectMetadata, result *spookytypesschemas.ValidationResult) {
+	if metadata.Version == "" {
+		return
 	}
 
-	// Validate settings if present
-	if config.Settings != nil {
-		if config.Settings.ParallelWorkers < 1 || config.Settings.ParallelWorkers > 100 {
-			result.Warnings = append(result.Warnings, spookytypesschemas.SchemaError{
-				Code:     "invalid_parallel_workers",
-				Message:  "Parallel workers should be between 1 and 100",
-				Severity: "warning",
-			})
-		}
-
-		if config.Settings.TimeoutSeconds < 1 || config.Settings.TimeoutSeconds > 3600 {
-			result.Warnings = append(result.Warnings, spookytypesschemas.SchemaError{
-				Code:     "invalid_timeout",
-				Message:  "Timeout should be between 1 and 3600 seconds",
-				Severity: "warning",
-			})
-		}
-
-		if config.Settings.MaxRetries < 0 || config.Settings.MaxRetries > 10 {
-			result.Warnings = append(result.Warnings, spookytypesschemas.SchemaError{
-				Code:     "invalid_max_retries",
-				Message:  "Max retries should be between 0 and 10",
-				Severity: "warning",
-			})
-		}
+	if !spookytypescommon.IsValidScalVerFormat(metadata.Version) {
+		result.Valid = false
+		result.Errors = append(result.Errors, spookytypesschemas.SchemaError{
+			Code:     "invalid_version_format",
+			Message:  "Project version must be in ScalVer format (MAJOR.DATE.PATCH)",
+			Severity: "error",
+		})
 	}
+}
+
+// validateMetadataAuthor validates the metadata author field
+func validateMetadataAuthor(metadata *spookytypes.ProjectMetadata, result *spookytypesschemas.ValidationResult) {
+	if metadata.Author != "" && len(metadata.Author) > 128 {
+		result.Warnings = append(result.Warnings, spookytypesschemas.SchemaError{
+			Code:     "author_too_long",
+			Message:  "Project author should be 128 characters or less",
+			Severity: "warning",
+		})
+	}
+}
+
+// validateProjectMetadata validates the project metadata fields
+func validateProjectMetadata(config *spookytypes.ProjectConfig, result *spookytypesschemas.ValidationResult) {
+	if config.Metadata == nil {
+		return
+	}
+
+	validateMetadataVersion(config.Metadata, result)
+	validateMetadataAuthor(config.Metadata, result)
+}
+
+// validateParallelWorkers validates the parallel workers setting
+func validateParallelWorkers(settings *spookytypes.ProjectSettings, result *spookytypesschemas.ValidationResult) {
+	if settings.ParallelWorkers < 1 || settings.ParallelWorkers > 100 {
+		result.Warnings = append(result.Warnings, spookytypesschemas.SchemaError{
+			Code:     "invalid_parallel_workers",
+			Message:  "Parallel workers should be between 1 and 100",
+			Severity: "warning",
+		})
+	}
+}
+
+// validateTimeoutSettings validates the timeout settings
+func validateTimeoutSettings(settings *spookytypes.ProjectSettings, result *spookytypesschemas.ValidationResult) {
+	if settings.TimeoutSeconds < 1 || settings.TimeoutSeconds > 3600 {
+		result.Warnings = append(result.Warnings, spookytypesschemas.SchemaError{
+			Code:     "invalid_timeout",
+			Message:  "Timeout should be between 1 and 3600 seconds",
+			Severity: "warning",
+		})
+	}
+}
+
+// validateRetrySettings validates the retry settings
+func validateRetrySettings(settings *spookytypes.ProjectSettings, result *spookytypesschemas.ValidationResult) {
+	if settings.MaxRetries < 0 || settings.MaxRetries > 10 {
+		result.Warnings = append(result.Warnings, spookytypesschemas.SchemaError{
+			Code:     "invalid_max_retries",
+			Message:  "Max retries should be between 0 and 10",
+			Severity: "warning",
+		})
+	}
+}
+
+// validateProjectSettings validates the project settings fields
+func validateProjectSettings(config *spookytypes.ProjectConfig, result *spookytypesschemas.ValidationResult) {
+	if config.Settings == nil {
+		return
+	}
+
+	validateParallelWorkers(config.Settings, result)
+	validateTimeoutSettings(config.Settings, result)
+	validateRetrySettings(config.Settings, result)
+}
+
+// ValidateProjectConfig validates project configuration
+func (v *Validator) ValidateProjectConfig(_ context.Context, config *spookytypes.ProjectConfig) (*spookytypesschemas.ValidationResult, error) {
+	v.logger.Info("Validating project configuration", map[string]interface{}{
+		"project_name": config.Name,
+	})
+
+	result := createValidationResult()
+
+	// Validate project name
+	validateProjectName(config, result)
+
+	// Validate project description
+	validateProjectDescription(config, result)
+
+	// Validate project metadata
+	validateProjectMetadata(config, result)
+
+	// Validate project settings
+	validateProjectSettings(config, result)
 
 	return result, nil
 }
