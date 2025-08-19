@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	spookyinterfaces "spooky/internal/interfaces"
@@ -380,69 +381,105 @@ func (m *Manager) Delete(_ context.Context, projectPath string) error {
 	return nil
 }
 
-// createProjectHCL creates the project.hcl file
+// createProjectHCL creates the project.hcl file using schema-driven generation
 func (m *Manager) createProjectHCL(project *spookytypes.Project) error {
-	const projectTemplate = `project {
-  name = "{{.Name}}"
-  description = "{{.Description}}"
-  {{- if .Metadata}}
-  metadata {
-    {{- if .Metadata.Version}}
-    version = "{{.Metadata.Version}}"
-    {{- end}}
-    {{- if .Metadata.Author}}
-    author = "{{.Metadata.Author}}"
-    {{- end}}
-    {{- if .Metadata.URL}}
-    url = "{{.Metadata.URL}}"
-    {{- end}}
-  }
-  {{- end}}
+	m.logger.Debug("Creating project.hcl using schema-driven generation", map[string]interface{}{
+		"project_path": project.Path,
+	})
 
-  {{- if .Settings}}
-  settings {
-    {{- if .Settings.ParallelWorkers}}
-    parallel_workers = {{.Settings.ParallelWorkers}}
-    {{- end}}
-    {{- if .Settings.TimeoutSeconds}}
-    timeout_seconds = {{.Settings.TimeoutSeconds}}
-    {{- end}}
-    {{- if .Settings.LogLevel}}
-    log_level = "{{.Settings.LogLevel}}"
-    {{- end}}
-    {{- if .Settings.DefaultDryRun}}
-    default_dry_run = {{.Settings.DefaultDryRun}}
-    {{- end}}
-    {{- if .Settings.ValidateBeforeRun}}
-    validate_before_run = {{.Settings.ValidateBeforeRun}}
-    {{- end}}
-    {{- if .Settings.MaxRetries}}
-    max_retries = {{.Settings.MaxRetries}}
-    {{- end}}
-    {{- if .Settings.RetryDelaySeconds}}
-    retry_delay_seconds = {{.Settings.RetryDelaySeconds}}
-    {{- end}}
-  }
-  {{- end}}
-}
-`
-
-	tmpl, err := template.New("project").Parse(projectTemplate)
+	// Load the project schema
+	schemaManager := spookyschemas.NewManager(m.logger)
+	projectSchema, err := schemaManager.Load("internal/schemas/schemas/structure/project.hcl")
 	if err != nil {
-		return fmt.Errorf("failed to parse project template: %w", err)
+		return fmt.Errorf("failed to load project schema: %w", err)
 	}
 
-	file, err := os.Create(filepath.Join(project.Path, "project.hcl"))
+	// Generate HCL content from schema and project data
+	hclContent, err := m.generateProjectHCLFromSchema(projectSchema, project)
 	if err != nil {
-		return fmt.Errorf("failed to create project.hcl file: %w", err)
+		return fmt.Errorf("failed to generate project.hcl from schema: %w", err)
 	}
-	defer file.Close()
 
-	if err := tmpl.Execute(file, project.Config); err != nil {
-		return fmt.Errorf("failed to run project template: %w", err)
+	// Write the generated content to file
+	filePath := filepath.Join(project.Path, "project.hcl")
+	if err := os.WriteFile(filePath, []byte(hclContent), 0o644); err != nil {
+		return fmt.Errorf("failed to write project.hcl file: %w", err)
 	}
+
+	m.logger.Debug("Generated project.hcl from schema", map[string]interface{}{
+		"file_path":      filePath,
+		"content_length": len(hclContent),
+	})
 
 	return nil
+}
+
+// generateProjectHCLFromSchema generates HCL content based on the project schema
+func (m *Manager) generateProjectHCLFromSchema(schema *spookytypesschemas.Schema, project *spookytypes.Project) (string, error) {
+	var content strings.Builder
+
+	// Start project block
+	content.WriteString("project {\n")
+
+	// Add required fields first
+	if project.Config.Name != "" {
+		content.WriteString(fmt.Sprintf("  name = %q\n", project.Config.Name))
+	}
+
+	// Add optional fields based on schema structure
+	if project.Config.Description != "" {
+		content.WriteString(fmt.Sprintf("  description = %q\n", project.Config.Description))
+	}
+
+	// Add metadata fields as direct attributes (not in metadata block)
+	if project.Config.Metadata != nil {
+		if project.Config.Metadata.Version != "" {
+			content.WriteString(fmt.Sprintf("  version = %q\n", project.Config.Metadata.Version))
+		}
+		if project.Config.Metadata.Author != "" {
+			content.WriteString(fmt.Sprintf("  author = %q\n", project.Config.Metadata.Author))
+		}
+		if project.Config.Metadata.Email != "" {
+			content.WriteString(fmt.Sprintf("  email = %q\n", project.Config.Metadata.Email))
+		}
+		if project.Config.Metadata.URL != "" {
+			content.WriteString(fmt.Sprintf("  url = %q\n", project.Config.Metadata.URL))
+		}
+	}
+
+	// Add settings block if settings exist
+	if project.Config.Settings != nil {
+		content.WriteString("  settings {\n")
+
+		if project.Config.Settings.ParallelWorkers > 0 {
+			content.WriteString(fmt.Sprintf("    parallel_workers = %d\n", project.Config.Settings.ParallelWorkers))
+		}
+		if project.Config.Settings.TimeoutSeconds > 0 {
+			content.WriteString(fmt.Sprintf("    timeout_seconds = %d\n", project.Config.Settings.TimeoutSeconds))
+		}
+		if project.Config.Settings.LogLevel != "" {
+			content.WriteString(fmt.Sprintf("    log_level = %q\n", project.Config.Settings.LogLevel))
+		}
+		if project.Config.Settings.DefaultDryRun {
+			content.WriteString("    default_dry_run = true\n")
+		}
+		if project.Config.Settings.ValidateBeforeRun {
+			content.WriteString("    validate_before_run = true\n")
+		}
+		if project.Config.Settings.MaxRetries > 0 {
+			content.WriteString(fmt.Sprintf("    max_retries = %d\n", project.Config.Settings.MaxRetries))
+		}
+		if project.Config.Settings.RetryDelaySeconds > 0 {
+			content.WriteString(fmt.Sprintf("    retry_delay_seconds = %d\n", project.Config.Settings.RetryDelaySeconds))
+		}
+
+		content.WriteString("  }\n")
+	}
+
+	// Close project block
+	content.WriteString("}\n")
+
+	return content.String(), nil
 }
 
 // createREADME creates a README.md file for the project

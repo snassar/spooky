@@ -7,6 +7,16 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclparse"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
+	"github.com/zclconf/go-cty/cty"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
+	spookyschemas "spooky/internal/schemas"
+	spookytypesschemas "spooky/internal/types/schemas"
 )
 
 // AutoSetupConfig ensures spooky configuration directory exists and is properly configured
@@ -51,14 +61,6 @@ func ensureConfigFiles(configDir string) error {
 	if _, err := os.Stat(spookyConfigPath); os.IsNotExist(err) {
 		if err := createDefaultSpookyConfig(configDir); err != nil {
 			return fmt.Errorf("failed to create default spooky.hcl: %w", err)
-		}
-	}
-
-	// Check if logging.hcl exists
-	loggingConfigPath := filepath.Join(configDir, "logging.hcl")
-	if _, err := os.Stat(loggingConfigPath); os.IsNotExist(err) {
-		if err := createDefaultLoggingConfig(configDir); err != nil {
-			return fmt.Errorf("failed to create default logging.hcl: %w", err)
 		}
 	}
 
@@ -125,174 +127,250 @@ func createConfigDirectory(configDir string) error {
 		return fmt.Errorf("failed to create default spooky.hcl: %w", err)
 	}
 
-	// Create default logging.hcl
-	if err := createDefaultLoggingConfig(configDir); err != nil {
-		return fmt.Errorf("failed to create default logging.hcl: %w", err)
+	return nil
+}
+
+// createDefaultSpookyConfig creates a comprehensive spooky.hcl file using schema-driven generation
+func createDefaultSpookyConfig(configDir string) error {
+	// Load the spooky schema
+	schemaManager := spookyschemas.NewManager(nil) // No logger needed for this operation
+	spookySchema, err := schemaManager.Load("internal/schemas/schemas/structure/spooky.hcl")
+	if err != nil {
+		return fmt.Errorf("failed to load spooky schema: %w", err)
+	}
+
+	// Generate HCL content from schema
+	hclContent, err := generateSpookyHCLFromSchema(spookySchema)
+	if err != nil {
+		return fmt.Errorf("failed to generate spooky.hcl from schema: %w", err)
+	}
+
+	// Write the generated content to file
+	configPath := filepath.Join(configDir, "spooky.hcl")
+	if err := os.WriteFile(configPath, []byte(hclContent), 0o600); err != nil {
+		return fmt.Errorf("failed to write spooky.hcl file: %w", err)
 	}
 
 	return nil
 }
 
-// createDefaultSpookyConfig creates a minimal spooky.hcl file with sane defaults
-func createDefaultSpookyConfig(configDir string) error {
-	content := `# Spooky CLI Configuration
-# This file contains global configuration for the spooky CLI tool
+// generateSpookyHCLFromSchema generates HCL content based on the spooky schema
+func generateSpookyHCLFromSchema(schema *spookytypesschemas.Schema) (string, error) {
+	var content strings.Builder
 
-# Global CLI settings
-cli {
-  # Default timeout for operations (in seconds)
-  default_timeout = 300
-  
-  # Maximum parallel operations
-  max_parallel = 10
-  
-  # Default log level for CLI operations
-  log_level = "info"
-  
-  # Enable colored output (if supported by terminal)
-  colored_output = true
-  
-  # Show progress indicators for long-running operations
-  show_progress = true
+	// Add header comment
+	content.WriteString("# Spooky CLI Configuration\n")
+	content.WriteString("# This file contains global configuration for the spooky CLI tool\n")
+	content.WriteString("# Generated from schema: " + schema.Name + "\n\n")
+
+	// Parse the schema content to understand the structure
+	parser := hclparse.NewParser()
+	file, diags := parser.ParseHCL([]byte(schema.Content), schema.Name)
+	if diags.HasErrors() {
+		return "", fmt.Errorf("failed to parse schema content: %s", diags.Error())
+	}
+
+	// Start spooky block
+	content.WriteString("spooky {\n")
+
+	// Parse the spooky block from the schema
+	bodyContent, diags := file.Body.Content(&hcl.BodySchema{
+		Blocks: []hcl.BlockHeaderSchema{
+			{Type: "spooky"},
+		},
+	})
+	if diags.HasErrors() {
+		return "", fmt.Errorf("failed to parse spooky block from schema: %s", diags.Error())
+	}
+
+	if len(bodyContent.Blocks) > 0 {
+		spookyBlock := bodyContent.Blocks[0]
+		if err := generateBlockFromSchema(spookyBlock, &content, 2); err != nil {
+			return "", fmt.Errorf("failed to generate spooky block: %w", err)
+		}
+	}
+
+	// Close spooky block
+	content.WriteString("}\n")
+
+	return content.String(), nil
 }
 
-# SSH configuration
-ssh {
-  # Default SSH timeout (in seconds)
-  timeout = 30
-  
-  # SSH connection retry attempts
-  retry_attempts = 3
-  
-  # Delay between retry attempts (in seconds)
-  retry_delay = 5
-  
-  # Enable SSH connection pooling
-  connection_pooling = true
-  
-  # Maximum number of SSH connections to keep in pool
-  max_connections = 20
+// generateBlockFromSchema generates HCL content for a block based on its schema definition
+func generateBlockFromSchema(block *hcl.Block, content *strings.Builder, indent int) error {
+	indentStr := strings.Repeat("  ", indent)
+
+	// Parse the block content to understand its structure
+	blockContent, diags := block.Body.Content(&hcl.BodySchema{
+		Attributes: []hcl.AttributeSchema{
+			{Name: "*", Required: false}, // Allow any attribute
+		},
+		Blocks: []hcl.BlockHeaderSchema{
+			{Type: "*"}, // Allow any blocks
+		},
+	})
+	if diags.HasErrors() {
+		return fmt.Errorf("failed to parse block content: %s", diags.Error())
+	}
+
+	// Generate attributes with their default values
+	for _, attr := range blockContent.Attributes {
+		if err := generateAttributeFromSchema(attr, content, indentStr); err != nil {
+			return fmt.Errorf("failed to generate attribute %s: %w", attr.Name, err)
+		}
+	}
+
+	// Generate nested blocks
+	for _, nestedBlock := range blockContent.Blocks {
+		if err := generateNestedBlockFromSchema(nestedBlock, content, indent); err != nil {
+			return fmt.Errorf("failed to generate nested block %s: %w", nestedBlock.Type, err)
+		}
+	}
+
+	return nil
 }
 
-# Facts collection configuration
-facts {
-  # Default facts collection timeout (in seconds)
-  timeout = 60
-  
-  # Enable automatic facts collection
-  auto_collect = false
-  
-  # Maximum parallel facts collection workers
-  max_parallel = 5
-  
-  # Facts collection retry attempts
-  retry_attempts = 3
-  
-  # Delay between facts collection retries (in seconds)
-  retry_delay = 5
+// generateAttributeFromSchema generates HCL content for an attribute based on its schema definition
+func generateAttributeFromSchema(attr *hcl.Attribute, content *strings.Builder, indentStr string) error {
+	// Try to parse the attribute as a field validation block
+	if block, ok := attr.Expr.(*hclsyntax.ObjectConsExpr); ok {
+		return generateFieldValidationFromBlock(attr.Name, block, content, indentStr)
+	}
+
+	// Try to parse as a simple value
+	if val, diags := attr.Expr.Value(nil); !diags.HasErrors() {
+		// Extract default value and type information
+		defaultValue := extractDefaultValue(val)
+		content.WriteString(fmt.Sprintf("%s%s = %s\n", indentStr, attr.Name, defaultValue))
+		return nil
+	}
+
+	// If we can't parse it, just write the attribute name with a placeholder
+	content.WriteString(fmt.Sprintf("%s%s = \"<value>\"\n", indentStr, attr.Name))
+	return nil
 }
 
-# Actions configuration
-actions {
-  # Default action timeout (in seconds)
-  default_timeout = 300
-  
-  # Maximum parallel action runs
-  max_parallel = 10
-  
-  # Enable dry-run mode by default
-  dry_run_default = false
-  
-  # Validate actions before running
-  validate_before_run = true
-  
-  # Create backups before making changes
-  backup_before_changes = false
+// generateFieldValidationFromBlock generates HCL content from a field validation block
+func generateFieldValidationFromBlock(fieldName string, block *hclsyntax.ObjectConsExpr, content *strings.Builder, indentStr string) error {
+	// Extract type, default value, and description from the validation block
+	var fieldType, defaultValue, description string
+
+	for _, item := range block.Items {
+		if key, ok := item.KeyExpr.(*hclsyntax.LiteralValueExpr); ok {
+			keyStr := key.Val.AsString()
+
+			if val, diags := item.ValueExpr.Value(nil); !diags.HasErrors() {
+				switch keyStr {
+				case "type":
+					fieldType = val.AsString()
+				case "default":
+					defaultValue = formatValue(val)
+				case "description":
+					description = val.AsString()
+				}
+			}
+		}
+	}
+
+	// Add comment with description if available
+	if description != "" {
+		content.WriteString(fmt.Sprintf("%s# %s\n", indentStr, description))
+	}
+
+	// Generate the field with appropriate default value
+	if defaultValue != "" {
+		content.WriteString(fmt.Sprintf("%s%s = %s\n", indentStr, fieldName, defaultValue))
+	} else {
+		// Generate appropriate default based on type
+		defaultValue = generateDefaultForType(fieldType)
+		content.WriteString(fmt.Sprintf("%s%s = %s\n", indentStr, fieldName, defaultValue))
+	}
+
+	return nil
 }
 
-# Facts configuration
-facts {
-  # Facts are collected and used in-memory only
-  # No persistent storage is used
+// generateNestedBlockFromSchema generates HCL content for a nested block
+func generateNestedBlockFromSchema(block *hcl.Block, content *strings.Builder, parentIndent int) error {
+	indentStr := strings.Repeat("  ", parentIndent)
+
+	// Add comment for the block
+	content.WriteString(fmt.Sprintf("%s# %s configuration\n", indentStr, cases.Title(language.English).String(block.Type)))
+	content.WriteString(fmt.Sprintf("%s%s {\n", indentStr, block.Type))
+
+	// Generate the block content
+	if err := generateBlockFromSchema(block, content, parentIndent+1); err != nil {
+		return err
+	}
+
+	content.WriteString(fmt.Sprintf("%s}\n\n", indentStr))
+	return nil
 }
-`
 
-	configPath := filepath.Join(configDir, "spooky.hcl")
-	return os.WriteFile(configPath, []byte(content), 0o600)
+// extractDefaultValue extracts a default value from a cty.Value
+func extractDefaultValue(val cty.Value) string {
+	if val.IsNull() {
+		return "null"
+	}
+
+	switch {
+	case val.Type() == cty.String:
+		return fmt.Sprintf("%q", val.AsString())
+	case val.Type() == cty.Number:
+		return val.AsBigFloat().String()
+	case val.Type() == cty.Bool:
+		return fmt.Sprintf("%t", val.True())
+	case val.Type().IsListType():
+		// Handle list values
+		if val.LengthInt() == 0 {
+			return "[]"
+		}
+		var items []string
+		for it := val.ElementIterator(); it.Next(); {
+			_, itemVal := it.Element()
+			items = append(items, extractDefaultValue(itemVal))
+		}
+		return fmt.Sprintf("[%s]", strings.Join(items, ", "))
+	case val.Type().IsMapType():
+		// Handle map values
+		if val.LengthInt() == 0 {
+			return "{}"
+		}
+		var items []string
+		for it := val.ElementIterator(); it.Next(); {
+			key, itemVal := it.Element()
+			items = append(items, fmt.Sprintf("%q = %s", key.AsString(), extractDefaultValue(itemVal)))
+		}
+		return fmt.Sprintf("{\n    %s\n  }", strings.Join(items, "\n    "))
+	default:
+		return fmt.Sprintf("%v", val)
+	}
 }
 
-// createDefaultLoggingConfig creates a minimal logging.hcl file with sane defaults
-func createDefaultLoggingConfig(configDir string) error {
-	content := `# Global logging configuration for spooky
-# This file configures logging behavior for all spooky operations
-# 
-# Default behavior (when this file doesn't exist or is empty):
-# - Log level: error (only errors are shown)
-# - Format: json (structured logging)
-# - Output: null (no logging output to terminal)
+// formatValue formats a cty.Value for HCL output
+func formatValue(val cty.Value) string {
+	return extractDefaultValue(val)
+}
 
-# Uncomment and modify the settings below to customize logging behavior:
-
-# logging {
-#   # Log level (debug, info, warn, error, fatal)
-#   # Default: error (only show errors)
-#   level = "error"
-#   
-#   # Output format (json, text, structured)
-#   # Default: json (structured logging)
-#   format = "json"
-#   
-#   # Output destination (stdout, stderr, file, null)
-#   # Default: null (no output to terminal)
-#   # Options: stdout, stderr, file, null
-#   output = "null"
-#   
-#   # File output configuration (used when output = "file")
-#   # file {
-#   #   path        = "/var/log/spooky/spooky.log"
-#   #   permissions = "0644"
-#   #   append      = true
-#   # }
-#   
-#   # Component-specific filtering
-#   # filtering {
-#   #   components = {
-#   #     "ssh"     = "debug"
-#   #     "facts"   = "info"
-#   #     "actions" = "warn"
-#   #   }
-#   # }
-#   
-#   # Performance optimization
-#   # performance {
-#   #   buffer {
-#   #     enabled        = false
-#   #     size           = 4096
-#   #     flush_interval = "1s"
-#   #   }
-#   #   
-#   #   async {
-#   #     enabled       = false
-#   #     queue_size    = 1000
-#   #     workers       = 1
-#   #     drop_when_full = false
-#   #   }
-#   # }
-#   
-#   # Log rotation (when using file output)
-#   # rotation {
-#   #   enabled      = true
-#   #   max_size     = "100MB"
-#   #   max_age      = "30d"
-#   #   max_backups  = 5
-#   #   compress     = true
-#   #   local_time   = false
-#   # }
-# }
-`
-
-	configPath := filepath.Join(configDir, "logging.hcl")
-	return os.WriteFile(configPath, []byte(content), 0o600)
+// generateDefaultForType generates an appropriate default value for a given type
+func generateDefaultForType(fieldType string) string {
+	switch fieldType {
+	case "string":
+		return `""`
+	case "integer":
+		return "0"
+	case "number":
+		return "0.0"
+	case "boolean":
+		return "false"
+	case "list":
+		return "[]"
+	case "map":
+		return "{}"
+	case "object":
+		return "{}"
+	default:
+		return `""`
+	}
 }
 
 // validateConfigFiles validates that the existing config files are valid HCL
@@ -300,12 +378,6 @@ func validateConfigFiles(configDir string) error {
 	// Check if spooky.hcl exists and is valid
 	spookyConfigPath := filepath.Join(configDir, "spooky.hcl")
 	if err := validateHCLFile(spookyConfigPath, "spooky.hcl"); err != nil {
-		return err
-	}
-
-	// Check if logging.hcl exists and is valid
-	loggingConfigPath := filepath.Join(configDir, "logging.hcl")
-	if err := validateHCLFile(loggingConfigPath, "logging.hcl"); err != nil {
 		return err
 	}
 
@@ -422,9 +494,4 @@ func isValidHCLSyntax(line string) bool {
 // GetConfigDirectory returns the config directory path (for external use)
 func GetConfigDirectory() (string, error) {
 	return getConfigDirectory()
-}
-
-// GetLoggingConfigManager creates and returns a LoggingConfigManager instance
-func GetLoggingConfigManager() *LoggingConfigManager {
-	return NewLoggingConfigManager()
 }

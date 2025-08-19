@@ -54,6 +54,9 @@ type Metadata struct {
 	// Project author
 	Author string `json:"author,omitempty" hcl:"author,optional"`
 
+	// Project contact email
+	Email string `json:"email,omitempty" hcl:"email,optional"`
+
 	// Project tags
 	Tags []string `json:"tags,omitempty" hcl:"tags,optional"`
 

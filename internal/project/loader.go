@@ -127,6 +127,10 @@ func (l *Loader) parseProjectBlock(block *hcl.Block, _ string) (*spookytypes.Pro
 		Attributes: []hcl.AttributeSchema{
 			{Name: "name", Required: true},
 			{Name: "description", Required: false},
+			{Name: "version", Required: false},
+			{Name: "author", Required: false},
+			{Name: "email", Required: false},
+			{Name: "url", Required: false},
 		},
 		Blocks: []hcl.BlockHeaderSchema{
 			{Type: "metadata"},
@@ -154,7 +158,47 @@ func (l *Loader) parseProjectBlock(block *hcl.Block, _ string) (*spookytypes.Pro
 		description = desc.AsString()
 	}
 
-	// Parse metadata block
+	// Parse version attribute (optional)
+	var version string
+	if versionAttr, exists := content.Attributes["version"]; exists {
+		ver, diags := versionAttr.Expr.Value(nil)
+		if diags.HasErrors() {
+			return nil, fmt.Errorf("failed to parse project version: %v", diags)
+		}
+		version = ver.AsString()
+	}
+
+	// Parse author attribute (optional)
+	var author string
+	if authorAttr, exists := content.Attributes["author"]; exists {
+		auth, diags := authorAttr.Expr.Value(nil)
+		if diags.HasErrors() {
+			return nil, fmt.Errorf("failed to parse project author: %v", diags)
+		}
+		author = auth.AsString()
+	}
+
+	// Parse email attribute (optional)
+	var email string
+	if emailAttr, exists := content.Attributes["email"]; exists {
+		em, diags := emailAttr.Expr.Value(nil)
+		if diags.HasErrors() {
+			return nil, fmt.Errorf("failed to parse project email: %v", diags)
+		}
+		email = em.AsString()
+	}
+
+	// Parse url attribute (optional)
+	var url string
+	if urlAttr, exists := content.Attributes["url"]; exists {
+		u, diags := urlAttr.Expr.Value(nil)
+		if diags.HasErrors() {
+			return nil, fmt.Errorf("failed to parse project url: %v", diags)
+		}
+		url = u.AsString()
+	}
+
+	// Parse metadata block (for additional metadata)
 	var metadata *spookytypesproject.Metadata
 	for _, block := range content.Blocks {
 		if block.Type == "metadata" {
@@ -186,6 +230,20 @@ func (l *Loader) parseProjectBlock(block *hcl.Block, _ string) (*spookytypes.Pro
 	}
 	if settings == nil {
 		settings = l.createDefaultSettings()
+	}
+
+	// Set the parsed values in metadata
+	if version != "" {
+		metadata.Version = version
+	}
+	if author != "" {
+		metadata.Author = author
+	}
+	if email != "" {
+		metadata.Email = email
+	}
+	if url != "" {
+		metadata.URL = url
 	}
 
 	return &spookytypes.ProjectConfig{
