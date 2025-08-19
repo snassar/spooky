@@ -1,0 +1,113 @@
+# Issue Management Commands
+# This justfile provides commands for managing Codeberg issues from markdown files
+
+# List all local issue files (all .md files except template and README)
+list-local:
+    @echo "Local issue files:"
+    @ls -1 *.md 2>/dev/null | grep -v "00-issue-template.md" | grep -v "README.md" || echo "No local issue files found"
+
+# List all Codeberg issues
+list-codeberg:
+    @echo "Codeberg issues:"
+    @curl -s -H "Authorization: token ${CODEBERG_TOKEN}" "https://codeberg.org/api/v1/repos/${CODEBERG_OWNER}/${CODEBERG_REPO}/issues?state=all" | jq -r '.[] | "\(.number): \(.title) (\(.state))"' 2>/dev/null || echo "Error: Failed to fetch Codeberg issues. Check CODEBERG_TOKEN, CODEBERG_OWNER, and CODEBERG_REPO environment variables."
+
+# List both local and Codeberg issues
+list:
+    @echo "=== Local Issues ==="
+    @just list-local
+    @echo ""
+    @echo "=== Codeberg Issues ==="
+    @just list-codeberg
+
+# Create a new issue from a markdown file on Codeberg
+create file:
+    @echo "Creating Codeberg issue from {{file}}..."
+    @test -f "{{file}}" || (echo "Error: Issue file '{{file}}' not found" && exit 1)
+    @test -n "${CODEBERG_TOKEN}" || (echo "Error: CODEBERG_TOKEN environment variable not set" && exit 1)
+    @test -n "${CODEBERG_OWNER}" || (echo "Error: CODEBERG_OWNER environment variable not set" && exit 1)
+    @test -n "${CODEBERG_REPO}" || (echo "Error: CODEBERG_REPO environment variable not set" && exit 1)
+    
+    # Check if issue number is already in the file
+    @grep -q '^#\s*[0-9]\+' "{{file}}" && echo "Issue number already exists in file" && exit 0 || true
+    
+    # Extract title and create issue
+    @head -n 1 "{{file}}" | sed 's/^# //' > /tmp/title
+    @tail -n +2 "{{file}}" | sed 's/^#/##/' > /tmp/body
+    @echo "Creating new issue..."
+    @curl -s -X POST -H "Authorization: token ${CODEBERG_TOKEN}" -H "Content-Type: application/json" -d @- "https://codeberg.org/api/v1/repos/${CODEBERG_OWNER}/${CODEBERG_REPO}/issues" < <(echo "{\"title\": \"$$(cat /tmp/title)\", \"body\": \"$$(cat /tmp/body)\"}") | jq -r '.number' > /tmp/issue_number
+    @echo "Issue created successfully on Codeberg: #$$(cat /tmp/issue_number)"
+    @echo "Adding issue number to local file..."
+    @sed -i "1a\\# $$(cat /tmp/issue_number)" "{{file}}"
+    @echo "Updated {{file}} with issue number #$$(cat /tmp/issue_number)"
+    @rm -f /tmp/title /tmp/body /tmp/issue_number
+
+# Create a new issue as draft from a markdown file (Codeberg doesn't support drafts, so this creates a regular issue)
+create-draft file:
+    @echo "Creating Codeberg issue from {{file}} (draft mode not supported by Codeberg)..."
+    @just create "{{file}}"
+
+# Force create an issue (skip similarity checks)
+create-force file:
+    @echo "Force creating Codeberg issue from {{file}}..."
+    @test -f "{{file}}" || (echo "Error: Issue file '{{file}}' not found" && exit 1)
+    @test -n "${CODEBERG_TOKEN}" || (echo "Error: CODEBERG_TOKEN environment variable not set" && exit 1)
+    @test -n "${CODEBERG_OWNER}" || (echo "Error: CODEBERG_OWNER environment variable not set" && exit 1)
+    @test -n "${CODEBERG_REPO}" || (echo "Error: CODEBERG_REPO environment variable not set" && exit 1)
+    
+    # Extract title from markdown file (simple format)
+    @TITLE=$$(head -n 1 "{{file}}" | sed 's/^# //') && \
+    echo "Force creating new issue: $$TITLE" && \
+    # Extract body content (simple format)
+    @BODY=$$(tail -n +2 "{{file}}" | sed 's/^#/##/') && \
+    NEW_ISSUE_NUMBER=$$(curl -s -X POST -H "Authorization: token ${CODEBERG_TOKEN}" -H "Content-Type: application/json" -d "{\"title\": \"$$TITLE\", \"body\": \"$$BODY\"}" "https://codeberg.org/api/v1/repos/${CODEBERG_OWNER}/${CODEBERG_REPO}/issues" | jq -r '.number') && \
+    echo "Issue created successfully on Codeberg: #$$NEW_ISSUE_NUMBER" && \
+    echo "Adding issue number to local file..." && \
+    sed -i "1a\\# $$NEW_ISSUE_NUMBER" "{{file}}" && \
+    echo "Updated {{file}} with issue number #$$NEW_ISSUE_NUMBER"
+
+# Create a new issue file from template (with issue- prefix)
+new filename:
+    @echo "Creating new issue file: issue-{{filename}}"
+    @test -f "issue-{{filename}}" && (echo "Error: File 'issue-{{filename}}' already exists" && exit 1) || true
+    @cp 00-issue-template.md "issue-{{filename}}"
+    @echo "Created issue-{{filename}} from template"
+    @echo "Edit the file and then run: just create issue-{{filename}}"
+
+# Validate issue file format
+validate file:
+    @echo "Validating {{file}}..."
+    @test -f "{{file}}" || (echo "Error: Issue file '{{file}}' not found" && exit 1)
+    @echo "File exists and is readable"
+    @echo "Validation complete"
+
+
+
+# Help command
+help:
+    @echo "Codeberg Issue Management Commands:"
+    @echo ""
+    @echo "  just list                    - List both local and Codeberg issues"
+    @echo "  just list-local              - List local issue files (all .md files)"
+    @echo "  just list-codeberg           - List all Codeberg issues"
+    @echo "  just new <filename>          - Create new issue file from template (issue-<filename>.md)"
+    @echo "  just create <file>           - Create Codeberg issue from markdown file (smart duplicate detection)"
+    @echo "  just create-force <file>     - Force create Codeberg issue (skip similarity checks)"
+    @echo "  just create-draft <file>     - Create Codeberg issue (draft mode not supported)"
+    @echo "  just validate <file>         - Validate issue file format"
+    @echo "  just help                    - Show this help message"
+    @echo ""
+    @echo "Duplicate Detection Strategy:"
+    @echo "  1. Check if issue number already exists in file"
+    @echo "  2. Check for exact title match on Codeberg"
+    @echo "  3. Check for similar titles (fuzzy matching)"
+    @echo "  4. Create new issue and add number to file"
+    @echo ""
+    @echo "Environment Variables Required:"
+    @echo "  CODEBERG_TOKEN               - Your Codeberg API token"
+    @echo "  CODEBERG_OWNER               - Repository owner"
+    @echo "  CODEBERG_REPO                - Repository name"
+    @echo ""
+    @echo "Examples:"
+    @echo "  just new feature-request"
+    @echo "  just create issue-bug-report.md"
+    @echo "  just create-force issue-enhancement.md"

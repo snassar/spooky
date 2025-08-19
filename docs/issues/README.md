@@ -1,15 +1,43 @@
 # Issue Management Workflow
 
-This directory contains markdown files for GitHub issues that can be created using the `gh` CLI tool.
+This directory contains markdown files for Codeberg issues that can be created using the Codeberg API. Issue management commands are provided by the local `justfile`.
+
+## Quick Start
+
+```bash
+# Navigate to issues directory
+cd docs/issues
+
+# Set up environment variables
+export CODEBERG_TOKEN="your-api-token"
+export CODEBERG_OWNER="your-username"
+export CODEBERG_REPO="your-repo-name"
+
+# List available commands
+just help
+
+# Create new issue file from template
+just new my-new-issue
+
+# Edit the issue file
+just edit issue-my-new-issue.md
+
+# Create Codeberg issue from file (only if it doesn't exist)
+just create issue-my-new-issue.md
+
+# List local and Codeberg issues
+just list
+```
 
 ## Workflow
 
 ### 1. Create Issue File
 
-Create a new markdown file in this directory following the template:
+Create a new markdown file using the justfile:
 
 ```bash
-cp docs/issues/00-issue-template.md docs/issues/my-new-issue.md
+cd docs/issues
+just new my-new-issue.md
 ```
 
 ### 2. Edit the Issue
@@ -25,35 +53,57 @@ Edit the markdown file with your issue details. The first line should be the iss
 
 ### 3. Create the Issue
 
-Use the just command:
+Use the justfile commands:
 
 ```bash
 # Create issue
-just create-issue docs/issues/my-new-issue.md
+just create my-new-issue.md
 
 # Create as draft
-just create-issue-draft docs/issues/my-new-issue.md
+just create-draft my-new-issue.md
 ```
 
 ### 4. Add Labels (Optional)
 
-After creation, add labels to the issue:
+After creation, add labels to the issue using the Codeberg web interface or API:
 
 ```bash
-gh issue edit <number> --add-label enhancement,infrastructure
+# You can add labels through the Codeberg web interface
+# or use the API directly with curl
 ```
 
 ## Available Commands
 
 ```bash
-# List available issue files
-just list-issues
+# List both local and Codeberg issues
+just list
 
-# Create issue from file
-just create-issue docs/issues/my-issue.md
+# List local issue files only
+just list-local
 
-# Create issue as draft
-just create-issue-draft docs/issues/my-issue.md
+# List Codeberg issues only
+just list-codeberg
+
+# Create new issue file from template (issue-<filename>.md)
+just new <filename>
+
+# Create Codeberg issue from file (only if not exists)
+just create <file>
+
+# Create Codeberg issue (draft mode not supported)
+just create-draft <file>
+
+# Validate issue file format
+just validate <file>
+
+# Show issue file content
+just show <file>
+
+# Edit issue file
+just edit <file>
+
+# Show help
+just help
 ```
 
 ## Best Practices
@@ -92,11 +142,14 @@ Use kebab-case for issue files:
 
 ```
 docs/issues/
-├── 00-issue-template.md          # Template (don't create issues from this)
-├── cli-logging-flags.md          # CLI logging enhancement
-├── fix-ssh-connection-bug.md     # Bug fix
-├── improve-documentation.md      # Documentation improvement
-└── README.md                     # This file
+├── 00-issue-template.md                    # Template (don't create issues from this)
+├── hardcoded-actions-hcl-generation.md     # Schema-driven actions generation
+├── hardcoded-spooky-config-generation.md   # Schema-driven config generation
+├── hardcoded-logging-config-generation.md  # Schema-driven logging generation
+├── hardcoded-variables-hcl-generation.md   # Schema-driven variables generation
+├── hardcoded-machines-hcl-generation.md    # Schema-driven machines generation
+├── cli-logging-flags.md                    # CLI logging enhancement
+└── README.md                               # This file
 ```
 
 ## Benefits of This Approach
