@@ -2,9 +2,12 @@ package utilities
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"spooky/internal/logging"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
@@ -66,8 +69,19 @@ func (v *HCLValidator) WithStrictMode(strict bool) *HCLValidator {
 
 // ValidateFile validates an HCL file at the given path
 func (v *HCLValidator) ValidateFile(filePath string) (*ValidationResult, error) {
+	logger := logging.GetGlobalLogger()
+
+	logger.Debug("validating HCL file",
+		slog.String("component", "hcl_validator"),
+		slog.String("operation", "validate_file"),
+		slog.String("file_path", filePath))
+
 	// Check if file exists
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		logger.Error("file does not exist",
+			slog.String("component", "hcl_validator"),
+			slog.String("operation", "validate_file"),
+			slog.String("file_path", filePath))
 		return &ValidationResult{
 			IsValid: false,
 			Errors: []ValidationError{

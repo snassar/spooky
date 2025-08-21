@@ -4,8 +4,11 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"path/filepath"
 	"strings"
+
+	"spooky/internal/logging"
 
 	"github.com/pkg/errors"
 )
@@ -26,6 +29,8 @@ type SchemaEmbedder struct {
 
 // NewSchemaEmbedder creates a new schema embedder instance
 func NewSchemaEmbedder() (*SchemaEmbedder, error) {
+	logger := logging.GetGlobalLogger()
+
 	embedder := &SchemaEmbedder{
 		schemas:  make(map[string]string),
 		rules:    make(map[string]string),
@@ -33,13 +38,30 @@ func NewSchemaEmbedder() (*SchemaEmbedder, error) {
 		testdata: make(map[string]string),
 	}
 
+	logger.Info("initializing schema embedder",
+		slog.String("component", "schema_embedder"),
+		slog.String("operation", "init"))
+
 	if err := embedder.loadEmbeddedSchemas(); err != nil {
+		logger.Error("failed to load embedded schemas",
+			slog.String("component", "schema_embedder"),
+			slog.String("operation", "load_schemas"))
 		return nil, errors.Wrap(err, "failed to load embedded schemas")
 	}
 
 	if err := embedder.loadEmbeddedTestData(); err != nil {
+		logger.Error("failed to load embedded test data",
+			slog.String("component", "schema_embedder"),
+			slog.String("operation", "load_test_data"))
 		return nil, errors.Wrap(err, "failed to load embedded test data")
 	}
+
+	logger.Info("schema embedder initialized successfully",
+		slog.String("component", "schema_embedder"),
+		slog.Int("schemas_count", len(embedder.schemas)),
+		slog.Int("rules_count", len(embedder.rules)),
+		slog.Int("metadata_count", len(embedder.metadata)),
+		slog.Int("testdata_count", len(embedder.testdata)))
 
 	return embedder, nil
 }
