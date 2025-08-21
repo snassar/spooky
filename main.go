@@ -69,5 +69,26 @@ func main() {
 		fmt.Printf("  %d. %s\n", i+1, name)
 	}
 
-	fmt.Println("\n🎉 Schema embedding is working!")
+	// List all available test data
+	fmt.Println("\n🧪 All Available Test Data:")
+	testdata := embedder.ListTestData()
+	for i, name := range testdata {
+		fmt.Printf("  %d. %s\n", i+1, name)
+	}
+
+	// Demonstrate getting test data
+	fmt.Println("\n🧪 Example: Getting 'valid-project' test data")
+	if testdata, exists := embedder.GetTestData("valid-project"); exists {
+		fmt.Printf("✅ Found valid-project test data (%d bytes)\n", len(testdata))
+		fmt.Println("First 200 characters:")
+		if len(testdata) > 200 {
+			fmt.Println(testdata[:200] + "...")
+		} else {
+			fmt.Println(testdata)
+		}
+	} else {
+		fmt.Println("❌ valid-project test data not found")
+	}
+
+	fmt.Println("\n🎉 Schema embedding with test data is working!")
 }

@@ -11,11 +11,15 @@ import (
 //go:embed schemafiles
 var embeddedSchemas embed.FS
 
+//go:embed testdata
+var embeddedTestData embed.FS
+
 // SchemaEmbedder provides functionality to embed and access HCL schemas
 type SchemaEmbedder struct {
 	schemas  map[string]string
 	rules    map[string]string
 	metadata map[string]string
+	testdata map[string]string
 }
 
 // NewSchemaEmbedder creates a new schema embedder instance
@@ -24,10 +28,15 @@ func NewSchemaEmbedder() (*SchemaEmbedder, error) {
 		schemas:  make(map[string]string),
 		rules:    make(map[string]string),
 		metadata: make(map[string]string),
+		testdata: make(map[string]string),
 	}
 
 	if err := embedder.loadEmbeddedSchemas(); err != nil {
 		return nil, fmt.Errorf("failed to load embedded schemas: %w", err)
+	}
+
+	if err := embedder.loadEmbeddedTestData(); err != nil {
+		return nil, fmt.Errorf("failed to load embedded test data: %w", err)
 	}
 
 	return embedder, nil
@@ -75,6 +84,37 @@ func (se *SchemaEmbedder) loadEmbeddedSchemas() error {
 	})
 }
 
+// loadEmbeddedTestData loads all embedded test data files into memory
+func (se *SchemaEmbedder) loadEmbeddedTestData() error {
+	return fs.WalkDir(embeddedTestData, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		// Only process .hcl files
+		if !strings.HasSuffix(path, ".hcl") {
+			return nil
+		}
+
+		// Read the file content
+		content, err := embeddedTestData.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("failed to read embedded test file %s: %w", path, err)
+		}
+
+		// Use the filename as the key
+		baseName := filepath.Base(path)
+		key := strings.TrimSuffix(baseName, ".hcl")
+		se.testdata[key] = string(content)
+
+		return nil
+	})
+}
+
 // GetSchema retrieves a schema by name
 func (se *SchemaEmbedder) GetSchema(name string) (string, bool) {
 	content, exists := se.schemas[name]
@@ -90,6 +130,12 @@ func (se *SchemaEmbedder) GetValidationRules(name string) (string, bool) {
 // GetMetadata retrieves metadata by name
 func (se *SchemaEmbedder) GetMetadata(name string) (string, bool) {
 	content, exists := se.metadata[name]
+	return content, exists
+}
+
+// GetTestData retrieves test data by name
+func (se *SchemaEmbedder) GetTestData(name string) (string, bool) {
+	content, exists := se.testdata[name]
 	return content, exists
 }
 
@@ -120,6 +166,15 @@ func (se *SchemaEmbedder) ListMetadata() []string {
 	return metadata
 }
 
+// ListTestData returns a list of all available test data names
+func (se *SchemaEmbedder) ListTestData() []string {
+	var testdata []string
+	for name := range se.testdata {
+		testdata = append(testdata, name)
+	}
+	return testdata
+}
+
 // GetAllSchemas returns all schemas as a map
 func (se *SchemaEmbedder) GetAllSchemas() map[string]string {
 	result := make(map[string]string)
@@ -142,6 +197,15 @@ func (se *SchemaEmbedder) GetAllValidationRules() map[string]string {
 func (se *SchemaEmbedder) GetAllMetadata() map[string]string {
 	result := make(map[string]string)
 	for k, v := range se.metadata {
+		result[k] = v
+	}
+	return result
+}
+
+// GetAllTestData returns all test data as a map
+func (se *SchemaEmbedder) GetAllTestData() map[string]string {
+	result := make(map[string]string)
+	for k, v := range se.testdata {
 		result[k] = v
 	}
 	return result
@@ -210,7 +274,7 @@ type SchemaInfo struct {
 // PrintSchemaSummary prints a summary of all embedded schemas
 func (se *SchemaEmbedder) PrintSchemaSummary() {
 	fmt.Println("=== Embedded Schemas Summary ===")
-
+	
 	fmt.Printf("\n📁 Structure Schemas (%d):\n", len(se.schemas))
 	for _, name := range se.ListSchemas() {
 		info, _ := se.GetSchemaInfo(name)
@@ -229,5 +293,11 @@ func (se *SchemaEmbedder) PrintSchemaSummary() {
 		fmt.Printf("  - %s (%d bytes)\n", name, len(metadata))
 	}
 
-	fmt.Printf("\n📊 Total: %d files embedded\n", len(se.schemas)+len(se.rules)+len(se.metadata))
+	fmt.Printf("\n🧪 Test Data (%d):\n", len(se.testdata))
+	for _, name := range se.ListTestData() {
+		testdata, _ := se.GetTestData(name)
+		fmt.Printf("  - %s (%d bytes)\n", name, len(testdata))
+	}
+
+	fmt.Printf("\n📊 Total: %d files embedded\n", len(se.schemas)+len(se.rules)+len(se.metadata)+len(se.testdata))
 }
