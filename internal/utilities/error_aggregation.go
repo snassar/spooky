@@ -38,7 +38,7 @@ func (ea *ErrorAggregator) AddWithContext(err error, context string) {
 		return
 	}
 	
-	wrappedErr := errors.Wrapf(err, context)
+	wrappedErr := errors.Wrap(err, context)
 	ea.Add(wrappedErr)
 }
 
