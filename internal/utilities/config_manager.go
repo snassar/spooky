@@ -89,75 +89,27 @@ func (cm *ConfigManager) ConfigFileExists(path string) bool {
 
 // CreateDefaultConfig creates a default configuration file
 func (cm *ConfigManager) CreateDefaultConfig() error {
-	defaultConfig := `# Spooky Configuration File
-# Generated automatically on first run
+	// Get embedded default config
+	fileEmbedder, err := NewFileEmbedder()
+	if err != nil {
+		return errors.Wrap(err, "failed to create file embedder")
+	}
 
-# Logging configuration
-logging {
-  level  = "info"
-  format = "json"
-  output = "file"
-  
-  file {
-    path = "${log_file}"
-  }
-  
-  structured {
-    include_timestamp = true
-    include_level     = true
-    include_source    = false
-  }
-}
+	defaultConfig, err := fileEmbedder.GetDefaultConfig()
+	if err != nil {
+		return errors.Wrap(err, "failed to get default config")
+	}
 
-# Project configuration
-project {
-  default_timeout = "30m"
-  max_parallel    = 4
-  retry_attempts  = 3
-}
+	// Validate the HCL before writing
+	validator := NewHCLValidator()
+	result, err := validator.ValidateContent(defaultConfig, "default-config.hcl")
+	if err != nil {
+		return errors.Wrap(err, "failed to validate default config")
+	}
 
-# SSH configuration
-ssh {
-  default_user     = ""
-  default_port     = 22
-  connection_timeout = "10s"
-  keepalive_interval = "30s"
-}
-
-# Template configuration
-templates {
-  default_engine = "go"
-  cache_enabled  = true
-  cache_ttl      = "1h"
-}
-
-# Variables configuration
-variables {
-  auto_load = true
-  env_prefix = "SPOOKY_"
-}
-
-# Facts configuration
-facts {
-  collection_timeout = "5m"
-  cache_enabled     = true
-  cache_ttl         = "1h"
-}
-
-# Actions configuration
-actions {
-  default_timeout = "10m"
-  max_retries     = 3
-  parallel_limit  = 10
-}
-
-# Machines configuration
-machines {
-  inventory_timeout = "30s"
-  connection_pool_size = 10
-  max_connections_per_host = 5
-}
-`
+	if !result.IsValid {
+		return errors.Errorf("default config is not valid HCL: %v", result.Errors)
+	}
 
 	return cm.WriteConfig(defaultConfig)
 }
@@ -229,7 +181,7 @@ func (cm *ConfigManager) BackupConfig() (string, error) {
 // RestoreConfig restores configuration from backup
 func (cm *ConfigManager) RestoreConfig() error {
 	backupPath := cm.config.ConfigFile + ".backup"
-	
+
 	if !cm.ConfigFileExists(backupPath) {
 		return errors.New("no backup file found")
 	}

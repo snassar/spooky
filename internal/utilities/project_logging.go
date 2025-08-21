@@ -7,8 +7,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/pkg/errors"
 	"spooky/internal/logging"
+
+	"github.com/pkg/errors"
 )
 
 // ProjectLogger manages project-specific logging with timestamps
@@ -186,7 +187,7 @@ func ListProjectLogs(projectName string) ([]string, error) {
 	}
 
 	projectLogDir := filepath.Join(config.LogDir, "projects", projectName)
-	
+
 	// Check if directory exists
 	if _, err := os.Stat(projectLogDir); os.IsNotExist(err) {
 		return []string{}, nil // No logs yet
