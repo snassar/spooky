@@ -120,7 +120,7 @@ var demoConfigCmd = &cobra.Command{
 		fmt.Printf("   Config File: %s\n\n", configManager.GetConfigPath())
 
 				// Show effective config info
-		effectiveInfo, err := configManager.GetEffectiveConfigInfo()
+		effectiveInfo, err := configManager.GetEffectiveConfigInfo("")
 		if err != nil {
 			fmt.Printf("⚠️  Could not get effective config info: %v\n", err)
 		} else {
@@ -172,7 +172,7 @@ var demoConfigCmd = &cobra.Command{
 		}
 
 		// Validate config
-		if err := configManager.ValidateConfig(); err != nil {
+		if err := configManager.ValidateConfig(""); err != nil {
 			fmt.Printf("⚠️  Config validation failed: %v\n", err)
 		} else {
 			fmt.Println("\n✅ Configuration is valid!")
@@ -284,12 +284,57 @@ var backupConfigCmd = &cobra.Command{
 	},
 }
 
+var testCustomConfigCmd = &cobra.Command{
+	Use:   "test-custom [config-file]",
+	Short: "Test configuration with a custom config file",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		customConfigFile := args[0]
+		fmt.Printf("🧪 Testing custom configuration: %s\n\n", customConfigFile)
+		
+		// Create config manager
+		configManager, err := utilities.NewConfigManager()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating config manager: %v\n", err)
+			os.Exit(1)
+		}
+		
+		// Show effective config info with custom file
+		effectiveInfo, err := configManager.GetEffectiveConfigInfo(customConfigFile)
+		if err != nil {
+			fmt.Printf("⚠️  Could not get effective config info: %v\n", err)
+		} else {
+			fmt.Printf("📄 Effective Config Info:\n")
+			fmt.Printf("   Source: %s\n", effectiveInfo.Source)
+			fmt.Printf("   Config File: %s\n", effectiveInfo.ConfigFile)
+			fmt.Printf("   Size: %d bytes\n", effectiveInfo.Size)
+			if effectiveInfo.ModTime != "" {
+				fmt.Printf("   Modified: %s\n", effectiveInfo.ModTime)
+			}
+		}
+		
+		// Validate custom config
+		if err := configManager.ValidateConfig(customConfigFile); err != nil {
+			fmt.Printf("⚠️  Custom config validation failed: %v\n", err)
+		} else {
+			fmt.Println("✅ Custom configuration is valid!")
+		}
+		
+		// Show config priority
+		fmt.Printf("\n📋 Configuration Priority:\n")
+		fmt.Printf("   1. Custom config file (--config flag)\n")
+		fmt.Printf("   2. User config (~/.config/spooky/spooky.hcl)\n")
+		fmt.Printf("   3. Embedded default\n")
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(demoProjectCmd)
 	rootCmd.AddCommand(demoConfigCmd)
 	rootCmd.AddCommand(demoPathsCmd)
 	demoConfigCmd.AddCommand(createConfigCmd)
 	demoConfigCmd.AddCommand(backupConfigCmd)
+	demoConfigCmd.AddCommand(testCustomConfigCmd)
 }
 
 func main() {

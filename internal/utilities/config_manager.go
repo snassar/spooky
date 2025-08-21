@@ -67,14 +67,22 @@ func (cm *ConfigManager) ReadConfig() (string, error) {
 }
 
 // GetEffectiveConfig returns the effective configuration content
-// If a user config exists, it returns that. Otherwise, it returns the embedded default.
-func (cm *ConfigManager) GetEffectiveConfig() (string, error) {
+// Priority: custom config file > user config > embedded default
+func (cm *ConfigManager) GetEffectiveConfig(customConfigFile string) (string, error) {
+	// Check for custom config file first (highest priority)
+	if customConfigFile != "" {
+		if cm.ConfigFileExists(customConfigFile) {
+			return cm.ReadConfigFile(customConfigFile)
+		}
+		return "", errors.Errorf("custom config file does not exist: %s", customConfigFile)
+	}
+
+	// Check for user config (second priority)
 	if cm.ConfigExists() {
-		// User config exists, return it
 		return cm.ReadConfig()
 	}
 
-	// No user config, return embedded default
+	// Return embedded default (lowest priority)
 	fileEmbedder, err := NewFileEmbedder()
 	if err != nil {
 		return "", errors.Wrap(err, "failed to create file embedder")
@@ -89,22 +97,39 @@ func (cm *ConfigManager) GetEffectiveConfig() (string, error) {
 }
 
 // GetEffectiveConfigInfo returns information about the effective configuration
-func (cm *ConfigManager) GetEffectiveConfigInfo() (*EffectiveConfigInfo, error) {
+func (cm *ConfigManager) GetEffectiveConfigInfo(customConfigFile string) (*EffectiveConfigInfo, error) {
 	info := &EffectiveConfigInfo{
 		ConfigDir:  cm.config.ConfigDir,
 		ConfigFile: cm.config.ConfigFile,
 		Exists:     cm.ConfigExists(),
 	}
 
+	// Check for custom config file first (highest priority)
+	if customConfigFile != "" {
+		if cm.ConfigFileExists(customConfigFile) {
+			info.Source = "custom"
+			info.ConfigFile = customConfigFile
+			if stat, err := os.Stat(customConfigFile); err == nil {
+				info.Size = stat.Size()
+				info.ModTime = stat.ModTime().Format(time.RFC3339)
+			}
+			return info, nil
+		}
+		// Custom config file doesn't exist
+		info.Source = "custom"
+		info.ConfigFile = customConfigFile
+		return info, nil
+	}
+
+	// Check for user config (second priority)
 	if info.Exists {
-		// User config exists
 		info.Source = "user"
 		if stat, err := os.Stat(cm.config.ConfigFile); err == nil {
 			info.Size = stat.Size()
 			info.ModTime = stat.ModTime().Format(time.RFC3339)
 		}
 	} else {
-		// Using embedded default
+		// Using embedded default (lowest priority)
 		info.Source = "embedded"
 		fileEmbedder, err := NewFileEmbedder()
 		if err == nil {
@@ -256,8 +281,8 @@ func (cm *ConfigManager) RestoreConfig() error {
 }
 
 // ValidateConfig validates the configuration file
-func (cm *ConfigManager) ValidateConfig() error {
-	content, err := cm.GetEffectiveConfig()
+func (cm *ConfigManager) ValidateConfig(customConfigFile string) error {
+	content, err := cm.GetEffectiveConfig(customConfigFile)
 	if err != nil {
 		return errors.Wrap(err, "failed to get effective configuration")
 	}
