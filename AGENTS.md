@@ -14,8 +14,12 @@ A dedicated guide for AI coding agents working on the **spooky** project.
 # Install Go dependencies
 go mod tidy
 
-# Run the schema embedder demo
+# Run main spooky application
 go run main.go
+
+# Run development tools
+go run tools/spooky-schemas-tool/main.go schemas
+go run tools/spooky-hcl-tool/main.go validate project.hcl
 
 # Run tests
 go test ./...
@@ -28,9 +32,10 @@ go build -o spooky main.go
 
 ```
 spooky/
+├── commands/                 # Main spooky commands
 ├── internal/                 # Core packages and business logic
-├── cmd/                      # CLI commands
-├── docs/                     # Project documentation
+├── tools/                    # Development utilities
+├── documentation/            # Project documentation
 └── main.go                   # Entry point
 ```
 
@@ -46,9 +51,10 @@ spooky/
 
 ### File Organization
 
-- **CLI Commands**: Place in `cmd/` directory
+- **Main Commands**: Place in `commands/` directory
+- **Development Tools**: Place in `tools/` directory
 - **Core Logic**: Place in `internal/` directory
-- **Documentation**: Place in `docs/` directory
+- **Documentation**: Place in `documentation/` directory
 
 ## Testing Instructions
 
@@ -82,6 +88,41 @@ func TestFunctionality(t *testing.T) {
     // ... error checking
 }
 ```
+
+## Tool Architecture
+
+### Main Application vs. Development Tools
+
+The project uses a two-tier architecture:
+
+**Main Application (`spooky`):**
+- Focus: Automation and configuration management
+- Commands: `commands/` directory
+- Purpose: Core automation functionality (like Ansible)
+
+**Development Tools (`./tools/`):**
+- Focus: Development utilities and schema management
+- Structure: Each tool has its own `main.go` in `tools/` directory
+- Purpose: Help developers work with schemas, validate HCL, etc.
+
+### Current Tools
+
+**`spooky-schemas-tool`:**
+- Purpose: Schema management and inspection
+- Commands: `schemas`, `list`, `show`
+- Usage: `go run tools/spooky-schemas-tool/main.go`
+
+**`spooky-hcl-tool`:**
+- Purpose: HCL validation and manipulation
+- Commands: `validate [path]`, `validate --quick`
+- Usage: `go run tools/spooky-hcl-tool/main.go`
+
+### Shared Dependencies
+
+- All tools share the same `go.mod` file
+- Tools import from `internal/` packages
+- Consistent use of `spf13/cobra` across all components
+- Guaranteed version consistency across all tools
 
 ## Development Workflow
 
@@ -149,13 +190,22 @@ Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`
 4. Verify existing functionality still works
 5. Update documentation if APIs change
 
-### CLI Command Development
+### Main Application Command Development
 
-1. Create command in `cmd/` directory
+1. Create command in `commands/` directory
 2. Implement command logic in `internal/` packages
 3. Add proper error handling and user feedback
 4. Include help text and usage examples
 5. Add tests for command functionality
+
+### Development Tool Development
+
+1. Create tool in `tools/` directory with its own `main.go`
+2. Import shared functionality from `internal/` packages
+3. Use `spf13/cobra` for consistent CLI experience
+4. Add proper error handling and user feedback
+5. Include help text and usage examples
+6. Add tests for tool functionality
 
 ## Error Handling
 
@@ -217,8 +267,12 @@ Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`
 ### Debug Commands
 
 ```bash
-# Run the application
+# Run main application
 go run main.go
+
+# Run development tools
+go run tools/spooky-schemas-tool/main.go schemas
+go run tools/spooky-hcl-tool/main.go validate project.hcl
 
 # Run specific tests
 go test -v ./internal/package/ -run TestSpecificFunction
