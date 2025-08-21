@@ -10,9 +10,9 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "spooky-files",
+	Use:   "spooky-embeds",
 	Short: "Embedded files management tool for spooky",
-	Long: `spooky-files demonstrates how spooky handles embedded files:
+	Long: `spooky-embeds demonstrates how spooky handles embedded files:
 - Default configuration files
 - HCL validation of embedded files
 - File embedding and retrieval`,
