@@ -95,8 +95,8 @@ func (se *SchemaEmbedder) loadEmbeddedTestData() error {
 			return nil
 		}
 
-		// Only process .hcl files
-		if !strings.HasSuffix(path, ".hcl") {
+		// Only process .hcl and .tmpl files
+		if !strings.HasSuffix(path, ".hcl") && !strings.HasSuffix(path, ".tmpl") {
 			return nil
 		}
 
@@ -106,9 +106,10 @@ func (se *SchemaEmbedder) loadEmbeddedTestData() error {
 			return fmt.Errorf("failed to read embedded test file %s: %w", path, err)
 		}
 
-		// Use the filename as the key
+		// Use the filename as the key (handle both .hcl and .tmpl extensions)
 		baseName := filepath.Base(path)
 		key := strings.TrimSuffix(baseName, ".hcl")
+		key = strings.TrimSuffix(key, ".tmpl")
 		se.testdata[key] = string(content)
 
 		return nil
