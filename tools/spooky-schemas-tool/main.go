@@ -1,21 +1,27 @@
-package cmd
+package main
 
 import (
 	"fmt"
 	"os"
 	"strings"
 
-	"spooky/internal/schemas"
-
 	"github.com/spf13/cobra"
+	"spooky/internal/schemas"
 )
+
+var rootCmd = &cobra.Command{
+	Use:   "spooky-schemas",
+	Short: "Manage and inspect embedded schemas",
+	Long: `spooky-schemas is a utility tool for working with embedded schemas,
+validation rules, and test data in the spooky project.
+
+It provides functionality to list, inspect, and validate schema definitions.`,
+}
 
 var schemasCmd = &cobra.Command{
 	Use:   "schemas",
-	Short: "Manage and inspect embedded schemas",
-	Long: `The schemas command provides functionality to work with embedded schemas,
-validation rules, and test data. It allows you to list, inspect, and validate
-schema definitions.`,
+	Short: "Show embedded schemas summary",
+	Long:  `Display a comprehensive summary of all embedded schemas, validation rules, and test data.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Initialize the schema embedder
 		embedder, err := schemas.NewSchemaEmbedder()
@@ -105,4 +111,10 @@ func init() {
 	rootCmd.AddCommand(schemasCmd)
 	schemasCmd.AddCommand(listCmd)
 	schemasCmd.AddCommand(showCmd)
+}
+
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
+	}
 }
