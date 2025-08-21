@@ -146,17 +146,13 @@ Use ScalVer format: `0.YYYYMMDD.N`
 
 ### Commit Guidelines
 
-**NEVER commit placeholder or stub code:**
-- ❌ Functions that return `nil` or empty values
-- ❌ Stub implementations with `// TODO` comments
-- ❌ Incomplete code that doesn't work
-- ❌ Mock implementations that don't do anything
+**See `.cursor/rules/no-placeholder-commits.mdc` for detailed commit guidelines.**
 
-**ONLY commit functional code:**
-- ✅ Working, complete implementations
-- ✅ Code that compiles and passes tests
-- ✅ Functional features ready for use
-- ✅ Comprehensive test coverage
+Key principles:
+- Only commit functional, working code
+- Never commit placeholder or stub implementations
+- Ensure code compiles and passes tests
+- Include comprehensive test coverage
 
 ### Commit Message Format
 
@@ -264,6 +260,22 @@ go test -v ./internal/schemas/ -run TestSpecificSchema
 # Check file structure
 find internal/schemas/ -name "*.hcl" -type f
 ```
+
+## Project Rules
+
+### Cursor Rules
+
+The project uses Cursor rules to maintain code quality and consistency:
+
+- **`.cursor/rules/no-placeholder-commits.mdc`** - Prevents committing placeholder or stub code
+- *Additional rules will be added here as the project evolves*
+
+### Rule Management
+
+- Rules are stored in `.cursor/rules/` directory
+- Each rule file uses `.mdc` format with frontmatter
+- Rules can specify file patterns and application scope
+- Update this section when adding new rules
 
 ## Resources
 
