@@ -1,0 +1,87 @@
+---
+description: "Rule to prevent committing placeholder or stub code to git"
+globs: ["**/*.go", "**/*.hcl", "**/*.tmpl"]
+alwaysApply: true
+---
+
+# No Placeholder/Stub Code Commits Rule
+
+## 🚫 **What NOT to Commit**
+
+**Never commit placeholder or stub code to git:**
+
+- ❌ Placeholder functions that just return `nil` or empty values
+- ❌ Stub implementations with `// TODO` comments
+- ❌ Incomplete code that doesn't work
+- ❌ Mock implementations that don't do anything
+- ❌ Code that's just a skeleton without real functionality
+- ❌ Functions that only contain `panic("not implemented")`
+- ❌ Empty structs or interfaces without implementations
+- ❌ Test files with only empty test functions
+
+## ✅ **What TO Commit**
+
+**Only commit code that:**
+
+1. **Actually works** - No broken or incomplete implementations
+2. **Is functional** - Does what it claims to do
+3. **Is complete** - No missing pieces or TODO items
+4. **Is tested** - At least basic functionality verified
+5. **Is ready for use** - Can be used by others
+
+## 🎯 **Examples**
+
+### ❌ DON'T Commit:
+```go
+func ProcessData(data []byte) error {
+    // TODO: implement data processing
+    return nil
+}
+
+func ValidateConfig(config *Config) error {
+    panic("not implemented")
+}
+
+type DataProcessor struct {
+    // TODO: add fields
+}
+```
+
+### ✅ DO Commit:
+```go
+func ProcessData(data []byte) error {
+    if len(data) == 0 {
+        return errors.New("empty data")
+    }
+    
+    // Actual processing logic here
+    processed := bytes.ToUpper(data)
+    return saveProcessedData(processed)
+}
+
+func ValidateConfig(config *Config) error {
+    if config == nil {
+        return errors.New("config cannot be nil")
+    }
+    
+    if config.Name == "" {
+        return errors.New("config name is required")
+    }
+    
+    return nil
+}
+```
+
+## 📋 **Commit Checklist**
+
+Before committing, verify:
+- [ ] Code compiles without errors
+- [ ] Functions have actual implementations
+- [ ] No `panic("not implemented")` calls
+- [ ] No empty `// TODO` blocks
+- [ ] Tests pass (if applicable)
+- [ ] Code does what it's supposed to do
+
+## 🎯 **Goal**
+
+Every commit should represent **real, working progress** rather than just scaffolding or placeholders. This ensures a clean, functional codebase that others can rely on.
