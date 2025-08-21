@@ -98,7 +98,15 @@ var showCmd = &cobra.Command{
 		}
 
 		if !exists {
-			fmt.Fprintf(os.Stderr, "%s '%s' not found\n", itemType, name)
+			var schemaErr *schemas.SchemaNotFoundError
+			if errors.As(err, &schemaErr) {
+				fmt.Fprintf(os.Stderr, "❌ %s '%s' not found\n", itemType, name)
+				if len(schemaErr.Available) > 0 {
+					fmt.Fprintf(os.Stderr, "💡 Available %ss: %s\n", itemType, strings.Join(schemaErr.Available, ", "))
+				}
+			} else {
+				fmt.Fprintf(os.Stderr, "❌ %s '%s' not found\n", itemType, name)
+			}
 			os.Exit(1)
 		}
 

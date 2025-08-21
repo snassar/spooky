@@ -76,7 +76,7 @@ func (v *HCLValidator) ValidateFile(filePath string) (*ValidationResult, error) 
 					Severity: "error",
 				},
 			},
-		}, nil
+		}, NewHCLFileError(filePath, "stat", "file does not exist")
 	}
 
 	// Check file extension
@@ -89,7 +89,7 @@ func (v *HCLValidator) ValidateFile(filePath string) (*ValidationResult, error) 
 					Severity: "error",
 				},
 			},
-		}, nil
+		}, NewHCLFileError(filePath, "validate", "file does not have .hcl extension")
 	}
 
 	// Read file content
@@ -103,7 +103,7 @@ func (v *HCLValidator) ValidateFile(filePath string) (*ValidationResult, error) 
 					Severity: "error",
 				},
 			},
-		}, errors.Wrapf(err, "failed to read file %s", filePath)
+		}, NewHCLFileError(filePath, "read", err.Error())
 	}
 
 	// Validate content

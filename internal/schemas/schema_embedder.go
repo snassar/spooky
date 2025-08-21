@@ -218,7 +218,8 @@ func (se *SchemaEmbedder) GetAllTestData() map[string]string {
 func (se *SchemaEmbedder) GetSchemaWithRules(name string) (schema string, rules string, err error) {
 	schemaContent, schemaExists := se.GetSchema(name)
 	if !schemaExists {
-		return "", "", errors.Errorf("schema '%s' not found", name)
+		available := se.ListSchemas()
+		return "", "", NewSchemaNotFoundError(name, available)
 	}
 
 	rulesContent, rulesExist := se.GetValidationRules(name)
@@ -239,7 +240,8 @@ func (se *SchemaEmbedder) ValidateSchemaExists(name string) bool {
 func (se *SchemaEmbedder) GetSchemaInfo(name string) (*SchemaInfo, error) {
 	schema, exists := se.GetSchema(name)
 	if !exists {
-		return nil, errors.Errorf("schema '%s' not found", name)
+		available := se.ListSchemas()
+		return nil, NewSchemaNotFoundError(name, available)
 	}
 
 	info := &SchemaInfo{
