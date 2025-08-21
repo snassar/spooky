@@ -119,20 +119,33 @@ var demoConfigCmd = &cobra.Command{
 		fmt.Printf("   Config Directory: %s\n", configManager.GetConfigDir())
 		fmt.Printf("   Config File: %s\n\n", configManager.GetConfigPath())
 
-		// Check if config exists
-		if configManager.ConfigExists() {
-			fmt.Println("✅ Configuration file already exists")
+				// Show effective config info
+		effectiveInfo, err := configManager.GetEffectiveConfigInfo()
+		if err != nil {
+			fmt.Printf("⚠️  Could not get effective config info: %v\n", err)
+		} else {
+			fmt.Printf("📄 Effective Config Info:\n")
+			fmt.Printf("   Source: %s\n", effectiveInfo.Source)
+			fmt.Printf("   Size: %d bytes\n", effectiveInfo.Size)
+			if effectiveInfo.ModTime != "" {
+				fmt.Printf("   Modified: %s\n", effectiveInfo.ModTime)
+			}
+		}
 
-			// Show config info
+		// Check if user config exists
+		if configManager.ConfigExists() {
+			fmt.Println("✅ User configuration file exists")
+			
+			// Show user config info
 			info, err := configManager.GetConfigInfo()
 			if err != nil {
 				fmt.Printf("⚠️  Could not get config info: %v\n", err)
 			} else {
-				fmt.Printf("📄 Config Info:\n")
+				fmt.Printf("📄 User Config Info:\n")
 				fmt.Printf("   Size: %d bytes\n", info.Size)
 				fmt.Printf("   Modified: %s\n", info.ModTime)
 			}
-
+			
 			// Create backup
 			backupPath, err := configManager.BackupConfig()
 			if err != nil {
@@ -141,15 +154,10 @@ var demoConfigCmd = &cobra.Command{
 				fmt.Printf("💾 Backup created: %s\n", backupPath)
 			}
 		} else {
-			fmt.Println("📝 Creating default configuration...")
-
-			// Create default config
-			if err := configManager.CreateDefaultConfig(); err != nil {
-				fmt.Fprintf(os.Stderr, "Error creating default config: %v\n", err)
-				os.Exit(1)
-			}
-
-			fmt.Println("✅ Default configuration created!")
+			fmt.Println("📝 No user configuration found - using embedded default")
+			
+			// Show that we can create a user config
+			fmt.Println("💡 You can create a user config with: spooky-demo config create")
 		}
 
 		// List config files
@@ -211,10 +219,77 @@ var demoPathsCmd = &cobra.Command{
 	},
 }
 
+var createConfigCmd = &cobra.Command{
+	Use:   "create",
+	Short: "Create a user configuration file from embedded default",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("📝 Creating user configuration from embedded default...")
+		
+		// Create config manager
+		configManager, err := utilities.NewConfigManager()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating config manager: %v\n", err)
+			os.Exit(1)
+		}
+		
+		// Check if user config already exists
+		if configManager.ConfigExists() {
+			fmt.Println("⚠️  User configuration already exists")
+			fmt.Printf("   Path: %s\n", configManager.GetConfigPath())
+			fmt.Println("💡 Use 'spooky-demo config backup' to backup first")
+			return
+		}
+		
+		// Create default config
+		if err := configManager.CreateDefaultConfig(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating default config: %v\n", err)
+			os.Exit(1)
+		}
+		
+		fmt.Println("✅ User configuration created!")
+		fmt.Printf("   Path: %s\n", configManager.GetConfigPath())
+		fmt.Println("💡 You can now edit this file to customize your settings")
+	},
+}
+
+var backupConfigCmd = &cobra.Command{
+	Use:   "backup",
+	Short: "Create a backup of the current user configuration",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("💾 Creating configuration backup...")
+		
+		// Create config manager
+		configManager, err := utilities.NewConfigManager()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating config manager: %v\n", err)
+			os.Exit(1)
+		}
+		
+		// Check if user config exists
+		if !configManager.ConfigExists() {
+			fmt.Println("⚠️  No user configuration to backup")
+			fmt.Println("💡 Create one first with 'spooky-demo config create'")
+			return
+		}
+		
+		// Create backup
+		backupPath, err := configManager.BackupConfig()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating backup: %v\n", err)
+			os.Exit(1)
+		}
+		
+		fmt.Println("✅ Configuration backup created!")
+		fmt.Printf("   Backup: %s\n", backupPath)
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(demoProjectCmd)
 	rootCmd.AddCommand(demoConfigCmd)
 	rootCmd.AddCommand(demoPathsCmd)
+	demoConfigCmd.AddCommand(createConfigCmd)
+	demoConfigCmd.AddCommand(backupConfigCmd)
 }
 
 func main() {

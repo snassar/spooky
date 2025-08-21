@@ -66,6 +66,57 @@ func (cm *ConfigManager) ReadConfig() (string, error) {
 	return cm.ReadConfigFile(cm.config.ConfigFile)
 }
 
+// GetEffectiveConfig returns the effective configuration content
+// If a user config exists, it returns that. Otherwise, it returns the embedded default.
+func (cm *ConfigManager) GetEffectiveConfig() (string, error) {
+	if cm.ConfigExists() {
+		// User config exists, return it
+		return cm.ReadConfig()
+	}
+
+	// No user config, return embedded default
+	fileEmbedder, err := NewFileEmbedder()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to create file embedder")
+	}
+
+	defaultConfig, err := fileEmbedder.GetDefaultConfig()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get default config")
+	}
+
+	return defaultConfig, nil
+}
+
+// GetEffectiveConfigInfo returns information about the effective configuration
+func (cm *ConfigManager) GetEffectiveConfigInfo() (*EffectiveConfigInfo, error) {
+	info := &EffectiveConfigInfo{
+		ConfigDir:  cm.config.ConfigDir,
+		ConfigFile: cm.config.ConfigFile,
+		Exists:     cm.ConfigExists(),
+	}
+
+	if info.Exists {
+		// User config exists
+		info.Source = "user"
+		if stat, err := os.Stat(cm.config.ConfigFile); err == nil {
+			info.Size = stat.Size()
+			info.ModTime = stat.ModTime().Format(time.RFC3339)
+		}
+	} else {
+		// Using embedded default
+		info.Source = "embedded"
+		fileEmbedder, err := NewFileEmbedder()
+		if err == nil {
+			if defaultConfig, err := fileEmbedder.GetDefaultConfig(); err == nil {
+				info.Size = int64(len(defaultConfig))
+			}
+		}
+	}
+
+	return info, nil
+}
+
 // ReadConfigFile reads a configuration file from a specific path
 func (cm *ConfigManager) ReadConfigFile(path string) (string, error) {
 	content, err := os.ReadFile(path)
@@ -142,6 +193,16 @@ type ConfigInfo struct {
 	ModTime    string `json:"mod_time,omitempty"`
 }
 
+// EffectiveConfigInfo represents effective configuration information
+type EffectiveConfigInfo struct {
+	ConfigDir  string `json:"config_dir"`
+	ConfigFile string `json:"config_file"`
+	Exists     bool   `json:"exists"`
+	Source     string `json:"source"` // "user" or "embedded"
+	Size       int64  `json:"size,omitempty"`
+	ModTime    string `json:"mod_time,omitempty"`
+}
+
 // ListConfigFiles lists all configuration files in the config directory
 func (cm *ConfigManager) ListConfigFiles() ([]string, error) {
 	entries, err := os.ReadDir(cm.config.ConfigDir)
@@ -196,29 +257,25 @@ func (cm *ConfigManager) RestoreConfig() error {
 
 // ValidateConfig validates the configuration file
 func (cm *ConfigManager) ValidateConfig() error {
-	if !cm.ConfigExists() {
-		return errors.New("configuration file does not exist")
-	}
-
-	content, err := cm.ReadConfig()
+	content, err := cm.GetEffectiveConfig()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get effective configuration")
 	}
 
 	// Check if content is empty
 	if len(content) == 0 {
-		return errors.New("configuration file is empty")
+		return errors.New("configuration is empty")
 	}
 
 	// Validate HCL syntax
 	validator := NewHCLValidator()
-	result, err := validator.ValidateContent(content, cm.config.ConfigFile)
+	result, err := validator.ValidateContent(content, "effective-config")
 	if err != nil {
 		return errors.Wrap(err, "failed to validate HCL syntax")
 	}
 
 	if !result.IsValid {
-		return errors.Errorf("configuration file contains HCL syntax errors: %v", result.Errors)
+		return errors.Errorf("configuration contains HCL syntax errors: %v", result.Errors)
 	}
 
 	return nil
