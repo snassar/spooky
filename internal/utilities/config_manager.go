@@ -205,10 +205,20 @@ func (cm *ConfigManager) ValidateConfig() error {
 		return err
 	}
 
-	// TODO: Add HCL validation here
-	// For now, just check if it's not empty
+	// Check if content is empty
 	if len(content) == 0 {
 		return errors.New("configuration file is empty")
+	}
+
+	// Validate HCL syntax
+	validator := NewHCLValidator()
+	result, err := validator.ValidateContent(content, cm.config.ConfigFile)
+	if err != nil {
+		return errors.Wrap(err, "failed to validate HCL syntax")
+	}
+
+	if !result.IsValid {
+		return errors.Errorf("configuration file contains HCL syntax errors: %v", result.Errors)
 	}
 
 	return nil
