@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
+	"github.com/pkg/errors"
 )
 
 // HCLValidator provides functionality to validate HCL files and content
@@ -102,7 +103,7 @@ func (v *HCLValidator) ValidateFile(filePath string) (*ValidationResult, error) 
 					Severity: "error",
 				},
 			},
-		}, err
+		}, errors.Wrapf(err, "failed to read file %s", filePath)
 	}
 
 	// Validate content
@@ -163,7 +164,7 @@ func (v *HCLValidator) ValidateDirectory(dirPath string) (map[string]*Validation
 		// Validate the file
 		result, err := v.ValidateFile(path)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to validate file %s", path)
 		}
 
 		// Use relative path as key

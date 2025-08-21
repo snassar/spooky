@@ -6,6 +6,8 @@ import (
 	"io/fs"
 	"path/filepath"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 //go:embed schemafiles
@@ -32,11 +34,11 @@ func NewSchemaEmbedder() (*SchemaEmbedder, error) {
 	}
 
 	if err := embedder.loadEmbeddedSchemas(); err != nil {
-		return nil, fmt.Errorf("failed to load embedded schemas: %w", err)
+		return nil, errors.Wrap(err, "failed to load embedded schemas")
 	}
 
 	if err := embedder.loadEmbeddedTestData(); err != nil {
-		return nil, fmt.Errorf("failed to load embedded test data: %w", err)
+		return nil, errors.Wrap(err, "failed to load embedded test data")
 	}
 
 	return embedder, nil
@@ -61,7 +63,7 @@ func (se *SchemaEmbedder) loadEmbeddedSchemas() error {
 		// Read the file content
 		content, err := embeddedSchemas.ReadFile(path)
 		if err != nil {
-			return fmt.Errorf("failed to read embedded file %s: %w", path, err)
+			return errors.Wrapf(err, "failed to read embedded file %s", path)
 		}
 
 		// Categorize the file based on its path
@@ -103,7 +105,7 @@ func (se *SchemaEmbedder) loadEmbeddedTestData() error {
 		// Read the file content
 		content, err := embeddedTestData.ReadFile(path)
 		if err != nil {
-			return fmt.Errorf("failed to read embedded test file %s: %w", path, err)
+			return errors.Wrapf(err, "failed to read embedded test file %s", path)
 		}
 
 		// Use the filename as the key (handle both .hcl and .tmpl extensions)
@@ -216,7 +218,7 @@ func (se *SchemaEmbedder) GetAllTestData() map[string]string {
 func (se *SchemaEmbedder) GetSchemaWithRules(name string) (schema string, rules string, err error) {
 	schemaContent, schemaExists := se.GetSchema(name)
 	if !schemaExists {
-		return "", "", fmt.Errorf("schema '%s' not found", name)
+		return "", "", errors.Errorf("schema '%s' not found", name)
 	}
 
 	rulesContent, rulesExist := se.GetValidationRules(name)
@@ -237,7 +239,7 @@ func (se *SchemaEmbedder) ValidateSchemaExists(name string) bool {
 func (se *SchemaEmbedder) GetSchemaInfo(name string) (*SchemaInfo, error) {
 	schema, exists := se.GetSchema(name)
 	if !exists {
-		return nil, fmt.Errorf("schema '%s' not found", name)
+		return nil, errors.Errorf("schema '%s' not found", name)
 	}
 
 	info := &SchemaInfo{
@@ -275,7 +277,7 @@ type SchemaInfo struct {
 // PrintSchemaSummary prints a summary of all embedded schemas
 func (se *SchemaEmbedder) PrintSchemaSummary() {
 	fmt.Println("=== Embedded Schemas Summary ===")
-	
+
 	fmt.Printf("\n📁 Structure Schemas (%d):\n", len(se.schemas))
 	for _, name := range se.ListSchemas() {
 		info, _ := se.GetSchemaInfo(name)

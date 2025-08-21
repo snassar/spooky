@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"spooky/internal/schemas"
 )
@@ -26,7 +27,7 @@ var schemasCmd = &cobra.Command{
 		// Initialize the schema embedder
 		embedder, err := schemas.NewSchemaEmbedder()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error initializing schema embedder: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error initializing schema embedder: %v\n", errors.WithStack(err))
 			os.Exit(1)
 		}
 
@@ -42,7 +43,7 @@ var listCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		embedder, err := schemas.NewSchemaEmbedder()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error initializing schema embedder: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error initializing schema embedder: %v\n", errors.WithStack(err))
 			os.Exit(1)
 		}
 
@@ -74,7 +75,7 @@ var showCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		embedder, err := schemas.NewSchemaEmbedder()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error initializing schema embedder: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error initializing schema embedder: %v\n", errors.WithStack(err))
 			os.Exit(1)
 		}
 

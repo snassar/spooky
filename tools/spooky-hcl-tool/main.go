@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"spooky/internal/utilities"
 )
@@ -51,7 +52,7 @@ func validateStdin(quick bool) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading from stdin: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error reading from stdin: %v\n", errors.WithStack(err))
 		os.Exit(1)
 	}
 
@@ -68,7 +69,7 @@ func validateStdin(quick bool) {
 		validator := utilities.NewHCLValidator()
 		result, err := validator.ValidateContent(content, "stdin")
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error validating content: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error validating content: %v\n", errors.WithStack(err))
 			os.Exit(1)
 		}
 
@@ -83,7 +84,7 @@ func validatePath(path string, quick bool) {
 	// Check if path exists
 	info, err := os.Stat(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error accessing path: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error accessing path: %v\n", errors.WithStack(err))
 		os.Exit(1)
 	}
 
@@ -99,7 +100,7 @@ func validateFile(filePath string, quick bool) {
 		// Quick validation
 		isValid, err := utilities.ValidateHCLFile(filePath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", errors.WithStack(err))
 			os.Exit(1)
 		}
 
@@ -114,7 +115,7 @@ func validateFile(filePath string, quick bool) {
 		validator := utilities.NewHCLValidator()
 		result, err := validator.ValidateFile(filePath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error validating file: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error validating file: %v\n", errors.WithStack(err))
 			os.Exit(1)
 		}
 
@@ -129,7 +130,7 @@ func validateDirectory(dirPath string, quick bool) {
 	validator := utilities.NewHCLValidator()
 	results, err := validator.ValidateDirectory(dirPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error validating directory: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error validating directory: %v\n", errors.WithStack(err))
 		os.Exit(1)
 	}
 
