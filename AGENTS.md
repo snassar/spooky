@@ -4,14 +4,7 @@ A dedicated guide for AI coding agents working on the **spooky** project.
 
 ## Project Overview
 
-**spooky** is a Go-based configuration management and automation tool that uses HCL (HashiCorp Configuration Language) schemas for validation. The project focuses on embedding schemas, validation rules, and test data into Go binaries for self-contained operation.
-
-### Key Components
-
-- **Schema System**: HCL-based schemas for project, machines, actions, variables, templates, logging, and secrets
-- **Embedding**: Go `embed` directive to include schemas and test data in binaries
-- **Validation**: Multi-layer validation (structure, rules, metadata)
-- **Test Data**: Comprehensive test cases for schema validation
+**spooky** is a Go-based configuration management and automation tool. The project focuses on creating self-contained binaries with embedded configuration schemas and validation rules.
 
 ## Development Environment
 
@@ -35,15 +28,9 @@ go build -o spooky main.go
 
 ```
 spooky/
-├── internal/schemas/          # Schema definitions and embedding
-│   ├── schemafiles/          # HCL schema files
-│   │   ├── structure/        # Data structure definitions
-│   │   ├── validation/       # Business logic validation rules
-│   │   └── metadata/         # Schema metadata definitions
-│   ├── testdata/             # Test data for validation
-│   └── schema_embedder.go    # Schema embedding logic
+├── internal/                 # Core packages and business logic
 ├── cmd/                      # CLI commands
-├── internal/                 # Core packages
+├── docs/                     # Project documentation
 └── main.go                   # Entry point
 ```
 
@@ -57,19 +44,11 @@ spooky/
 - **Testing**: Write tests for all public functions, use `_test.go` suffix
 - **Documentation**: Add comments for exported functions and types
 
-### HCL Schemas
-
-- **Naming**: Use kebab-case for schema files (`project.hcl`, `machines.hcl`)
-- **Structure**: Group related schemas in subdirectories
-- **Validation**: Include both structure and business rule validation
-- **Metadata**: Always include `metadata` blocks with ScalVer versioning
-
 ### File Organization
 
-- **Schemas**: Place in `internal/schemas/schemafiles/`
-- **Test Data**: Place in `internal/schemas/testdata/`
 - **CLI Commands**: Place in `cmd/` directory
 - **Core Logic**: Place in `internal/` directory
+- **Documentation**: Place in `docs/` directory
 
 ## Testing Instructions
 
@@ -89,52 +68,38 @@ go test -v ./...
 go test -cover ./...
 ```
 
-### Test Data Validation
-
-- **Valid cases**: Test data should pass all schema validations
-- **Invalid cases**: Test data should trigger appropriate validation errors
-- **Edge cases**: Include boundary conditions and error scenarios
-- **Completeness**: Test data should cover all schema fields and rules
-
 ### Test Structure
 
 ```go
-func TestSchemaValidation(t *testing.T) {
+func TestFunctionality(t *testing.T) {
     // Setup
-    embedder, err := schemas.NewSchemaEmbedder()
-    require.NoError(t, err)
+    // ... setup code
     
-    // Test valid data
-    validData := embedder.GetTestData("valid-project")
-    // ... validation logic
+    // Test valid cases
+    // ... test logic
     
-    // Test invalid data
-    invalidData := embedder.GetTestData("invalid-project")
+    // Test invalid cases
     // ... error checking
 }
 ```
 
-## Schema Development
+## Development Workflow
 
-### Creating New Schemas
+### Adding New Features
 
-1. **Structure Schema**: Define data structure in `schemafiles/structure/`
-2. **Validation Rules**: Add business logic in `schemafiles/validation/`
-3. **Test Data**: Create test cases in `testdata/`
-4. **Update Embedder**: Ensure new files are included in embedding
+1. **Plan**: Understand requirements and design approach
+2. **Implement**: Write functional code with proper error handling
+3. **Test**: Create comprehensive tests for new functionality
+4. **Document**: Update documentation as needed
+5. **Review**: Ensure code follows project conventions
 
-### Schema Validation Layers
+### Code Quality
 
-1. **Structure Validation**: Field types, requirements, patterns
-2. **Business Rules**: Complex validation logic and relationships
-3. **Metadata Validation**: Version, type, and description consistency
-
-### ScalVer Versioning
-
-Use ScalVer format: `0.YYYYMMDD.N`
-- Example: `0.20250809.0`
-- Update version when schema changes
-- Maintain backward compatibility when possible
+- Write clear, readable code
+- Include proper error handling
+- Add comprehensive tests
+- Follow Go best practices
+- Document public APIs
 
 ## Git Workflow
 
@@ -168,20 +133,21 @@ Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`
 
 ## Common Tasks
 
-### Adding New Schema Fields
+### Adding New Features
 
-1. Update structure schema in `schemafiles/structure/`
-2. Add validation rules in `schemafiles/validation/`
-3. Update test data to include new fields
-4. Test with both valid and invalid data
-5. Update documentation if needed
+1. Understand the feature requirements
+2. Implement the functionality with proper error handling
+3. Add comprehensive tests for the new feature
+4. Update documentation as needed
+5. Ensure the feature follows project conventions
 
-### Embedding New Files
+### Modifying Existing Code
 
-1. Place files in appropriate `schemafiles/` subdirectory
-2. Update `schema_embedder.go` if new file types are needed
-3. Add test data for new schemas
-4. Verify embedding works correctly
+1. Understand the current implementation
+2. Make changes while maintaining backward compatibility
+3. Update tests to reflect changes
+4. Verify existing functionality still works
+5. Update documentation if APIs change
 
 ### CLI Command Development
 
@@ -193,12 +159,12 @@ Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`
 
 ## Error Handling
 
-### Schema Validation Errors
+### Validation Errors
 
 - Provide clear, actionable error messages
-- Include field names and expected values
-- Reference schema documentation when helpful
-- Group related validation errors together
+- Include relevant context and expected values
+- Reference documentation when helpful
+- Group related errors together
 
 ### File System Errors
 
@@ -209,28 +175,28 @@ Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`
 
 ## Performance Considerations
 
-### Schema Loading
+### Resource Loading
 
-- Use Go `embed` directive for compile-time inclusion
-- Cache loaded schemas in memory
+- Use efficient loading mechanisms
+- Cache frequently accessed data in memory
 - Minimize file system operations
-- Optimize schema parsing for large files
+- Optimize parsing for large files
 
-### Validation Performance
+### Performance Optimization
 
-- Validate only necessary fields
-- Use efficient validation algorithms
-- Cache validation results when appropriate
-- Profile validation performance for large datasets
+- Profile code for bottlenecks
+- Use efficient algorithms and data structures
+- Cache results when appropriate
+- Optimize for common use cases
 
 ## Security Guidelines
 
 ### Input Validation
 
-- Validate all HCL input before processing
+- Validate all user input before processing
 - Sanitize file paths and user inputs
 - Prevent path traversal attacks
-- Validate template content for security
+- Validate content for security
 
 ### Secret Handling
 
@@ -243,22 +209,22 @@ Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`
 
 ### Common Issues
 
-1. **Schema not found**: Check file paths and embedding configuration
-2. **Validation errors**: Verify schema structure and test data
+1. **File not found**: Check file paths and configuration
+2. **Validation errors**: Verify data structure and test cases
 3. **Build failures**: Ensure all dependencies are properly imported
-4. **Test failures**: Check test data matches current schema versions
+4. **Test failures**: Check test data matches current implementations
 
 ### Debug Commands
 
 ```bash
-# Check schema embedding
+# Run the application
 go run main.go
 
-# Validate specific schema
-go test -v ./internal/schemas/ -run TestSpecificSchema
+# Run specific tests
+go test -v ./internal/package/ -run TestSpecificFunction
 
 # Check file structure
-find internal/schemas/ -name "*.hcl" -type f
+find . -name "*.go" -type f
 ```
 
 ## Project Rules
@@ -279,8 +245,7 @@ The project uses Cursor rules to maintain code quality and consistency:
 
 ## Resources
 
-- [HCL Documentation](https://github.com/hashicorp/hcl)
-- [Go Embed Directive](https://pkg.go.dev/embed)
+- [Go Documentation](https://golang.org/doc/)
 - [AGENTS.md Specification](https://github.com/openai/agents.md)
 - [Project Documentation](./docs/)
 
