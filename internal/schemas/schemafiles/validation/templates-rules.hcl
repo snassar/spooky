@@ -1,16 +1,24 @@
 # Templates Validation Rules
-# Extracted from internal/schemas/schemas/structure/templates.hcl
+# Validation rules for templates.hcl schema
 # These rules validate schema compliance and data format correctness
 
 # Templates validation rules
 validation_rules {
-  # Template ID validation
-  template_id_validation {
+  # Template name validation
+  template_name_validation {
     rule {
-      name = "template_id_format"
-      description = "Template ID must contain only alphanumeric characters, dots, underscores, and hyphens"
-      condition = "template_id != null && !template_id.matches('^[a-zA-Z0-9._-]+$')"
-      message = "Template ID must contain only alphanumeric characters, dots, underscores, and hyphens"
+      name = "template_name_format"
+      description = "Template names must contain only alphanumeric characters, dots, underscores, and hyphens"
+      condition = "name != null && !name.matches('^[a-zA-Z0-9._-]+$')"
+      message = "Template names must contain only alphanumeric characters, dots, underscores, and hyphens"
+      severity = "error"
+    }
+    
+    rule {
+      name = "template_name_length"
+      description = "Template names must be between 1 and 128 characters"
+      condition = "name != null && (name.length() < 1 || name.length() > 128)"
+      message = "Template names must be between 1 and 128 characters"
       severity = "error"
     }
   }
@@ -26,134 +34,168 @@ validation_rules {
     }
   }
   
-  # Required fields validation
-  required_fields_validation {
+  # Destination path validation
+  destination_path_validation {
     rule {
-      name = "template_type_required"
-      description = "Template type is required"
-      condition = "template_type == null"
-      message = "Template type is required"
+      name = "destination_path_format"
+      description = "Destination path must be a valid file path"
+      condition = "destination_path != null && !destination_path.matches('^[a-zA-Z0-9/._-]+$')"
+      message = "Destination path must be a valid file path"
+      severity = "error"
+    }
+  }
+  
+  # Description validation
+  description_validation {
+    rule {
+      name = "description_length"
+      description = "Template description must not exceed 500 characters"
+      condition = "description != null && description.length() > 500"
+      message = "Template description must not exceed 500 characters"
+      severity = "error"
+    }
+  }
+  
+  # Tags validation
+  tags_validation {
+    rule {
+      name = "tags_count_limit"
+      description = "Templates cannot have more than 10 tags"
+      condition = "tags != null && tags.size() > 10"
+      message = "Templates cannot have more than 10 tags"
+      severity = "warning"
+    }
+    
+    rule {
+      name = "tag_format"
+      description = "Tags must contain only alphanumeric characters, underscores, and hyphens"
+      condition = "tags != null && tags.any(tag -> !tag.matches('^[a-zA-Z0-9_-]+$'))"
+      message = "Tags must contain only alphanumeric characters, underscores, and hyphens"
       severity = "error"
     }
     
     rule {
-      name = "scope_required"
-      description = "Template scope is required"
-      condition = "scope == null"
-      message = "Template scope is required"
+      name = "tag_length"
+      description = "Tags must be between 1 and 32 characters"
+      condition = "tags != null && tags.any(tag -> tag.length() < 1 || tag.length() > 32)"
+      message = "Tags must be between 1 and 32 characters"
+      severity = "error"
+    }
+  }
+  
+  # Enable flags validation
+  enable_flags_validation {
+    rule {
+      name = "enable_machines_boolean"
+      description = "Enable machines flag must be a boolean value"
+      condition = "enable_machines != null && typeof(enable_machines) != 'boolean'"
+      message = "Enable machines flag must be a boolean value"
       severity = "error"
     }
     
     rule {
-      name = "security_level_required"
-      description = "Security level is required"
-      condition = "security_level == null"
-      message = "Security level is required"
+      name = "enable_facts_boolean"
+      description = "Enable facts flag must be a boolean value"
+      condition = "enable_facts != null && typeof(enable_facts) != 'boolean'"
+      message = "Enable facts flag must be a boolean value"
       severity = "error"
     }
     
     rule {
-      name = "engine_required"
-      description = "Template engine is required"
-      condition = "engine == null"
-      message = "Template engine is required"
-      severity = "error"
-    }
-  }
-  
-  # Variable validation
-  variable_validation {
-    rule {
-      name = "variable_name_format"
-      description = "Variable names must start with letter or underscore and contain only alphanumeric characters and underscores"
-      condition = "variables != null && !allVariableNamesValid(variables)"
-      message = "Variable names must start with letter or underscore and contain only alphanumeric characters and underscores"
-      severity = "error"
-    }
-  }
-  
-  # Function validation
-  function_validation {
-    rule {
-      name = "function_name_format"
-      description = "Function names must start with letter or underscore and contain only alphanumeric characters and underscores"
-      condition = "functions != null && !allFunctionNamesValid(functions)"
-      message = "Function names must start with letter or underscore and contain only alphanumeric characters and underscores"
-      severity = "error"
-    }
-  }
-  
-  # Pattern validation
-  pattern_validation {
-    rule {
-      name = "pattern_format"
-      description = "Restricted patterns must be valid regex patterns"
-      condition = "restricted_patterns != null && !allPatternsValid(restricted_patterns)"
-      message = "Restricted patterns must be valid regex patterns"
-      severity = "error"
-    }
-  }
-  
-  # Size validation
-  size_validation {
-    rule {
-      name = "template_size_limits"
-      description = "Template size must be between 1KB and 10MB"
-      condition = "size != null && (size < 1024 || size > 10485760)"
-      message = "Template size must be between 1KB and 10MB"
-      severity = "warning"
-    }
-  }
-  
-  # Nesting validation
-  nesting_validation {
-    rule {
-      name = "nesting_depth_limits"
-      description = "Nesting depth must be between 1 and 50"
-      condition = "nesting_depth != null && (nesting_depth < 1 || nesting_depth > 50)"
-      message = "Nesting depth must be between 1 and 50"
-      severity = "warning"
-    }
-  }
-  
-  # Run time validation
-  runtime_validation {
-    rule {
-      name = "run_time_limits"
-      description = "Run time must be between 100ms and 30s"
-      condition = "run_time != null && (run_time < 100 || run_time > 30000)"
-      message = "Run time must be between 100ms and 30s"
-      severity = "warning"
-    }
-  }
-  
-  # Memory usage validation
-  memory_validation {
-    rule {
-      name = "memory_usage_limits"
-      description = "Memory usage must be between 1MB and 100MB"
-      condition = "memory_usage != null && (memory_usage < 1048576 || memory_usage > 104857600)"
-      message = "Memory usage must be between 1MB and 100MB"
-      severity = "warning"
-    }
-  }
-  
-  # Security validation
-  security_validation {
-    rule {
-      name = "no_circular_refs"
-      description = "No circular references allowed in template definitions"
-      condition = "hasCircularReferences(template_content)"
-      message = "No circular references allowed in template definitions"
+      name = "enable_variables_boolean"
+      description = "Enable variables flag must be a boolean value"
+      condition = "enable_variables != null && typeof(enable_variables) != 'boolean'"
+      message = "Enable variables flag must be a boolean value"
       severity = "error"
     }
     
     rule {
-      name = "no_dangerous_patterns"
-      description = "Dangerous patterns are not allowed in templates"
-      condition = "hasDangerousPatterns(template_content)"
-      message = "Dangerous patterns are not allowed in templates"
+      name = "enable_environment_boolean"
+      description = "Enable environment flag must be a boolean value"
+      condition = "enable_environment != null && typeof(enable_environment) != 'boolean'"
+      message = "Enable environment flag must be a boolean value"
       severity = "error"
+    }
+  }
+  
+  # Constraints validation
+  constraints_validation {
+    rule {
+      name = "max_size_reasonable"
+      description = "Maximum template size must be between 1 and 10 MB"
+      condition = "max_size_mb != null && (max_size_mb < 1 || max_size_mb > 10)"
+      message = "Maximum template size must be between 1 and 10 MB"
+      severity = "warning"
+    }
+    
+    rule {
+      name = "max_execution_time_reasonable"
+      description = "Maximum execution time must be between 1 and 300 seconds"
+      condition = "max_execution_time_seconds != null && (max_execution_time_seconds < 1 || max_execution_time_seconds > 300)"
+      message = "Maximum execution time must be between 1 and 300 seconds"
+      severity = "warning"
+    }
+    
+    rule {
+      name = "max_memory_reasonable"
+      description = "Maximum memory usage must be between 1 and 100 MB"
+      condition = "max_memory_mb != null && (max_memory_mb < 1 || max_memory_mb > 100)"
+      message = "Maximum memory usage must be between 1 and 100 MB"
+      severity = "warning"
+    }
+  }
+  
+  # Metadata validation
+  metadata_validation {
+    rule {
+      name = "version_format"
+      description = "Version must contain only alphanumeric characters, dots, underscores, and hyphens"
+      condition = "version != null && !version.matches('^[a-zA-Z0-9._-]+$')"
+      message = "Version must contain only alphanumeric characters, dots, underscores, and hyphens"
+      severity = "error"
+    }
+    
+    rule {
+      name = "version_length"
+      description = "Version must not exceed 32 characters"
+      condition = "version != null && version.length() > 32"
+      message = "Version must not exceed 32 characters"
+      severity = "error"
+    }
+    
+    rule {
+      name = "author_length"
+      description = "Author must not exceed 100 characters"
+      condition = "author != null && author.length() > 100"
+      message = "Author must not exceed 100 characters"
+      severity = "warning"
+    }
+    
+    rule {
+      name = "timestamp_format"
+      description = "Timestamps must be in ISO 8601 format"
+      condition = "(created_at != null && !created_at.matches('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$')) || (updated_at != null && !updated_at.matches('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$'))"
+      message = "Timestamps must be in ISO 8601 format"
+      severity = "error"
+    }
+  }
+  
+  # Cross-field validation
+  cross_field_validation {
+    rule {
+      name = "created_before_updated"
+      description = "Created timestamp must be before or equal to updated timestamp"
+      condition = "created_at != null && updated_at != null && created_at > updated_at"
+      message = "Created timestamp must be before or equal to updated timestamp"
+      severity = "error"
+    }
+    
+    rule {
+      name = "at_least_one_enable_flag"
+      description = "At least one enable flag should be true for template context"
+      condition = "enable_machines == false && enable_facts == false && enable_variables == false && enable_environment == false"
+      message = "At least one enable flag should be true for template context"
+      severity = "warning"
     }
   }
 }

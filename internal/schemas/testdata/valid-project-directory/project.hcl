@@ -2,11 +2,7 @@
 # This file should pass all schema validations
 
 metadata {
-  schema_version = "0.20250809.0"
-  schema_type = "project"
-  schema_name = "Test Project Configuration"
-  last_updated = "2024-01-01"
-  compatibility = ["0.20250809.0"]
+  version = 1
   description = "A test project configuration that should pass all validations"
 }
 

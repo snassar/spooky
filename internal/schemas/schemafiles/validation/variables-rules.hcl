@@ -1,5 +1,5 @@
 # Variables Validation Rules
-# Extracted from internal/schemas/schemas/structure/variables.hcl
+# Validation rules for variables.hcl schema
 # These rules validate schema compliance and data format correctness
 
 # Variables validation rules
@@ -9,35 +9,27 @@ validation_rules {
     # Variable name validation
     rule {
       name = "variable_name_format"
-      description = "Variable names must start with a letter or underscore and contain only alphanumeric characters and underscores"
+      description = "Variable names must be valid identifiers"
       condition = "name != null && !name.matches('^[a-zA-Z_][a-zA-Z0-9_]*$')"
-      message = "Variable names must start with a letter or underscore and contain only alphanumeric characters and underscores"
-      severity = "error"
-    }
-    
-    rule {
-      name = "variable_name_length"
-      description = "Variable names must be between 1 and 64 characters"
-      condition = "name != null && (name.length() < 1 || name.length() > 64)"
-      message = "Variable names must be between 1 and 64 characters"
+      message = "Variable names must be valid identifiers"
       severity = "error"
     }
     
     # Variable description validation
     rule {
       name = "description_length"
-      description = "Variable descriptions must not exceed 256 characters"
-      condition = "description != null && description.length() > 256"
-      message = "Variable descriptions must not exceed 256 characters"
+      description = "Variable descriptions should be reasonable length"
+      condition = "description != null && description.length() > 500"
+      message = "Variable descriptions should not exceed 500 characters"
       severity = "warning"
     }
     
     # Tags validation
     rule {
       name = "tags_count_limit"
-      description = "Variables cannot have more than 10 tags"
-      condition = "tags != null && tags.size() > 10"
-      message = "Variables cannot have more than 10 tags"
+      description = "Variables cannot have more than 20 tags"
+      condition = "tags != null && tags.size() > 20"
+      message = "Variables cannot have more than 20 tags"
       severity = "warning"
     }
     
@@ -105,14 +97,6 @@ validation_rules {
       message = "Version identifiers must not exceed 32 characters"
       severity = "error"
     }
-    
-    rule {
-      name = "source_valid"
-      description = "Source must be one of: environment, file, manual, computed, imported"
-      condition = "metadata != null && metadata.source != null && !['environment', 'file', 'manual', 'computed', 'imported'].contains(metadata.source)"
-      message = "Source must be one of: environment, file, manual, computed, imported"
-      severity = "error"
-    }
   }
   
   # Cross-field validation rules
@@ -132,15 +116,6 @@ validation_rules {
       description = "Encryption metadata must not be present when encrypted = false"
       condition = "encrypted == false && encryption_metadata != null"
       message = "Encryption metadata is not allowed when encrypted = false"
-      severity = "error"
-    }
-    
-    # Value type validation for encryption
-    rule {
-      name = "encryptable_value_types"
-      description = "Only string, number, and object values can be encrypted"
-      condition = "encrypted == true && (value_type == 'bool')"
-      message = "Boolean values cannot be encrypted"
       severity = "error"
     }
     

@@ -5,18 +5,8 @@
 
 # Schema metadata
 metadata {
-  schema_version = "0.20250809.2"
-  schema_type = "variables-structure"
-  schema_name = "Variables Structure Schema"
-  last_updated = "2024-01-01"
-  compatibility = ["0.20250809.0", "0.20250809.1", "0.20250809.2"]
-  description = "Common variable structure definitions for all storage formats - defines the structure of variables that can be stored with age encryption support"
-  
-  # ScalVer format: 0.YYYYMMDD.N
-  # - 0: Development phase
-  # - 20250809: Date (9 August 2025)
-  # - 2: Patch version (reorganized for validation system)
-  scalver_format = "0.20250809.2"
+  version = "1"
+  description = "Variables configuration schema for spooky variable definitions"
 }
 
 # Variable structure definition
@@ -67,50 +57,50 @@ variable_structure {
   }
   
   # Age encryption metadata (optional, only when encrypted = true)
-  encryption_metadata {
+  encryption_metadata = {
     type = "object"
     required = false
     description = "Age encryption metadata - only present when encrypted = true"
     
-    # Encryption metadata structure
-    structure {
-      # Recipients list (required for encryption)
-      recipients {
-        type = "list"
-        required = true
-        description = "List of age public keys that can decrypt this value"
-        
-        items {
-          type = "string"
-          description = "Age public key starting with 'age1'"
-        }
-      }
+    # Recipients list (required for encryption)
+    recipients = {
+      type = "list"
+      required = true
+      description = "List of age public keys that can decrypt this value"
       
-      # Encryption timestamp (optional)
-      encrypted_at {
+      items = {
         type = "string"
-        required = false
-        description = "ISO 8601 timestamp when the value was encrypted"
+        description = "Age public key starting with 'age1'"
       }
-      
-      # Encryption method (optional)
-      method {
-        type = "string"
-        required = false
-        default = "age"
-        description = "Encryption method used"
-      }
+    }
+    
+    # Encryption timestamp (optional)
+    encrypted_at = {
+      type = "string"
+      required = false
+      description = "ISO 8601 timestamp when the value was encrypted"
+    }
+    
+    # Encryption method (optional)
+    method = {
+      type = "string"
+      required = false
+      default = "age"
+      description = "Encryption method used"
     }
   }
   
   # Variable tags (optional)
-  tags {
-    type = "list"
+  tags = {
+    type = "array"
     required = false
+    max_items = 10
     description = "Tags for categorizing and filtering variables"
-    
-    items {
+    items = {
       type = "string"
+      pattern = "^[a-zA-Z0-9_-]+$"
+      min_length = 1
+      max_length = 32
       description = "Tag value"
     }
   }

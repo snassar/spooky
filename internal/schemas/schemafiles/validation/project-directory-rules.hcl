@@ -1,5 +1,5 @@
 # Project Directory Validation Rules
-# Created for internal/schemas/schemas/structure/project-directory.hcl
+# Validation rules for project-directory.hcl schema
 # These rules validate schema compliance and data format correctness
 
 # Project directory validation rules
@@ -116,17 +116,6 @@ validation_rules {
       description = "logs/ directory is optional but must be writable if present"
       condition = "directoryExists('logs') && !isWritableDirectory('logs')"
       message = "logs/ directory must be writable if present"
-      severity = "error"
-    }
-  }
-  
-  # Recipients file validation
-  recipients_validation {
-    rule {
-      name = "recipients_file_format"
-      description = "recipients.txt must contain valid age public keys"
-      condition = "fileExists('recipients.txt') && !hasValidAgeKeys('recipients.txt')"
-      message = "recipients.txt must contain valid age public keys (one per line)"
       severity = "error"
     }
   }

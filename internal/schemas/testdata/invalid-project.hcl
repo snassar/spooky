@@ -2,11 +2,7 @@
 # This file should fail schema validations
 
 metadata {
-  schema_version = "invalid-version"  # Invalid ScalVer format
-  schema_type = "project"
-  schema_name = "Test Project Configuration"
-  last_updated = "2024-01-01"
-  compatibility = ["0.20250809.0"]
+  version = 1
   description = "A test project configuration that should fail validations"
 }
 

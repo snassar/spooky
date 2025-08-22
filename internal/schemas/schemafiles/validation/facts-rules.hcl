@@ -1,5 +1,5 @@
 # Facts Validation Rules
-# Extracted from internal/schemas/schemas/structure/facts.hcl
+# Validation rules for facts.hcl schema
 # These rules validate schema compliance and data format correctness
 
 # Facts validation rules
