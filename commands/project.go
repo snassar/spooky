@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"spooky/internal/encryption"
 	"spooky/internal/schemas"
 	"spooky/internal/utilities"
 
@@ -56,6 +57,22 @@ The directory defaults to the current directory if not specified.`,
 	RunE: runProjectValidate,
 }
 
+var projectEncryptCmd = &cobra.Command{
+	Use:   "encrypt [directory]",
+	Short: "Encrypt sensitive values in a spooky project",
+	Long: `Encrypt sensitive values in a spooky project using age encryption.
+
+This command:
+- Finds variables marked with encrypted = true
+- Encrypts their plaintext values using age encryption
+- Updates the HCL files with encrypted values
+- Requires age identities and recipients to be configured
+
+The directory defaults to the current directory if not specified.`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: runProjectEncrypt,
+}
+
 func init() {
 	// Add project command to root
 	RootCmd.AddCommand(projectCmd)
@@ -65,6 +82,9 @@ func init() {
 
 	// Add validate subcommand to project
 	projectCmd.AddCommand(projectValidateCmd)
+
+	// Add encrypt subcommand to project
+	projectCmd.AddCommand(projectEncryptCmd)
 
 	// Add flags for project init
 	projectInitCmd.Flags().StringVar(&projectName, "name", "", "Project name (required)")
@@ -1595,4 +1615,80 @@ func getProjectName(targetDir string) (string, error) {
 	}
 
 	return matches[1], nil
+}
+
+func runProjectEncrypt(cmd *cobra.Command, args []string) error {
+	// Determine target directory
+	targetDir := "."
+	if len(args) > 0 {
+		targetDir = args[0]
+	}
+
+	// Validate project directory
+	validator := utilities.NewProjectValidator()
+	result := validator.ValidateProject(targetDir)
+	if !result.IsValid {
+		return fmt.Errorf("project directory validation failed: %s", result.Errors[0].Message)
+	}
+
+	// Get age configuration from spooky config
+	configManager, err := utilities.NewConfigManager()
+	if err != nil {
+		return fmt.Errorf("failed to create config manager: %w", err)
+	}
+
+	// Get effective config to find age settings
+	_, err = configManager.GetEffectiveConfig("")
+	if err != nil {
+		return fmt.Errorf("failed to get effective config: %w", err)
+	}
+
+	// Parse config to find age settings
+	// For now, we'll use default paths - in a real implementation,
+	// you'd parse the HCL config to get the actual paths
+	identitiesPath := "~/.config/spooky/age/identities"
+	recipientsPath := "~/.config/spooky/age/recipients"
+
+	// Expand home directory
+	if strings.HasPrefix(identitiesPath, "~/") {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("failed to get home directory: %w", err)
+		}
+		identitiesPath = filepath.Join(homeDir, identitiesPath[2:])
+	}
+
+	if strings.HasPrefix(recipientsPath, "~/") {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("failed to get home directory: %w", err)
+		}
+		recipientsPath = filepath.Join(homeDir, recipientsPath[2:])
+	}
+
+	// Create age encryption instance
+	ageEncryption, err := encryption.NewAgeEncryption(identitiesPath, recipientsPath)
+	if err != nil {
+		return fmt.Errorf("failed to create age encryption: %w", err)
+	}
+
+	// Validate age configuration
+	if err := ageEncryption.ValidateConfiguration(); err != nil {
+		return fmt.Errorf("age encryption configuration invalid: %w", err)
+	}
+
+	fmt.Printf("Age encryption configured with %d identities and %d recipients\n",
+		ageEncryption.GetIdentitiesCount(), ageEncryption.GetRecipientsCount())
+
+	// Create HCL updater
+	updater := encryption.NewSimpleHCLUpdater(ageEncryption)
+
+	// Process the project directory
+	fmt.Printf("Processing project directory: %s\n", targetDir)
+	if err := updater.UpdateDirectory(targetDir); err != nil {
+		return fmt.Errorf("failed to process project directory: %w", err)
+	}
+
+	fmt.Println("Project encryption completed successfully!")
+	return nil
 }
