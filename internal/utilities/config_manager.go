@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"spooky/internal/schemas"
+
 	"github.com/pkg/errors"
 )
 
@@ -61,13 +63,57 @@ func (cm *ConfigManager) WriteConfigFile(path, content string) error {
 	return nil
 }
 
+// GetStructBasedDefaultConfig returns the default configuration using struct-based defaults
+func (cm *ConfigManager) GetStructBasedDefaultConfig() string {
+	// Import the schemas package to use the default config generator
+	// Note: We need to import "spooky/internal/schemas" at the top of this file
+	defaultGen := schemas.NewDefaultConfigGenerator()
+	defaultConfig := defaultGen.GetDefaultSpookyConfig()
+
+	// Convert to HCL
+	hclConfig, err := defaultGen.ToHCL(defaultConfig)
+	if err != nil {
+		// Fallback to a simple default if HCL generation fails
+		return cm.getFallbackDefaultConfig()
+	}
+
+	return hclConfig
+}
+
+// getFallbackDefaultConfig provides a simple fallback configuration
+func (cm *ConfigManager) getFallbackDefaultConfig() string {
+	return `# Spooky Default Configuration (Fallback)
+# Generated from struct-based defaults
+
+logging {
+  level  = "info"
+  format = "json"
+  output = "stderr"
+}
+
+ssh {
+  timeout = 30
+  keepalive_interval = 60
+  keepalive_count = 3
+  key_scan_timeout = 10
+  known_hosts_strict = true
+  connection_pool_size = 10
+}
+
+security {
+  allow_unsafe_commands = false
+  audit_logging = true
+}
+`
+}
+
 // ReadConfig reads the main configuration file
 func (cm *ConfigManager) ReadConfig() (string, error) {
 	return cm.ReadConfigFile(cm.config.ConfigFile)
 }
 
 // GetEffectiveConfig returns the effective configuration content
-// Priority: custom config file > user config > embedded default
+// Priority: custom config file > user config > struct-based default
 func (cm *ConfigManager) GetEffectiveConfig(customConfigFile string) (string, error) {
 	// Check for custom config file first (highest priority)
 	if customConfigFile != "" {
@@ -82,18 +128,8 @@ func (cm *ConfigManager) GetEffectiveConfig(customConfigFile string) (string, er
 		return cm.ReadConfig()
 	}
 
-	// Return embedded default (lowest priority)
-	fileEmbedder, err := NewFileEmbedder()
-	if err != nil {
-		return "", errors.Wrap(err, "failed to create file embedder")
-	}
-
-	defaultConfig, err := fileEmbedder.GetDefaultConfig()
-	if err != nil {
-		return "", errors.Wrap(err, "failed to get default config")
-	}
-
-	return defaultConfig, nil
+	// Return struct-based default (lowest priority)
+	return cm.GetStructBasedDefaultConfig(), nil
 }
 
 // GetEffectiveConfigInfo returns information about the effective configuration
@@ -129,14 +165,10 @@ func (cm *ConfigManager) GetEffectiveConfigInfo(customConfigFile string) (*Effec
 			info.ModTime = stat.ModTime().Format(time.RFC3339)
 		}
 	} else {
-		// Using embedded default (lowest priority)
-		info.Source = "embedded"
-		fileEmbedder, err := NewFileEmbedder()
-		if err == nil {
-			if defaultConfig, err := fileEmbedder.GetDefaultConfig(); err == nil {
-				info.Size = int64(len(defaultConfig))
-			}
-		}
+		// Using struct-based default (lowest priority)
+		info.Source = "struct-based"
+		defaultConfig := cm.GetStructBasedDefaultConfig()
+		info.Size = int64(len(defaultConfig))
 	}
 
 	return info, nil

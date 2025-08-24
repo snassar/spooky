@@ -182,7 +182,7 @@ func (sv *StructValidator) parseExpression(expr hclsyntax.Expression) interface{
 			}
 		}
 		// For other operations, return a representation
-		return fmt.Sprintf("%v %s %v", left, v.Op, right)
+		return fmt.Sprintf("%v %v %v", left, v.Op, right)
 	case *hclsyntax.ConditionalExpr:
 		// Handle conditional expressions
 		condition := sv.parseExpression(v.Condition)
