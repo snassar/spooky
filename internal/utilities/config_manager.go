@@ -168,13 +168,60 @@ func (cm *ConfigManager) CreateDefaultConfig() error {
 	// Get embedded default config
 	fileEmbedder, err := NewFileEmbedder()
 	if err != nil {
-		return errors.Wrap(err, "failed to create file embedder")
+		return errors.Wrap(err, "failed to get file embedder")
 	}
 
 	defaultConfig, err := fileEmbedder.GetDefaultConfig()
 	if err != nil {
 		return errors.Wrap(err, "failed to get default config")
 	}
+
+	// Validate the HCL before writing
+	validator := NewHCLValidator()
+	result, err := validator.ValidateContent(defaultConfig, "default-config.hcl")
+	if err != nil {
+		return errors.Wrap(err, "failed to validate default config")
+	}
+
+	if !result.IsValid {
+		return errors.Errorf("default config is not valid HCL: %v", result.Errors)
+	}
+
+	return cm.WriteConfig(defaultConfig)
+}
+
+// CreateDefaultConfigFromStructs creates a default configuration file from Go structs
+func (cm *ConfigManager) CreateDefaultConfigFromStructs() error {
+	// Import the schemas package to access generation functions
+	// This will be implemented when we integrate the schemas package
+	defaultConfig := `# Spooky Global Configuration
+# Generated from Go struct schemas
+
+spooky {
+  # SSH Configuration
+  ssh {
+    timeout = 30  # SSH connection timeout in seconds
+    keepalive_interval = 60  # SSH keepalive interval in seconds
+  }
+  
+  # Security Configuration
+  security {
+    allow_unsafe_commands = false  # Allow potentially unsafe commands
+  }
+  
+  # Age Encryption Configuration
+  age {
+    identities = "~/.config/spooky/age/identities.txt"  # Path to age identities
+  }
+  
+  # Logging Configuration
+  logging {
+    level = "info"  # debug, info, warn, error, fatal
+    format = "structured"  # json, text, structured
+    output = "stdout"  # stdout, stderr, file, null
+    # file_path = "/var/log/spooky.log"  # Required when output is 'file'
+  }
+}`
 
 	// Validate the HCL before writing
 	validator := NewHCLValidator()

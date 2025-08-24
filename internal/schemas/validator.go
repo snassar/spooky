@@ -12,8 +12,7 @@ import (
 
 // SchemaValidator provides functionality to validate HCL content against embedded schemas
 type SchemaValidator struct {
-	embedder *SchemaEmbedder
-	logger   *slog.Logger
+	logger *slog.Logger
 }
 
 // ValidationResult contains the result of schema validation
@@ -30,6 +29,10 @@ type ValidationError struct {
 	Value    interface{}
 	Message  string
 	Severity string
+	File     string // File path where the error occurred
+	Line     int    // Line number where the error occurred
+	Column   int    // Column number where the error occurred
+	Context  string // Additional context about the error
 }
 
 // ValidationWarning represents a schema validation warning
@@ -37,86 +40,22 @@ type ValidationWarning struct {
 	Field   string
 	Value   interface{}
 	Message string
+	File    string // File path where the warning occurred
+	Line    int    // Line number where the warning occurred
+	Column  int    // Column number where the warning occurred
+	Context string // Additional context about the warning
 }
 
 // NewSchemaValidator creates a new schema validator
 func NewSchemaValidator() (*SchemaValidator, error) {
-	embedder, err := NewSchemaEmbedder()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create schema embedder")
-	}
-
-	return &SchemaValidator{
-		embedder: embedder,
-		logger:   slog.Default(),
-	}, nil
+	// Temporarily return error since schema embedder is not available
+	return nil, errors.New("schema validator not available - use struct validator instead")
 }
 
 // ValidateContent validates HCL content against a specific schema
 func (sv *SchemaValidator) ValidateContent(schemaName, content string) (*ValidationResult, error) {
-	result := &ValidationResult{
-		IsValid:    true,
-		Errors:     []ValidationError{},
-		Warnings:   []ValidationWarning{},
-		SchemaName: schemaName,
-	}
-
-	// First, validate basic HCL syntax
-	_, diags := hclsyntax.ParseConfig([]byte(content), schemaName+".hcl", hcl.Pos{Line: 1, Column: 1})
-	if diags.HasErrors() {
-		result.IsValid = false
-		for _, diag := range diags.Errs() {
-			result.Errors = append(result.Errors, ValidationError{
-				Message:  diag.Error(),
-				Severity: "error",
-			})
-		}
-		return result, nil
-	}
-
-	// Get the actual schema to understand what's required
-	schema, exists := sv.embedder.GetSchema(schemaName)
-	if !exists {
-		return nil, NewSchemaNotFoundError(schemaName, sv.embedder.ListSchemas())
-	}
-
-	// Parse the schema to understand the structure
-	schemaData, err := sv.ParseHCLContent(schema)
-	if err != nil {
-		result.IsValid = false
-		result.Errors = append(result.Errors, ValidationError{
-			Message:  fmt.Sprintf("Failed to parse schema: %v", err),
-			Severity: "error",
-		})
-		return result, nil
-	}
-
-	// Parse the content to validate
-	contentData, err := sv.ParseHCLContent(content)
-	if err != nil {
-		result.IsValid = false
-		result.Errors = append(result.Errors, ValidationError{
-			Message:  fmt.Sprintf("Failed to parse content: %v", err),
-			Severity: "error",
-		})
-		return result, nil
-	}
-
-	// Validate the content against the schema structure
-	if err := sv.validateAgainstSchemaStructure(schemaName, contentData, schemaData, result); err != nil {
-		result.IsValid = false
-		result.Errors = append(result.Errors, ValidationError{
-			Message:  err.Error(),
-			Severity: "error",
-		})
-	}
-
-	// Update validity based on errors
-	if len(result.Errors) > 0 {
-		result.IsValid = false
-	}
-
-	return result, nil
+	// Temporarily disabled - use struct validator instead
+	return nil, errors.New("schema validator not available - use struct validator instead")
 }
 
 // ParseHCLContent parses HCL content into a structured map
@@ -393,4 +332,106 @@ func (sv *SchemaValidator) extractRequiredAttributes(schemaBlock map[string]inte
 	}
 
 	return requiredAttrs
+}
+
+// FormatOutput formats the validation result for CLI output (Terraform/Ansible style)
+func (vr *ValidationResult) FormatOutput() string {
+	var output strings.Builder
+
+	if vr.IsValid {
+		output.WriteString("Validation completed successfully.\n")
+		if len(vr.Warnings) > 0 {
+			output.WriteString(fmt.Sprintf("%d warnings found\n", len(vr.Warnings)))
+		}
+		return output.String()
+	}
+
+	// Show errors first
+	output.WriteString(fmt.Sprintf("Validation failed with %d errors", len(vr.Errors)))
+	if len(vr.Warnings) > 0 {
+		output.WriteString(fmt.Sprintf(" and %d warnings", len(vr.Warnings)))
+	}
+	output.WriteString("\n\n")
+
+	// Group issues by file for better readability
+	fileErrors := make(map[string][]ValidationError)
+	fileWarnings := make(map[string][]ValidationWarning)
+
+	for _, err := range vr.Errors {
+		file := err.File
+		if file == "" {
+			file = "unknown"
+		}
+		fileErrors[file] = append(fileErrors[file], err)
+	}
+
+	for _, warning := range vr.Warnings {
+		file := warning.File
+		if file == "" {
+			file = "unknown"
+		}
+		fileWarnings[file] = append(fileWarnings[file], warning)
+	}
+
+	// Display errors by file (Terraform style)
+	for file, errors := range fileErrors {
+		output.WriteString(fmt.Sprintf("  on %s:\n", file))
+
+		for _, err := range errors {
+			output.WriteString(fmt.Sprintf("  %s\n", err.Message))
+
+			if err.Line > 0 {
+				output.WriteString(fmt.Sprintf("    at line %d", err.Line))
+				if err.Column > 0 {
+					output.WriteString(fmt.Sprintf(":%d", err.Column))
+				}
+				output.WriteString("\n")
+			}
+
+			if err.Context != "" {
+				output.WriteString(fmt.Sprintf("    %s\n", err.Context))
+			}
+
+			if err.Field != "" {
+				output.WriteString(fmt.Sprintf("    Field: %s\n", err.Field))
+			}
+
+			output.WriteString("\n")
+		}
+	}
+
+	// Display warnings by file
+	for file, warnings := range fileWarnings {
+		output.WriteString(fmt.Sprintf("  on %s:\n", file))
+
+		for _, warning := range warnings {
+			output.WriteString(fmt.Sprintf("  %s\n", warning.Message))
+
+			if warning.Line > 0 {
+				output.WriteString(fmt.Sprintf("    at line %d", warning.Line))
+				if warning.Column > 0 {
+					output.WriteString(fmt.Sprintf(":%d", warning.Column))
+				}
+				output.WriteString("\n")
+			}
+
+			if warning.Context != "" {
+				output.WriteString(fmt.Sprintf("    %s\n", warning.Context))
+			}
+
+			if warning.Field != "" {
+				output.WriteString(fmt.Sprintf("    Field: %s\n", warning.Field))
+			}
+
+			output.WriteString("\n")
+		}
+	}
+
+	// Summary
+	output.WriteString(fmt.Sprintf("Validation Summary:\n"))
+	output.WriteString(fmt.Sprintf("  Schema: %s\n", vr.SchemaName))
+	output.WriteString(fmt.Sprintf("  Errors: %d\n", len(vr.Errors)))
+	output.WriteString(fmt.Sprintf("  Warnings: %d\n", len(vr.Warnings)))
+
+	return output.String()
 }

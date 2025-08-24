@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"spooky/internal/schemas"
+	"spooky/internal/utilities"
 
 	"github.com/spf13/cobra"
 )
@@ -149,104 +149,316 @@ func validateProjectName(name string) error {
 }
 
 func createProjectHCL(targetDir, name, description string) error {
-	// Get the embedded project schema
-	embedder, err := schemas.NewSchemaEmbedder()
-	if err != nil {
-		return fmt.Errorf("failed to initialize schema embedder: %w", err)
-	}
-
-	// Get the project schema structure
-	schema, exists := embedder.GetSchema("project")
-	if !exists {
-		return fmt.Errorf("project schema not found in embedded schemas")
-	}
-
-	// Create minimal valid project.hcl based on the schema
-	content := fmt.Sprintf(`# Spooky Project Configuration
-# Generated on %s
-# Based on embedded schema: project
-
-%s
-
-project {
-  name = "%s"
-  description = "%s"
-}
-`, time.Now().Format("2006-01-02 15:04:05"), schema, name, description)
-
+	// Generate project configuration directly from Go structs
+	content := schemas.GenerateProjectConfigFromStructs(name, description)
 	return os.WriteFile(filepath.Join(targetDir, "project.hcl"), []byte(content), 0644)
 }
 
 func createMachinesHCL(targetDir string) error {
-	// Get the embedded machines schema
-	embedder, err := schemas.NewSchemaEmbedder()
-	if err != nil {
-		return fmt.Errorf("failed to initialize schema embedder: %w", err)
-	}
-
-	// Get the machines schema structure
-	schema, exists := embedder.GetSchema("machines")
-	if !exists {
-		return fmt.Errorf("machines schema not found in embedded schemas")
-	}
-
-	// Create minimal valid machines.hcl based on the schema
-	content := fmt.Sprintf(`# Machines Configuration
-# Define your machine inventory and connectivity settings
-# Based on embedded schema: machines
-
-%s
-`, schema)
-
+	// Generate machines configuration directly from Go structs
+	content := schemas.GenerateMachinesConfigFromStructs()
 	return os.WriteFile(filepath.Join(targetDir, "machines.hcl"), []byte(content), 0644)
 }
 
 func createActionsHCL(targetDir string) error {
-	// Get the embedded actions schema
-	embedder, err := schemas.NewSchemaEmbedder()
-	if err != nil {
-		return fmt.Errorf("failed to initialize schema embedder: %w", err)
-	}
-
-	// Get the actions schema structure
-	schema, exists := embedder.GetSchema("actions")
-	if !exists {
-		return fmt.Errorf("actions schema not found in embedded schemas")
-	}
-
-	// Create minimal valid actions.hcl based on the schema
-	content := fmt.Sprintf(`# Actions Configuration
-# Define automation tasks and deployment actions
-# Based on embedded schema: actions
-
-%s
-`, schema)
-
+	// Generate actions configuration directly from Go structs
+	content := schemas.GenerateActionsConfigFromStructs()
 	return os.WriteFile(filepath.Join(targetDir, "actions.hcl"), []byte(content), 0644)
 }
 
 func createVariablesHCL(targetDir string) error {
-	// Get the embedded variables schema
-	embedder, err := schemas.NewSchemaEmbedder()
-	if err != nil {
-		return fmt.Errorf("failed to initialize schema embedder: %w", err)
-	}
-
-	// Get the variables schema structure
-	schema, exists := embedder.GetSchema("variables")
-	if !exists {
-		return fmt.Errorf("variables schema not found in embedded schemas")
-	}
-
-	// Create minimal valid variables.hcl based on the schema
-	content := fmt.Sprintf(`# Variables Configuration
-# Define project-wide variables and configuration values
-# Based on embedded schema: variables
-
-%s
-`, schema)
+	// Generate variables configuration directly from Go structs
+	content := schemas.GenerateVariablesConfigFromStructs()
 
 	return os.WriteFile(filepath.Join(targetDir, "variables.hcl"), []byte(content), 0644)
+}
+
+// generateProjectConfigFromSchema creates a project configuration based on schema understanding
+func generateProjectConfigFromSchema(name, description string, schemaData map[string]interface{}) string {
+	var content strings.Builder
+
+	// Generate header from schema metadata if available
+	if metadata, ok := schemaData["metadata"].(map[string]interface{}); ok {
+		if version, hasVersion := metadata["version"]; hasVersion {
+			content.WriteString(fmt.Sprintf("# Spooky Project Configuration Schema v%v\n", version))
+		}
+		if desc, hasDesc := metadata["description"]; hasDesc {
+			content.WriteString(fmt.Sprintf("# %v\n", desc))
+		}
+		content.WriteString("# Generated based on embedded schema\n\n")
+	} else {
+		content.WriteString("# Spooky Project Configuration\n# Generated based on embedded schema\n\n")
+	}
+
+	// Generate configuration blocks entirely from schema structure
+	for blockName, blockData := range schemaData {
+		if blockName == "metadata" {
+			continue // Skip metadata block, already handled above
+		}
+
+		// Generate block header
+		content.WriteString(fmt.Sprintf("%s {\n", blockName))
+
+		// Handle special case for project block - add required name and description
+		if blockName == "project" {
+			content.WriteString(fmt.Sprintf("  name = \"%s\"\n", name))
+			content.WriteString(fmt.Sprintf("  description = \"%s\"\n", description))
+		}
+
+		// Generate fields from schema understanding
+		if blockInfo, ok := blockData.(map[string]interface{}); ok {
+			for fieldName, fieldData := range blockInfo {
+				// Skip name and description if we already added them for project block
+				if blockName == "project" && (fieldName == "name" || fieldName == "description") {
+					continue
+				}
+
+				if fieldInfo, ok := fieldData.(map[string]interface{}); ok {
+					// Check if field is required
+					if required, hasRequired := fieldInfo["required"]; hasRequired && required == true {
+						// For required fields, add placeholder with description
+						if desc, hasDesc := fieldInfo["description"]; hasDesc {
+							content.WriteString(fmt.Sprintf("  # %s = <required>  # %v\n", fieldName, desc))
+						} else {
+							content.WriteString(fmt.Sprintf("  # %s = <required>\n", fieldName))
+						}
+					} else {
+						// For optional fields, add commented default or placeholder
+						if defaultValue, hasDefault := fieldInfo["default"]; hasDefault {
+							if desc, hasDesc := fieldInfo["description"]; hasDesc {
+								content.WriteString(fmt.Sprintf("  # %s = %v  # %v\n", fieldName, defaultValue, desc))
+							} else {
+								content.WriteString(fmt.Sprintf("  # %s = %v\n", fieldName, defaultValue))
+							}
+						} else {
+							if desc, hasDesc := fieldInfo["description"]; hasDesc {
+								content.WriteString(fmt.Sprintf("  # %s = <value>  # %v\n", fieldName, desc))
+							} else {
+								content.WriteString(fmt.Sprintf("  # %s = <value>\n", fieldName))
+							}
+						}
+					}
+				}
+			}
+		}
+
+		content.WriteString("}\n\n")
+	}
+
+	return strings.TrimSpace(content.String())
+}
+
+// generateVariablesConfigFromSchema creates a variables configuration based on schema understanding
+func generateVariablesConfigFromSchema(schemaData map[string]interface{}) string {
+	var content strings.Builder
+
+	// Generate header from schema metadata if available
+	if metadata, ok := schemaData["metadata"].(map[string]interface{}); ok {
+		if version, hasVersion := metadata["version"]; hasVersion {
+			content.WriteString(fmt.Sprintf("# Variables Configuration Schema v%v\n", version))
+		}
+		if desc, hasDesc := metadata["description"]; hasDesc {
+			content.WriteString(fmt.Sprintf("# %v\n", desc))
+		}
+		content.WriteString("# Generated based on embedded schema\n\n")
+	} else {
+		content.WriteString("# Variables Configuration\n# Generated based on embedded schema\n\n")
+	}
+
+	// Generate configuration blocks entirely from schema structure
+	for blockName, blockData := range schemaData {
+		if blockName == "metadata" {
+			continue // Skip metadata block, already handled above
+		}
+
+		// Generate block header
+		content.WriteString(fmt.Sprintf("%s \"example-%s\" {\n", blockName, blockName))
+
+		// Generate fields from schema understanding
+		if blockInfo, ok := blockData.(map[string]interface{}); ok {
+			for fieldName, fieldData := range blockInfo {
+				if fieldInfo, ok := fieldData.(map[string]interface{}); ok {
+					// Check if field is required
+					if required, hasRequired := fieldInfo["required"]; hasRequired && required == true {
+						// For required fields, add placeholder with description
+						if desc, hasDesc := fieldInfo["description"]; hasDesc {
+							content.WriteString(fmt.Sprintf("  # %s = <required>  # %v\n", fieldName, desc))
+						} else {
+							content.WriteString(fmt.Sprintf("  # %s = <required>\n", fieldName))
+						}
+					} else {
+						// For optional fields, add commented default or placeholder
+						if defaultValue, hasDefault := fieldInfo["default"]; hasDefault {
+							if desc, hasDesc := fieldInfo["description"]; hasDesc {
+								content.WriteString(fmt.Sprintf("  # %s = %v  # %v\n", fieldName, defaultValue, desc))
+							} else {
+								content.WriteString(fmt.Sprintf("  # %s = %v\n", fieldName, defaultValue))
+							}
+						} else {
+							if desc, hasDesc := fieldInfo["description"]; hasDesc {
+								content.WriteString(fmt.Sprintf("  # %s = <value>  # %v\n", fieldName, desc))
+							} else {
+								content.WriteString(fmt.Sprintf("  # %s = <value>\n", fieldName))
+							}
+						}
+					}
+				}
+			}
+		}
+
+		content.WriteString("}\n\n")
+	}
+
+	// Add usage guidance
+	content.WriteString("# Usage:\n")
+	content.WriteString("# 1. Replace 'example-*' with your actual variable names\n")
+	content.WriteString("# 2. Fill in required fields marked with <required>\n")
+	content.WriteString("# 3. Uncomment and configure optional fields as needed\n")
+	content.WriteString("# 4. Add more variables by copying and modifying the examples\n")
+
+	return strings.TrimSpace(content.String())
+}
+
+// generateMachinesConfigFromSchema creates a machines configuration based on schema understanding
+func generateMachinesConfigFromSchema(schemaData map[string]interface{}) string {
+	var content strings.Builder
+
+	// Generate header from schema metadata if available
+	if metadata, ok := schemaData["metadata"].(map[string]interface{}); ok {
+		if version, hasVersion := metadata["version"]; hasVersion {
+			content.WriteString(fmt.Sprintf("# Machines Configuration Schema v%v\n", version))
+		}
+		if desc, hasDesc := metadata["description"]; hasDesc {
+			content.WriteString(fmt.Sprintf("# %v\n", desc))
+		}
+		content.WriteString("# Generated based on embedded schema\n\n")
+	} else {
+		content.WriteString("# Machines Configuration\n# Generated based on embedded schema\n\n")
+	}
+
+	// Generate configuration blocks entirely from schema structure
+	for blockName, blockData := range schemaData {
+		if blockName == "metadata" {
+			continue // Skip metadata block, already handled above
+		}
+
+		// Generate block header
+		content.WriteString(fmt.Sprintf("%s \"example-%s\" {\n", blockName, blockName))
+
+		// Generate fields from schema understanding
+		if blockInfo, ok := blockData.(map[string]interface{}); ok {
+			for fieldName, fieldData := range blockInfo {
+				if fieldInfo, ok := fieldData.(map[string]interface{}); ok {
+					// Check if field is required
+					if required, hasRequired := fieldInfo["required"]; hasRequired && required == true {
+						// For required fields, add placeholder with description
+						if desc, hasDesc := fieldInfo["description"]; hasDesc {
+							content.WriteString(fmt.Sprintf("  # %s = <required>  # %v\n", fieldName, desc))
+						} else {
+							content.WriteString(fmt.Sprintf("  # %s = <required>\n", fieldName))
+						}
+					} else {
+						// For optional fields, add commented default or placeholder
+						if defaultValue, hasDefault := fieldInfo["default"]; hasDefault {
+							if desc, hasDesc := fieldInfo["description"]; hasDesc {
+								content.WriteString(fmt.Sprintf("  # %s = %v  # %v\n", fieldName, defaultValue, desc))
+							} else {
+								content.WriteString(fmt.Sprintf("  # %s = %v\n", fieldName, defaultValue))
+							}
+						} else {
+							if desc, hasDesc := fieldInfo["description"]; hasDesc {
+								content.WriteString(fmt.Sprintf("  # %s = <value>  # %v\n", fieldName, desc))
+							} else {
+								content.WriteString(fmt.Sprintf("  # %s = <value>\n", fieldName))
+							}
+						}
+					}
+				}
+			}
+		}
+
+		content.WriteString("}\n\n")
+	}
+
+	// Add usage guidance
+	content.WriteString("# Usage:\n")
+	content.WriteString("# 1. Replace 'example-*' with your actual machine/group names\n")
+	content.WriteString("# 2. Fill in required fields marked with <required>\n")
+	content.WriteString("# 3. Uncomment and configure optional fields as needed\n")
+	content.WriteString("# 4. Add more machines/groups by copying and modifying the examples\n")
+
+	return strings.TrimSpace(content.String())
+}
+
+// generateActionsConfigFromSchema creates an actions configuration based on schema understanding
+func generateActionsConfigFromSchema(schemaData map[string]interface{}) string {
+	var content strings.Builder
+
+	// Generate header from schema metadata if available
+	if metadata, ok := schemaData["metadata"].(map[string]interface{}); ok {
+		if version, hasVersion := metadata["version"]; hasVersion {
+			content.WriteString(fmt.Sprintf("# Actions Configuration Schema v%v\n", version))
+		}
+		if desc, hasDesc := metadata["description"]; hasDesc {
+			content.WriteString(fmt.Sprintf("# %v\n", desc))
+		}
+		content.WriteString("# Generated based on embedded schema\n\n")
+	} else {
+		content.WriteString("# Actions Configuration\n# Generated based on embedded schema\n\n")
+	}
+
+	// Generate configuration blocks entirely from schema structure
+	for blockName, blockData := range schemaData {
+		if blockName == "metadata" {
+			continue // Skip metadata block, already handled above
+		}
+
+		// Generate block header
+		content.WriteString(fmt.Sprintf("%s \"example-%s\" {\n", blockName, blockName))
+
+		// Generate fields from schema understanding
+		if blockInfo, ok := blockData.(map[string]interface{}); ok {
+			for fieldName, fieldData := range blockInfo {
+				if fieldInfo, ok := fieldData.(map[string]interface{}); ok {
+					// Check if field is required
+					if required, hasRequired := fieldInfo["required"]; hasRequired && required == true {
+						// For required fields, add placeholder with description
+						if desc, hasDesc := fieldInfo["description"]; hasDesc {
+							content.WriteString(fmt.Sprintf("  # %s = <required>  # %v\n", fieldName, desc))
+						} else {
+							content.WriteString(fmt.Sprintf("  # %s = <required>\n", fieldName))
+						}
+					} else {
+						// For optional fields, add commented default or placeholder
+						if defaultValue, hasDefault := fieldInfo["default"]; hasDefault {
+							if desc, hasDesc := fieldInfo["description"]; hasDesc {
+								content.WriteString(fmt.Sprintf("  # %s = %v  # %v\n", fieldName, defaultValue, desc))
+							} else {
+								content.WriteString(fmt.Sprintf("  # %s = %v\n", fieldName, defaultValue))
+							}
+						} else {
+							if desc, hasDesc := fieldInfo["description"]; hasDesc {
+								content.WriteString(fmt.Sprintf("  # %s = <value>  # %v\n", fieldName, desc))
+							} else {
+								content.WriteString(fmt.Sprintf("  # %s = <value>\n", fieldName))
+							}
+						}
+					}
+				}
+			}
+		}
+
+		content.WriteString("}\n\n")
+	}
+
+	// Add usage guidance
+	content.WriteString("# Usage:\n")
+	content.WriteString("# 1. Replace 'example-*' with your actual action names\n")
+	content.WriteString("# 2. Fill in required fields marked with <required>\n")
+	content.WriteString("# 3. Uncomment and configure optional fields as needed\n")
+	content.WriteString("# 4. Add more actions by copying and modifying the examples\n")
+
+	return strings.TrimSpace(content.String())
 }
 
 func createREADME(targetDir, name, description string) error {
@@ -267,19 +479,58 @@ func runProjectValidate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("directory does not exist: %s", targetDir)
 	}
 
-	fmt.Printf("Validating spooky project in: %s\n\n", targetDir)
-
-	// Validate project structure
-	if err := validateProjectStructure(targetDir); err != nil {
-		return fmt.Errorf("project structure validation failed: %w", err)
+	// Get project name from project.hcl
+	projectName, err := getProjectName(targetDir)
+	if err != nil {
+		return fmt.Errorf("failed to get project name: %w", err)
 	}
 
-	// Validate individual files
-	if err := validateProjectFiles(targetDir); err != nil {
-		return fmt.Errorf("project files validation failed: %w", err)
+	// Use the enhanced project validator
+	validator := utilities.NewProjectValidator()
+	result := validator.ValidateProject(targetDir)
+
+	// Validate project directory structure against schema
+	if err := validateProjectDirectoryStructure(targetDir); err != nil {
+		return fmt.Errorf("project validation failed: %w", err)
 	}
 
-	fmt.Println("✅ Project validation completed successfully!")
+	// Display simple validation result
+	fmt.Printf("Project \"%s\" is valid\n", projectName)
+
+	// Return error if validation failed
+	if !result.IsValid {
+		return fmt.Errorf("project validation failed with %d errors", len(result.Errors))
+	}
+
+	return nil
+}
+
+// validateProjectDirectoryStructure validates the project directory against the project directory schema
+func validateProjectDirectoryStructure(targetDir string) error {
+	// Check for required files based on project directory schema
+	requiredFiles := []string{"project.hcl"}
+	for _, file := range requiredFiles {
+		filePath := filepath.Join(targetDir, file)
+		if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			return fmt.Errorf("required file missing: %s", file)
+		}
+	}
+
+	// Check for at least one configuration file (machines.hcl, actions.hcl, or variables.hcl)
+	configFiles := []string{"machines.hcl", "actions.hcl", "variables.hcl"}
+	hasConfig := false
+	for _, file := range configFiles {
+		filePath := filepath.Join(targetDir, file)
+		if _, err := os.Stat(filePath); err == nil {
+			hasConfig = true
+			break
+		}
+	}
+
+	if !hasConfig {
+		return fmt.Errorf("at least one configuration file (machines.hcl, actions.hcl, or variables.hcl) must exist")
+	}
+
 	return nil
 }
 
@@ -379,18 +630,15 @@ func validateProjectConfig(targetDir string) error {
 		return fmt.Errorf("project.hcl not found")
 	}
 
-	// Validate syntax and schema
-	validator, err := schemas.NewSchemaValidator()
-	if err != nil {
-		return fmt.Errorf("failed to create schema validator: %w", err)
-	}
+	// Validate syntax and schema using struct validator
+	validator := schemas.NewStructValidator()
 	content, err := os.ReadFile(projectHCLPath)
 	if err != nil {
 		return fmt.Errorf("failed to read project.hcl: %w", err)
 	}
 
 	// Validate against project schema
-	result, err := validator.ValidateContent("project", string(content))
+	result, err := validator.ValidateHCLContent("project", string(content))
 	if err != nil {
 		return fmt.Errorf("project.hcl schema validation failed: %w", err)
 	}
@@ -438,13 +686,10 @@ func validateActions(projectPath string) error {
 
 // validateAgainstSchema validates HCL content against embedded schemas
 func validateAgainstSchema(schemaName, content string) error {
-	// Use the new schema validator for proper schema validation
-	validator, err := schemas.NewSchemaValidator()
-	if err != nil {
-		return fmt.Errorf("failed to create schema validator: %w", err)
-	}
+	// Use the new struct validator for proper schema validation
+	validator := schemas.NewStructValidator()
 
-	result, err := validator.ValidateContent(schemaName, content)
+	result, err := validator.ValidateHCLContent(schemaName, content)
 	if err != nil {
 		return fmt.Errorf("failed to validate schema: %w", err)
 	}
@@ -533,12 +778,9 @@ func validateMergedMachines(contents []string, fileNames []string) error {
 		fileName := fileNames[i]
 
 		// Use schema-aware parsing for collision detection
-		validator, err := schemas.NewSchemaValidator()
-		if err != nil {
-			return fmt.Errorf("failed to create schema validator: %w", err)
-		}
+		validator := schemas.NewStructValidator()
 
-		// Parse the content using the schema validator
+		// Parse the content using the struct validator
 		parsedData, err := validator.ParseHCLContent(content)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", fileName, err)
@@ -791,12 +1033,9 @@ func validateMergedVariables(contents []string, fileNames []string) error {
 		fileName := fileNames[i]
 
 		// Use schema-aware parsing for collision detection
-		validator, err := schemas.NewSchemaValidator()
-		if err != nil {
-			return fmt.Errorf("failed to create schema validator: %w", err)
-		}
+		validator := schemas.NewStructValidator()
 
-		// Parse the content using the schema validator
+		// Parse the content using the struct validator
 		parsedData, err := validator.ParseHCLContent(content)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", fileName, err)
@@ -957,12 +1196,9 @@ func validateMergedActions(contents []string, fileNames []string) error {
 		fileName := fileNames[i]
 
 		// Use schema-aware parsing for collision detection
-		validator, err := schemas.NewSchemaValidator()
-		if err != nil {
-			return fmt.Errorf("failed to create schema validator: %w", err)
-		}
+		validator := schemas.NewStructValidator()
 
-		// Parse the content using the schema validator
+		// Parse the content using the struct validator
 		parsedData, err := validator.ParseHCLContent(content)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", fileName, err)
@@ -1341,4 +1577,22 @@ func extractActionNamesFromParsedData(data map[string]interface{}, fileName stri
 	}
 
 	return actions, nil
+}
+
+// getProjectName extracts the project name from project.hcl file
+func getProjectName(targetDir string) (string, error) {
+	projectHCLPath := filepath.Join(targetDir, "project.hcl")
+	content, err := os.ReadFile(projectHCLPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read project.hcl: %w", err)
+	}
+
+	// Simple regex to extract project name from "name = \"value\""
+	re := regexp.MustCompile(`name\s*=\s*["']([^"']+)["']`)
+	matches := re.FindStringSubmatch(string(content))
+	if len(matches) < 2 {
+		return "unknown", nil // Return default name instead of error
+	}
+
+	return matches[1], nil
 }
