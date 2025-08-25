@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // DefaultConfigGenerator extracts default values from struct tags and creates default instances
@@ -34,6 +35,21 @@ func (dcg *DefaultConfigGenerator) GetDefaultSpookySSH() *SpookySSHV1 {
 		KeyScanTimeout:     dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(3), 10),
 		KnownHostsStrict:   dcg.extractBoolDefault(reflect.TypeOf(SpookySSHV1{}).Field(4), true),
 		ConnectionPoolSize: dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(5), 10),
+
+		// Proxy configuration (no defaults)
+		ProxyCommand: "",
+		ProxyJump:    "",
+
+		// Compression configuration
+		Compression:      dcg.extractBoolDefault(reflect.TypeOf(SpookySSHV1{}).Field(7), false),
+		CompressionLevel: dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(8), 6),
+
+		// TCP keepalive configuration
+		TCPKeepAlive:              dcg.extractBoolDefault(reflect.TypeOf(SpookySSHV1{}).Field(9), true),
+		TCPKeepAliveCount:         dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(10), 3),
+		TCPKeepAliveIdle:          60 * time.Second,
+		TCPKeepAliveInterval:      10 * time.Second,
+		TCPKeepAliveProbeInterval: 5 * time.Second,
 	}
 }
 

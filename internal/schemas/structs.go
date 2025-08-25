@@ -1,5 +1,7 @@
 package schemas
 
+import "time"
+
 // SchemaVersion represents the current supported schema version
 const SchemaVersion = "1"
 
@@ -298,6 +300,21 @@ type SpookySSHV1 struct {
 	KeyScanTimeout     int  `json:"key_scan_timeout" min:"1" max:"60" default:"10" description:"SSH key scanning timeout in seconds"`
 	KnownHostsStrict   bool `json:"known_hosts_strict" default:"true" description:"Strict known_hosts checking"`
 	ConnectionPoolSize int  `json:"connection_pool_size" min:"1" max:"100" default:"10" description:"SSH connection pool size"`
+
+	// Proxy configuration
+	ProxyCommand string `json:"proxy_command" description:"SSH proxy command (e.g., 'ssh -W %h:%p bastion.example.com')"`
+	ProxyJump    string `json:"proxy_jump" description:"SSH proxy jump host (e.g., 'bastion.example.com')"`
+
+	// Compression configuration
+	Compression      bool `json:"compression" default:"false" description:"Enable SSH compression"`
+	CompressionLevel int  `json:"compression_level" min:"1" max:"9" default:"6" description:"SSH compression level (1-9)"`
+
+	// TCP keepalive configuration
+	TCPKeepAlive              bool          `json:"tcp_keepalive" default:"true" description:"Enable TCP keepalive"`
+	TCPKeepAliveCount         int           `json:"tcp_keepalive_count" min:"1" max:"10" default:"3" description:"TCP keepalive count"`
+	TCPKeepAliveIdle          time.Duration `json:"tcp_keepalive_idle" default:"60s" description:"TCP keepalive idle time"`
+	TCPKeepAliveInterval      time.Duration `json:"tcp_keepalive_interval" default:"10s" description:"TCP keepalive interval"`
+	TCPKeepAliveProbeInterval time.Duration `json:"tcp_keepalive_probe_interval" default:"5s" description:"TCP keepalive probe interval"`
 }
 
 // SpookySecurityV1 represents security configuration in global spooky config
