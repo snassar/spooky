@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
-	"strings"
 	"time"
+
+	"github.com/hashicorp/hcl/v2/hclwrite"
+	"github.com/zclconf/go-cty/cty"
 )
 
 // DefaultConfigGenerator extracts default values from struct tags and creates default instances
@@ -200,24 +202,46 @@ func (dcg *DefaultConfigGenerator) extractDefaultTag(field reflect.StructField) 
 
 // ToHCL converts the default config to HCL string
 func (dcg *DefaultConfigGenerator) ToHCL(config interface{}) (string, error) {
-	// For now, return a simple HCL representation
-	// TODO: Implement proper HCL generation using the HCL library
-	return dcg.generateSimpleHCL(config), nil
+	// Convert the config to HCL using the HCL library
+	hclFile := hclwrite.NewEmptyFile()
+
+	// Convert the config to cty.Value
+	ctyValue, err := dcg.structToCty(config)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert config to cty.Value: %v", err)
+	}
+
+	// Create the root body
+	rootBody := hclFile.Body()
+
+	// Get the config type name for the root block
+	configType := reflect.TypeOf(config)
+	if configType.Kind() == reflect.Ptr {
+		configType = configType.Elem()
+	}
+
+	// Convert to HCL block
+	err = dcg.ctyValueToHCL(ctyValue, rootBody, configType.Name())
+	if err != nil {
+		return "", fmt.Errorf("failed to convert cty.Value to HCL: %v", err)
+	}
+
+	return string(hclFile.Bytes()), nil
 }
 
-// generateSimpleHCL generates a simple HCL representation
-func (dcg *DefaultConfigGenerator) generateSimpleHCL(config interface{}) string {
-	var result strings.Builder
-
+// structToCty converts a Go struct to cty.Value
+func (dcg *DefaultConfigGenerator) structToCty(config interface{}) (cty.Value, error) {
 	v := reflect.ValueOf(config)
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
 
 	if v.Kind() != reflect.Struct {
-		return ""
+		return cty.NilVal, fmt.Errorf("config must be a struct, got %s", v.Kind())
 	}
 
+	// Convert struct to map[string]cty.Value
+	valueMap := make(map[string]cty.Value)
 	t := v.Type()
 
 	for i := 0; i < v.NumField(); i++ {
@@ -230,40 +254,136 @@ func (dcg *DefaultConfigGenerator) generateSimpleHCL(config interface{}) string 
 			continue
 		}
 
-		// Handle nested structs
-		if field.Kind() == reflect.Struct {
-			if !field.IsZero() {
-				result.WriteString(fmt.Sprintf("\n%s {\n", jsonTag))
-				result.WriteString(dcg.generateSimpleHCL(field.Interface()))
-				result.WriteString("}\n")
-			}
-			continue
+		// Convert field value to cty.Value
+		ctyVal, err := dcg.fieldToCty(field)
+		if err != nil {
+			return cty.NilVal, fmt.Errorf("failed to convert field %s: %v", jsonTag, err)
 		}
 
-		// Handle slices
-		if field.Kind() == reflect.Slice {
-			if field.Len() > 0 {
-				result.WriteString(fmt.Sprintf("\n%s {\n", jsonTag))
-				for j := 0; j < field.Len(); j++ {
-					result.WriteString(dcg.generateSimpleHCL(field.Index(j).Interface()))
-				}
-				result.WriteString("}\n")
-			}
-			continue
-		}
-
-		// Handle basic types
-		if !field.IsZero() {
-			switch field.Kind() {
-			case reflect.String:
-				result.WriteString(fmt.Sprintf("  %s = \"%s\"\n", jsonTag, field.String()))
-			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				result.WriteString(fmt.Sprintf("  %s = %d\n", jsonTag, field.Int()))
-			case reflect.Bool:
-				result.WriteString(fmt.Sprintf("  %s = %t\n", jsonTag, field.Bool()))
-			}
+		if !ctyVal.IsNull() {
+			valueMap[jsonTag] = ctyVal
 		}
 	}
 
-	return result.String()
+	return cty.ObjectVal(valueMap), nil
+}
+
+// fieldToCty converts a struct field to cty.Value
+func (dcg *DefaultConfigGenerator) fieldToCty(field reflect.Value) (cty.Value, error) {
+	switch field.Kind() {
+	case reflect.String:
+		return cty.StringVal(field.String()), nil
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return cty.NumberIntVal(field.Int()), nil
+	case reflect.Bool:
+		return cty.BoolVal(field.Bool()), nil
+	case reflect.Struct:
+		// Handle nested structs
+		if field.CanInterface() {
+			return dcg.structToCty(field.Interface())
+		}
+		return cty.NilVal, fmt.Errorf("cannot convert unexported struct field")
+	case reflect.Slice:
+		// Handle slices
+		if field.Len() == 0 {
+			return cty.ListValEmpty(cty.DynamicPseudoType), nil
+		}
+
+		values := make([]cty.Value, field.Len())
+		for i := 0; i < field.Len(); i++ {
+			val, err := dcg.fieldToCty(field.Index(i))
+			if err != nil {
+				return cty.NilVal, err
+			}
+			values[i] = val
+		}
+		return cty.ListVal(values), nil
+	case reflect.Map:
+		// Handle maps
+		if field.Len() == 0 {
+			return cty.MapValEmpty(cty.DynamicPseudoType), nil
+		}
+
+		valueMap := make(map[string]cty.Value)
+		iter := field.MapRange()
+		for iter.Next() {
+			key := iter.Key()
+			val := iter.Value()
+
+			if key.Kind() != reflect.String {
+				return cty.NilVal, fmt.Errorf("map keys must be strings")
+			}
+
+			ctyVal, err := dcg.fieldToCty(val)
+			if err != nil {
+				return cty.NilVal, err
+			}
+			valueMap[key.String()] = ctyVal
+		}
+		return cty.MapVal(valueMap), nil
+	default:
+		return cty.NilVal, fmt.Errorf("unsupported field type: %s", field.Kind())
+	}
+}
+
+// ctyValueToHCL converts a cty.Value to HCL and writes it to the body
+func (dcg *DefaultConfigGenerator) ctyValueToHCL(value cty.Value, body *hclwrite.Body, blockName string) error {
+	if !value.IsKnown() {
+		return fmt.Errorf("cannot convert unknown value to HCL")
+	}
+
+	if value.IsNull() {
+		return nil
+	}
+
+	valueType := value.Type()
+	if valueType.IsObjectType() {
+		// Create a block for objects
+		block := body.AppendNewBlock(blockName, nil)
+		blockBody := block.Body()
+
+		// Add each field to the block
+		for key, val := range value.AsValueMap() {
+			if !val.IsNull() {
+				err := dcg.ctyValueToHCL(val, blockBody, key)
+				if err != nil {
+					return fmt.Errorf("failed to convert field %s: %v", key, err)
+				}
+			}
+		}
+
+	} else if valueType.IsListType() {
+		// Handle lists by creating blocks for each element
+		values := value.AsValueSlice()
+		for _, val := range values {
+			if !val.IsNull() {
+				err := dcg.ctyValueToHCL(val, body, blockName)
+				if err != nil {
+					return fmt.Errorf("failed to convert list element: %v", err)
+				}
+			}
+		}
+
+	} else if valueType.IsMapType() {
+		// Handle maps by creating blocks for each key-value pair
+		valueMap := value.AsValueMap()
+		for key, val := range valueMap {
+			if !val.IsNull() {
+				// For maps, we create a block with the key as the label
+				block := body.AppendNewBlock(blockName, []string{key})
+				blockBody := block.Body()
+
+				err := dcg.ctyValueToHCL(val, blockBody, "")
+				if err != nil {
+					return fmt.Errorf("failed to convert map value for key %s: %v", key, err)
+				}
+			}
+		}
+
+	} else {
+		// For primitive types, set as attribute
+		body.SetAttributeValue(blockName, value)
+	}
+
+	return nil
 }

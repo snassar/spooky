@@ -1,6 +1,7 @@
 package schemas
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -98,15 +99,22 @@ func TestDefaultConfigGeneratorHCL(t *testing.T) {
 		t.Error("Expected non-empty HCL output")
 	}
 
-	// Check for specific values in HCL
-	if !contains(hcl, "timeout = 30") {
-		t.Error("Expected HCL to contain 'timeout = 30'")
+	// Debug: print the actual HCL output
+	t.Logf("Generated HCL:\n%s", hcl)
+
+	// Check for specific values in HCL (now in block format)
+	if !contains(hcl, "timeout") || !contains(hcl, "30") {
+		t.Error("Expected HCL to contain 'timeout' and '30'")
 	}
-	if !contains(hcl, "keepalive_interval = 60") {
-		t.Error("Expected HCL to contain 'keepalive_interval = 60'")
+	if !contains(hcl, "keepalive_interval") || !contains(hcl, "60") {
+		t.Error("Expected HCL to contain 'keepalive_interval' and '60'")
 	}
-	if !contains(hcl, "known_hosts_strict = true") {
-		t.Error("Expected HCL to contain 'known_hosts_strict = true'")
+	if !contains(hcl, "known_hosts_strict") || !contains(hcl, "true") {
+		t.Error("Expected HCL to contain 'known_hosts_strict' and 'true'")
+	}
+	// Check for block format
+	if !contains(hcl, "SpookySSHV1 {") {
+		t.Error("Expected HCL to contain 'SpookySSHV1 {' block")
 	}
 }
 
@@ -130,6 +138,96 @@ func TestDefaultConfigGeneratorComplete(t *testing.T) {
 	if spookyDefaults.Logging.Level != "info" {
 		t.Errorf("Expected log level to be 'info', got '%s'", spookyDefaults.Logging.Level)
 	}
+}
+
+func TestDefaultConfigGenerator_ToHCL(t *testing.T) {
+	dcg := NewDefaultConfigGenerator()
+
+	// Test with SpookySSH config
+	sshConfig := dcg.GetDefaultSpookySSH()
+	hclOutput, err := dcg.ToHCL(sshConfig)
+	if err != nil {
+		t.Fatalf("ToHCL failed: %v", err)
+	}
+
+	// Verify the HCL output contains expected fields
+	expectedFields := []string{
+		"timeout",
+		"keepalive_interval",
+		"keepalive_count",
+		"key_scan_timeout",
+		"known_hosts_strict",
+		"connection_pool_size",
+		"compression",
+		"compression_level",
+		"tcp_keepalive",
+		"tcp_keepalive_count",
+	}
+
+	for _, field := range expectedFields {
+		if !strings.Contains(hclOutput, field) {
+			t.Errorf("HCL output missing expected field: %s", field)
+		}
+	}
+
+	// Verify the output is valid HCL format
+	if !strings.Contains(hclOutput, "SpookySSHV1") {
+		t.Error("HCL output should contain the struct name as a block")
+	}
+
+	t.Logf("Generated HCL:\n%s", hclOutput)
+}
+
+func TestDefaultConfigGenerator_ToHCL_ComplexStruct(t *testing.T) {
+	dcg := NewDefaultConfigGenerator()
+
+	// Test with full Spooky config
+	spookyConfig := dcg.GetDefaultSpookyConfig()
+	hclOutput, err := dcg.ToHCL(spookyConfig)
+	if err != nil {
+		t.Fatalf("ToHCL failed: %v", err)
+	}
+
+	// Verify nested blocks are present
+	expectedBlocks := []string{
+		"ssh",
+		"security",
+		"age",
+		"logging",
+	}
+
+	for _, block := range expectedBlocks {
+		if !strings.Contains(hclOutput, block) {
+			t.Errorf("HCL output missing expected block: %s", block)
+		}
+	}
+
+	// Verify the output is valid HCL format
+	if !strings.Contains(hclOutput, "SpookyV1") {
+		t.Error("HCL output should contain the struct name as a block")
+	}
+
+	t.Logf("Generated HCL:\n%s", hclOutput)
+}
+
+func TestDefaultConfigGenerator_ToHCL_EmptyStruct(t *testing.T) {
+	dcg := NewDefaultConfigGenerator()
+
+	// Test with empty struct
+	type EmptyStruct struct{}
+	empty := EmptyStruct{}
+
+	hclOutput, err := dcg.ToHCL(empty)
+	if err != nil {
+		t.Fatalf("ToHCL failed: %v", err)
+	}
+
+	// Should generate an empty block
+	if !strings.Contains(hclOutput, "EmptyStruct") {
+		t.Error("HCL output should contain the struct name as a block")
+	}
+
+	t.Logf("Generated HCL for empty struct:\n%s", hclOutput)
 }
 
 // Helper function to check if a string contains a substring

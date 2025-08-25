@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -74,13 +75,300 @@ func SyncFile(sourcePath, targetPath string, options *SyncOptions) (*FileSyncRes
 
 // SyncDirectory synchronizes entire directories with support for different modes
 func SyncDirectory(sourcePath, targetPath string, options *SyncOptions) (*FileSyncResult, error) {
-	// TODO: Implement directory synchronization with mode support
-	// This would handle the broader use cases like:
-	// - Database replication
-	// - Configuration management
-	// - Backup systems
-	// - Disaster recovery
-	return nil, nil
+	if options == nil {
+		options = DefaultSyncOptions()
+	}
+
+	result := &FileSyncResult{
+		SourcePath: sourcePath,
+		TargetPath: targetPath,
+	}
+
+	// Validate source directory exists
+	sourceInfo, err := os.Stat(sourcePath)
+	if err != nil {
+		result.Error = fmt.Errorf("source directory not found: %v", err)
+		return result, result.Error
+	}
+	if !sourceInfo.IsDir() {
+		result.Error = fmt.Errorf("source path is not a directory: %s", sourcePath)
+		return result, result.Error
+	}
+
+	// Create target directory if it doesn't exist
+	if err := os.MkdirAll(targetPath, 0755); err != nil {
+		result.Error = fmt.Errorf("failed to create target directory: %v", err)
+		return result, result.Error
+	}
+
+	// Check target directory exists
+	targetInfo, err := os.Stat(targetPath)
+	if err != nil {
+		result.Error = fmt.Errorf("failed to stat target directory: %v", err)
+		return result, result.Error
+	}
+	if !targetInfo.IsDir() {
+		result.Error = fmt.Errorf("target path is not a directory: %s", targetPath)
+		return result, result.Error
+	}
+
+	// Perform directory synchronization based on mode
+	switch options.SyncMode {
+	case SyncModeOneWayReplica:
+		return syncOneWayReplica(sourcePath, targetPath, options, result)
+	case SyncModeOneWaySafe:
+		return syncOneWaySafe(sourcePath, targetPath, options, result)
+	case SyncModeTwoWaySafe:
+		return syncTwoWaySafe(sourcePath, targetPath, options, result)
+	case SyncModeTwoWayResolved:
+		return syncTwoWayResolved(sourcePath, targetPath, options, result)
+	default:
+		result.Error = fmt.Errorf("unknown sync mode: %s", options.SyncMode)
+		return result, result.Error
+	}
+}
+
+// syncOneWayReplica performs exact one-way replication (source → target)
+// Target becomes exact copy of source, overwriting any local changes
+func syncOneWayReplica(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
+	if options.Verbose {
+		fmt.Printf("Performing one-way replica sync: %s → %s\n", sourcePath, targetPath)
+	}
+
+	// Walk source directory and sync all files
+	err := filepath.Walk(sourcePath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Calculate relative path from source
+		relPath, err := filepath.Rel(sourcePath, path)
+		if err != nil {
+			return fmt.Errorf("failed to calculate relative path: %v", err)
+		}
+
+		// Skip root directory
+		if relPath == "." {
+			return nil
+		}
+
+		targetFile := filepath.Join(targetPath, relPath)
+
+		if info.IsDir() {
+			// Create directory in target
+			if err := os.MkdirAll(targetFile, info.Mode()); err != nil {
+				return fmt.Errorf("failed to create directory %s: %v", targetFile, err)
+			}
+			if options.Verbose {
+				fmt.Printf("Created directory: %s\n", targetFile)
+			}
+		} else {
+			// Sync file using existing SyncFile function
+			fileResult, err := SyncFile(path, targetFile, options)
+			if err != nil {
+				return fmt.Errorf("failed to sync file %s: %v", path, err)
+			}
+
+			result.BytesTransferred += fileResult.BytesTransferred
+			result.BytesSaved += fileResult.BytesSaved
+			result.Operations += fileResult.Operations
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		result.Error = err
+		return result, err
+	}
+
+	// Remove files in target that don't exist in source (cleanup)
+	err = filepath.Walk(targetPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip root directory
+		if path == targetPath {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(targetPath, path)
+		if err != nil {
+			return fmt.Errorf("failed to calculate relative path: %v", err)
+		}
+
+		sourceFile := filepath.Join(sourcePath, relPath)
+		if _, err := os.Stat(sourceFile); os.IsNotExist(err) {
+			if options.DryRun {
+				if options.Verbose {
+					fmt.Printf("Would remove: %s\n", path)
+				}
+			} else {
+				if info.IsDir() {
+					if err := os.RemoveAll(path); err != nil {
+						return fmt.Errorf("failed to remove directory %s: %v", path, err)
+					}
+				} else {
+					if err := os.Remove(path); err != nil {
+						return fmt.Errorf("failed to remove file %s: %v", path, err)
+					}
+				}
+				if options.Verbose {
+					fmt.Printf("Removed: %s\n", path)
+				}
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		result.Error = err
+		return result, err
+	}
+
+	result.Success = true
+	return result, nil
+}
+
+// syncOneWaySafe performs safe one-way sync (source → target)
+// Changes only propagate from source to target, conflicts are preserved
+func syncOneWaySafe(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
+	if options.Verbose {
+		fmt.Printf("Performing one-way safe sync: %s → %s\n", sourcePath, targetPath)
+	}
+
+	// Walk source directory and sync files, but preserve conflicts
+	err := filepath.Walk(sourcePath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		relPath, err := filepath.Rel(sourcePath, path)
+		if err != nil {
+			return fmt.Errorf("failed to calculate relative path: %v", err)
+		}
+
+		if relPath == "." {
+			return nil
+		}
+
+		targetFile := filepath.Join(targetPath, relPath)
+
+		if info.IsDir() {
+			if err := os.MkdirAll(targetFile, info.Mode()); err != nil {
+				return fmt.Errorf("failed to create directory %s: %v", targetFile, err)
+			}
+		} else {
+			// Check if target file exists and is different
+			if targetInfo, err := os.Stat(targetFile); err == nil {
+				// Target exists, check for conflicts
+				if targetInfo.ModTime().After(info.ModTime()) {
+					// Target is newer, preserve it (conflict)
+					if options.Verbose {
+						fmt.Printf("Conflict detected, preserving target: %s\n", targetFile)
+					}
+					result.Conflicts = append(result.Conflicts, targetFile)
+					return nil
+				}
+			}
+
+			// No conflict, sync the file
+			fileResult, err := SyncFile(path, targetFile, options)
+			if err != nil {
+				return fmt.Errorf("failed to sync file %s: %v", path, err)
+			}
+
+			result.BytesTransferred += fileResult.BytesTransferred
+			result.BytesSaved += fileResult.BytesSaved
+			result.Operations += fileResult.Operations
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		result.Error = err
+		return result, err
+	}
+
+	result.Success = true
+	return result, nil
+}
+
+// syncTwoWaySafe performs bidirectional sync with conflict detection
+// Both endpoints can modify, conflicts are detected and preserved
+func syncTwoWaySafe(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
+	if options.Verbose {
+		fmt.Printf("Performing two-way safe sync: %s ↔ %s\n", sourcePath, targetPath)
+	}
+
+	// First, sync source → target (one-way safe)
+	sourceToTarget, err := syncOneWaySafe(sourcePath, targetPath, options, &FileSyncResult{
+		SourcePath: sourcePath,
+		TargetPath: targetPath,
+	})
+	if err != nil {
+		result.Error = err
+		return result, err
+	}
+
+	// Then, sync target → source (one-way safe)
+	targetToSource, err := syncOneWaySafe(targetPath, sourcePath, options, &FileSyncResult{
+		SourcePath: targetPath,
+		TargetPath: sourcePath,
+	})
+	if err != nil {
+		result.Error = err
+		return result, err
+	}
+
+	// Combine results
+	result.BytesTransferred = sourceToTarget.BytesTransferred + targetToSource.BytesTransferred
+	result.BytesSaved = sourceToTarget.BytesSaved + targetToSource.BytesSaved
+	result.Operations = sourceToTarget.Operations + targetToSource.Operations
+	result.Conflicts = append(sourceToTarget.Conflicts, targetToSource.Conflicts...)
+	result.Success = true
+
+	return result, nil
+}
+
+// syncTwoWayResolved performs bidirectional sync with source winning conflicts
+// Both endpoints can modify, source always wins conflicts
+func syncTwoWayResolved(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
+	if options.Verbose {
+		fmt.Printf("Performing two-way resolved sync (source wins): %s ↔ %s\n", sourcePath, targetPath)
+	}
+
+	// Use one-way replica for source → target (source always wins)
+	sourceToTarget, err := syncOneWayReplica(sourcePath, targetPath, options, &FileSyncResult{
+		SourcePath: sourcePath,
+		TargetPath: targetPath,
+	})
+	if err != nil {
+		result.Error = err
+		return result, err
+	}
+
+	// Use one-way safe for target → source (preserve source changes)
+	targetToSource, err := syncOneWaySafe(targetPath, sourcePath, options, &FileSyncResult{
+		SourcePath: targetPath,
+		TargetPath: sourcePath,
+	})
+	if err != nil {
+		result.Error = err
+		return result, err
+	}
+
+	// Combine results
+	result.BytesTransferred = sourceToTarget.BytesTransferred + targetToSource.BytesTransferred
+	result.BytesSaved = sourceToTarget.BytesSaved + targetToSource.BytesSaved
+	result.Operations = sourceToTarget.Operations + targetToSource.Operations
+	result.Conflicts = append(sourceToTarget.Conflicts, targetToSource.Conflicts...)
+	result.Success = true
+
+	return result, nil
 }
 
 // copyFile performs a simple file copy
