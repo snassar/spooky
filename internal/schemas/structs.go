@@ -86,14 +86,16 @@ type MachinesMachineAuthenticationV1 struct {
 
 // MachinesMachineAuthenticationPassphraseV1 represents SSH key passphrase configuration
 type MachinesMachineAuthenticationPassphraseV1 struct {
-	Value     string `json:"value" required:"true" description:"SSH key passphrase value - can be plain text or age-encrypted"`
-	Encrypted bool   `json:"encrypted" default:"false" description:"Whether the passphrase is encrypted"`
+	Value          string            `json:"value" description:"SSH key passphrase value (mutually exclusive with encrypted_value)"`
+	Encrypted      bool              `json:"encrypted" default:"false" description:"Whether the passphrase should be encrypted (triggers transformation)"`
+	EncryptedValue *EncryptedValueV1 `json:"encrypted_value,omitempty" description:"Structured encrypted value (mutually exclusive with value)"`
 }
 
 // MachinesMachineAuthenticationPasswordV1 represents SSH password configuration
 type MachinesMachineAuthenticationPasswordV1 struct {
-	Value     string `json:"value" required:"true" description:"SSH password value - can be plain text or age-encrypted"`
-	Encrypted bool   `json:"encrypted" default:"false" description:"Whether the password is encrypted"`
+	Value          string            `json:"value" description:"SSH password value (mutually exclusive with encrypted_value)"`
+	Encrypted      bool              `json:"encrypted" default:"false" description:"Whether the password should be encrypted (triggers transformation)"`
+	EncryptedValue *EncryptedValueV1 `json:"encrypted_value,omitempty" description:"Structured encrypted value (mutually exclusive with value)"`
 }
 
 // MachinesMachineFactsV1 represents machine facts and metadata
@@ -199,11 +201,12 @@ type VariablesV1 struct {
 // In HCL2, this becomes: variable "name" { ... } where "name" is the block label
 type VariablesVariableV1 struct {
 	// Variable identification (name comes from block label)
-	Type        string `json:"type" enum:"string,number,boolean,list,map" description:"Variable type"`
-	Value       string `json:"value" required:"true" description:"Variable value"`
-	Description string `json:"description" max_length:"256" description:"Variable description"`
-	Sensitive   bool   `json:"sensitive" default:"false" description:"Whether this variable contains sensitive information"`
-	Encrypted   bool   `json:"encrypted" default:"false" description:"Whether this variable value is encrypted"`
+	Type           string            `json:"type" enum:"string,number,boolean,list,map" description:"Variable type"`
+	Value          string            `json:"value" description:"Variable value (mutually exclusive with encrypted_value)"`
+	Description    string            `json:"description" max_length:"256" description:"Variable description"`
+	Sensitive      bool              `json:"sensitive" default:"false" description:"Whether this variable contains sensitive information (auto-true if encrypted_value exists)"`
+	Encrypted      bool              `json:"encrypted" default:"false" description:"Whether this variable should be encrypted (triggers transformation)"`
+	EncryptedValue *EncryptedValueV1 `json:"encrypted_value,omitempty" description:"Structured encrypted value (mutually exclusive with value)"`
 
 	// Validation rules
 	Required  bool   `json:"required" default:"false" description:"Whether this variable is required"`
@@ -219,6 +222,15 @@ type VariablesVariableV1 struct {
 // ============================================================================
 // COMMON SCHEMA STRUCTS
 // ============================================================================
+
+// EncryptedValueV1 represents a structured encrypted value
+type EncryptedValueV1 struct {
+	Data        string `json:"data" required:"true" description:"The encrypted data (base64 content only, no headers/footers)"`
+	Format      string `json:"format" enum:"base64,armored,compact" default:"base64" description:"Format of the encrypted data"`
+	Algorithm   string `json:"algorithm" default:"age" description:"Encryption algorithm used"`
+	Version     string `json:"version" default:"v1" description:"Encryption version"`
+	EncryptedAt string `json:"encrypted_at" description:"ISO 8601 timestamp when the value was encrypted"`
+}
 
 // MetadataSchemaV1 represents schema metadata
 type MetadataSchemaV1 struct {

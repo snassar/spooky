@@ -149,8 +149,8 @@ func TestStructValidator_ValidateMachines(t *testing.T) {
 							"hostname": "192.168.1.100",
 							"user":     "admin",
 							"authentication": map[string]interface{}{
-								"method":       "ssh_key",
-								"ssh_key_path": "/path/to/key",
+								"method":          "publickey",
+								"public_key_path": "/path/to/key",
 							},
 						},
 					},
@@ -217,7 +217,7 @@ func TestStructValidator_ValidateMachines(t *testing.T) {
 			wantErrors: 1,
 		},
 		{
-			name: "ssh_key method without ssh_key_path",
+			name: "publickey method without public_key_path",
 			content: map[string]interface{}{
 				"machines": map[string]interface{}{
 					"machine": []interface{}{
@@ -226,8 +226,8 @@ func TestStructValidator_ValidateMachines(t *testing.T) {
 							"hostname": "192.168.1.100",
 							"user":     "admin",
 							"authentication": map[string]interface{}{
-								"method": "ssh_key",
-								// missing ssh_key_path
+								"method": "publickey",
+								// missing public_key_path
 							},
 						},
 					},

@@ -488,220 +488,47 @@ func createREADME(targetDir, name, description string) error {
 }
 
 func runProjectValidate(cmd *cobra.Command, args []string) error {
+	fmt.Printf("DEBUG: runProjectValidate called with args: %v\n", args)
+
 	// Determine target directory
 	targetDir := "."
 	if len(args) > 0 {
 		targetDir = args[0]
 	}
 
+	fmt.Printf("DEBUG: Using targetDir: %s\n", targetDir)
+
 	// Check if directory exists
 	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
 		return fmt.Errorf("directory does not exist: %s", targetDir)
 	}
 
-	// Get project name from project.hcl
-	projectName, err := getProjectName(targetDir)
-	if err != nil {
-		return fmt.Errorf("failed to get project name: %w", err)
-	}
-
-	// Use the enhanced project validator
+	// Use the enhanced project validator with schema-driven validation
+	fmt.Printf("DEBUG: Creating project validator\n")
 	validator := utilities.NewProjectValidator()
+
+	fmt.Printf("DEBUG: Calling ValidateProject\n")
 	result := validator.ValidateProject(targetDir)
 
-	// Validate project directory structure against schema
-	if err := validateProjectDirectoryStructure(targetDir); err != nil {
-		return fmt.Errorf("project validation failed: %w", err)
-	}
+	fmt.Printf("DEBUG: Validation complete - IsValid: %v, Errors: %d\n", result.IsValid, len(result.Errors))
 
-	// Display simple validation result
-	fmt.Printf("Project \"%s\" is valid\n", projectName)
-
-	// Return error if validation failed
-	if !result.IsValid {
+	// Display validation result
+	if result.IsValid {
+		// Try to get project name for display, but don't fail if it's missing
+		projectName, _ := getProjectName(targetDir)
+		if projectName == "" {
+			projectName = "unknown"
+		}
+		fmt.Printf("Project \"%s\" is valid\n", projectName)
+	} else {
+		fmt.Printf("Project validation failed with %d errors:\n", len(result.Errors))
+		for _, err := range result.Errors {
+			fmt.Printf("  - %s\n", err.Message)
+		}
 		return fmt.Errorf("project validation failed with %d errors", len(result.Errors))
 	}
 
 	return nil
-}
-
-// validateProjectDirectoryStructure validates the project directory against the project directory schema
-func validateProjectDirectoryStructure(targetDir string) error {
-	// Check for required files based on project directory schema
-	requiredFiles := []string{"project.hcl"}
-	for _, file := range requiredFiles {
-		filePath := filepath.Join(targetDir, file)
-		if _, err := os.Stat(filePath); os.IsNotExist(err) {
-			return fmt.Errorf("required file missing: %s", file)
-		}
-	}
-
-	// Check for at least one configuration file (machines.hcl, actions.hcl, or variables.hcl)
-	configFiles := []string{"machines.hcl", "actions.hcl", "variables.hcl"}
-	hasConfig := false
-	for _, file := range configFiles {
-		filePath := filepath.Join(targetDir, file)
-		if _, err := os.Stat(filePath); err == nil {
-			hasConfig = true
-			break
-		}
-	}
-
-	if !hasConfig {
-		return fmt.Errorf("at least one configuration file (machines.hcl, actions.hcl, or variables.hcl) must exist")
-	}
-
-	return nil
-}
-
-func validateProjectStructure(targetDir string) error {
-	fmt.Println("📁 Validating project structure...")
-
-	// Check for required project.hcl
-	projectHCLPath := filepath.Join(targetDir, "project.hcl")
-	if _, err := os.Stat(projectHCLPath); os.IsNotExist(err) {
-		return fmt.Errorf("required file missing: project.hcl")
-	}
-	fmt.Println("  ✅ project.hcl found")
-
-	// Check for machines configuration (file or directory)
-	machinesHCLPath := filepath.Join(targetDir, "machines.hcl")
-	machinesDirPath := filepath.Join(targetDir, "machines")
-
-	if _, err := os.Stat(machinesHCLPath); os.IsNotExist(err) {
-		if _, err := os.Stat(machinesDirPath); os.IsNotExist(err) {
-			return fmt.Errorf("either machines.hcl file or machines/ directory must exist")
-		}
-		fmt.Println("  ✅ machines/ directory found")
-	} else {
-		fmt.Println("  ✅ machines.hcl file found")
-	}
-
-	// Check for actions configuration (file or directory)
-	actionsHCLPath := filepath.Join(targetDir, "actions.hcl")
-	actionsDirPath := filepath.Join(targetDir, "actions")
-
-	if _, err := os.Stat(actionsHCLPath); os.IsNotExist(err) {
-		if _, err := os.Stat(actionsDirPath); os.IsNotExist(err) {
-			return fmt.Errorf("either actions.hcl file or actions/ directory must exist")
-		}
-		fmt.Println("  ✅ actions/ directory found")
-	} else {
-		fmt.Println("  ✅ actions.hcl file found")
-	}
-
-	// Check for variables configuration (file or directory)
-	variablesHCLPath := filepath.Join(targetDir, "variables.hcl")
-	variablesDirPath := filepath.Join(targetDir, "variables")
-
-	if _, err := os.Stat(variablesHCLPath); os.IsNotExist(err) {
-		if _, err := os.Stat(variablesDirPath); os.IsNotExist(err) {
-			return fmt.Errorf("either variables.hcl file or variables/ directory must exist")
-		}
-		fmt.Println("  ✅ variables/ directory found")
-	} else {
-		fmt.Println("  ✅ variables.hcl file found")
-	}
-
-	// Check optional directories
-	optionalDirs := []string{"templates", "files", "logs"}
-	for _, dir := range optionalDirs {
-		dirPath := filepath.Join(targetDir, dir)
-		if _, err := os.Stat(dirPath); err == nil {
-			fmt.Printf("  ℹ️  %s/ directory found (optional)\n", dir)
-		}
-	}
-
-	fmt.Println("  ✅ Project structure validation passed")
-	return nil
-}
-
-func validateProjectFiles(targetDir string) error {
-	fmt.Printf("\n🔍 Validating project files...\n")
-
-	// Validate project.hcl
-	if err := validateProjectConfig(targetDir); err != nil {
-		return fmt.Errorf("project configuration validation failed: %w", err)
-	}
-
-	// Validate machines
-	if err := validateMachines(targetDir); err != nil {
-		return fmt.Errorf("machines validation failed: %w", err)
-	}
-
-	// Validate actions
-	if err := validateActions(targetDir); err != nil {
-		return fmt.Errorf("actions validation failed: %w", err)
-	}
-
-	// Validate variables
-	if err := validateVariablesConfig(targetDir); err != nil {
-		return fmt.Errorf("variables validation failed: %w", err)
-	}
-
-	fmt.Printf("✅ All project files validation completed successfully\n")
-	return nil
-}
-
-func validateProjectConfig(targetDir string) error {
-	projectHCLPath := filepath.Join(targetDir, "project.hcl")
-
-	if _, err := os.Stat(projectHCLPath); os.IsNotExist(err) {
-		return fmt.Errorf("project.hcl not found")
-	}
-
-	// Validate syntax and schema using struct validator
-	validator := schemas.NewStructValidator()
-	content, err := os.ReadFile(projectHCLPath)
-	if err != nil {
-		return fmt.Errorf("failed to read project.hcl: %w", err)
-	}
-
-	// Validate against project schema
-	result, err := validator.ValidateHCLContent("project", string(content))
-	if err != nil {
-		return fmt.Errorf("project.hcl schema validation failed: %w", err)
-	}
-	if !result.IsValid {
-		return fmt.Errorf("project.hcl schema validation failed: %d errors", len(result.Errors))
-	}
-
-	fmt.Printf("✅ project.hcl - syntax and schema valid\n")
-	return nil
-}
-
-func validateMachines(projectPath string) error {
-	// Use the new merged validation approach
-	return mergeAndValidateMachines(projectPath)
-}
-
-func validateActions(projectPath string) error {
-	actionsHCLPath := filepath.Join(projectPath, "actions.hcl")
-	actionsDirPath := filepath.Join(projectPath, "actions")
-
-	// Check if actions.hcl exists
-	if _, err := os.Stat(actionsHCLPath); err == nil {
-		// Read file content for schema validation
-		content, err := os.ReadFile(actionsHCLPath)
-		if err != nil {
-			return fmt.Errorf("failed to read actions.hcl: %w", err)
-		}
-
-		// Validate against embedded schema
-		if err := validateAgainstSchema("actions", string(content)); err != nil {
-			return fmt.Errorf("actions.hcl schema validation failed: %w", err)
-		}
-
-		return nil
-	}
-
-	// Check if actions/ directory exists
-	if _, err := os.Stat(actionsDirPath); err == nil {
-		// Use the new merged validation approach for actions directory
-		return mergeAndValidateActions(projectPath)
-	}
-
-	return fmt.Errorf("neither actions.hcl nor actions/ directory found")
 }
 
 // validateAgainstSchema validates HCL content against embedded schemas
@@ -722,22 +549,6 @@ func validateAgainstSchema(schemaName, content string) error {
 	}
 
 	return nil
-}
-
-// validateBasicStructure performs basic structural validation
-func validateBasicStructure(schemaName, content string) error {
-	switch schemaName {
-	case "project":
-		return validateProjectContent(content)
-	case "machines":
-		return validateMachinesStructure(content)
-	case "actions":
-		return validateActionsStructure(content)
-	case "variables":
-		return validateVariablesStructure(content)
-	default:
-		return fmt.Errorf("unknown schema type: %s", schemaName)
-	}
 }
 
 // mergeAndValidateMachines merges multiple machines HCL files and validates for collisions
@@ -1093,67 +904,6 @@ type variableInfo struct {
 	description string
 	sensitive   bool
 	encrypted   bool
-}
-
-func validateProjectContent(content string) error {
-	// Check for required metadata block
-	if !strings.Contains(content, "metadata {") {
-		return fmt.Errorf("missing required metadata block")
-	}
-
-	// Check for required project block
-	if !strings.Contains(content, "project {") {
-		return fmt.Errorf("missing required project block")
-	}
-
-	// Check for required name field
-	if !strings.Contains(content, "name =") {
-		return fmt.Errorf("missing required 'name' field in project block")
-	}
-
-	return nil
-}
-
-func validateMachinesStructure(content string) error {
-	// Check for required metadata block
-	if !strings.Contains(content, "metadata {") {
-		return fmt.Errorf("missing required metadata block")
-	}
-
-	// Check for required machines block
-	if !strings.Contains(content, "machines {") {
-		return fmt.Errorf("missing required machines block")
-	}
-
-	return nil
-}
-
-func validateActionsStructure(content string) error {
-	// Check for required metadata block
-	if !strings.Contains(content, "metadata {") {
-		return fmt.Errorf("missing required metadata block")
-	}
-
-	// Check for required actions block
-	if !strings.Contains(content, "actions {") {
-		return fmt.Errorf("missing required actions block")
-	}
-
-	// Check for at least one action block
-	if !strings.Contains(content, "action \"") {
-		return fmt.Errorf("missing required action block")
-	}
-
-	return nil
-}
-
-func validateVariablesStructure(content string) error {
-	// Check for required metadata block
-	if !strings.Contains(content, "metadata {") {
-		return fmt.Errorf("missing required metadata block")
-	}
-
-	return nil
 }
 
 func validateVariablesConfig(targetDir string) error {
@@ -1604,7 +1354,7 @@ func getProjectName(targetDir string) (string, error) {
 	projectHCLPath := filepath.Join(targetDir, "project.hcl")
 	content, err := os.ReadFile(projectHCLPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read project.hcl: %w", err)
+		return "", nil // Return empty string instead of error for missing files
 	}
 
 	// Simple regex to extract project name from "name = \"value\""
