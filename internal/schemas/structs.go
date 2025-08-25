@@ -29,6 +29,18 @@ type ProjectV1 struct {
 	FactsParallelCollection int `json:"facts_parallel_collection" min:"1" max:"100" default:"10" description:"Number of parallel facts collection workers for this project"`
 	FactsRetryAttempts      int `json:"facts_retry_attempts" min:"0" max:"10" default:"3" description:"Number of retry attempts for failed facts collection"`
 	FactsRetryDelay         int `json:"facts_retry_delay" min:"1" max:"60" default:"5" description:"Delay between retry attempts in seconds"`
+
+	// Age encryption configuration
+	Age ProjectAgeV1 `json:"age" description:"Age encryption configuration for this project"`
+}
+
+// ProjectAgeV1 represents age encryption configuration for a project
+type ProjectAgeV1 struct {
+	// Default recipients path for this project (overrides global default)
+	DefaultRecipientsPath string `json:"default_recipients_path" description:"Path to default recipients directory or file for this project (overrides global default)"`
+
+	// Default identities path for this project (overrides global default)
+	DefaultIdentitiesPath string `json:"default_identities_path" description:"Path to default identities directory or file for this project (overrides global default)"`
 }
 
 // ============================================================================

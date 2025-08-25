@@ -73,6 +73,19 @@ The directory defaults to the current directory if not specified.`,
 	RunE: runProjectEncrypt,
 }
 
+var projectConfigCmd = &cobra.Command{
+	Use:   "config",
+	Short: "Show current configuration information",
+	Long: `Show information about the current spooky configuration.
+
+This command displays:
+- Which configuration file is being used
+- Configuration source (custom, user, or embedded default)
+- Age encryption settings
+- Configuration file details`,
+	RunE: runProjectConfig,
+}
+
 func init() {
 	// Add project command to root
 	RootCmd.AddCommand(projectCmd)
@@ -85,6 +98,9 @@ func init() {
 
 	// Add encrypt subcommand to project
 	projectCmd.AddCommand(projectEncryptCmd)
+
+	// Add config subcommand to project
+	projectCmd.AddCommand(projectConfigCmd)
 
 	// Add flags for project init
 	projectInitCmd.Flags().StringVar(&projectName, "name", "", "Project name (required)")
@@ -1387,8 +1403,9 @@ func runProjectEncrypt(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create config manager: %w", err)
 	}
 
-	// Get effective config to find age settings
-	_, err = configManager.GetEffectiveConfig("")
+	// Get effective config to find age settings (respect --config flag)
+	customConfigFile := GetConfigFile()
+	_, err = configManager.GetEffectiveConfig(customConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to get effective config: %w", err)
 	}
@@ -1440,5 +1457,55 @@ func runProjectEncrypt(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("Project encryption completed successfully!")
+	return nil
+}
+
+func runProjectConfig(cmd *cobra.Command, args []string) error {
+	// Get custom config file from --config flag
+	customConfigFile := GetConfigFile()
+
+	fmt.Println("=== Spooky Configuration Information ===")
+	fmt.Println()
+
+	// Create config manager
+	configManager, err := utilities.NewConfigManager()
+	if err != nil {
+		return fmt.Errorf("failed to create config manager: %w", err)
+	}
+
+	// Get effective config info
+	effectiveInfo, err := configManager.GetEffectiveConfigInfo(customConfigFile)
+	if err != nil {
+		return fmt.Errorf("failed to get effective config info: %w", err)
+	}
+
+	// Display configuration information
+	fmt.Printf("Configuration Source: %s\n", effectiveInfo.Source)
+	fmt.Printf("Configuration File: %s\n", effectiveInfo.ConfigFile)
+
+	if effectiveInfo.Exists {
+		fmt.Printf("File Size: %d bytes\n", effectiveInfo.Size)
+		if effectiveInfo.ModTime != "" {
+			fmt.Printf("Last Modified: %s\n", effectiveInfo.ModTime)
+		}
+	} else {
+		fmt.Println("File Status: Does not exist")
+	}
+
+	// Show config priority
+	fmt.Println()
+	fmt.Println("Configuration Priority:")
+	fmt.Println("  1. Custom config file (--config flag)")
+	fmt.Println("  2. User config (~/.config/spooky/spooky.hcl)")
+	fmt.Println("  3. Embedded default")
+
+	// Show current --config flag status
+	fmt.Println()
+	if customConfigFile != "" {
+		fmt.Printf("--config flag: %s\n", customConfigFile)
+	} else {
+		fmt.Println("--config flag: Not specified")
+	}
+
 	return nil
 }

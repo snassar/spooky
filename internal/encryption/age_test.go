@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"spooky/internal/schemas"
 )
 
 // TestAgeKeyGenerationAndLoading tests the complete workflow of generating and loading age keys
@@ -215,6 +218,152 @@ func TestAgeEncryptionErrors(t *testing.T) {
 		if err == nil {
 			t.Error("Expected error when loading invalid identity file")
 		}
+	})
+}
+
+// TestAgePathFunctions tests the age path utility functions
+func TestAgePathFunctions(t *testing.T) {
+	t.Run("GetDefaultAgePaths", func(t *testing.T) {
+		identitiesPath, recipientsPath := GetDefaultAgePaths()
+
+		// Verify paths are not empty
+		if identitiesPath == "" {
+			t.Error("Default identities path should not be empty")
+		}
+		if recipientsPath == "" {
+			t.Error("Default recipients path should not be empty")
+		}
+
+		// Verify paths contain expected components
+		if !strings.Contains(identitiesPath, "spooky") {
+			t.Error("Default identities path should contain 'spooky'")
+		}
+		if !strings.Contains(identitiesPath, "age") {
+			t.Error("Default identities path should contain 'age'")
+		}
+		if !strings.Contains(identitiesPath, "identities") {
+			t.Error("Default identities path should contain 'identities'")
+		}
+
+		if !strings.Contains(recipientsPath, "spooky") {
+			t.Error("Default recipients path should contain 'spooky'")
+		}
+		if !strings.Contains(recipientsPath, "age") {
+			t.Error("Default recipients path should contain 'age'")
+		}
+		if !strings.Contains(recipientsPath, "recipients") {
+			t.Error("Default recipients path should contain 'recipients'")
+		}
+
+		fmt.Printf("Default identities path: %s\n", identitiesPath)
+		fmt.Printf("Default recipients path: %s\n", recipientsPath)
+	})
+
+	t.Run("GetProjectAgePaths with nil config", func(t *testing.T) {
+		identitiesPath, recipientsPath := GetProjectAgePaths(nil)
+
+		// Should return default paths when config is nil
+		defaultIdentities, defaultRecipients := GetDefaultAgePaths()
+
+		if identitiesPath != defaultIdentities {
+			t.Errorf("Expected default identities path, got: %s", identitiesPath)
+		}
+		if recipientsPath != defaultRecipients {
+			t.Errorf("Expected default recipients path, got: %s", recipientsPath)
+		}
+	})
+
+	t.Run("GetProjectAgePaths with custom config", func(t *testing.T) {
+		projectAge := &schemas.ProjectAgeV1{
+			DefaultRecipientsPath: "/custom/recipients/path",
+			DefaultIdentitiesPath: "/custom/identities/path",
+		}
+
+		identitiesPath, recipientsPath := GetProjectAgePaths(projectAge)
+
+		if identitiesPath != "/custom/identities/path" {
+			t.Errorf("Expected custom identities path, got: %s", identitiesPath)
+		}
+		if recipientsPath != "/custom/recipients/path" {
+			t.Errorf("Expected custom recipients path, got: %s", recipientsPath)
+		}
+	})
+
+	t.Run("GetProjectAgePaths with partial config", func(t *testing.T) {
+		projectAge := &schemas.ProjectAgeV1{
+			DefaultRecipientsPath: "/custom/recipients/path",
+			// DefaultIdentitiesPath not set
+		}
+
+		identitiesPath, recipientsPath := GetProjectAgePaths(projectAge)
+
+		// Should use default for identities, custom for recipients
+		defaultIdentities, _ := GetDefaultAgePaths()
+
+		if identitiesPath != defaultIdentities {
+			t.Errorf("Expected default identities path, got: %s", identitiesPath)
+		}
+		if recipientsPath != "/custom/recipients/path" {
+			t.Errorf("Expected custom recipients path, got: %s", recipientsPath)
+		}
+	})
+}
+
+// TestDirectoryBasedRecipients tests loading recipients from a directory
+func TestDirectoryBasedRecipients(t *testing.T) {
+	// Create temporary directory for test recipients
+	tempDir, err := os.MkdirTemp("", "age-recipients-test-*")
+	if err != nil {
+		t.Fatal("Failed to create temp directory:", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create test recipient files
+	recipientFiles := []string{
+		"alice.txt",
+		"bob.txt",
+		"charlie.txt",
+		".hidden.txt", // Should be skipped
+		"README.md",   // Should be skipped (not .txt)
+	}
+
+	for _, filename := range recipientFiles {
+		filePath := filepath.Join(tempDir, filename)
+		var content string
+
+		switch filename {
+		case "alice.txt":
+			content = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
+		case "bob.txt":
+			content = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
+		case "charlie.txt":
+			content = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
+		case ".hidden.txt":
+			content = "age1hiddenkeythatshouldbeskipped"
+		case "README.md":
+			content = "# This should be skipped\nage1readmekeythatshouldbeskipped"
+		}
+
+		if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+			t.Fatalf("Failed to create test file %s: %v", filename, err)
+		}
+	}
+
+	// Test loading recipients from directory
+	t.Run("Load Recipients from Directory", func(t *testing.T) {
+		ae, err := NewAgeEncryption("", tempDir)
+		if err != nil {
+			t.Fatal("Failed to create age encryption with recipients directory:", err)
+		}
+
+		recipientCount := ae.GetRecipientsCount()
+		expectedCount := 3 // alice.txt, bob.txt, charlie.txt (hidden and README should be skipped)
+
+		if recipientCount != expectedCount {
+			t.Errorf("Expected %d recipients, got %d", expectedCount, recipientCount)
+		}
+
+		fmt.Printf("Loaded %d recipients from directory\n", recipientCount)
 	})
 }
 

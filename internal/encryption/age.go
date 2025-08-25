@@ -11,6 +11,9 @@ import (
 	"filippo.io/age"
 	"filippo.io/age/armor"
 	"github.com/pkg/errors"
+
+	"spooky/internal/schemas"
+	"spooky/internal/utilities"
 )
 
 // AgeEncryption provides age encryption functionality
@@ -116,9 +119,58 @@ func (ae *AgeEncryption) loadIdentityFromFile(path string) error {
 
 // loadRecipients loads age recipients from the specified path
 func (ae *AgeEncryption) loadRecipients() error {
-	file, err := os.Open(ae.recipientsPath)
+	// Check if path is a directory
+	info, err := os.Stat(ae.recipientsPath)
 	if err != nil {
-		return errors.Wrapf(err, "failed to open recipients file: %s", ae.recipientsPath)
+		return errors.Wrapf(err, "failed to stat recipients path: %s", ae.recipientsPath)
+	}
+
+	if info.IsDir() {
+		// Load all recipient files from directory
+		return ae.loadRecipientsFromDirectory()
+	} else {
+		// Load single recipient file
+		return ae.loadRecipientsFromFile(ae.recipientsPath)
+	}
+}
+
+// loadRecipientsFromDirectory loads all recipient files from a directory
+func (ae *AgeEncryption) loadRecipientsFromDirectory() error {
+	entries, err := os.ReadDir(ae.recipientsPath)
+	if err != nil {
+		return errors.Wrapf(err, "failed to read recipients directory: %s", ae.recipientsPath)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		// Skip hidden files
+		if strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+
+		// Skip non-text files
+		if !isTextFile(entry.Name()) {
+			continue
+		}
+
+		recipientPath := filepath.Join(ae.recipientsPath, entry.Name())
+		if err := ae.loadRecipientsFromFile(recipientPath); err != nil {
+			// Log error but continue loading other recipients
+			fmt.Printf("Warning: failed to load recipients from %s: %v\n", recipientPath, err)
+		}
+	}
+
+	return nil
+}
+
+// loadRecipientsFromFile loads recipients from a single file
+func (ae *AgeEncryption) loadRecipientsFromFile(path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return errors.Wrapf(err, "failed to open recipients file: %s", path)
 	}
 	defer file.Close()
 
@@ -136,17 +188,30 @@ func (ae *AgeEncryption) loadRecipients() error {
 
 		recipient, err := age.ParseX25519Recipient(line)
 		if err != nil {
-			return errors.Wrapf(err, "failed to parse recipient on line %d: %s", lineNum, line)
+			return errors.Wrapf(err, "failed to parse recipient on line %d in %s: %s", lineNum, path, line)
 		}
 
 		ae.recipients = append(ae.recipients, recipient)
 	}
 
 	if err := scanner.Err(); err != nil {
-		return errors.Wrap(err, "failed to read recipients file")
+		return errors.Wrapf(err, "failed to read recipients file: %s", path)
 	}
 
 	return nil
+}
+
+// isTextFile checks if a file appears to be a text file based on extension
+func isTextFile(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	textExtensions := []string{".txt", ".pub", ".key", ".age", ""} // empty extension for files without extension
+
+	for _, textExt := range textExtensions {
+		if ext == textExt {
+			return true
+		}
+	}
+	return false
 }
 
 // Encrypt encrypts a plaintext value using age encryption
@@ -239,4 +304,41 @@ func (ae *AgeEncryption) ValidateConfiguration() error {
 	}
 
 	return nil
+}
+
+// GetDefaultAgePaths returns the default paths for age configuration
+func GetDefaultAgePaths() (identitiesPath, recipientsPath string) {
+	// Use OS detection utility to get proper config directory
+	pathConfig, err := utilities.GetPathConfig("spooky")
+	if err != nil {
+		// Fallback to current directory if OS detection fails
+		identitiesPath = ".spooky/age/identities"
+		recipientsPath = ".spooky/age/recipients"
+		return
+	}
+
+	// Use the config directory from OS detection
+	identitiesPath = filepath.Join(pathConfig.ConfigDir, "age", "identities")
+	recipientsPath = filepath.Join(pathConfig.ConfigDir, "age", "recipients")
+	return
+}
+
+// GetProjectAgePaths returns age paths for a project, using project-specific overrides if available
+func GetProjectAgePaths(projectAge *schemas.ProjectAgeV1) (identitiesPath, recipientsPath string) {
+	defaultIdentities, defaultRecipients := GetDefaultAgePaths()
+
+	// Use project-specific paths if provided, otherwise use defaults
+	if projectAge != nil && projectAge.DefaultIdentitiesPath != "" {
+		identitiesPath = projectAge.DefaultIdentitiesPath
+	} else {
+		identitiesPath = defaultIdentities
+	}
+
+	if projectAge != nil && projectAge.DefaultRecipientsPath != "" {
+		recipientsPath = projectAge.DefaultRecipientsPath
+	} else {
+		recipientsPath = defaultRecipients
+	}
+
+	return
 }
