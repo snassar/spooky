@@ -9,6 +9,41 @@ const SchemaVersion = "1"
 var SupportedVersions = []string{"1"}
 
 // ============================================================================
+// VALIDATION TYPES
+// ============================================================================
+
+// ValidationResult contains the result of schema validation
+type ValidationResult struct {
+	IsValid    bool
+	Errors     []ValidationError
+	Warnings   []ValidationWarning
+	SchemaName string
+}
+
+// ValidationError represents a schema validation error
+type ValidationError struct {
+	Field    string
+	Value    interface{}
+	Message  string
+	Severity string
+	File     string // File path where the error occurred
+	Line     int    // Line number where the error occurred
+	Column   int    // Column number where the error occurred
+	Context  string // Additional context about the error
+}
+
+// ValidationWarning represents a schema validation warning
+type ValidationWarning struct {
+	Field   string
+	Value   interface{}
+	Message string
+	File    string // File path where the warning occurred
+	Line    int    // Line number where the warning occurred
+	Column  int    // Column number where the warning occurred
+	Context string // Additional context about the warning
+}
+
+// ============================================================================
 // PROJECT SCHEMA STRUCTS
 // ============================================================================
 

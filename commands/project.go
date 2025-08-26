@@ -123,7 +123,7 @@ func runProjectInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create target directory if it doesn't exist
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", targetDir, err)
 	}
 
@@ -187,26 +187,26 @@ func validateProjectName(name string) error {
 func createProjectHCL(targetDir, name, description string) error {
 	// Generate project configuration directly from Go structs
 	content := schemas.GenerateProjectConfigFromStructs(name, description)
-	return os.WriteFile(filepath.Join(targetDir, "project.hcl"), []byte(content), 0644)
+	return os.WriteFile(filepath.Join(targetDir, "project.hcl"), []byte(content), 0o644)
 }
 
 func createMachinesHCL(targetDir string) error {
 	// Generate machines configuration directly from Go structs
 	content := schemas.GenerateMachinesConfigFromStructs()
-	return os.WriteFile(filepath.Join(targetDir, "machines.hcl"), []byte(content), 0644)
+	return os.WriteFile(filepath.Join(targetDir, "machines.hcl"), []byte(content), 0o644)
 }
 
 func createActionsHCL(targetDir string) error {
 	// Generate actions configuration directly from Go structs
 	content := schemas.GenerateActionsConfigFromStructs()
-	return os.WriteFile(filepath.Join(targetDir, "actions.hcl"), []byte(content), 0644)
+	return os.WriteFile(filepath.Join(targetDir, "actions.hcl"), []byte(content), 0o644)
 }
 
 func createVariablesHCL(targetDir string) error {
 	// Generate variables configuration directly from Go structs
 	content := schemas.GenerateVariablesConfigFromStructs()
 
-	return os.WriteFile(filepath.Join(targetDir, "variables.hcl"), []byte(content), 0644)
+	return os.WriteFile(filepath.Join(targetDir, "variables.hcl"), []byte(content), 0o644)
 }
 
 // generateProjectConfigFromSchema creates a project configuration based on schema understanding
@@ -500,7 +500,7 @@ func generateActionsConfigFromSchema(schemaData map[string]interface{}) string {
 func createREADME(targetDir, name, description string) error {
 	content := fmt.Sprintf("# %s\n\n%s\n\n## Overview\n\nThis is a Spooky automation project that defines configuration management, \ndeployment automation, and infrastructure management tasks.\n\n## Project Structure\n\n- project.hcl - Project configuration and metadata\n- machines.hcl - Machine inventory and connectivity settings\n- actions.hcl - Automation tasks and deployment actions\n- variables.hcl - Project-wide variables and configuration values\n- templates/ - Template files for deployment (create as needed)\n- files/ - Static files for deployment (create as needed)\n\n## Getting Started\n\n1. **Configure Machines**: Edit machines.hcl to define your target machines\n2. **Define Actions**: Edit actions.hcl to create automation tasks\n3. **Set Variables**: Edit variables.hcl to configure project variables\n4. **Validate**: Run 'spooky project validate' to check configuration\n5. **Execute**: Run 'spooky run <action-name>' to execute actions\n\n## Examples\n\n### Running Actions\n```bash\n# Run a specific action\nspooky run deploy-application\n\n# Run actions with specific tags\nspooky run --tags deployment\n\n# Dry run to see what would happen\nspooky run --dry-run deploy-application\n```\n\n### Managing Machines\n```bash\n# List all machines\nspooky machines list\n\n# Test connectivity\nspooky machines test-connection\n\n# Collect facts\nspooky machines collect-facts\n```\n\n## Documentation\n\nFor more information about Spooky, visit the project documentation or run:\n```bash\nspooky --help\nspooky project --help\nspooky machines --help\nspooky actions --help\n```\n\n## Support\n\nIf you encounter issues or have questions, please refer to the Spooky documentation\nor create an issue in the project repository.", name, description)
 
-	return os.WriteFile(filepath.Join(targetDir, "README.md"), []byte(content), 0644)
+	return os.WriteFile(filepath.Join(targetDir, "README.md"), []byte(content), 0o644)
 }
 
 func runProjectValidate(cmd *cobra.Command, args []string) error {
@@ -540,8 +540,8 @@ func runProjectValidate(cmd *cobra.Command, args []string) error {
 
 // validateAgainstSchema validates HCL content against embedded schemas
 func validateAgainstSchema(schemaName, content string) error {
-	// Use the new struct validator for proper schema validation
-	validator := schemas.NewStructValidator()
+	// Use the new unified validator for proper schema validation
+	validator := schemas.NewValidator()
 
 	result, err := validator.ValidateHCLContent(schemaName, content)
 	if err != nil {
@@ -616,9 +616,9 @@ func validateMergedMachines(contents []string, fileNames []string) error {
 		fileName := fileNames[i]
 
 		// Use schema-aware parsing for collision detection
-		validator := schemas.NewStructValidator()
+		validator := schemas.NewValidator()
 
-		// Parse the content using the struct validator
+		// Parse the content using the unified validator
 		parsedData, err := validator.ParseHCLContent(content)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", fileName, err)
@@ -871,9 +871,9 @@ func validateMergedVariables(contents []string, fileNames []string) error {
 		fileName := fileNames[i]
 
 		// Use schema-aware parsing for collision detection
-		validator := schemas.NewStructValidator()
+		validator := schemas.NewValidator()
 
-		// Parse the content using the struct validator
+		// Parse the content using the unified validator
 		parsedData, err := validator.ParseHCLContent(content)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", fileName, err)
@@ -973,9 +973,9 @@ func validateMergedActions(contents []string, fileNames []string) error {
 		fileName := fileNames[i]
 
 		// Use schema-aware parsing for collision detection
-		validator := schemas.NewStructValidator()
+		validator := schemas.NewValidator()
 
-		// Parse the content using the struct validator
+		// Parse the content using the unified validator
 		parsedData, err := validator.ParseHCLContent(content)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", fileName, err)
@@ -1364,8 +1364,8 @@ func getProjectName(targetDir string) (string, error) {
 		return "", nil // Return empty string instead of error for missing files
 	}
 
-	// Simple regex to extract project name from "name = \"value\""
-	re := regexp.MustCompile(`name\s*=\s*["']([^"']+)["']`)
+	// Regex to extract project name from "project \"name\" {"
+	re := regexp.MustCompile(`project\s+["']([^"']+)["']\s*{`)
 	matches := re.FindStringSubmatch(string(content))
 	if len(matches) < 2 {
 		return "unknown", nil // Return default name instead of error

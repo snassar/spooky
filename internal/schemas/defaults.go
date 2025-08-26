@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/hcl/v2/hclwrite"
@@ -386,4 +387,83 @@ func (dcg *DefaultConfigGenerator) ctyValueToHCL(value cty.Value, body *hclwrite
 	}
 
 	return nil
+}
+
+// GenerateProjectConfigFromStructs generates a project configuration HCL string from Go structs
+func GenerateProjectConfigFromStructs(name, description string) string {
+	generator := NewDefaultConfigGenerator()
+	config := generator.GetDefaultProjectConfig()
+
+	// Override with provided values
+	config.Name = name
+	config.Description = description
+
+	hcl, err := generator.ToHCL(config)
+	if err != nil {
+		// This is a critical bug - struct generation should never fail
+		panic(fmt.Sprintf("failed to generate project config from struct: %v", err))
+	}
+
+	// The ToHCL method generates "ProjectV1" as the block name, but we need "project"
+	// So we need to replace the block name in the generated HCL
+	hcl = strings.Replace(hcl, "ProjectV1", "project", 1)
+
+	// Convert from project { name = "..." } to project "..." { }
+	// Remove the name attribute and add it as a quoted label
+	hcl = strings.Replace(hcl, fmt.Sprintf(`  name                      = "%s"`, name), "", 1)
+	hcl = strings.Replace(hcl, fmt.Sprintf(`  name = "%s"`, name), "", 1)
+	hcl = strings.Replace(hcl, "project {", fmt.Sprintf(`project "%s" {`, name), 1)
+
+	return hcl
+}
+
+// GenerateMachinesConfigFromStructs generates a machines configuration HCL string from Go structs
+func GenerateMachinesConfigFromStructs() string {
+	generator := NewDefaultConfigGenerator()
+	config := generator.GetDefaultMachinesConfig()
+
+	hcl, err := generator.ToHCL(config)
+	if err != nil {
+		return fmt.Sprintf("machines {\n  # Error generating from struct: %v\n}", err)
+	}
+
+	// The ToHCL method generates "MachinesV1" as the block name, but we need "machines"
+	// So we need to replace the block name in the generated HCL
+	hcl = strings.Replace(hcl, "MachinesV1", "machines", 1)
+
+	return hcl
+}
+
+// GenerateActionsConfigFromStructs generates an actions configuration HCL string from Go structs
+func GenerateActionsConfigFromStructs() string {
+	generator := NewDefaultConfigGenerator()
+	config := generator.GetDefaultActionsConfig()
+
+	hcl, err := generator.ToHCL(config)
+	if err != nil {
+		return fmt.Sprintf("actions {\n  # Error generating from struct: %v\n}", err)
+	}
+
+	// The ToHCL method generates "ActionsV1" as the block name, but we need "actions"
+	// So we need to replace the block name in the generated HCL
+	hcl = strings.Replace(hcl, "ActionsV1", "actions", 1)
+
+	return hcl
+}
+
+// GenerateVariablesConfigFromStructs generates a variables configuration HCL string from Go structs
+func GenerateVariablesConfigFromStructs() string {
+	generator := NewDefaultConfigGenerator()
+	config := generator.GetDefaultVariablesConfig()
+
+	hcl, err := generator.ToHCL(config)
+	if err != nil {
+		return fmt.Sprintf("variables {\n  # Error generating from struct: %v\n}", err)
+	}
+
+	// The ToHCL method generates "VariablesV1" as the block name, but we need "variables"
+	// So we need to replace the block name in the generated HCL
+	hcl = strings.Replace(hcl, "VariablesV1", "variables", 1)
+
+	return hcl
 }
