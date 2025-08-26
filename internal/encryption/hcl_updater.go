@@ -59,7 +59,7 @@ func (hu *HCLUpdater) UpdateFile(filePath string) error {
 	}
 
 	// Write the modified content back to the file
-	if err := os.WriteFile(filePath, []byte(contentStr), 0644); err != nil {
+	if err := os.WriteFile(filePath, []byte(contentStr), 0o644); err != nil {
 		return errors.Wrapf(err, "failed to write modified file: %s", filePath)
 	}
 

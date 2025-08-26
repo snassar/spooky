@@ -78,7 +78,7 @@ func (dcg *DefaultConfigGenerator) GetDefaultSpookyLogging() *SpookyLoggingV1 {
 		Format:     dcg.extractStringDefault(reflect.TypeOf(SpookyLoggingV1{}).Field(1), "json"),
 		Output:     dcg.extractStringDefault(reflect.TypeOf(SpookyLoggingV1{}).Field(2), "stderr"),
 		FilePath:   "", // Will be computed based on OS
-		FilePerms:  dcg.extractStringDefault(reflect.TypeOf(SpookyLoggingV1{}).Field(4), "0644"),
+		FilePerms:  dcg.extractStringDefault(reflect.TypeOf(SpookyLoggingV1{}).Field(4), "0o644"),
 		FileAppend: dcg.extractBoolDefault(reflect.TypeOf(SpookyLoggingV1{}).Field(5), true),
 	}
 }
@@ -125,7 +125,7 @@ func (dcg *DefaultConfigGenerator) GetDefaultLoggingConfig() *LoggingV1 {
 		Level:                          "info",
 		Format:                         "json",
 		Output:                         "stderr",
-		FilePermissions:                "0644",
+		FilePermissions:                "0o644",
 		FileAppend:                     true,
 		StructuredTimestampEnabled:     true,
 		StructuredTimestampFormat:      "RFC3339",

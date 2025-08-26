@@ -28,12 +28,14 @@ type PathConfig struct {
 	LogDir      string // Log directory
 	CacheDir    string // Cache directory
 	DataDir     string // Data directory
+	StateDir    string // State directory (for databases, logs, etc.)
 	TempDir     string // Temporary directory
 	UserHomeDir string // User home directory
 	AppName     string // Application name for paths
 	ConfigFile  string // Main config file path
 	LogFile     string // Main log file path
 	CacheFile   string // Main cache file path
+	StateFile   string // Main state file path (for SQLite database)
 }
 
 // DetectOS detects the current operating system and provides detailed information
@@ -271,14 +273,10 @@ func GetPathConfig(appName string) (*PathConfig, error) {
 
 	// Set OS-specific paths
 	switch osInfo.OS {
-	case "linux":
-		setLinuxPaths(config, osInfo)
-	case "darwin":
-		setDarwinPaths(config, osInfo)
+	case "linux", "darwin", "freebsd", "openbsd", "netbsd":
+		setXDGPaths(config, osInfo)
 	case "windows":
 		setWindowsPaths(config, osInfo)
-	case "freebsd", "openbsd", "netbsd":
-		setBSDPaths(config, osInfo)
 	default:
 		return nil, errors.Errorf("unsupported OS for path configuration: %s", osInfo.OS)
 	}
@@ -287,12 +285,14 @@ func GetPathConfig(appName string) (*PathConfig, error) {
 	config.ConfigFile = filepath.Join(config.ConfigDir, appName+".hcl")
 	config.LogFile = filepath.Join(config.LogDir, appName+".log")
 	config.CacheFile = filepath.Join(config.CacheDir, appName+".cache")
+	config.StateFile = filepath.Join(config.StateDir, appName+".db")
 
 	return config, nil
 }
 
-// setLinuxPaths sets Linux-specific paths
-func setLinuxPaths(config *PathConfig, osInfo *OSInfo) {
+// setXDGPaths sets paths following XDG Base Directory Specification
+// Used for Linux, macOS, and BSD systems
+func setXDGPaths(config *PathConfig, osInfo *OSInfo) {
 	// Follow XDG Base Directory Specification
 	xdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
 	if xdgConfigHome == "" {
@@ -309,19 +309,17 @@ func setLinuxPaths(config *PathConfig, osInfo *OSInfo) {
 		xdgCacheHome = filepath.Join(config.UserHomeDir, ".cache")
 	}
 
+	// XDG_STATE_HOME for application state (databases, logs, etc.)
+	xdgStateHome := os.Getenv("XDG_STATE_HOME")
+	if xdgStateHome == "" {
+		xdgStateHome = filepath.Join(config.UserHomeDir, ".local", "state")
+	}
+
 	config.ConfigDir = filepath.Join(xdgConfigHome, config.AppName)
 	config.DataDir = filepath.Join(xdgDataHome, config.AppName)
 	config.CacheDir = filepath.Join(xdgCacheHome, config.AppName)
-	config.LogDir = filepath.Join(xdgDataHome, config.AppName, "logs")
-	config.TempDir = os.TempDir()
-}
-
-// setDarwinPaths sets macOS-specific paths
-func setDarwinPaths(config *PathConfig, osInfo *OSInfo) {
-	config.ConfigDir = filepath.Join(config.UserHomeDir, "Library", "Application Support", config.AppName)
-	config.DataDir = filepath.Join(config.UserHomeDir, "Library", "Application Support", config.AppName)
-	config.CacheDir = filepath.Join(config.UserHomeDir, "Library", "Caches", config.AppName)
-	config.LogDir = filepath.Join(config.UserHomeDir, "Library", "Logs", config.AppName)
+	config.StateDir = filepath.Join(xdgStateHome, config.AppName)
+	config.LogDir = filepath.Join(xdgStateHome, config.AppName, "logs")
 	config.TempDir = os.TempDir()
 }
 
@@ -340,17 +338,8 @@ func setWindowsPaths(config *PathConfig, osInfo *OSInfo) {
 	config.ConfigDir = filepath.Join(appData, config.AppName)
 	config.DataDir = filepath.Join(localAppData, config.AppName)
 	config.CacheDir = filepath.Join(localAppData, config.AppName, "Cache")
-	config.LogDir = filepath.Join(localAppData, config.AppName, "Logs")
-	config.TempDir = os.TempDir()
-}
-
-// setBSDPaths sets BSD-specific paths
-func setBSDPaths(config *PathConfig, osInfo *OSInfo) {
-	// BSD systems typically follow Unix conventions
-	config.ConfigDir = filepath.Join(config.UserHomeDir, ".config", config.AppName)
-	config.DataDir = filepath.Join(config.UserHomeDir, ".local", "share", config.AppName)
-	config.CacheDir = filepath.Join(config.UserHomeDir, ".cache", config.AppName)
-	config.LogDir = filepath.Join(config.UserHomeDir, ".local", "share", config.AppName, "logs")
+	config.StateDir = filepath.Join(localAppData, config.AppName, "State")
+	config.LogDir = filepath.Join(localAppData, config.AppName, "State", "logs")
 	config.TempDir = os.TempDir()
 }
 
@@ -360,11 +349,12 @@ func EnsureDirectories(config *PathConfig) error {
 		config.ConfigDir,
 		config.DataDir,
 		config.CacheDir,
+		config.StateDir,
 		config.LogDir,
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return errors.Wrapf(err, "failed to create directory: %s", dir)
 		}
 	}

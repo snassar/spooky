@@ -27,19 +27,14 @@ func NewProjectValidator() *ProjectValidator {
 
 // ValidateProject performs comprehensive project validation
 func (pv *ProjectValidator) ValidateProject(targetDir string) *schemas.ValidationResult {
-	fmt.Printf("DEBUG: ValidateProject called for targetDir: %s\n", targetDir)
-
 	// Validate project structure
-	fmt.Printf("DEBUG: Calling validateProjectStructure\n")
 	pv.validateProjectStructure(targetDir)
 
 	// Validate individual files
-	fmt.Printf("DEBUG: Calling validateProjectFiles\n")
 	pv.validateProjectFiles(targetDir)
 
 	// Set final validity
 	pv.result.IsValid = len(pv.result.Errors) == 0
-	fmt.Printf("DEBUG: Final validation result - IsValid: %v, Errors: %d\n", pv.result.IsValid, len(pv.result.Errors))
 
 	return pv.result
 }
@@ -49,11 +44,8 @@ func (pv *ProjectValidator) validateProjectStructure(targetDir string) {
 	// Scan the actual project directory structure
 	projectDir := pv.scanProjectDirectory(targetDir)
 
-	// Validate against ProjectDirectoryV1 schema rules
-	pv.validateProjectDirectoryAgainstSchema(projectDir, targetDir)
-
-	// Additional validation for alternative configurations (either file or directory)
-	pv.validateAlternativeConfigurations(targetDir)
+	// Convert to schema format and validate using struct validator
+	pv.validateProjectDirectoryWithSchema(projectDir, targetDir)
 }
 
 // scanProjectDirectory scans the actual project directory and returns filesystem structure
@@ -84,107 +76,145 @@ func (pv *ProjectValidator) scanProjectDirectory(targetDir string) map[string]in
 	return projectDir
 }
 
-// validateProjectDirectoryAgainstSchema validates the scanned directory structure against ProjectDirectoryV1 schema rules
-func (pv *ProjectValidator) validateProjectDirectoryAgainstSchema(projectDir map[string]interface{}, targetDir string) {
-	// Get the scanned files and directories
-	files, _ := projectDir["files"].([]string)
-	directories, _ := projectDir["directories"].([]string)
+// validateProjectDirectoryWithSchema validates project directory structure using schema-driven validation
+func (pv *ProjectValidator) validateProjectDirectoryWithSchema(projectDir map[string]interface{}, targetDir string) {
+	// Convert scanned directory structure to schema format
+	schemaData := map[string]interface{}{
+		"project_directory": map[string]interface{}{
+			"name":        projectDir["name"],
+			"files":       pv.convertFilesToSchema(projectDir["files"].([]string)),
+			"directories": pv.convertDirectoriesToSchema(projectDir["directories"].([]string)),
+		},
+	}
 
-	// Validate required files
-	pv.validateRequiredFiles(files, targetDir)
+	// Validate using struct validator
+	validator := schemas.NewStructValidator()
+	result := validator.ValidateProjectDirectory(schemaData)
 
-	// Validate optional files and directories
-	pv.validateOptionalFiles(files, targetDir)
-	pv.validateOptionalDirectories(directories, targetDir)
+	// Add schema validation errors to our result
+	if !result.IsValid {
+		for _, schemaErr := range result.Errors {
+			schemaErr.File = targetDir
+			schemaErr.Context = "Project directory structure validation"
+			pv.result.Errors = append(pv.result.Errors, schemaErr)
+		}
+	}
+
+	// Add schema validation warnings to our result
+	for _, schemaWarning := range result.Warnings {
+		schemaWarning.File = targetDir
+		schemaWarning.Context = "Project directory structure validation"
+		pv.result.Warnings = append(pv.result.Warnings, schemaWarning)
+	}
+
+	// Additional validation for alternative configurations (either file or directory)
+	pv.validateAlternativeConfigurations(targetDir)
 }
 
-// validateRequiredFiles validates that all required files exist
-func (pv *ProjectValidator) validateRequiredFiles(files []string, targetDir string) {
-	requiredFiles := []string{"project.hcl"}
+// convertFilesToSchema converts file names to schema format
+func (pv *ProjectValidator) convertFilesToSchema(files []string) []map[string]interface{} {
+	var schemaFiles []map[string]interface{}
 
-	for _, requiredFile := range requiredFiles {
-		found := false
-		for _, file := range files {
-			if file == requiredFile {
-				found = true
-				break
-			}
-		}
+	// Define expected files based on schema
+	expectedFiles := map[string]map[string]interface{}{
+		"project.hcl": {
+			"name":        "project.hcl",
+			"type":        "file",
+			"required":    true,
+			"description": "Main project configuration file",
+			"pattern":     "project \"[a-zA-Z0-9_-]+\" {",
+		},
+		"machines.hcl": {
+			"name":        "machines.hcl",
+			"type":        "file",
+			"required":    false,
+			"description": "Machine inventory definitions",
+			"pattern":     "machines {",
+		},
+		"actions.hcl": {
+			"name":        "actions.hcl",
+			"type":        "file",
+			"required":    false,
+			"description": "Main actions file",
+			"pattern":     "actions {",
+		},
+		"variables.hcl": {
+			"name":        "variables.hcl",
+			"type":        "file",
+			"required":    false,
+			"description": "Main variables file",
+			"pattern":     "variables {",
+		},
+		"README.md": {
+			"name":        "README.md",
+			"type":        "file",
+			"required":    false,
+			"description": "Project documentation",
+			"pattern":     "# .*",
+		},
+	}
 
-		if !found {
-			pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
-				Message: fmt.Sprintf("required file missing: %s", requiredFile),
-				File:    targetDir,
-				Context: "Project structure validation",
-			})
+	// Add found files to schema
+	for _, fileName := range files {
+		if expectedFile, exists := expectedFiles[fileName]; exists {
+			schemaFiles = append(schemaFiles, expectedFile)
 		}
 	}
+
+	return schemaFiles
 }
 
-// validateOptionalFiles validates optional files and their patterns
-func (pv *ProjectValidator) validateOptionalFiles(files []string, targetDir string) {
-	// Optional files that can be validated for content patterns
-	optionalFiles := map[string]string{
-		"machines.hcl":  "machines {",
-		"actions.hcl":   "actions {",
-		"variables.hcl": "variables {",
-		"README.md":     "# ",
+// convertDirectoriesToSchema converts directory names to schema format
+func (pv *ProjectValidator) convertDirectoriesToSchema(directories []string) []map[string]interface{} {
+	var schemaDirs []map[string]interface{}
+
+	// Define expected directories based on schema
+	expectedDirs := map[string]map[string]interface{}{
+		"machines": {
+			"name":        "machines",
+			"type":        "directory",
+			"required":    false,
+			"description": "Machine inventory files directory",
+			"pattern":     ".*\\.hcl$",
+		},
+		"actions": {
+			"name":        "actions",
+			"type":        "directory",
+			"required":    false,
+			"description": "Organized action files",
+			"pattern":     ".*\\.hcl$",
+		},
+		"variables": {
+			"name":        "variables",
+			"type":        "directory",
+			"required":    false,
+			"description": "Variables files directory",
+			"pattern":     ".*\\.hcl$",
+		},
+		"templates": {
+			"name":        "templates",
+			"type":        "directory",
+			"required":    false,
+			"description": "Template files for dynamic content",
+			"pattern":     "",
+		},
+		"files": {
+			"name":        "files",
+			"type":        "directory",
+			"required":    false,
+			"description": "Static files to be deployed",
+			"pattern":     "",
+		},
 	}
 
-	for _, file := range files {
-		if pattern, exists := optionalFiles[file]; exists {
-			filePath := filepath.Join(targetDir, file)
-			pv.validateFileContent(filePath, pattern, file)
+	// Add found directories to schema
+	for _, dirName := range directories {
+		if expectedDir, exists := expectedDirs[dirName]; exists {
+			schemaDirs = append(schemaDirs, expectedDir)
 		}
 	}
-}
 
-// validateOptionalDirectories validates optional directories
-func (pv *ProjectValidator) validateOptionalDirectories(directories []string, targetDir string) {
-	// Optional directories that can be validated
-	optionalDirs := []string{"machines", "actions", "variables", "templates", "files"}
-
-	for _, dir := range directories {
-		found := false
-		for _, optionalDir := range optionalDirs {
-			if dir == optionalDir {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			// Unknown directory - could be a warning
-			pv.result.Warnings = append(pv.result.Warnings, schemas.ValidationWarning{
-				Message: fmt.Sprintf("unknown directory: %s", dir),
-				File:    targetDir,
-				Context: "Project structure validation",
-			})
-		}
-	}
-}
-
-// validateFileContent validates file content against expected patterns
-func (pv *ProjectValidator) validateFileContent(filePath, pattern, fileName string) {
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		// File exists but can't be read - this is a warning, not an error
-		pv.result.Warnings = append(pv.result.Warnings, schemas.ValidationWarning{
-			Message: fmt.Sprintf("cannot read file %s: %v", fileName, err),
-			File:    filePath,
-			Context: "Project structure validation",
-		})
-		return
-	}
-
-	// Check if content matches expected pattern
-	if !strings.Contains(string(content), pattern) {
-		pv.result.Warnings = append(pv.result.Warnings, schemas.ValidationWarning{
-			Message: fmt.Sprintf("file %s does not contain expected pattern: %s", fileName, pattern),
-			File:    filePath,
-			Context: "Project structure validation",
-		})
-	}
+	return schemaDirs
 }
 
 // validateAlternativeConfigurations validates that at least one configuration option exists for each type
@@ -365,39 +395,25 @@ func (pv *ProjectValidator) validateMachinesDirectory(dirPath string) {
 
 // validateActions validates action configurations
 func (pv *ProjectValidator) validateActions(projectPath string) {
-	fmt.Printf("DEBUG: validateActions called for projectPath: %s\n", projectPath)
-
 	actionsHCLPath := filepath.Join(projectPath, "actions.hcl")
 	actionsDirPath := filepath.Join(projectPath, "actions")
 
-	fmt.Printf("DEBUG: Checking for actionsHCLPath: %s\n", actionsHCLPath)
-	fmt.Printf("DEBUG: Checking for actionsDirPath: %s\n", actionsDirPath)
-
 	// Always validate actions.hcl if it exists
 	if _, err := os.Stat(actionsHCLPath); err == nil {
-		fmt.Printf("DEBUG: actions.hcl exists, calling validateActionsFile\n")
 		pv.validateActionsFile(actionsHCLPath)
-	} else {
-		fmt.Printf("DEBUG: actions.hcl does not exist: %v\n", err)
 	}
 
 	// Always validate actions/ directory if it exists
 	if _, err := os.Stat(actionsDirPath); err == nil {
-		fmt.Printf("DEBUG: actions/ directory exists, calling validateActionsDirectory\n")
 		pv.validateActionsDirectory(actionsDirPath)
-	} else {
-		fmt.Printf("DEBUG: actions/ directory does not exist: %v\n", err)
 	}
 }
 
 // validateActionsFile validates a single actions.hcl file
 func (pv *ProjectValidator) validateActionsFile(filePath string) {
-	fmt.Printf("DEBUG: Validating actions file: %s\n", filePath)
-
 	validator := schemas.NewStructValidator()
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		fmt.Printf("DEBUG: Failed to read file: %v\n", err)
 		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
 			Message: fmt.Sprintf("failed to read %s: %v", filepath.Base(filePath), err),
 			File:    filePath,
@@ -406,12 +422,8 @@ func (pv *ProjectValidator) validateActionsFile(filePath string) {
 		return
 	}
 
-	fmt.Printf("DEBUG: File content length: %d bytes\n", len(content))
-	fmt.Printf("DEBUG: File content preview: %s\n", string(content[:min(100, len(content))]))
-
 	result, err := validator.ValidateHCLContent("actions", string(content))
 	if err != nil {
-		fmt.Printf("DEBUG: Schema validation error: %v\n", err)
 		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
 			Message: fmt.Sprintf("schema validation failed: %v", err),
 			File:    filePath,
@@ -420,24 +432,13 @@ func (pv *ProjectValidator) validateActionsFile(filePath string) {
 		return
 	}
 
-	fmt.Printf("DEBUG: Schema validation result - IsValid: %v, Errors: %d, Warnings: %d\n",
-		result.IsValid, len(result.Errors), len(result.Warnings))
-
 	if !result.IsValid {
 		for _, schemaErr := range result.Errors {
-			fmt.Printf("DEBUG: Schema error: %s - %s\n", schemaErr.Field, schemaErr.Message)
 			schemaErr.File = filePath
 			schemaErr.Context = "Schema validation"
 			pv.result.Errors = append(pv.result.Errors, schemaErr)
 		}
 	}
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // validateActionsDirectory validates all .hcl files in the actions directory

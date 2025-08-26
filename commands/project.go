@@ -504,15 +504,11 @@ func createREADME(targetDir, name, description string) error {
 }
 
 func runProjectValidate(cmd *cobra.Command, args []string) error {
-	fmt.Printf("DEBUG: runProjectValidate called with args: %v\n", args)
-
 	// Determine target directory
 	targetDir := "."
 	if len(args) > 0 {
 		targetDir = args[0]
 	}
-
-	fmt.Printf("DEBUG: Using targetDir: %s\n", targetDir)
 
 	// Check if directory exists
 	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
@@ -520,13 +516,8 @@ func runProjectValidate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Use the enhanced project validator with schema-driven validation
-	fmt.Printf("DEBUG: Creating project validator\n")
 	validator := utilities.NewProjectValidator()
-
-	fmt.Printf("DEBUG: Calling ValidateProject\n")
 	result := validator.ValidateProject(targetDir)
-
-	fmt.Printf("DEBUG: Validation complete - IsValid: %v, Errors: %d\n", result.IsValid, len(result.Errors))
 
 	// Display validation result
 	if result.IsValid {

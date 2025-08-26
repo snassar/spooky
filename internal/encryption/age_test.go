@@ -344,7 +344,7 @@ func TestDirectoryBasedRecipients(t *testing.T) {
 			content = "# This should be skipped\nage1readmekeythatshouldbeskipped"
 		}
 
-		if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
 			t.Fatalf("Failed to create test file %s: %v", filename, err)
 		}
 	}

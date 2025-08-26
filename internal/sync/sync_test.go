@@ -30,10 +30,10 @@ func TestSyncDirectory(t *testing.T) {
 	for path, content := range testFiles {
 		fullPath := filepath.Join(sourceDir, path)
 		dir := filepath.Dir(fullPath)
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatalf("Failed to create directory %s: %v", dir, err)
 		}
-		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
 			t.Fatalf("Failed to create file %s: %v", fullPath, err)
 		}
 	}
@@ -76,7 +76,7 @@ func TestSyncDirectory(t *testing.T) {
 
 		// Create a newer file in target that should be preserved
 		conflictFile := filepath.Join(targetDir2, "file1.txt")
-		if err := os.WriteFile(conflictFile, []byte("newer content"), 0644); err != nil {
+		if err := os.WriteFile(conflictFile, []byte("newer content"), 0o644); err != nil {
 			t.Fatalf("Failed to create conflict file: %v", err)
 		}
 

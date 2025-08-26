@@ -96,7 +96,7 @@ func SyncDirectory(sourcePath, targetPath string, options *SyncOptions) (*FileSy
 	}
 
 	// Create target directory if it doesn't exist
-	if err := os.MkdirAll(targetPath, 0755); err != nil {
+	if err := os.MkdirAll(targetPath, 0o755); err != nil {
 		result.Error = fmt.Errorf("failed to create target directory: %v", err)
 		return result, result.Error
 	}
@@ -381,7 +381,7 @@ func copyFile(src, dst string, options *SyncOptions) error {
 
 	// Create target directory if it doesn't exist
 	targetDir := filepath.Dir(dst)
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		return err
 	}
 

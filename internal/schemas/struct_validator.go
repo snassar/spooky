@@ -1411,7 +1411,7 @@ func (sv *StructValidator) ValidateProjectDirectory(content map[string]interface
 		IsValid:    true,
 		Errors:     []ValidationError{},
 		Warnings:   []ValidationWarning{},
-		SchemaName: "project-directory",
+		SchemaName: "project_directory",
 	}
 
 	// Validate against all supported versions
@@ -1457,7 +1457,7 @@ func (sv *StructValidator) validateProjectDirectoryV1(content map[string]interfa
 
 // validateProjectDirectoryBlockV1 validates the project_directory block contents against V1 schema
 func (sv *StructValidator) validateProjectDirectoryBlockV1(projectDir map[string]interface{}, result *ValidationResult) {
-	// Required fields
+	// Validate required name field
 	if name, exists := projectDir["name"]; !exists {
 		result.Errors = append(result.Errors, ValidationError{
 			Field:    "project_directory.name",
@@ -1468,23 +1468,23 @@ func (sv *StructValidator) validateProjectDirectoryBlockV1(projectDir map[string
 		sv.validateProjectDirectoryNameV1(name, result)
 	}
 
-	// Validate files if present
-	if files, exists := projectDir["file"]; exists {
+	// Validate files array
+	if files, exists := projectDir["files"]; exists {
 		if filesArray, ok := files.([]interface{}); ok {
 			for i, file := range filesArray {
 				if fileMap, ok := file.(map[string]interface{}); ok {
-					sv.validateProjectDirectoryFileV1(fileMap, fmt.Sprintf("project_directory.file[%d]", i), result)
+					sv.validateProjectDirectoryFileV1(fileMap, fmt.Sprintf("project_directory.files[%d]", i), result)
 				}
 			}
 		}
 	}
 
-	// Validate directories if present
-	if dirs, exists := projectDir["directory"]; exists {
-		if dirsArray, ok := dirs.([]interface{}); ok {
+	// Validate directories array
+	if directories, exists := projectDir["directories"]; exists {
+		if dirsArray, ok := directories.([]interface{}); ok {
 			for i, dir := range dirsArray {
 				if dirMap, ok := dir.(map[string]interface{}); ok {
-					sv.validateProjectDirectoryDirV1(dirMap, fmt.Sprintf("project_directory.directory[%d]", i), result)
+					sv.validateProjectDirectoryDirV1(dirMap, fmt.Sprintf("project_directory.directories[%d]", i), result)
 				}
 			}
 		}
@@ -1503,19 +1503,16 @@ func (sv *StructValidator) validateProjectDirectoryNameV1(name interface{}, resu
 		return
 	}
 
-	// Pattern validation: ^[a-zA-Z0-9_.-]+$
-	pattern := regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
-	if !pattern.MatchString(nameStr) {
+	if nameStr == "" {
 		result.Errors = append(result.Errors, ValidationError{
 			Field:    "project_directory.name",
-			Value:    nameStr,
-			Message:  "name must contain only alphanumeric characters, dots, underscores, and hyphens",
+			Message:  "name cannot be empty",
 			Severity: "error",
 		})
 	}
 }
 
-// validateProjectDirectoryFileV1 validates a project directory file requirement against V1 rules
+// validateProjectDirectoryFileV1 validates a project directory file against V1 schema
 func (sv *StructValidator) validateProjectDirectoryFileV1(file map[string]interface{}, path string, result *ValidationResult) {
 	// Required fields
 	if name, exists := file["name"]; !exists {
@@ -1525,14 +1522,7 @@ func (sv *StructValidator) validateProjectDirectoryFileV1(file map[string]interf
 			Severity: "error",
 		})
 	} else {
-		// Validate name is a string
-		if _, ok := name.(string); !ok {
-			result.Errors = append(result.Errors, ValidationError{
-				Field:    fmt.Sprintf("%s.name", path),
-				Message:  "name must be a string",
-				Severity: "error",
-			})
-		}
+		sv.validateProjectDirectoryFileNameV1(name, path, result)
 	}
 
 	if fileType, exists := file["type"]; !exists {
@@ -1542,27 +1532,54 @@ func (sv *StructValidator) validateProjectDirectoryFileV1(file map[string]interf
 			Severity: "error",
 		})
 	} else {
-		// Validate type is "file"
-		if typeStr, ok := fileType.(string); ok {
-			if typeStr != "file" {
-				result.Errors = append(result.Errors, ValidationError{
-					Field:    fmt.Sprintf("%s.type", path),
-					Value:    typeStr,
-					Message:  "type must be 'file'",
-					Severity: "error",
-				})
-			}
-		} else {
-			result.Errors = append(result.Errors, ValidationError{
-				Field:    fmt.Sprintf("%s.type", path),
-				Message:  "type must be a string",
-				Severity: "error",
-			})
-		}
+		sv.validateProjectDirectoryFileTypeV1(fileType, path, result)
 	}
 }
 
-// validateProjectDirectoryDirV1 validates a project directory directory requirement against V1 rules
+// validateProjectDirectoryFileNameV1 validates project directory file name
+func (sv *StructValidator) validateProjectDirectoryFileNameV1(name interface{}, path string, result *ValidationResult) {
+	nameStr, ok := name.(string)
+	if !ok {
+		result.Errors = append(result.Errors, ValidationError{
+			Field:    fmt.Sprintf("%s.name", path),
+			Message:  "name must be a string",
+			Severity: "error",
+		})
+		return
+	}
+
+	if nameStr == "" {
+		result.Errors = append(result.Errors, ValidationError{
+			Field:    fmt.Sprintf("%s.name", path),
+			Message:  "name cannot be empty",
+			Severity: "error",
+		})
+	}
+}
+
+// validateProjectDirectoryFileTypeV1 validates project directory file type
+func (sv *StructValidator) validateProjectDirectoryFileTypeV1(fileType interface{}, path string, result *ValidationResult) {
+	typeStr, ok := fileType.(string)
+	if !ok {
+		result.Errors = append(result.Errors, ValidationError{
+			Field:    fmt.Sprintf("%s.type", path),
+			Message:  "type must be a string",
+			Severity: "error",
+		})
+		return
+	}
+
+	if typeStr != "file" {
+		result.Errors = append(result.Errors, ValidationError{
+			Field:    fmt.Sprintf("%s.type", path),
+			Value:    typeStr,
+			Message:  "type must be 'file'",
+			Severity: "error",
+		})
+	}
+}
+
+// validateProjectDirectoryDirV1 validates a project directory directory against V1 schema
 func (sv *StructValidator) validateProjectDirectoryDirV1(dir map[string]interface{}, path string, result *ValidationResult) {
 	// Required fields
 	if name, exists := dir["name"]; !exists {
@@ -1572,40 +1589,60 @@ func (sv *StructValidator) validateProjectDirectoryDirV1(dir map[string]interfac
 			Severity: "error",
 		})
 	} else {
-		// Validate name is a string
-		if _, ok := name.(string); !ok {
-			result.Errors = append(result.Errors, ValidationError{
-				Field:    fmt.Sprintf("%s.name", path),
-				Message:  "name must be a string",
-				Severity: "error",
-			})
-		}
+		sv.validateProjectDirectoryDirNameV1(name, path, result)
 	}
 
 	if dirType, exists := dir["type"]; !exists {
 		result.Errors = append(result.Errors, ValidationError{
-			Field:    fmt.Sprintf("%s.name", path),
+			Field:    fmt.Sprintf("%s.type", path),
 			Message:  "missing required field: type",
 			Severity: "error",
 		})
 	} else {
-		// Validate type is "directory"
-		if typeStr, ok := dirType.(string); ok {
-			if typeStr != "directory" {
-				result.Errors = append(result.Errors, ValidationError{
-					Field:    fmt.Sprintf("%s.type", path),
-					Value:    typeStr,
-					Message:  "type must be 'directory'",
-					Severity: "error",
-				})
-			}
-		} else {
-			result.Errors = append(result.Errors, ValidationError{
-				Field:    fmt.Sprintf("%s.type", path),
-				Message:  "type must be 'directory'",
-				Severity: "error",
-			})
-		}
+		sv.validateProjectDirectoryDirTypeV1(dirType, path, result)
+	}
+}
+
+// validateProjectDirectoryDirNameV1 validates project directory directory name
+func (sv *StructValidator) validateProjectDirectoryDirNameV1(name interface{}, path string, result *ValidationResult) {
+	nameStr, ok := name.(string)
+	if !ok {
+		result.Errors = append(result.Errors, ValidationError{
+			Field:    fmt.Sprintf("%s.name", path),
+			Message:  "name must be a string",
+			Severity: "error",
+		})
+		return
+	}
+
+	if nameStr == "" {
+		result.Errors = append(result.Errors, ValidationError{
+			Field:    fmt.Sprintf("%s.name", path),
+			Message:  "name cannot be empty",
+			Severity: "error",
+		})
+	}
+}
+
+// validateProjectDirectoryDirTypeV1 validates project directory directory type
+func (sv *StructValidator) validateProjectDirectoryDirTypeV1(dirType interface{}, path string, result *ValidationResult) {
+	typeStr, ok := dirType.(string)
+	if !ok {
+		result.Errors = append(result.Errors, ValidationError{
+			Field:    fmt.Sprintf("%s.type", path),
+			Message:  "type must be a string",
+			Severity: "error",
+		})
+		return
+	}
+
+	if typeStr != "directory" {
+		result.Errors = append(result.Errors, ValidationError{
+			Field:    fmt.Sprintf("%s.type", path),
+			Value:    typeStr,
+			Message:  "type must be 'directory'",
+			Severity: "error",
+		})
 	}
 }
 

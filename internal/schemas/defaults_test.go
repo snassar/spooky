@@ -49,8 +49,8 @@ func TestDefaultConfigGenerator(t *testing.T) {
 	if loggingDefaults.Output != "stderr" {
 		t.Errorf("Expected log output to be 'stderr', got '%s'", loggingDefaults.Output)
 	}
-	if loggingDefaults.FilePerms != "0644" {
-		t.Errorf("Expected file permissions to be '0644', got '%s'", loggingDefaults.FilePerms)
+	if loggingDefaults.FilePerms != "0o644" {
+		t.Errorf("Expected file permissions to be '0o644', got '%s'", loggingDefaults.FilePerms)
 	}
 	if !loggingDefaults.FileAppend {
 		t.Errorf("Expected file append to be true, got %t", loggingDefaults.FileAppend)

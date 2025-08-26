@@ -41,7 +41,7 @@ func NewProjectLogger(projectName string) (*ProjectLogger, error) {
 
 	// Create project-specific log directory
 	projectLogDir := filepath.Join(config.LogDir, "projects", projectName)
-	if err := os.MkdirAll(projectLogDir, 0755); err != nil {
+	if err := os.MkdirAll(projectLogDir, 0o755); err != nil {
 		return nil, errors.Wrapf(err, "failed to create project log directory: %s", projectLogDir)
 	}
 

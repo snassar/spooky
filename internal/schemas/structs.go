@@ -267,41 +267,30 @@ type ValidationRuleV1 struct {
 // PROJECT DIRECTORY SCHEMA STRUCTS
 // ============================================================================
 
-// ProjectDirectoryV1 represents project directory structure validation (version 1)
+// ProjectDirectoryV1 represents project directory structure validation
+// This validates the overall project directory structure and file organization
 type ProjectDirectoryV1 struct {
-	Name       string                   `json:"name" required:"true" description:"Project root directory name"`
-	File       []ProjectDirectoryFileV1 `json:"file" description:"Required and optional files"`
-	Directory  []ProjectDirectoryDirV1  `json:"directory" description:"Required and optional directories"`
-	Validation []ProjectDirectoryRuleV1 `json:"validation" description:"Directory validation rules"`
+	Name        string                   `json:"name" required:"true" description:"Project directory name"`
+	Files       []ProjectDirectoryFileV1 `json:"files" description:"Files in the project directory"`
+	Directories []ProjectDirectoryDirV1  `json:"directories" description:"Subdirectories in the project directory"`
 }
 
-// ProjectDirectoryFileV1 represents a file requirement in project directory
+// ProjectDirectoryFileV1 represents a file in the project directory
 type ProjectDirectoryFileV1 struct {
 	Name        string `json:"name" required:"true" description:"File name"`
 	Type        string `json:"type" required:"true" enum:"file" description:"Type (always 'file')"`
 	Required    bool   `json:"required" default:"false" description:"Whether this file is required"`
-	Description string `json:"description" description:"Description of the file's purpose"`
-	Validate    string `json:"validate" description:"Validation rule to apply to this file"`
-	Pattern     string `json:"pattern" description:"Regex pattern for file content validation"`
+	Description string `json:"description" description:"File description"`
+	Pattern     string `json:"pattern" description:"Expected content pattern"`
 }
 
-// ProjectDirectoryDirV1 represents a directory requirement in project directory
+// ProjectDirectoryDirV1 represents a directory in the project directory
 type ProjectDirectoryDirV1 struct {
 	Name        string `json:"name" required:"true" description:"Directory name"`
 	Type        string `json:"type" required:"true" enum:"directory" description:"Type (always 'directory')"`
 	Required    bool   `json:"required" default:"false" description:"Whether this directory is required"`
-	Description string `json:"description" description:"Description of the directory's purpose"`
-	Validate    string `json:"validate" description:"Validation rule to apply to this directory"`
-	Pattern     string `json:"pattern" description:"Regex pattern for directory content validation"`
-}
-
-// ProjectDirectoryRuleV1 represents a directory validation rule
-type ProjectDirectoryRuleV1 struct {
-	Name        string `json:"name" required:"true" description:"Rule name"`
-	Description string `json:"description" description:"Rule description"`
-	Type        string `json:"type" required:"true" enum:"file_exists,directory_exists,hcl_config,pattern_match" description:"Validation rule type"`
-	Pattern     string `json:"pattern" description:"Regex pattern for validation"`
-	Message     string `json:"message" description:"Validation error message"`
+	Description string `json:"description" description:"Directory description"`
+	Pattern     string `json:"pattern" description:"Expected file pattern in directory"`
 }
 
 // ============================================================================
@@ -359,7 +348,7 @@ type SpookyLoggingV1 struct {
 	Format     string `json:"format" default:"json" enum:"json,text,structured" description:"Log format"`
 	Output     string `json:"output" default:"stderr" enum:"stdout,stderr,file,null" description:"Log output destination"`
 	FilePath   string `json:"file_path" description:"Path to log file (required when output is 'file')"`
-	FilePerms  string `json:"file_permissions" default:"0644" pattern:"^[0-7]{3,4}$" description:"File permissions in octal format"`
+	FilePerms  string `json:"file_permissions" default:"0o644" pattern:"^[0-7]{3,4}$" description:"File permissions in octal format"`
 	FileAppend bool   `json:"file_append" default:"true" description:"Whether to append to existing file or truncate"`
 }
 
@@ -409,7 +398,7 @@ type LoggingV1 struct {
 
 	// File output configuration
 	FilePath        string `json:"file_path" description:"Path to log file (required when output is 'file')"`
-	FilePermissions string `json:"file_permissions" default:"0644" pattern:"^[0-7]{3,4}$" description:"File permissions in octal format"`
+	FilePermissions string `json:"file_permissions" default:"0o644" pattern:"^[0-7]{3,4}$" description:"File permissions in octal format"`
 	FileAppend      bool   `json:"file_append" default:"true" description:"Whether to append to existing file or truncate"`
 
 	// Structured logging configuration

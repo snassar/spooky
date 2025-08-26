@@ -139,12 +139,12 @@ func (tr *TemplateRenderer) RenderTemplateToFile(templatePath, outputPath string
 
 	// Create output directory if it doesn't exist
 	outputDir := filepath.Dir(outputPath)
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return errors.Wrapf(err, "failed to create output directory: %s", outputDir)
 	}
 
 	// Write the rendered content to file
-	if err := os.WriteFile(outputPath, []byte(rendered), 0644); err != nil {
+	if err := os.WriteFile(outputPath, []byte(rendered), 0o644); err != nil {
 		return errors.Wrapf(err, "failed to write rendered template to: %s", outputPath)
 	}
 

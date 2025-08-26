@@ -21,7 +21,7 @@ func TestMutagenSync(t *testing.T) {
 
 		// Create source file
 		sourceData := []byte("Hello, this is a new file for testing Mutagen sync!")
-		if err := os.WriteFile(sourcePath, sourceData, 0644); err != nil {
+		if err := os.WriteFile(sourcePath, sourceData, 0o644); err != nil {
 			t.Fatalf("Failed to create source file: %v", err)
 		}
 
@@ -58,10 +58,10 @@ func TestMutagenSync(t *testing.T) {
 
 		// Create identical files
 		data := []byte("This content is identical in both files.")
-		if err := os.WriteFile(sourcePath, data, 0644); err != nil {
+		if err := os.WriteFile(sourcePath, data, 0o644); err != nil {
 			t.Fatalf("Failed to create source file: %v", err)
 		}
-		if err := os.WriteFile(targetPath, data, 0644); err != nil {
+		if err := os.WriteFile(targetPath, data, 0o644); err != nil {
 			t.Fatalf("Failed to create target file: %v", err)
 		}
 
@@ -92,13 +92,13 @@ func TestMutagenSync(t *testing.T) {
 
 		// Create source file
 		sourceData := []byte("This is the source file with some content that will be modified slightly.")
-		if err := os.WriteFile(sourcePath, sourceData, 0644); err != nil {
+		if err := os.WriteFile(sourcePath, sourceData, 0o644); err != nil {
 			t.Fatalf("Failed to create source file: %v", err)
 		}
 
 		// Create target file with similar but different content
 		targetData := []byte("This is the target file with some content that will be modified differently.")
-		if err := os.WriteFile(targetPath, targetData, 0644); err != nil {
+		if err := os.WriteFile(targetPath, targetData, 0o644); err != nil {
 			t.Fatalf("Failed to create target file: %v", err)
 		}
 
@@ -142,7 +142,7 @@ func TestMutagenSync(t *testing.T) {
 		// Modify the source slightly
 		copy(sourceData[5000:5010], []byte("DIFFERENT!"))
 
-		if err := os.WriteFile(sourcePath, sourceData, 0644); err != nil {
+		if err := os.WriteFile(sourcePath, sourceData, 0o644); err != nil {
 			t.Fatalf("Failed to create source file: %v", err)
 		}
 
@@ -154,7 +154,7 @@ func TestMutagenSync(t *testing.T) {
 		// Different modification in target
 		copy(targetData[5000:5010], []byte("original!!"))
 
-		if err := os.WriteFile(targetPath, targetData, 0644); err != nil {
+		if err := os.WriteFile(targetPath, targetData, 0o644); err != nil {
 			t.Fatalf("Failed to create target file: %v", err)
 		}
 
@@ -206,7 +206,7 @@ func TestMutagenSync(t *testing.T) {
 
 		// Create source file
 		sourceData := []byte("This is a dry run test file.")
-		if err := os.WriteFile(sourcePath, sourceData, 0644); err != nil {
+		if err := os.WriteFile(sourcePath, sourceData, 0o644); err != nil {
 			t.Fatalf("Failed to create source file: %v", err)
 		}
 

@@ -61,7 +61,7 @@ func (m *MutagenSyncEngine) SyncFile(sourcePath, targetPath string, options *Syn
 
 		// Create target directory if it doesn't exist
 		targetDir := filepath.Dir(targetPath)
-		if err := os.MkdirAll(targetDir, 0755); err != nil {
+		if err := os.MkdirAll(targetDir, 0o755); err != nil {
 			result.Error = fmt.Errorf("failed to create target directory: %v", err)
 			return result, result.Error
 		}
