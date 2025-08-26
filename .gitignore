@@ -67,3 +67,6 @@ tools/*/pre-commit
 documentation/codeflow/
 documentation/research/
 documentation/schemafiles/
+
+# Testing directories
+testing/
