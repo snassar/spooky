@@ -1,6 +1,6 @@
-# test-schema-validation
+# test-syntax
 
-
+Testing HCL syntax
 
 ## Overview
 

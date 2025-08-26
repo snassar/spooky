@@ -1,6 +1,6 @@
-# test-schema-validation
+# test-enhanced-validation
 
-
+Testing enhanced validation rules
 
 ## Overview
 

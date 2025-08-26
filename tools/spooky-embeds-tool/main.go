@@ -106,7 +106,7 @@ var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Demonstrate default configuration functionality",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("⚙️  Default Configuration Demo:\n")
+		fmt.Println("⚙️  Default Configuration Demo:")
 
 		// Get embedded default config
 		embedder, err := utilities.NewFileEmbedder()

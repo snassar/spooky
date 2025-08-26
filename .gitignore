@@ -62,3 +62,8 @@ tools/*/pre-commit
 # Facts exports (facts are stored in memory during export operations)
 *.facts.json
 *.facts.hcl
+
+# Documentation directories
+documentation/codeflow/
+documentation/research/
+documentation/schemafiles/

@@ -106,7 +106,7 @@ var demoConfigCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Demonstrate configuration management functionality",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("⚙️  Starting configuration management demo...\n")
+		fmt.Println("⚙️  Starting configuration management demo...")
 
 		// Create config manager
 		configManager, err := utilities.NewConfigManager()
@@ -119,7 +119,7 @@ var demoConfigCmd = &cobra.Command{
 		fmt.Printf("   Config Directory: %s\n", configManager.GetConfigDir())
 		fmt.Printf("   Config File: %s\n\n", configManager.GetConfigPath())
 
-				// Show effective config info
+		// Show effective config info
 		effectiveInfo, err := configManager.GetEffectiveConfigInfo("")
 		if err != nil {
 			fmt.Printf("⚠️  Could not get effective config info: %v\n", err)
@@ -135,7 +135,7 @@ var demoConfigCmd = &cobra.Command{
 		// Check if user config exists
 		if configManager.ConfigExists() {
 			fmt.Println("✅ User configuration file exists")
-			
+
 			// Show user config info
 			info, err := configManager.GetConfigInfo()
 			if err != nil {
@@ -145,7 +145,7 @@ var demoConfigCmd = &cobra.Command{
 				fmt.Printf("   Size: %d bytes\n", info.Size)
 				fmt.Printf("   Modified: %s\n", info.ModTime)
 			}
-			
+
 			// Create backup
 			backupPath, err := configManager.BackupConfig()
 			if err != nil {
@@ -155,7 +155,7 @@ var demoConfigCmd = &cobra.Command{
 			}
 		} else {
 			fmt.Println("📝 No user configuration found - using embedded default")
-			
+
 			// Show that we can create a user config
 			fmt.Println("💡 You can create a user config with: spooky-demo config create")
 		}
@@ -184,7 +184,7 @@ var demoPathsCmd = &cobra.Command{
 	Use:   "paths",
 	Short: "Show OS-specific paths for spooky",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("🖥️  OS-specific paths for spooky:\n")
+		fmt.Println("🖥️  OS-specific paths for spooky:")
 
 		// Get OS info
 		osInfo, err := utilities.DetectOS()
@@ -224,14 +224,14 @@ var createConfigCmd = &cobra.Command{
 	Short: "Create a user configuration file from embedded default",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("📝 Creating user configuration from embedded default...")
-		
+
 		// Create config manager
 		configManager, err := utilities.NewConfigManager()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating config manager: %v\n", err)
 			os.Exit(1)
 		}
-		
+
 		// Check if user config already exists
 		if configManager.ConfigExists() {
 			fmt.Println("⚠️  User configuration already exists")
@@ -239,13 +239,13 @@ var createConfigCmd = &cobra.Command{
 			fmt.Println("💡 Use 'spooky-demo config backup' to backup first")
 			return
 		}
-		
+
 		// Create default config
 		if err := configManager.CreateDefaultConfig(); err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating default config: %v\n", err)
 			os.Exit(1)
 		}
-		
+
 		fmt.Println("✅ User configuration created!")
 		fmt.Printf("   Path: %s\n", configManager.GetConfigPath())
 		fmt.Println("💡 You can now edit this file to customize your settings")
@@ -257,28 +257,28 @@ var backupConfigCmd = &cobra.Command{
 	Short: "Create a backup of the current user configuration",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("💾 Creating configuration backup...")
-		
+
 		// Create config manager
 		configManager, err := utilities.NewConfigManager()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating config manager: %v\n", err)
 			os.Exit(1)
 		}
-		
+
 		// Check if user config exists
 		if !configManager.ConfigExists() {
 			fmt.Println("⚠️  No user configuration to backup")
 			fmt.Println("💡 Create one first with 'spooky-demo config create'")
 			return
 		}
-		
+
 		// Create backup
 		backupPath, err := configManager.BackupConfig()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating backup: %v\n", err)
 			os.Exit(1)
 		}
-		
+
 		fmt.Println("✅ Configuration backup created!")
 		fmt.Printf("   Backup: %s\n", backupPath)
 	},
@@ -291,14 +291,14 @@ var testCustomConfigCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		customConfigFile := args[0]
 		fmt.Printf("🧪 Testing custom configuration: %s\n\n", customConfigFile)
-		
+
 		// Create config manager
 		configManager, err := utilities.NewConfigManager()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating config manager: %v\n", err)
 			os.Exit(1)
 		}
-		
+
 		// Show effective config info with custom file
 		effectiveInfo, err := configManager.GetEffectiveConfigInfo(customConfigFile)
 		if err != nil {
@@ -312,14 +312,14 @@ var testCustomConfigCmd = &cobra.Command{
 				fmt.Printf("   Modified: %s\n", effectiveInfo.ModTime)
 			}
 		}
-		
+
 		// Validate custom config
 		if err := configManager.ValidateConfig(customConfigFile); err != nil {
 			fmt.Printf("⚠️  Custom config validation failed: %v\n", err)
 		} else {
 			fmt.Println("✅ Custom configuration is valid!")
 		}
-		
+
 		// Show config priority
 		fmt.Printf("\n📋 Configuration Priority:\n")
 		fmt.Printf("   1. Custom config file (--config flag)\n")
