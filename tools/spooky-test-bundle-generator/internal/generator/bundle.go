@@ -381,21 +381,21 @@ func (bg *BundleGenerator) generateVariablesHCL(profile *profiles.Profile, proje
 	var content strings.Builder
 	content.WriteString("variables {\n")
 
-	if profile.Project.Variables.TestType != "" {
-		content.WriteString(fmt.Sprintf("  test_type = \"%s\"\n", profile.Project.Variables.TestType))
+	if profile.Project.Variables.TestType != nil {
+		content.WriteString(fmt.Sprintf("  test_type = \"%s\"\n", *profile.Project.Variables.TestType))
 	}
 
-	if len(profile.Project.Variables.OSList) > 0 {
+	if profile.Project.Variables.OSList != nil && len(*profile.Project.Variables.OSList) > 0 {
 		content.WriteString("  os_list = [\n")
-		for _, os := range profile.Project.Variables.OSList {
+		for _, os := range *profile.Project.Variables.OSList {
 			content.WriteString(fmt.Sprintf("    \"%s\",\n", os))
 		}
 		content.WriteString("  ]\n")
 	}
 
-	if len(profile.Project.Variables.ExpectedFacts) > 0 {
+	if profile.Project.Variables.ExpectedFacts != nil && len(*profile.Project.Variables.ExpectedFacts) > 0 {
 		content.WriteString("  expected_facts = [\n")
-		for _, fact := range profile.Project.Variables.ExpectedFacts {
+		for _, fact := range *profile.Project.Variables.ExpectedFacts {
 			content.WriteString(fmt.Sprintf("    \"%s\",\n", fact))
 		}
 		content.WriteString("  ]\n")
@@ -435,9 +435,9 @@ func (bg *BundleGenerator) generateVariablesHCL(profile *profiles.Profile, proje
 	if profile.Project.Variables.SyncMode != nil {
 		content.WriteString(fmt.Sprintf("  sync_mode = \"%s\"\n", *profile.Project.Variables.SyncMode))
 	}
-	if len(profile.Project.Variables.IgnorePatterns) > 0 {
+	if profile.Project.Variables.IgnorePatterns != nil && len(*profile.Project.Variables.IgnorePatterns) > 0 {
 		content.WriteString("  ignore_patterns = [\n")
-		for _, pattern := range profile.Project.Variables.IgnorePatterns {
+		for _, pattern := range *profile.Project.Variables.IgnorePatterns {
 			content.WriteString(fmt.Sprintf("    \"%s\",\n", pattern))
 		}
 		content.WriteString("  ]\n")
@@ -654,8 +654,8 @@ test: setup-network build start
     #!/usr/bin/env bash
     echo "Running Spooky tests..."
     cd spooky-project
-    spooky facts --machines machines.hcl
-    spooky actions --machines machines.hcl --actions actions.hcl
+    ../../spooky facts --machines machines.hcl
+    ../../spooky actions --machines machines.hcl --actions actions.hcl
 
 # Show container status
 status:
@@ -783,13 +783,13 @@ func (bg *BundleGenerator) generateReadme(profile *profiles.Profile, outputPath 
 	content.WriteString("```bash\n")
 	content.WriteString("cd spooky-project\n\n")
 	content.WriteString("# Gather facts from all machines\n")
-	content.WriteString("spooky facts --machines machines.hcl\n\n")
+	content.WriteString("../../spooky facts --machines machines.hcl\n\n")
 	content.WriteString("# Run specific actions\n")
-	content.WriteString("spooky actions --machines machines.hcl --actions actions.hcl\n\n")
+	content.WriteString("../../spooky actions --machines machines.hcl --actions actions.hcl\n\n")
 	content.WriteString("# Test specific functionality\n")
-	content.WriteString("spooky facts --machines machines.hcl --enhanced\n")
-	content.WriteString("spooky template --render-all\n")
-	content.WriteString("spooky sync --start\n")
+	content.WriteString("../../spooky facts --machines machines.hcl --enhanced\n")
+	content.WriteString("../../spooky template --render-all\n")
+	content.WriteString("../../spooky sync --start\n")
 	content.WriteString("```\n\n")
 
 	content.WriteString("## Troubleshooting\n\n")
@@ -805,8 +805,8 @@ func (bg *BundleGenerator) generateReadme(profile *profiles.Profile, outputPath 
 
 	content.WriteString("### Spooky Command Failures\n")
 	content.WriteString("1. Verify all containers are running: `just status`\n")
-	content.WriteString("2. Check machine connectivity: `spooky facts --machines machines.hcl --debug`\n")
-	content.WriteString("3. Review action logs: `spooky actions --machines machines.hcl --actions actions.hcl --verbose`\n\n")
+	content.WriteString("2. Check machine connectivity: `../../spooky facts --machines machines.hcl --debug`\n")
+	content.WriteString("3. Review action logs: `../../spooky actions --machines machines.hcl --actions actions.hcl --verbose`\n\n")
 
 	content.WriteString("## Cleanup\n\n")
 	content.WriteString("To completely clean up all test artifacts:\n\n")
@@ -822,7 +822,11 @@ func (bg *BundleGenerator) generateReadme(profile *profiles.Profile, outputPath 
 	content.WriteString(fmt.Sprintf("- **Profile Name**: %s\n", profile.Name))
 	content.WriteString(fmt.Sprintf("- **Description**: %s\n", profile.Description))
 	content.WriteString("- **Generated**: 2025-01-27\n")
-	content.WriteString(fmt.Sprintf("- **Test Type**: %s\n\n", profile.Project.Variables.TestType))
+	if profile.Project.Variables.TestType != nil {
+		content.WriteString(fmt.Sprintf("- **Test Type**: %s\n\n", *profile.Project.Variables.TestType))
+	} else {
+		content.WriteString("- **Test Type**: Not specified\n\n")
+	}
 
 	content.WriteString("## License\n\n")
 	content.WriteString("This test bundle is part of the Spooky project testing infrastructure.\n")
@@ -834,20 +838,22 @@ func (bg *BundleGenerator) generateReadme(profile *profiles.Profile, outputPath 
 func (bg *BundleGenerator) validateGeneratedProject(outputPath string) error {
 	fmt.Println("🔍 Validating generated project...")
 
-	// Check if spooky binary exists
-	spookyPath := filepath.Join(outputPath, "spooky")
+	// Get the current working directory (where the generator is running from)
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	// Look for spooky binary in the generator directory
+	spookyPath := filepath.Join(currentDir, "spooky")
 	if _, err := os.Stat(spookyPath); os.IsNotExist(err) {
-		// Try to find spooky in parent directories
-		spookyPath = filepath.Join(outputPath, "..", "..", "spooky")
-		if _, err := os.Stat(spookyPath); os.IsNotExist(err) {
-			return fmt.Errorf("spooky binary not found. Please build it first: go build -o spooky ../../main.go")
-		}
+		return fmt.Errorf("spooky binary not found at %s. Please build it first: just build-spooky-test-bundle-generator", spookyPath)
 	}
 
 	// Validate the project configuration
 	projectDir := filepath.Join(outputPath, "spooky-project")
-	cmd := exec.Command(spookyPath, "validate", "--project", projectDir)
-	cmd.Dir = projectDir
+	cmd := exec.Command(spookyPath, "project", "validate", projectDir)
+	// Don't change working directory - run from current directory
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
