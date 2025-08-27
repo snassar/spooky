@@ -136,6 +136,63 @@ clean-tests:
     mkdir -p testing
     echo "✅ Test projects cleaned"
 
+# Multi-stage build for spooky-test-bundle-generator
+build-spooky-test-bundle-generator:
+    #!/usr/bin/env bash
+    echo "🔨 Building spooky-test-bundle-generator..."
+    
+    # Stage 1: Build spooky binary for bundle generator
+    echo "📦 Stage 1: Building spooky binary..."
+    go build -o tools/spooky-test-bundle-generator/spooky main.go
+    if [ $? -ne 0 ]; then
+        echo "❌ Failed to build spooky binary"
+        exit 1
+    fi
+    echo "✅ Spooky binary built"
+    
+    # Stage 2: Build bundle generator
+    echo "📦 Stage 2: Building bundle generator..."
+    cd tools/spooky-test-bundle-generator
+    go build -o spooky-test-bundle-generator main.go
+    if [ $? -ne 0 ]; then
+        echo "❌ Failed to build bundle generator"
+        exit 1
+    fi
+    echo "✅ Bundle generator built"
+    
+    echo "🎉 Multi-stage build completed successfully!"
+    echo "📁 Output: tools/spooky-test-bundle-generator/spooky-test-bundle-generator"
+
+# Alternative: Separate stages for more control
+build-spooky-for-bundles:
+    #!/usr/bin/env bash
+    echo "🔨 Building spooky binary for bundle generator..."
+    go build -o tools/spooky-test-bundle-generator/spooky main.go
+    echo "✅ Spooky binary built"
+
+build-bundle-generator: build-spooky-for-bundles
+    #!/usr/bin/env bash
+    echo "🔨 Building bundle generator..."
+    cd tools/spooky-test-bundle-generator
+    go build -o spooky-test-bundle-generator main.go
+    echo "✅ Bundle generator built"
+
+# Run bundle generator
+run-bundle-generator profile output: build-spooky-test-bundle-generator
+    #!/usr/bin/env bash
+    echo "🔧 Running bundle generator..."
+    cd tools/spooky-test-bundle-generator
+    ./spooky-test-bundle-generator generate --profile {{profile}} --output {{output}}
+    echo "✅ Bundle generated: {{output}}"
+
+# Clean bundle generator artifacts
+clean-bundle-generator:
+    #!/usr/bin/env bash
+    echo "🧹 Cleaning bundle generator artifacts..."
+    rm -f tools/spooky-test-bundle-generator/spooky
+    rm -f tools/spooky-test-bundle-generator/spooky-test-bundle-generator
+    echo "✅ Cleanup completed"
+
 # Show project statistics
 stats:
     #!/usr/bin/env bash
