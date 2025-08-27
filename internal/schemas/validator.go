@@ -1790,22 +1790,177 @@ func (v *Validator) validateFactsV1(content map[string]interface{}, result *Vali
 	}
 }
 
-// validateFactsBlockV1 validates the facts block contents against V1 schema
+// validateFactsBlockV1 validates the hierarchical facts block contents against V1 schema
 func (v *Validator) validateFactsBlockV1(facts map[string]interface{}, result *ValidationResult) {
-	// Required fields
-	if name, exists := facts["name"]; !exists {
-		result.Errors = append(result.Errors, ValidationError{
-			Field:    "facts.name",
-			Message:  "missing required field: name",
-			Severity: "error",
-		})
-	} else {
-		v.validateFactNameV1(name, result)
+	// Validate basic_facts if present
+	if basicFacts, exists := facts["basic_facts"]; exists {
+		if basicFactsMap, ok := basicFacts.(map[string]interface{}); ok {
+			v.validateBasicFactsV1(basicFactsMap, result)
+		} else {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:    "facts.basic_facts",
+				Message:  "basic_facts must be a configuration block",
+				Severity: "error",
+			})
+		}
 	}
 
-	if value, exists := facts["value"]; !exists {
+	// Validate enhanced_facts if present
+	if enhancedFacts, exists := facts["enhanced_facts"]; exists {
+		if enhancedFactsMap, ok := enhancedFacts.(map[string]interface{}); ok {
+			v.validateEnhancedFactsV1(enhancedFactsMap, result)
+		} else {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:    "facts.enhanced_facts",
+				Message:  "enhanced_facts must be a configuration block",
+				Severity: "error",
+			})
+		}
+	}
+
+	// Validate custom_facts if present
+	if customFacts, exists := facts["custom_facts"]; exists {
+		if customFactsMap, ok := customFacts.(map[string]interface{}); ok {
+			v.validateCustomFactsV1(customFactsMap, result)
+		} else {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:    "facts.custom_facts",
+				Message:  "custom_facts must be a configuration block",
+				Severity: "error",
+			})
+		}
+	}
+}
+
+// validateBasicFactsV1 validates basic facts gathered via SSH commands
+func (v *Validator) validateBasicFactsV1(basicFacts map[string]interface{}, result *ValidationResult) {
+	// Validate each fact category
+	if systemFacts, exists := basicFacts["system_facts"]; exists {
+		if systemFactsMap, ok := systemFacts.(map[string]interface{}); ok {
+			if facts, exists := systemFactsMap["facts"]; exists {
+				if factsMap, ok := facts.(map[string]interface{}); ok {
+					for factName, factData := range factsMap {
+						if factMap, ok := factData.(map[string]interface{}); ok {
+							v.validateIndividualFactV1(factName, factMap, result, "basic_facts.system_facts")
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if hardwareFacts, exists := basicFacts["hardware_facts"]; exists {
+		if hardwareFactsMap, ok := hardwareFacts.(map[string]interface{}); ok {
+			if facts, exists := hardwareFactsMap["facts"]; exists {
+				if factsMap, ok := facts.(map[string]interface{}); ok {
+					for factName, factData := range factsMap {
+						if factMap, ok := factData.(map[string]interface{}); ok {
+							v.validateIndividualFactV1(factName, factMap, result, "basic_facts.hardware_facts")
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if networkFacts, exists := basicFacts["network_facts"]; exists {
+		if networkFactsMap, ok := networkFacts.(map[string]interface{}); ok {
+			if facts, exists := networkFactsMap["facts"]; exists {
+				if factsMap, ok := facts.(map[string]interface{}); ok {
+					for factName, factData := range factsMap {
+						if factMap, ok := factData.(map[string]interface{}); ok {
+							v.validateIndividualFactV1(factName, factMap, result, "basic_facts.network_facts")
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if osFacts, exists := basicFacts["os_facts"]; exists {
+		if osFactsMap, ok := osFacts.(map[string]interface{}); ok {
+			if facts, exists := osFactsMap["facts"]; exists {
+				if factsMap, ok := facts.(map[string]interface{}); ok {
+					for factName, factData := range factsMap {
+						if factMap, ok := factData.(map[string]interface{}); ok {
+							v.validateIndividualFactV1(factName, factMap, result, "basic_facts.os_facts")
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if userFacts, exists := basicFacts["user_facts"]; exists {
+		if userFactsMap, ok := userFacts.(map[string]interface{}); ok {
+			if facts, exists := userFactsMap["facts"]; exists {
+				if factsMap, ok := facts.(map[string]interface{}); ok {
+					for factName, factData := range factsMap {
+						if factMap, ok := factData.(map[string]interface{}); ok {
+							v.validateIndividualFactV1(factName, factMap, result, "basic_facts.user_facts")
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if runtimeFacts, exists := basicFacts["runtime_facts"]; exists {
+		if runtimeFactsMap, ok := runtimeFacts.(map[string]interface{}); ok {
+			if facts, exists := runtimeFactsMap["facts"]; exists {
+				if factsMap, ok := facts.(map[string]interface{}); ok {
+					for factName, factData := range factsMap {
+						if factMap, ok := factData.(map[string]interface{}); ok {
+							v.validateIndividualFactV1(factName, factMap, result, "basic_facts.runtime_facts")
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// validateEnhancedFactsV1 validates enhanced facts gathered by spooky-facts
+func (v *Validator) validateEnhancedFactsV1(enhancedFacts map[string]interface{}, result *ValidationResult) {
+	// Validate individual facts
+	for factName, factData := range enhancedFacts {
+		if factMap, ok := factData.(map[string]interface{}); ok {
+			v.validateIndividualFactV1(factName, factMap, result, "enhanced_facts")
+		} else {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:    fmt.Sprintf("facts.enhanced_facts.%s", factName),
+				Message:  "fact must be a configuration block",
+				Severity: "error",
+			})
+		}
+	}
+}
+
+// validateCustomFactsV1 validates custom facts (including age-encrypted ones)
+func (v *Validator) validateCustomFactsV1(customFacts map[string]interface{}, result *ValidationResult) {
+	// Validate individual facts
+	for factName, factData := range customFacts {
+		if factMap, ok := factData.(map[string]interface{}); ok {
+			v.validateIndividualFactV1(factName, factMap, result, "custom_facts")
+		} else {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:    fmt.Sprintf("facts.custom_facts.%s", factName),
+				Message:  "fact must be a configuration block",
+				Severity: "error",
+			})
+		}
+	}
+}
+
+// validateIndividualFactV1 validates a single fact block
+func (v *Validator) validateIndividualFactV1(factName string, fact map[string]interface{}, result *ValidationResult, context string) {
+	// Validate fact name (from block label)
+	v.validateFactNameV1(factName, result)
+
+	// Required fields
+	if value, exists := fact["value"]; !exists {
 		result.Errors = append(result.Errors, ValidationError{
-			Field:    "facts.value",
+			Field:    fmt.Sprintf("facts.%s.%s.value", context, factName),
 			Message:  "missing required field: value",
 			Severity: "error",
 		})
@@ -1813,21 +1968,56 @@ func (v *Validator) validateFactsBlockV1(facts map[string]interface{}, result *V
 		// Value can be any type, just ensure it's not nil
 		if value == nil {
 			result.Errors = append(result.Errors, ValidationError{
-				Field:    "facts.value",
+				Field:    fmt.Sprintf("facts.%s.%s.value", context, factName),
 				Message:  "value cannot be null",
 				Severity: "error",
 			})
 		}
 	}
 
-	if factType, exists := facts["type"]; !exists {
+	if factType, exists := fact["type"]; !exists {
 		result.Errors = append(result.Errors, ValidationError{
-			Field:    "facts.type",
+			Field:    fmt.Sprintf("facts.%s.%s.type", context, factName),
 			Message:  "missing required field: type",
 			Severity: "error",
 		})
 	} else {
 		v.validateFactTypeV1(factType, result)
+	}
+
+	// Optional fields
+	if encrypted, exists := fact["encrypted"]; exists {
+		if _, ok := encrypted.(bool); !ok {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:    fmt.Sprintf("facts.%s.%s.encrypted", context, factName),
+				Message:  "encrypted must be a boolean",
+				Severity: "error",
+			})
+		}
+	}
+
+	// Validate encrypted_value if present
+	if encryptedValue, exists := fact["encrypted_value"]; exists {
+		if encryptedValueMap, ok := encryptedValue.(map[string]interface{}); ok {
+			v.validateEncryptedValueV1(encryptedValueMap, result, fmt.Sprintf("facts.%s.%s.encrypted_value", context, factName))
+		} else {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:    fmt.Sprintf("facts.%s.%s.encrypted_value", context, factName),
+				Message:  "encrypted_value must be a configuration block",
+				Severity: "error",
+			})
+		}
+	}
+
+	// Validate sensitive flag if present
+	if sensitive, exists := fact["sensitive"]; exists {
+		if _, ok := sensitive.(bool); !ok {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:    fmt.Sprintf("facts.%s.%s.sensitive", context, factName),
+				Message:  "sensitive must be a boolean",
+				Severity: "error",
+			})
+		}
 	}
 }
 
@@ -2105,6 +2295,87 @@ func (v *Validator) validateFactTypeV1(factType interface{}, result *ValidationR
 			Message:  fmt.Sprintf("type must be one of: %s", strings.Join(validTypes, ", ")),
 			Severity: "error",
 		})
+	}
+}
+
+// validateEncryptedValueV1 validates an encrypted value structure
+func (v *Validator) validateEncryptedValueV1(encryptedValue map[string]interface{}, result *ValidationResult, context string) {
+	// Validate data field (required)
+	if data, exists := encryptedValue["data"]; !exists {
+		result.Errors = append(result.Errors, ValidationError{
+			Field:    fmt.Sprintf("%s.data", context),
+			Message:  "missing required field: data",
+			Severity: "error",
+		})
+	} else {
+		if dataStr, ok := data.(string); !ok || dataStr == "" {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:    fmt.Sprintf("%s.data", context),
+				Message:  "data must be a non-empty string",
+				Severity: "error",
+			})
+		}
+	}
+
+	// Validate format field (optional, defaults to "base64")
+	if format, exists := encryptedValue["format"]; exists {
+		if formatStr, ok := format.(string); !ok {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:    fmt.Sprintf("%s.format", context),
+				Message:  "format must be a string",
+				Severity: "error",
+			})
+		} else {
+			validFormats := []string{"base64", "armored", "compact"}
+			valid := false
+			for _, validFormat := range validFormats {
+				if formatStr == validFormat {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				result.Errors = append(result.Errors, ValidationError{
+					Field:    fmt.Sprintf("%s.format", context),
+					Value:    formatStr,
+					Message:  "format must be one of: base64, armored, compact",
+					Severity: "error",
+				})
+			}
+		}
+	}
+
+	// Validate algorithm field (optional, defaults to "age")
+	if algorithm, exists := encryptedValue["algorithm"]; exists {
+		if algorithmStr, ok := algorithm.(string); !ok || algorithmStr == "" {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:    fmt.Sprintf("%s.algorithm", context),
+				Message:  "algorithm must be a non-empty string",
+				Severity: "error",
+			})
+		}
+	}
+
+	// Validate version field (optional, defaults to "v1")
+	if version, exists := encryptedValue["version"]; exists {
+		if versionStr, ok := version.(string); !ok || versionStr == "" {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:    fmt.Sprintf("%s.version", context),
+				Message:  "version must be a non-empty string",
+				Severity: "error",
+			})
+		}
+	}
+
+	// Validate encrypted_at field (optional)
+	if encryptedAt, exists := encryptedValue["encrypted_at"]; exists {
+		if encryptedAtStr, ok := encryptedAt.(string); !ok || encryptedAtStr == "" {
+			result.Errors = append(result.Errors, ValidationError{
+				Field:    fmt.Sprintf("%s.encrypted_at", context),
+				Message:  "encrypted_at must be a non-empty string",
+				Severity: "error",
+			})
+		}
 	}
 }
 

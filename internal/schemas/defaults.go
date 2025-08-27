@@ -153,7 +153,16 @@ func (dcg *DefaultConfigGenerator) GetDefaultLoggingConfig() *LoggingV1 {
 // GetDefaultFactsConfig returns a default FactsV1 configuration
 func (dcg *DefaultConfigGenerator) GetDefaultFactsConfig() *FactsV1 {
 	return &FactsV1{
-		Encrypted: dcg.extractBoolDefault(reflect.TypeOf(FactsV1{}).Field(3), false),
+		BasicFacts: &BasicFactsV1{
+			SystemFacts:   &SystemFactsV1{Facts: make(map[string]*FactV1)},
+			HardwareFacts: &HardwareFactsV1{Facts: make(map[string]*FactV1)},
+			NetworkFacts:  &NetworkFactsV1{Facts: make(map[string]*FactV1)},
+			OSFacts:       &OSFactsV1{Facts: make(map[string]*FactV1)},
+			UserFacts:     &UserFactsV1{Facts: make(map[string]*FactV1)},
+			RuntimeFacts:  &RuntimeFactsV1{Facts: make(map[string]*FactV1)},
+		},
+		EnhancedFacts: &EnhancedFactsV1{Facts: make(map[string]*FactV1)},
+		CustomFacts:   &CustomFactsV1{Facts: make(map[string]*FactV1)},
 	}
 }
 
@@ -255,6 +264,11 @@ func (dcg *DefaultConfigGenerator) structToCty(config interface{}) (cty.Value, e
 			continue
 		}
 
+		// Handle comma-separated JSON tags (e.g., "basic_facts,omitempty")
+		if commaIndex := strings.Index(jsonTag, ","); commaIndex != -1 {
+			jsonTag = jsonTag[:commaIndex]
+		}
+
 		// Convert field value to cty.Value
 		ctyVal, err := dcg.fieldToCty(field)
 		if err != nil {
@@ -272,10 +286,20 @@ func (dcg *DefaultConfigGenerator) structToCty(config interface{}) (cty.Value, e
 // fieldToCty converts a struct field to cty.Value
 func (dcg *DefaultConfigGenerator) fieldToCty(field reflect.Value) (cty.Value, error) {
 	switch field.Kind() {
+	case reflect.Ptr:
+		// Handle pointers
+		if field.IsNil() {
+			return cty.NilVal, nil
+		}
+		return dcg.fieldToCty(field.Elem())
 	case reflect.String:
 		return cty.StringVal(field.String()), nil
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return cty.NumberIntVal(field.Int()), nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return cty.NumberUIntVal(field.Uint()), nil
+	case reflect.Float32, reflect.Float64:
+		return cty.NumberFloatVal(field.Float()), nil
 	case reflect.Bool:
 		return cty.BoolVal(field.Bool()), nil
 	case reflect.Struct:
@@ -321,7 +345,17 @@ func (dcg *DefaultConfigGenerator) fieldToCty(field reflect.Value) (cty.Value, e
 			}
 			valueMap[key.String()] = ctyVal
 		}
+		// Create a map with dynamic type to allow mixed value types
 		return cty.MapVal(valueMap), nil
+	case reflect.Interface:
+		// Handle interface{} types
+		if field.IsNil() {
+			return cty.NilVal, nil
+		}
+
+		// Get the concrete value
+		concreteValue := field.Elem()
+		return dcg.fieldToCty(concreteValue)
 	default:
 		return cty.NilVal, fmt.Errorf("unsupported field type: %s", field.Kind())
 	}

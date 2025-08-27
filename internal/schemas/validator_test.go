@@ -429,9 +429,12 @@ func TestValidator_FactsV1Validation(t *testing.T) {
 	// Test valid facts
 	validFacts := map[string]interface{}{
 		"facts": map[string]interface{}{
-			"name":  "test-fact",
-			"value": "test-value",
-			"type":  "string",
+			"basic_facts": map[string]interface{}{
+				"test-fact": map[string]interface{}{
+					"value": "test-value",
+					"type":  "string",
+				},
+			},
 		},
 	}
 
@@ -443,8 +446,11 @@ func TestValidator_FactsV1Validation(t *testing.T) {
 	// Test invalid facts (missing required fields)
 	invalidFacts := map[string]interface{}{
 		"facts": map[string]interface{}{
-			"name": "test-fact",
-			// Missing value and type
+			"basic_facts": map[string]interface{}{
+				"test-fact": map[string]interface{}{
+					// Missing value and type
+				},
+			},
 		},
 	}
 
@@ -459,9 +465,12 @@ func TestValidator_FactsV1Validation(t *testing.T) {
 	// Test invalid fact name
 	invalidNameFacts := map[string]interface{}{
 		"facts": map[string]interface{}{
-			"name":  "invalid@name",
-			"value": "test-value",
-			"type":  "string",
+			"basic_facts": map[string]interface{}{
+				"invalid@name": map[string]interface{}{
+					"value": "test-value",
+					"type":  "string",
+				},
+			},
 		},
 	}
 
@@ -476,9 +485,12 @@ func TestValidator_FactsV1Validation(t *testing.T) {
 	// Test invalid fact type
 	invalidTypeFacts := map[string]interface{}{
 		"facts": map[string]interface{}{
-			"name":  "test-fact",
-			"value": "test-value",
-			"type":  "invalid-type",
+			"basic_facts": map[string]interface{}{
+				"test-fact": map[string]interface{}{
+					"value": "test-value",
+					"type":  "invalid-type",
+				},
+			},
 		},
 	}
 
@@ -493,9 +505,12 @@ func TestValidator_FactsV1Validation(t *testing.T) {
 	// Test null value
 	nullValueFacts := map[string]interface{}{
 		"facts": map[string]interface{}{
-			"name":  "test-fact",
-			"value": nil,
-			"type":  "string",
+			"basic_facts": map[string]interface{}{
+				"test-fact": map[string]interface{}{
+					"value": nil,
+					"type":  "string",
+				},
+			},
 		},
 	}
 
@@ -505,6 +520,32 @@ func TestValidator_FactsV1Validation(t *testing.T) {
 	}
 	if len(result.Errors) == 0 {
 		t.Error("Expected validation errors for null value")
+	}
+
+	// Test encrypted fact with encrypted_value
+	encryptedFacts := map[string]interface{}{
+		"facts": map[string]interface{}{
+			"custom_facts": map[string]interface{}{
+				"secret-fact": map[string]interface{}{
+					"value":     "secret-value",
+					"type":      "string",
+					"encrypted": true,
+					"encrypted_value": map[string]interface{}{
+						"data":         "encrypted-data-here",
+						"format":       "base64",
+						"algorithm":    "age",
+						"version":      "v1",
+						"encrypted_at": "2023-01-01T00:00:00Z",
+					},
+					"sensitive": true,
+				},
+			},
+		},
+	}
+
+	result = validator.ValidateData("facts", encryptedFacts)
+	if !result.IsValid {
+		t.Errorf("Expected valid encrypted facts, got errors: %v", result.Errors)
 	}
 }
 

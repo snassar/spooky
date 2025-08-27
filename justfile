@@ -88,6 +88,46 @@ test-project name:
     ../build/spooky project init --name {{name}} --description "Test project for {{name}}" {{name}}
     echo "✅ Test project created: testing/{{name}}"
 
+build-facts:
+    #!/usr/bin/env bash
+    echo "🔧 Building spooky-facts gatherer..."
+    cd tools/spooky-facts-gatherer
+    go build -o spooky-facts .
+    echo "✅ Facts gatherer built: tools/spooky-facts-gatherer/spooky-facts"
+
+test-facts:
+    #!/usr/bin/env bash
+    echo "🧪 Testing facts gatherer..."
+    cd tools/spooky-facts-gatherer
+    ./spooky-facts preview
+    echo "✅ Facts gatherer test completed"
+
+gather-facts:
+    #!/usr/bin/env bash
+    echo "🔍 Gathering system facts..."
+    cd tools/spooky-facts-gatherer
+    ./spooky-facts gather
+    echo "✅ Facts gathered and saved"
+
+gather-facts-verbose:
+	#!/usr/bin/env bash
+	echo "🔍 Gathering system facts (verbose mode)..."
+	cd tools/spooky-facts-gatherer
+	./spooky-facts gather --verbose
+	echo "✅ Facts gathered and saved"
+
+# Gather facts from remote machines
+gather-remote-facts:
+	#!/usr/bin/env bash
+	echo "🌐 Gathering facts from remote machines..."
+	./build/spooky facts gather
+
+# Gather facts from remote machines with custom output
+gather-remote-facts-to output:
+	#!/usr/bin/env bash
+	echo "🌐 Gathering facts from remote machines..."
+	./build/spooky facts gather {{output}}
+
 # Clean test projects
 clean-tests:
     #!/usr/bin/env bash

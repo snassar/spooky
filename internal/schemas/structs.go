@@ -391,24 +391,91 @@ type SpookyLoggingV1 struct {
 // FACTS SCHEMA STRUCTS
 // ============================================================================
 
-// FactsV1 represents facts configuration (version 1)
-// Based on documentation/schemafiles/structure/facts.hcl
+// FactsV1 represents the hierarchical facts structure (version 1)
+// Structure: facts { basic_facts {} enhanced_facts {} custom_facts {} }
 type FactsV1 struct {
-	Name               string                     `json:"name" required:"true" pattern:"^[a-zA-Z0-9_.-]+$" min_length:"1" max_length:"128" description:"Name of the fact"`
-	Value              interface{}                `json:"value" required:"true" description:"Value of the fact - can be string, number, boolean, object, or age-encrypted string"`
-	Type               string                     `json:"type" required:"true" enum:"string,number,boolean,object,array,encrypted" description:"Type of the fact value"`
-	Encrypted          bool                       `json:"encrypted" default:"false" description:"Whether the fact value is age-encrypted"`
-	EncryptionMetadata *FactsEncryptionMetadataV1 `json:"encryption_metadata,omitempty" description:"Age encryption metadata - only present when encrypted = true"`
-	Description        string                     `json:"description" max_length:"256" description:"Description of the fact"`
-	Tags               []string                   `json:"tags" max_items:"10" description:"Tags for categorizing facts"`
-	Metadata           *FactsMetadataV1           `json:"metadata,omitempty" description:"Additional metadata for the fact"`
+	BasicFacts    *BasicFactsV1    `json:"basic_facts,omitempty" description:"Facts gathered by normal commands run via SSH"`
+	EnhancedFacts *EnhancedFactsV1 `json:"enhanced_facts,omitempty" description:"Facts gathered from /etc/spooky/facts.hcl via spooky-facts"`
+	CustomFacts   *CustomFactsV1   `json:"custom_facts,omitempty" description:"Facts gathered from /etc/spooky/custom.hcl (may contain age-encrypted facts)"`
 }
 
-// FactsEncryptionMetadataV1 represents age encryption metadata for facts
-type FactsEncryptionMetadataV1 struct {
-	Recipients  []string `json:"recipients" required:"true" description:"List of age public keys that can decrypt this value"`
-	EncryptedAt string   `json:"encrypted_at" description:"ISO 8601 timestamp when the value was encrypted"`
-	Method      string   `json:"method" default:"age" description:"Encryption method used"`
+// BasicFactsV1 represents facts gathered by normal SSH commands
+// Organized into logical categories matching Ansible's fact structure
+type BasicFactsV1 struct {
+	// System & Architecture Facts
+	SystemFacts *SystemFactsV1 `json:"system_facts,omitempty" description:"System architecture, kernel, hostname, domain, virtualization"`
+
+	// Hardware Facts
+	HardwareFacts *HardwareFactsV1 `json:"hardware_facts,omitempty" description:"CPU, memory, storage, BIOS, hardware details"`
+
+	// Network Facts
+	NetworkFacts *NetworkFactsV1 `json:"network_facts,omitempty" description:"Network interfaces, IP addresses, DNS, SSH keys"`
+
+	// Operating System Facts
+	OSFacts *OSFactsV1 `json:"os_facts,omitempty" description:"Distribution, package manager, security modules, services"`
+
+	// User & Environment Facts
+	UserFacts *UserFactsV1 `json:"user_facts,omitempty" description:"Current user, environment variables, permissions"`
+
+	// Runtime Facts
+	RuntimeFacts *RuntimeFactsV1 `json:"runtime_facts,omitempty" description:"Python, time, uptime, command line"`
+}
+
+// ============================================================================
+// BASIC FACTS CATEGORY STRUCTS
+// ============================================================================
+
+// SystemFactsV1 represents system and architecture facts
+type SystemFactsV1 struct {
+	Facts map[string]*FactV1 `json:"facts" description:"System architecture, kernel, hostname, domain, virtualization facts"`
+}
+
+// HardwareFactsV1 represents hardware-related facts
+type HardwareFactsV1 struct {
+	Facts map[string]*FactV1 `json:"facts" description:"CPU, memory, storage, BIOS, hardware details"`
+}
+
+// NetworkFactsV1 represents network-related facts
+type NetworkFactsV1 struct {
+	Facts map[string]*FactV1 `json:"facts" description:"Network interfaces, IP addresses, DNS, SSH keys"`
+}
+
+// OSFactsV1 represents operating system facts
+type OSFactsV1 struct {
+	Facts map[string]*FactV1 `json:"facts" description:"Distribution, package manager, security modules, services"`
+}
+
+// UserFactsV1 represents user and environment facts
+type UserFactsV1 struct {
+	Facts map[string]*FactV1 `json:"facts" description:"Current user, environment variables, permissions"`
+}
+
+// RuntimeFactsV1 represents runtime and execution facts
+type RuntimeFactsV1 struct {
+	Facts map[string]*FactV1 `json:"facts" description:"Python, time, uptime, command line"`
+}
+
+// EnhancedFactsV1 represents facts gathered by spooky-facts tool
+type EnhancedFactsV1 struct {
+	Facts map[string]*FactV1 `json:"facts" description:"Individual facts gathered by spooky-facts"`
+}
+
+// CustomFactsV1 represents custom facts (including age-encrypted ones)
+type CustomFactsV1 struct {
+	Facts map[string]*FactV1 `json:"facts" description:"Individual custom facts (may contain age-encrypted facts)"`
+}
+
+// FactV1 represents a single fact (version 1)
+// Structure: fact "name" { value = "...", type = "...", description = "..." }
+type FactV1 struct {
+	Value          interface{}       `json:"value" required:"true" description:"Value of the fact - can be string, number, boolean, object, array, or age-encrypted string"`
+	Type           string            `json:"type" required:"true" enum:"string,number,boolean,object,array,encrypted" description:"Type of the fact value"`
+	Description    string            `json:"description" max_length:"256" description:"Description of the fact"`
+	Tags           []string          `json:"tags" max_items:"10" description:"Tags for categorizing facts"`
+	Sensitive      bool              `json:"sensitive" default:"false" description:"Whether this fact contains sensitive information (auto-true if encrypted_value exists)"`
+	Encrypted      bool              `json:"encrypted" default:"false" description:"Whether this fact should be encrypted (triggers transformation)"`
+	EncryptedValue *EncryptedValueV1 `json:"encrypted_value,omitempty" description:"Structured encrypted value (mutually exclusive with value)"`
+	Metadata       *FactsMetadataV1  `json:"metadata,omitempty" description:"Additional metadata for the fact"`
 }
 
 // FactsMetadataV1 represents additional metadata for facts
