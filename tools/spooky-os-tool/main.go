@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	"spooky/internal/utilities"
+
+	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
@@ -87,7 +88,7 @@ var setupCmd = &cobra.Command{
 		}
 
 		fmt.Printf("🔧 Setting up directories for '%s':\n", appName)
-		
+
 		err = utilities.EnsureDirectories(config)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating directories: %v\n", err)

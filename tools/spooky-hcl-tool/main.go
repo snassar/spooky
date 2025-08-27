@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"os"
 
+	"spooky/internal/utilities"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"spooky/internal/utilities"
 )
 
 var rootCmd = &cobra.Command{
