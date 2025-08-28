@@ -193,8 +193,41 @@ func createProjectHCL(targetDir, name, description string) error {
 }
 
 func createMachinesHCL(targetDir string) error {
-	// Generate machines configuration directly from Go structs
-	content := schemas.GenerateMachinesConfigFromStructs()
+	// Generate machines configuration with the new simplified format
+	content := `machines {
+  # Example machine using IP address as identifier
+  machine "192.168.1.100" {
+    port = 22
+    user = "root"
+    authentication "password" {
+      password {
+        value = "your_password_here"
+        encrypted = false
+      }
+    }
+  }
+
+  # Example machine using FQDN as identifier
+  # machine "web-server.example.com" {
+  #   port = 22
+  #   user = "admin"
+  #   authentication "publickey" {
+  #     public_key_path = "~/.ssh/id_rsa"
+  #   }
+  # }
+
+  # Example machine using IPv6 address as identifier
+  # machine "2001:db8::1" {
+  #   port = 22
+  #   user = "root"
+  #   authentication "password" {
+  #     password {
+  #       value = "your_password_here"
+  #       encrypted = false
+  #     }
+  #   }
+  # }
+}`
 	return os.WriteFile(filepath.Join(targetDir, "machines.hcl"), []byte(content), 0o644)
 }
 

@@ -37,6 +37,7 @@ func (sm *SimpleSSHManager) ExecuteCommandOnMachine(ctx context.Context, machine
 		KeepAliveCount: sm.config.KeepaliveCount,
 		KeyScanTimeout: time.Duration(sm.config.KeyScanTimeout) * time.Second,
 		StrictHostKey:  sm.config.KnownHostsStrict,
+		KnownHostsMode: sm.config.KnownHostsMode,
 		PubkeyAuth:     true,
 		PasswordAuth:   true,
 
@@ -183,6 +184,7 @@ func (sm *SimpleSSHManager) UploadFileToMachine(ctx context.Context, machine *sc
 		KeepAliveCount: sm.config.KeepaliveCount,
 		KeyScanTimeout: time.Duration(sm.config.KeyScanTimeout) * time.Second,
 		StrictHostKey:  sm.config.KnownHostsStrict,
+		KnownHostsMode: sm.config.KnownHostsMode,
 		PubkeyAuth:     true,
 		PasswordAuth:   true,
 

@@ -1115,11 +1115,6 @@ func (v *Validator) validateMachinesBlockV1(machines map[string]interface{}, res
 			// This is a machine block (machine name is the key)
 			hasMachine = true
 			if machineMap, ok := machineValue.(map[string]interface{}); ok {
-				keys := make([]string, 0, len(machineMap))
-				for k := range machineMap {
-					keys = append(keys, k)
-				}
-				fmt.Printf("DEBUG: Validating machine %s with keys: %v\n", machineName, keys)
 				v.validateMachineV1(machineMap, fmt.Sprintf("machines.%s", machineName), result)
 			}
 		}
@@ -1136,15 +1131,11 @@ func (v *Validator) validateMachinesBlockV1(machines map[string]interface{}, res
 // validateMachineV1 validates an individual machine against V1 schema
 func (v *Validator) validateMachineV1(machine map[string]interface{}, path string, result *ValidationResult) {
 	// Required fields
-	// Note: machine name comes from the block label, not a field
+	// Note: machine name (hostname) comes from the block label, not a field
+	// The hostname field is optional since it can be derived from the block label
 
-	if hostname, exists := machine["hostname"]; !exists {
-		result.Errors = append(result.Errors, ValidationError{
-			Field:    fmt.Sprintf("%s.hostname", path),
-			Message:  "missing required field: hostname",
-			Severity: "error",
-		})
-	} else {
+	// Validate hostname if provided (optional)
+	if hostname, exists := machine["hostname"]; exists {
 		v.validateMachineHostnameV1(hostname, path, result)
 	}
 
@@ -1158,15 +1149,17 @@ func (v *Validator) validateMachineV1(machine map[string]interface{}, path strin
 		v.validateMachineUserV1(user, path, result)
 	}
 
-	if auth, exists := machine["authentication"]; !exists {
+	// Check for authentication - it could be a block or flattened fields
+	if auth, exists := machine["authentication"]; exists {
+		v.validateMachineAuthenticationV1(auth, path, result)
+	} else if _, exists := machine["password"]; exists {
+		// Authentication is flattened - consider this valid since we have authentication data
+	} else {
 		result.Errors = append(result.Errors, ValidationError{
 			Field:    fmt.Sprintf("%s.authentication", path),
 			Message:  "missing required field: authentication",
 			Severity: "error",
 		})
-	} else {
-		fmt.Printf("DEBUG: Found authentication block for %s: %T\n", path, auth)
-		v.validateMachineAuthenticationV1(auth, path, result)
 	}
 }
 

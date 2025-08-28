@@ -32,27 +32,22 @@ func (dcg *DefaultConfigGenerator) GetDefaultSpookyConfig() *SpookyV1 {
 // GetDefaultSpookySSH returns a default SpookySSHV1 configuration
 func (dcg *DefaultConfigGenerator) GetDefaultSpookySSH() *SpookySSHV1 {
 	return &SpookySSHV1{
-		Timeout:            dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(0), 30),
-		KeepaliveInterval:  dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(1), 60),
-		KeepaliveCount:     dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(2), 3),
-		KeyScanTimeout:     dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(3), 10),
-		KnownHostsStrict:   dcg.extractBoolDefault(reflect.TypeOf(SpookySSHV1{}).Field(4), true),
-		ConnectionPoolSize: dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(5), 10),
-
-		// Proxy configuration (no defaults)
-		ProxyCommand: "",
-		ProxyJump:    "",
-
-		// Compression configuration
-		Compression:      dcg.extractBoolDefault(reflect.TypeOf(SpookySSHV1{}).Field(7), false),
-		CompressionLevel: dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(8), 6),
-
-		// TCP keepalive configuration
-		TCPKeepAlive:              dcg.extractBoolDefault(reflect.TypeOf(SpookySSHV1{}).Field(9), true),
-		TCPKeepAliveCount:         dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(10), 3),
-		TCPKeepAliveIdle:          60 * time.Second,
-		TCPKeepAliveInterval:      10 * time.Second,
-		TCPKeepAliveProbeInterval: 5 * time.Second,
+		Timeout:                   dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(0), 30),
+		KeepaliveInterval:         dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(1), 60),
+		KeepaliveCount:            dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(2), 3),
+		KeyScanTimeout:            dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(3), 10),
+		KnownHostsStrict:          dcg.extractBoolDefault(reflect.TypeOf(SpookySSHV1{}).Field(4), false), // Deprecated
+		KnownHostsMode:            dcg.extractStringDefault(reflect.TypeOf(SpookySSHV1{}).Field(5), "accept-new"),
+		ConnectionPoolSize:        dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(6), 10),
+		ProxyCommand:              "", // No default
+		ProxyJump:                 "", // No default
+		Compression:               dcg.extractBoolDefault(reflect.TypeOf(SpookySSHV1{}).Field(9), false),
+		CompressionLevel:          dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(10), 6),
+		TCPKeepAlive:              dcg.extractBoolDefault(reflect.TypeOf(SpookySSHV1{}).Field(11), true),
+		TCPKeepAliveCount:         dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(12), 3),
+		TCPKeepAliveIdle:          dcg.extractDurationDefault(reflect.TypeOf(SpookySSHV1{}).Field(13), 60*time.Second),
+		TCPKeepAliveInterval:      dcg.extractDurationDefault(reflect.TypeOf(SpookySSHV1{}).Field(14), 10*time.Second),
+		TCPKeepAliveProbeInterval: dcg.extractDurationDefault(reflect.TypeOf(SpookySSHV1{}).Field(15), 5*time.Second),
 	}
 }
 
@@ -102,6 +97,8 @@ func (dcg *DefaultConfigGenerator) GetDefaultProjectConfig() *ProjectV1 {
 func (dcg *DefaultConfigGenerator) GetDefaultMachinesConfig() *MachinesV1 {
 	return &MachinesV1{
 		Group: []MachinesGroupV1{},
+		// Note: Individual machines are not included in the default config
+		// as they should be added by users based on their specific needs
 	}
 }
 
@@ -189,6 +186,16 @@ func (dcg *DefaultConfigGenerator) extractBoolDefault(field reflect.StructField,
 func (dcg *DefaultConfigGenerator) extractStringDefault(field reflect.StructField, fallback string) string {
 	if defaultStr := dcg.extractDefaultTag(field); defaultStr != "" {
 		return defaultStr
+	}
+	return fallback
+}
+
+// extractDurationDefault extracts a duration default value from a struct field tag
+func (dcg *DefaultConfigGenerator) extractDurationDefault(field reflect.StructField, fallback time.Duration) time.Duration {
+	if defaultStr := dcg.extractDefaultTag(field); defaultStr != "" {
+		if val, err := time.ParseDuration(defaultStr); err == nil {
+			return val
+		}
 	}
 	return fallback
 }

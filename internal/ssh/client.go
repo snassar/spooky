@@ -43,7 +43,6 @@ import (
 //
 // SSH Features NOT Supported:
 // - Terminal/PTY allocation (no interactive sessions)
-// - Port forwarding (local, remote, dynamic)
 // - X11 forwarding
 // - SSH agent forwarding
 // - Environment variable passing
@@ -74,6 +73,7 @@ type SSHConfig struct {
 	KeyScanTimeout            time.Duration
 	KnownHostsPath            string
 	StrictHostKey             bool
+	KnownHostsMode            string
 	UserKnownHosts            []string
 	GlobalKnownHosts          []string
 	ProxyCommand              string
@@ -94,10 +94,6 @@ type SSHConfig struct {
 	X11Forwarding             bool
 	X11Display                string
 	X11AuthType               string
-	PortForwarding            []PortForward
-	DynamicForward            []DynamicForward
-	LocalForward              []LocalForward
-	RemoteForward             []RemoteForward
 	Environment               map[string]string
 	RequestTTY                bool
 	RequestPty                bool
@@ -106,36 +102,6 @@ type SSHConfig struct {
 	Stdin                     io.Reader
 	Stdout                    io.Writer
 	Stderr                    io.Writer
-}
-
-// PortForward represents port forwarding configuration
-type PortForward struct {
-	LocalHost  string
-	LocalPort  int
-	RemoteHost string
-	RemotePort int
-}
-
-// DynamicForward represents dynamic port forwarding
-type DynamicForward struct {
-	LocalHost string
-	LocalPort int
-}
-
-// LocalForward represents local port forwarding
-type LocalForward struct {
-	LocalHost  string
-	LocalPort  int
-	RemoteHost string
-	RemotePort int
-}
-
-// RemoteForward represents remote port forwarding
-type RemoteForward struct {
-	RemoteHost string
-	RemotePort int
-	LocalHost  string
-	LocalPort  int
 }
 
 // TerminalSize represents terminal dimensions
@@ -460,31 +426,6 @@ func (sc *SSHClient) DownloadFile(ctx context.Context, remotePath, localPath str
 	return session.Wait()
 }
 
-// SetupPortForwarding sets up port forwarding
-func (sc *SSHClient) SetupPortForwarding(ctx context.Context) error {
-	if sc.client == nil {
-		return errors.New("SSH client not connected")
-	}
-
-	// Set up local port forwarding
-	for _, forward := range sc.config.LocalForward {
-		if err := sc.setupLocalForward(ctx, forward); err != nil {
-			return errors.Wrapf(err, "failed to setup local forward %s:%d -> %s:%d",
-				forward.LocalHost, forward.LocalPort, forward.RemoteHost, forward.RemotePort)
-		}
-	}
-
-	// Set up remote port forwarding
-	for _, forward := range sc.config.RemoteForward {
-		if err := sc.setupRemoteForward(ctx, forward); err != nil {
-			return errors.Wrapf(err, "failed to setup remote forward %s:%d -> %s:%d",
-				forward.RemoteHost, forward.RemotePort, forward.LocalHost, forward.LocalPort)
-		}
-	}
-
-	return nil
-}
-
 // CommandResult represents the result of a command execution
 type CommandResult struct {
 	ExitCode int
@@ -625,18 +566,69 @@ func (sc *SSHClient) initKnownHosts() error {
 		}
 	}
 
-	// Create known hosts callback
-	callback, err := knownhosts.New(knownHostsFiles...)
-	if err != nil {
+	// Determine the known hosts mode
+	mode := sc.config.KnownHostsMode
+	if mode == "" {
+		// Fallback to legacy StrictHostKey setting
 		if sc.config.StrictHostKey {
-			return errors.Wrap(err, "failed to load known hosts")
+			mode = "strict"
+		} else {
+			mode = "accept-new"
 		}
-		// Use insecure callback if strict host key checking is disabled
-		callback = ssh.InsecureIgnoreHostKey()
 	}
 
-	sc.knownHosts = callback
+	// Create appropriate callback based on mode
+	switch mode {
+	case "strict":
+		callback, err := knownhosts.New(knownHostsFiles...)
+		if err != nil {
+			return errors.Wrap(err, "failed to load known hosts")
+		}
+		sc.knownHosts = callback
+
+	case "accept-new":
+		sc.knownHosts = sc.createAcceptNewCallback(knownHostsFiles)
+
+	case "ignore":
+		sc.knownHosts = ssh.InsecureIgnoreHostKey()
+
+	default:
+		return errors.Errorf("invalid known hosts mode: %s (valid modes: strict, accept-new, ignore)", mode)
+	}
+
 	return nil
+}
+
+// createAcceptNewCallback creates a host key callback that mimics OpenSSH's "accept-new" behavior
+func (sc *SSHClient) createAcceptNewCallback(knownHostsFiles []string) ssh.HostKeyCallback {
+	// Try to load existing known hosts
+	existingCallback, err := knownhosts.New(knownHostsFiles...)
+	if err != nil {
+		// If we can't load known hosts, just accept all keys (like accept-new with no existing file)
+		return ssh.InsecureIgnoreHostKey()
+	}
+
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		// Try existing known hosts first
+		err := existingCallback(hostname, remote, key)
+		if err == nil {
+			return nil // Key already known and matches
+		}
+
+		// Check if it's a "host key changed" error (security issue)
+		// The knownhosts package returns specific error messages for changed keys
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "REMOTE HOST IDENTIFICATION HAS CHANGED") ||
+			strings.Contains(errMsg, "host key mismatch") ||
+			strings.Contains(errMsg, "key verification failed") {
+			// Warn about changed keys (security issue) - don't suppress this
+			return err
+		}
+
+		// For new hosts or other errors, accept silently (like accept-new)
+		// This suppresses the "Permanently added" messages
+		return nil
+	}
 }
 
 // setupSession configures a session for command execution
@@ -742,54 +734,4 @@ func (sc *SSHClient) keepAlive() {
 			break
 		}
 	}
-}
-
-// setupLocalForward sets up local port forwarding
-func (sc *SSHClient) setupLocalForward(ctx context.Context, forward LocalForward) error {
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", forward.LocalHost, forward.LocalPort))
-	if err != nil {
-		return errors.Wrap(err, "failed to create local listener")
-	}
-
-	go func() {
-		defer listener.Close()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				conn, err := listener.Accept()
-				if err != nil {
-					continue
-				}
-
-				go sc.handleLocalForward(conn, forward)
-			}
-		}
-	}()
-
-	return nil
-}
-
-// setupRemoteForward sets up remote port forwarding
-func (sc *SSHClient) setupRemoteForward(ctx context.Context, forward RemoteForward) error {
-	// This would require the remote server to support remote port forwarding
-	// Implementation depends on the specific requirements
-	return errors.New("remote port forwarding not yet implemented")
-}
-
-// handleLocalForward handles a local port forward connection
-func (sc *SSHClient) handleLocalForward(localConn net.Conn, forward LocalForward) {
-	defer localConn.Close()
-
-	// Connect to remote host
-	remoteConn, err := sc.client.Dial("tcp", fmt.Sprintf("%s:%d", forward.RemoteHost, forward.RemotePort))
-	if err != nil {
-		return
-	}
-	defer remoteConn.Close()
-
-	// Copy data between connections
-	go io.Copy(remoteConn, localConn)
-	io.Copy(localConn, remoteConn)
 }

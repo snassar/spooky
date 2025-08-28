@@ -98,7 +98,7 @@ type MachinesMachineV1 struct {
 	Description string `json:"description" max_length:"256" description:"Description of the machine"`
 
 	// Connection details
-	Hostname string `json:"hostname" required:"true" min_length:"1" max_length:"253" description:"Hostname or IP address of the machine"`
+	Hostname string `json:"hostname" min_length:"1" max_length:"253" description:"Hostname or IP address of the machine (can be omitted if machine name is the hostname)"`
 	Port     int    `json:"port" min:"1" max:"65535" default:"22" description:"SSH port number"`
 	User     string `json:"user" required:"true" pattern:"^[a-zA-Z0-9_.-]+$" min_length:"1" max_length:"32" description:"SSH username"`
 
@@ -344,12 +344,13 @@ type SpookyV1 struct {
 
 // SpookySSHV1 represents SSH configuration in global spooky config
 type SpookySSHV1 struct {
-	Timeout            int  `json:"timeout" min:"1" max:"300" default:"30" description:"SSH connection timeout in seconds"`
-	KeepaliveInterval  int  `json:"keepalive_interval" min:"1" max:"300" default:"60" description:"SSH keepalive interval in seconds"`
-	KeepaliveCount     int  `json:"keepalive_count" min:"1" max:"10" default:"3" description:"SSH keepalive count before considering connection dead"`
-	KeyScanTimeout     int  `json:"key_scan_timeout" min:"1" max:"60" default:"10" description:"SSH key scanning timeout in seconds"`
-	KnownHostsStrict   bool `json:"known_hosts_strict" default:"true" description:"Strict known_hosts checking"`
-	ConnectionPoolSize int  `json:"connection_pool_size" min:"1" max:"100" default:"10" description:"SSH connection pool size"`
+	Timeout            int    `json:"timeout" min:"1" max:"300" default:"30" description:"SSH connection timeout in seconds"`
+	KeepaliveInterval  int    `json:"keepalive_interval" min:"1" max:"300" default:"60" description:"SSH keepalive interval in seconds"`
+	KeepaliveCount     int    `json:"keepalive_count" min:"1" max:"10" default:"3" description:"SSH keepalive count before considering connection dead"`
+	KeyScanTimeout     int    `json:"key_scan_timeout" min:"1" max:"60" default:"10" description:"SSH key scanning timeout in seconds"`
+	KnownHostsStrict   bool   `json:"known_hosts_strict" default:"true" description:"Strict known_hosts checking (deprecated, use known_hosts_mode instead)"`
+	KnownHostsMode     string `json:"known_hosts_mode" default:"accept-new" description:"Known hosts handling mode: strict, accept-new, or ignore"`
+	ConnectionPoolSize int    `json:"connection_pool_size" min:"1" max:"100" default:"10" description:"SSH connection pool size"`
 
 	// Proxy configuration
 	ProxyCommand string `json:"proxy_command" description:"SSH proxy command (e.g., 'ssh -W %h:%p bastion.example.com')"`
