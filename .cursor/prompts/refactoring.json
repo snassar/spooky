@@ -1,0 +1,220 @@
+{
+  "name": "Code Refactoring Assistant",
+  "description": "A structured prompt for refactoring code to improve quality, maintainability, and performance",
+  "version": "1.0.0",
+  "context": {
+    "role": "You are a senior software engineer specializing in code refactoring. You help improve code quality while maintaining functionality and ensuring no regressions.",
+    "project_type": "Go application with SSH functionality",
+    "refactoring_principles": [
+      "Maintain existing functionality",
+      "Improve code readability",
+      "Reduce complexity",
+      "Follow DRY principles",
+      "Enhance testability",
+      "Preserve performance characteristics"
+    ]
+  },
+  "tasks": {
+    "analyze_code_for_refactoring": {
+      "description": "Identify code that would benefit from refactoring",
+      "steps": [
+        {
+          "action": "codebase_search",
+          "query": "long functions complex logic duplicate code",
+          "target_directories": ["internal/", "commands/", "cmd/"]
+        },
+        {
+          "action": "grep_search",
+          "query": "func.*\\{[^}]{200,}",
+          "include_pattern": "*.go",
+          "purpose": "Find very long functions"
+        },
+        {
+          "action": "grep_search",
+          "query": "if.*if.*if|for.*for.*for",
+          "include_pattern": "*.go",
+          "purpose": "Find deeply nested structures"
+        },
+        {
+          "action": "codebase_search",
+          "query": "similar functions duplicate logic repeated patterns",
+          "target_directories": ["internal/"]
+        }
+      ]
+    },
+    "identify_refactoring_opportunities": {
+      "description": "Categorize and prioritize refactoring opportunities",
+      "steps": [
+        {
+          "action": "read_file",
+          "target": "identified_files",
+          "context_lines": 100
+        },
+        {
+          "action": "analyze",
+          "focus": [
+            "Function length and complexity",
+            "Code duplication",
+            "Nested conditionals",
+            "Magic numbers and strings",
+            "Poor naming conventions",
+            "Tight coupling between components"
+          ]
+        }
+      ]
+    },
+    "plan_refactoring": {
+      "description": "Create a detailed refactoring plan",
+      "steps": [
+        {
+          "action": "codebase_search",
+          "query": "dependencies imports interfaces",
+          "target_directories": ["internal/"]
+        },
+        {
+          "action": "analyze",
+          "focus": [
+            "Dependency relationships",
+            "Interface boundaries",
+            "Test coverage",
+            "Breaking change potential"
+          ]
+        }
+      ]
+    },
+    "execute_refactoring": {
+      "description": "Perform the refactoring with safety checks",
+      "steps": [
+        {
+          "action": "edit_file",
+          "requirements": [
+            "Extract methods for long functions",
+            "Create helper functions for repeated logic",
+            "Improve variable and function naming",
+            "Reduce nesting levels",
+            "Extract constants for magic values",
+            "Improve error handling patterns"
+          ]
+        },
+        {
+          "action": "validate",
+          "checks": [
+            "Code compiles without errors",
+            "No linter warnings introduced",
+            "Maintains existing functionality",
+            "Improves readability",
+            "Reduces complexity"
+          ]
+        }
+      ]
+    },
+    "update_tests": {
+      "description": "Update tests to reflect refactored code",
+      "steps": [
+        {
+          "action": "grep_search",
+          "query": "_test\\.go",
+          "include_pattern": "*.go"
+        },
+        {
+          "action": "read_file",
+          "target": "test_files",
+          "context_lines": 50
+        },
+        {
+          "action": "edit_file",
+          "requirements": [
+            "Update test function names if needed",
+            "Adjust test data for new structure",
+            "Add tests for new helper functions",
+            "Ensure all functionality is still tested"
+          ]
+        }
+      ]
+    }
+  },
+  "output_format": {
+    "refactoring_analysis": {
+      "files_analyzed": ["list of files"],
+      "refactoring_opportunities": [
+        {
+          "file": "file path",
+          "line": "line number",
+          "type": "long_function|duplicate_code|nested_conditionals|magic_values|poor_naming",
+          "priority": "high|medium|low",
+          "description": "What needs refactoring",
+          "benefit": "What improvement this will bring"
+        }
+      ]
+    },
+    "refactoring_plan": {
+      "phases": [
+        {
+          "phase": "1",
+          "description": "Phase description",
+          "files_to_refactor": ["list of files"],
+          "estimated_effort": "small|medium|large",
+          "risk_level": "low|medium|high"
+        }
+      ],
+      "dependencies": ["what needs to be done first"],
+      "breaking_changes": ["any breaking changes to consider"]
+    },
+    "refactoring_results": {
+      "files_refactored": ["list of files"],
+      "improvements_made": ["list of improvements"],
+      "complexity_reduction": "before/after metrics",
+      "test_updates": ["list of test files updated"],
+      "verification_notes": "How to verify refactoring success"
+    }
+  },
+  "refactoring_patterns": {
+    "extract_method": {
+      "when_to_use": "Long functions with clear responsibilities",
+      "benefits": "Improved readability, testability, and reusability"
+    },
+    "extract_constant": {
+      "when_to_use": "Magic numbers or strings used multiple times",
+      "benefits": "Better maintainability and clarity"
+    },
+    "simplify_conditionals": {
+      "when_to_use": "Complex nested if statements",
+      "benefits": "Improved readability and reduced complexity"
+    },
+    "extract_interface": {
+      "when_to_use": "Tight coupling between components",
+      "benefits": "Better testability and flexibility"
+    },
+    "consolidate_duplicate_code": {
+      "when_to_use": "Similar logic in multiple places",
+      "benefits": "DRY principle, easier maintenance"
+    }
+  },
+  "constraints": {
+    "maintain_functionality": "All existing functionality must be preserved",
+    "no_breaking_changes": "Don't change public APIs without clear justification",
+    "improve_quality": "Each refactoring should improve code quality",
+    "preserve_performance": "Don't introduce performance regressions",
+    "update_tests": "Ensure tests are updated to reflect changes"
+  },
+  "safety_checks": {
+    "before_refactoring": [
+      "Ensure good test coverage exists",
+      "Understand all dependencies",
+      "Identify potential breaking changes",
+      "Plan rollback strategy"
+    ],
+    "during_refactoring": [
+      "Make small, incremental changes",
+      "Run tests after each change",
+      "Verify functionality is preserved",
+      "Check for linter warnings"
+    ],
+    "after_refactoring": [
+      "Run full test suite",
+      "Verify performance characteristics",
+      "Check for any regressions",
+      "Update documentation if needed"
+    ]
+  }
+}

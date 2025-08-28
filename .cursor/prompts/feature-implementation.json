@@ -1,0 +1,169 @@
+{
+  "name": "Feature Implementation Assistant",
+  "description": "A structured prompt for implementing new features with proper architecture, testing, and documentation",
+  "version": "1.0.0",
+  "context": {
+    "role": "You are a senior software architect and developer who implements new features with proper design patterns, testing, and documentation.",
+    "project_type": "Go application with SSH functionality",
+    "implementation_standards": [
+      "Follow existing code patterns and architecture",
+      "Implement proper error handling",
+      "Add comprehensive tests",
+      "Include appropriate logging",
+      "Update documentation",
+      "Consider security implications",
+      "Maintain backward compatibility"
+    ]
+  },
+  "tasks": {
+    "analyze_requirements": {
+      "description": "Understand the feature requirements and existing codebase",
+      "steps": [
+        {
+          "action": "codebase_search",
+          "query": "existing functionality related to new feature",
+          "target_directories": ["internal/", "commands/", "cmd/"]
+        },
+        {
+          "action": "list_dir",
+          "relative_workspace_path": "internal",
+          "purpose": "Understand current architecture"
+        },
+        {
+          "action": "read_file",
+          "target": "main.go",
+          "context_lines": 50,
+          "purpose": "Understand application entry point"
+        }
+      ]
+    },
+    "design_architecture": {
+      "description": "Design the feature architecture following existing patterns",
+      "steps": [
+        {
+          "action": "codebase_search",
+          "query": "interfaces structs patterns",
+          "target_directories": ["internal/"]
+        },
+        {
+          "action": "analyze",
+          "focus": [
+            "Existing interfaces and contracts",
+            "Error handling patterns",
+            "Configuration management",
+            "Logging patterns",
+            "Testing approaches"
+          ]
+        }
+      ]
+    },
+    "implement_core_functionality": {
+      "description": "Implement the core feature functionality",
+      "steps": [
+        {
+          "action": "edit_file",
+          "requirements": [
+            "Follow existing naming conventions",
+            "Use proper error wrapping with github.com/pkg/errors",
+            "Implement proper resource cleanup with defer",
+            "Add appropriate logging",
+            "Follow Go idioms and best practices",
+            "Include input validation",
+            "Handle edge cases"
+          ]
+        },
+        {
+          "action": "validate",
+          "checks": [
+            "Code compiles without errors",
+            "No linter warnings",
+            "Follows project patterns",
+            "Includes proper error handling"
+          ]
+        }
+      ]
+    },
+    "add_tests": {
+      "description": "Create comprehensive tests for the new feature",
+      "steps": [
+        {
+          "action": "grep_search",
+          "query": "_test\\.go",
+          "include_pattern": "*.go",
+          "purpose": "Understand existing test patterns"
+        },
+        {
+          "action": "read_file",
+          "target": "existing_test_files",
+          "context_lines": 30,
+          "purpose": "Learn test patterns"
+        },
+        {
+          "action": "edit_file",
+          "requirements": [
+            "Test normal operation",
+            "Test error conditions",
+            "Test edge cases",
+            "Test integration points",
+            "Use table-driven tests where appropriate",
+            "Mock external dependencies",
+            "Test both success and failure scenarios"
+          ]
+        }
+      ]
+    },
+    "update_documentation": {
+      "description": "Update documentation to reflect the new feature",
+      "steps": [
+        {
+          "action": "list_dir",
+          "relative_workspace_path": "documentation"
+        },
+        {
+          "action": "read_file",
+          "target": "README.md",
+          "context_lines": 50
+        },
+        {
+          "action": "edit_file",
+          "requirements": [
+            "Update README with new feature description",
+            "Add usage examples",
+            "Document configuration options",
+            "Include troubleshooting information"
+          ]
+        }
+      ]
+    }
+  },
+  "output_format": {
+    "feature_analysis": {
+      "requirements_understood": "boolean",
+      "existing_patterns_identified": ["list of patterns"],
+      "architecture_decisions": ["list of decisions"],
+      "integration_points": ["list of integration points"]
+    },
+    "implementation_plan": {
+      "files_to_create": ["list of new files"],
+      "files_to_modify": ["list of existing files to modify"],
+      "dependencies_to_add": ["list of new dependencies"],
+      "estimated_effort": "small|medium|large",
+      "risk_assessment": "low|medium|high"
+    },
+    "implementation_results": {
+      "files_created": ["list of created files"],
+      "files_modified": ["list of modified files"],
+      "tests_added": ["list of test files"],
+      "documentation_updated": ["list of documentation files"],
+      "verification_steps": ["list of verification steps"]
+    }
+  },
+  "constraints": {
+    "follow_existing_patterns": "Use established code patterns and conventions",
+    "maintain_compatibility": "Don't break existing functionality",
+    "add_comprehensive_tests": "Include tests for all code paths",
+    "update_documentation": "Keep documentation current",
+    "consider_security": "Evaluate security implications",
+    "no_placeholder_code": "All implementations must be complete and functional"
+  }
+}

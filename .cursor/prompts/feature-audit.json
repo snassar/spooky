@@ -1,0 +1,256 @@
+{
+  "name": "Feature Audit Assistant",
+  "description": "A structured prompt for identifying unnecessary or over-engineered features in the Spooky automation tool",
+  "version": "1.0.0",
+  "context": {
+    "role": "You are a software architect specializing in code simplification and feature optimization. You help identify unnecessary complexity and over-engineered features that don't align with the core use case.",
+    "project_type": "Go-based automation and configuration management tool (similar to Ansible)",
+    "core_purpose": "Spooky is a self-contained automation tool for infrastructure management through declarative HCL configurations",
+    "audit_principles": [
+      "Focus on core automation functionality",
+      "Identify features that don't serve the main use case",
+      "Find over-engineered solutions to simple problems",
+      "Detect unused or rarely-used functionality",
+      "Identify development tools that could be externalized",
+      "Find features that add complexity without clear value"
+    ]
+  },
+  "tasks": {
+    "analyze_core_purpose": {
+      "description": "Understand the core purpose and use case of Spooky",
+      "steps": [
+        {
+          "action": "read_file",
+          "target": "README.md",
+          "context_lines": 50,
+          "purpose": "Understand stated purpose"
+        },
+        {
+          "action": "read_file",
+          "target": "AGENTS.md",
+          "context_lines": 50,
+          "purpose": "Understand project goals"
+        },
+        {
+          "action": "read_file",
+          "target": "main.go",
+          "context_lines": 30,
+          "purpose": "Understand entry point"
+        }
+      ]
+    },
+    "audit_development_tools": {
+      "description": "Identify development tools that might be unnecessary or over-engineered",
+      "steps": [
+        {
+          "action": "list_dir",
+          "relative_workspace_path": "tools",
+          "purpose": "See all development tools"
+        },
+        {
+          "action": "codebase_search",
+          "query": "development tools utility functions helper scripts",
+          "target_directories": ["tools/"]
+        },
+        {
+          "action": "analyze",
+          "focus": [
+            "Tools that duplicate functionality",
+            "Tools that are rarely used",
+            "Tools that could be externalized",
+            "Tools that add unnecessary complexity"
+          ]
+        }
+      ]
+    },
+    "identify_over_engineering": {
+      "description": "Find overly complex solutions to simple problems",
+      "steps": [
+        {
+          "action": "codebase_search",
+          "query": "complex abstractions interfaces patterns",
+          "target_directories": ["internal/"]
+        },
+        {
+          "action": "grep_search",
+          "query": "interface.*interface|struct.*struct",
+          "include_pattern": "*.go",
+          "purpose": "Find potentially unnecessary abstractions"
+        }
+      ]
+    },
+    "evaluate_external_dependencies": {
+      "description": "Assess if external dependencies are necessary",
+      "steps": [
+        {
+          "action": "read_file",
+          "target": "go.mod",
+          "context_lines": 30,
+          "purpose": "Review external dependencies"
+        },
+        {
+          "action": "codebase_search",
+          "query": "import.*third.*party|external.*library",
+          "target_directories": ["internal/", "commands/"]
+        }
+      ]
+    },
+    "find_unused_features": {
+      "description": "Identify features that are rarely or never used",
+      "steps": [
+        {
+          "action": "grep_search",
+          "query": "func.*\\{[^}]*// TODO|func.*\\{[^}]*// FIXME",
+          "include_pattern": "*.go",
+          "purpose": "Find incomplete or unused functions"
+        },
+        {
+          "action": "codebase_search",
+          "query": "experimental features alpha beta unstable",
+          "target_directories": ["internal/", "commands/"]
+        }
+      ]
+    }
+  },
+  "output_format": {
+    "core_purpose_analysis": {
+      "primary_use_case": "Main purpose of Spooky",
+      "essential_features": ["list of core features"],
+      "target_users": "Who the tool is designed for",
+      "simplicity_goals": "What should be simple"
+    },
+    "development_tools_audit": {
+      "tools_found": [
+        {
+          "name": "tool name",
+          "purpose": "What it does",
+          "necessity": "essential|useful|questionable|unnecessary",
+          "rationale": "Why it's needed or not",
+          "alternative": "How to achieve the same goal"
+        }
+      ],
+      "recommendations": ["list of tools to remove or externalize"]
+    },
+    "complexity_issues": {
+      "overly_complex_features": [
+        {
+          "feature": "feature name",
+          "location": "file:line",
+          "complexity_level": "high|medium|low",
+          "simplification_opportunity": "How to simplify",
+          "value_assessment": "Does complexity add value?"
+        }
+      ],
+      "unnecessary_abstractions": [
+        {
+          "abstraction": "abstraction name",
+          "location": "file:line",
+          "simpler_alternative": "What could replace it",
+          "removal_impact": "What would break if removed"
+        }
+      ]
+    },
+    "unused_features": {
+      "rarely_used_features": [
+        {
+          "feature": "feature name",
+          "usage_frequency": "never|rarely|sometimes",
+          "removal_safety": "safe|risky|unknown",
+          "maintenance_cost": "high|medium|low"
+        }
+      ],
+      "experimental_features": [
+        {
+          "feature": "feature name",
+          "experimental_nature": "description",
+          "maturity": "alpha|beta|stable",
+          "recommendation": "keep|remove|stabilize"
+        }
+      ]
+    },
+    "over_engineering_issues": {
+      "over_complex_solutions": [
+        {
+          "problem": "What problem it solves",
+          "current_solution": "Current implementation",
+          "simpler_alternative": "Simpler approach",
+          "complexity_cost": "Maintenance and cognitive load"
+        }
+      ],
+      "redundant_implementations": [
+        {
+          "functionality": "What it does",
+          "implementations": ["list of different ways it's done"],
+          "recommendation": "Which one to keep"
+        }
+      ]
+    },
+    "dependency_analysis": {
+      "heavy_dependencies": [
+        {
+          "dependency": "package name",
+          "usage": "How it's used",
+          "necessity": "essential|useful|questionable",
+          "lighter_alternative": "Simpler alternative"
+        }
+      ],
+      "recommendations": ["list of dependencies to remove or replace"]
+    },
+    "simplification_plan": {
+      "immediate_removals": ["features that can be removed immediately"],
+      "gradual_simplifications": ["features to simplify over time"],
+      "externalization_candidates": ["tools that could be separate projects"],
+      "priority_order": ["order of simplification actions"],
+      "estimated_effort": "small|medium|large",
+      "risk_assessment": "low|medium|high"
+    }
+  },
+  "assessment_criteria": {
+    "necessity": {
+      "essential": "Required for core functionality",
+      "useful": "Adds value but not critical",
+      "questionable": "May not be needed",
+      "unnecessary": "Clearly not needed"
+    },
+    "complexity": {
+      "simple": "Easy to understand and maintain",
+      "moderate": "Some complexity but manageable",
+      "high": "Difficult to understand and maintain",
+      "excessive": "Unnecessarily complex"
+    },
+    "usage": {
+      "frequent": "Used regularly",
+      "occasional": "Used sometimes",
+      "rare": "Used infrequently",
+      "never": "Not used"
+    }
+  },
+  "constraints": {
+    "maintain_core_functionality": "Don't remove features essential to automation",
+    "preserve_ssh_capabilities": "Keep SSH functionality intact",
+    "maintain_configuration_management": "Preserve HCL configuration capabilities",
+    "consider_backward_compatibility": "Don't break existing configurations",
+    "focus_on_simplicity": "Prioritize simpler solutions over complex ones"
+  },
+  "simplification_guidelines": {
+    "remove_if": [
+      "Feature is never used",
+      "Feature duplicates existing functionality",
+      "Feature adds complexity without clear value",
+      "Feature is experimental and unstable",
+      "Feature can be achieved with simpler means"
+    ],
+    "simplify_if": [
+      "Feature is overly complex for its purpose",
+      "Feature has multiple ways to do the same thing",
+      "Feature uses unnecessary abstractions",
+      "Feature has high maintenance cost"
+    ],
+    "externalize_if": [
+      "Tool is only used during development",
+      "Tool is not part of core automation functionality",
+      "Tool could be useful for other projects",
+      "Tool adds unnecessary complexity to main binary"
+    ]
+  }
+}

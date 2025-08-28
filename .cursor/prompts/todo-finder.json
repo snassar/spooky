@@ -1,0 +1,132 @@
+{
+  "name": "TODO and Incomplete Code Finder",
+  "description": "A structured prompt for finding, analyzing, and completing TODO items and incomplete code",
+  "version": "1.0.0",
+  "context": {
+    "role": "You are a code completion specialist who helps identify and resolve incomplete code, TODO items, and placeholder implementations.",
+    "project_type": "Go application with SSH functionality",
+    "completion_standards": [
+      "All code must be functional and complete",
+      "No placeholder implementations allowed",
+      "Must follow existing code patterns",
+      "Include proper error handling",
+      "Add appropriate tests"
+    ]
+  },
+  "tasks": {
+    "scan_for_incomplete_code": {
+      "description": "Search the codebase for TODO items, incomplete implementations, and placeholder code",
+      "steps": [
+        {
+          "action": "grep_search",
+          "query": "TODO|FIXME|XXX|HACK|BUG|NOTE",
+          "include_pattern": "*.go",
+          "case_sensitive": false
+        },
+        {
+          "action": "grep_search",
+          "query": "panic\\(\"not implemented\"\\)|return nil|// TODO|// FIXME",
+          "include_pattern": "*.go"
+        },
+        {
+          "action": "codebase_search",
+          "query": "incomplete functions empty implementations placeholder code",
+          "target_directories": ["internal/", "commands/", "cmd/", "tools/"]
+        }
+      ]
+    },
+    "analyze_incomplete_items": {
+      "description": "Analyze each incomplete item to understand what needs to be implemented",
+      "steps": [
+        {
+          "action": "read_file",
+          "target": "file_with_todo",
+          "context_lines": 30
+        },
+        {
+          "action": "analyze",
+          "focus": [
+            "Function signature and expected behavior",
+            "Input/output requirements",
+            "Error handling needs",
+            "Integration points with other code",
+            "Testing requirements"
+          ]
+        }
+      ]
+    },
+    "implement_completion": {
+      "description": "Implement complete, functional code to replace incomplete items",
+      "steps": [
+        {
+          "action": "codebase_search",
+          "query": "similar functionality patterns examples",
+          "target_directories": ["internal/"]
+        },
+        {
+          "action": "edit_file",
+          "requirements": [
+            "Implement complete functionality",
+            "Add proper error handling",
+            "Include input validation",
+            "Add appropriate logging",
+            "Follow existing code patterns",
+            "Ensure resource cleanup"
+          ]
+        },
+        {
+          "action": "create_tests",
+          "requirements": [
+            "Test normal operation",
+            "Test error conditions",
+            "Test edge cases",
+            "Test integration points"
+          ]
+        }
+      ]
+    }
+  },
+  "output_format": {
+    "incomplete_items_report": {
+      "file": "path to file",
+      "line": "line number",
+      "type": "TODO|FIXME|incomplete_function|placeholder",
+      "description": "What needs to be implemented",
+      "priority": "high|medium|low",
+      "estimated_effort": "small|medium|large"
+    },
+    "completion_plan": {
+      "items_to_complete": ["list of items"],
+      "implementation_order": ["priority order"],
+      "dependencies": ["what needs to be done first"]
+    },
+    "implementation_result": {
+      "files_modified": ["list of files"],
+      "functions_completed": ["list of functions"],
+      "tests_added": ["list of test files"],
+      "verification_notes": "How to verify completion"
+    }
+  },
+  "constraints": {
+    "no_placeholders": "All implementations must be complete and functional",
+    "follow_patterns": "Use existing code patterns and conventions",
+    "maintain_compatibility": "Don't break existing functionality",
+    "add_tests": "Include appropriate tests for new implementations"
+  },
+  "examples": {
+    "todo_patterns": [
+      "// TODO: implement error handling",
+      "// FIXME: add validation",
+      "// XXX: needs proper logging",
+      "panic(\"not implemented\")",
+      "return nil // TODO: implement"
+    ],
+    "completion_examples": [
+      "Replace panic with proper error handling",
+      "Add input validation and error returns",
+      "Implement missing business logic",
+      "Add proper resource cleanup",
+      "Include comprehensive logging"
+    ]
+  }
+}
