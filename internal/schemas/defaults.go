@@ -101,8 +101,7 @@ func (dcg *DefaultConfigGenerator) GetDefaultProjectConfig() *ProjectV1 {
 // GetDefaultMachinesConfig returns a default MachinesV1 configuration
 func (dcg *DefaultConfigGenerator) GetDefaultMachinesConfig() *MachinesV1 {
 	return &MachinesV1{
-		Machine: []MachinesMachineV1{},
-		Group:   []MachinesGroupV1{},
+		Group: []MachinesGroupV1{},
 	}
 }
 

@@ -84,9 +84,11 @@ type ProjectAgeV1 struct {
 
 // MachinesV1 represents a machines configuration (version 1)
 // In HCL2, this becomes: machines { machine "name" { ... } }
+// The machine names are block labels, not fields in the struct
 type MachinesV1 struct {
-	Machine []MachinesMachineV1 `json:"machine" description:"Individual machine configurations"`
-	Group   []MachinesGroupV1   `json:"group" description:"Machine group configurations"`
+	// Machine blocks are identified by their block labels
+	// The actual machine data is stored separately
+	Group []MachinesGroupV1 `json:"group" description:"Machine group configurations"`
 }
 
 // MachinesMachineV1 represents an individual machine configuration

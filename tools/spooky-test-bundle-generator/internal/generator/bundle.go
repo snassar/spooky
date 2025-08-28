@@ -187,23 +187,35 @@ func (bg *BundleGenerator) generateContainerfile(osName string, container *profi
 				content.WriteString(fmt.Sprintf("    %s \\\n", pkg))
 			}
 		}
+		// Add vim package for xxd command
+		content.WriteString("# Install additional tools\n")
+		content.WriteString("RUN zypper install -y vim\n\n")
 	}
 
 	// Generate machine ID
 	content.WriteString("# Generate machine ID\n")
-	content.WriteString("RUN echo \"$(head -c 16 /dev/urandom | xxd -p)\" > /etc/machine-id\n\n")
+	if osName == "opensuse156" {
+		content.WriteString("RUN echo \"$(head -c 16 /dev/urandom | hexdump -e '16/1 \"%02x\"')\" > /etc/machine-id\n\n")
+	} else {
+		content.WriteString("RUN echo \"$(head -c 16 /dev/urandom | xxd -p)\" > /etc/machine-id\n\n")
+	}
 
 	// Copy SSH config
 	content.WriteString("# Copy SSH configuration\n")
 	content.WriteString("COPY sshd_config /etc/ssh/sshd_config\n\n")
 
+	// Generate SSH host keys
+	content.WriteString("# Generate SSH host keys\n")
+	content.WriteString("RUN ssh-keygen -A\n\n")
+
 	// Setup SSH service
 	content.WriteString("# Setup SSH service\n")
 	if osName == "alpine319" {
-		content.WriteString("RUN mkdir -p /run/openrc && touch /run/openrc/softlevel\n")
-		content.WriteString("RUN rc-update add sshd default\n")
+		// Alpine containers don't need OpenRC, just create sshd directory
+		content.WriteString("RUN mkdir -p /run/sshd\n")
 	} else {
-		content.WriteString("RUN systemctl enable sshd\n")
+		// For systemd-based systems, we'll start sshd manually in containers
+		content.WriteString("RUN mkdir -p /run/sshd\n")
 	}
 	content.WriteString("\n")
 
@@ -212,11 +224,7 @@ func (bg *BundleGenerator) generateContainerfile(osName string, container *profi
 
 	// Start command
 	content.WriteString("# Start SSH service\n")
-	if osName == "alpine319" {
-		content.WriteString("CMD [\"rc-service\", \"sshd\", \"start\", \"&&\", \"tail\", \"-f\", \"/dev/null\"]\n")
-	} else {
-		content.WriteString("CMD [\"systemctl\", \"start\", \"sshd\", \"&&\", \"tail\", \"-f\", \"/dev/null\"]\n")
-	}
+	content.WriteString("CMD [\"/usr/sbin/sshd\", \"-D\"]\n")
 
 	return os.WriteFile(containerfilePath, []byte(content.String()), 0o644)
 }
@@ -263,9 +271,14 @@ func (bg *BundleGenerator) generateSSHConfig(osName string, container *profiles.
 
 	content.WriteString("X11Forwarding no\n")
 	content.WriteString("PrintMotd no\n")
-	content.WriteString("PrintLastLog no\n")
 	content.WriteString("AcceptEnv LANG LC_*\n")
-	content.WriteString("Subsystem sftp /usr/lib/openssh/sftp-server\n")
+
+	// Use different sftp subsystem paths for different OSes
+	if osName == "alpine319" {
+		content.WriteString("Subsystem sftp /usr/lib/openssh/sftp-server\n")
+	} else {
+		content.WriteString("Subsystem sftp /usr/libexec/openssh/sftp-server\n")
+	}
 
 	return os.WriteFile(sshConfigPath, []byte(content.String()), 0o644)
 }
@@ -309,25 +322,63 @@ func (bg *BundleGenerator) generateProject(profile *profiles.Profile, outputPath
 		return fmt.Errorf("failed to generate files: %w", err)
 	}
 
+	// Generate Spooky runner container
+	if err := bg.generateSpookyRunner(profile, outputPath); err != nil {
+		return fmt.Errorf("failed to generate Spooky runner: %w", err)
+	}
+
 	return nil
 }
 
 // generateProjectHCL creates the project.hcl file
 func (bg *BundleGenerator) generateProjectHCL(profile *profiles.Profile, projectDir string) error {
-	content := fmt.Sprintf(`project "%s" {
+	// Generate project configuration in the correct HCL format
+	content := fmt.Sprintf(`# Spooky Project Configuration
+# Generated for test bundle: %s
+
+project "%s" {
   description = "%s"
-  
-  machines = "machines.hcl"
-  variables = "variables.hcl"
-  actions = "actions.hcl"
 }
-`, profile.Project.Name, profile.Project.Description)
+`, profile.Name, profile.Project.Name, profile.Project.Description)
 
 	return os.WriteFile(filepath.Join(projectDir, "project.hcl"), []byte(content), 0o644)
 }
 
 // generateMachinesHCL creates the machines.hcl file
 func (bg *BundleGenerator) generateMachinesHCL(profile *profiles.Profile, projectDir string) error {
+	// Get the current working directory (where the generator is running from)
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	// Look for spooky binary in the generator directory
+	spookyPath := filepath.Join(currentDir, "spooky")
+	if _, err := os.Stat(spookyPath); os.IsNotExist(err) {
+		return fmt.Errorf("spooky binary not found at %s. Please build it first: just build-spooky-test-bundle-generator", spookyPath)
+	}
+
+	// First, generate a temporary project to get the base machines.hcl
+	tempDir := filepath.Join(projectDir, "temp-init")
+	if err := os.MkdirAll(tempDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Use spooky project init to generate base files
+	cmd := exec.Command(spookyPath, "project", "init", "--name", "temp-project", "--description", "Temporary project for schema generation", tempDir)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to run spooky project init: %w\nOutput: %s", err, string(output))
+	}
+
+	// Read the generated machines.hcl to understand the structure
+	baseMachinesPath := filepath.Join(tempDir, "machines.hcl")
+	_, err = os.ReadFile(baseMachinesPath)
+	if err != nil {
+		return fmt.Errorf("failed to read base machines.hcl: %w", err)
+	}
+
+	// Now build the actual machines.hcl content using the same structure
 	var content strings.Builder
 	content.WriteString("machines {\n")
 
@@ -346,25 +397,23 @@ func (bg *BundleGenerator) generateMachinesHCL(profile *profiles.Profile, projec
 
 	for _, osConfig := range osConfigs {
 		if osConfig.config != nil && osConfig.machine != nil {
-			content.WriteString(fmt.Sprintf("  %s {\n", osConfig.name))
-			content.WriteString(fmt.Sprintf("    hostname = \"%s\"\n", osConfig.machine.Hostname))
-			content.WriteString(fmt.Sprintf("    ip = \"%s\"\n", osConfig.machine.IP))
+			content.WriteString(fmt.Sprintf("  machine \"%s\" {\n", osConfig.name))
+			content.WriteString(fmt.Sprintf("    hostname = \"%s\"\n", osConfig.machine.IP)) // Use internal container IPs
 			content.WriteString(fmt.Sprintf("    port = %d\n", osConfig.machine.Port))
 
-			// Auth configuration
-			content.WriteString("    auth {\n")
-			content.WriteString(fmt.Sprintf("      password = \"%s\"\n", osConfig.machine.Auth.Password))
+			// User field (required)
+			user := "root"
 			if osConfig.machine.Auth.Username != nil {
-				content.WriteString(fmt.Sprintf("      username = \"%s\"\n", *osConfig.machine.Auth.Username))
+				user = *osConfig.machine.Auth.Username
 			}
-			content.WriteString("    }\n")
+			content.WriteString(fmt.Sprintf("    user = \"%s\"\n", user))
 
-			// Facts configuration
-			content.WriteString("    facts {\n")
-			content.WriteString(fmt.Sprintf("      basic = %t\n", osConfig.machine.Facts.Basic))
-			content.WriteString(fmt.Sprintf("      enhanced = %t\n", osConfig.machine.Facts.Enhanced))
-			content.WriteString(fmt.Sprintf("      custom = %t\n", osConfig.machine.Facts.Custom))
-			content.WriteString(fmt.Sprintf("      encrypted = %t\n", osConfig.machine.Facts.Encrypted))
+			// Authentication block (required)
+			content.WriteString("    authentication \"password\" {\n")
+			content.WriteString("      password {\n")
+			content.WriteString(fmt.Sprintf("        value = \"%s\"\n", osConfig.machine.Auth.Password))
+			content.WriteString("        encrypted = false\n")
+			content.WriteString("      }\n")
 			content.WriteString("    }\n")
 
 			content.WriteString("  }\n\n")
@@ -378,153 +427,85 @@ func (bg *BundleGenerator) generateMachinesHCL(profile *profiles.Profile, projec
 
 // generateVariablesHCL creates the variables.hcl file
 func (bg *BundleGenerator) generateVariablesHCL(profile *profiles.Profile, projectDir string) error {
-	var content strings.Builder
-	content.WriteString("variables {\n")
+	// For now, generate a minimal variables.hcl since the profile variables are test-specific
+	// and don't map directly to Spooky's variables schema
+	content := `variables {
+  # Test-specific variables for this bundle
+  # These are not part of the standard Spooky variables schema
+  # but are used for test configuration
+}
+`
 
-	if profile.Project.Variables.TestType != nil {
-		content.WriteString(fmt.Sprintf("  test_type = \"%s\"\n", *profile.Project.Variables.TestType))
-	}
-
-	if profile.Project.Variables.OSList != nil && len(*profile.Project.Variables.OSList) > 0 {
-		content.WriteString("  os_list = [\n")
-		for _, os := range *profile.Project.Variables.OSList {
-			content.WriteString(fmt.Sprintf("    \"%s\",\n", os))
-		}
-		content.WriteString("  ]\n")
-	}
-
-	if profile.Project.Variables.ExpectedFacts != nil && len(*profile.Project.Variables.ExpectedFacts) > 0 {
-		content.WriteString("  expected_facts = [\n")
-		for _, fact := range *profile.Project.Variables.ExpectedFacts {
-			content.WriteString(fmt.Sprintf("    \"%s\",\n", fact))
-		}
-		content.WriteString("  ]\n")
-	}
-
-	// Add other optional variables
-	if profile.Project.Variables.EnhancedFactsTimeout != nil {
-		content.WriteString(fmt.Sprintf("  enhanced_facts_timeout = \"%s\"\n", *profile.Project.Variables.EnhancedFactsTimeout))
-	}
-	if profile.Project.Variables.CustomFactsDir != nil {
-		content.WriteString(fmt.Sprintf("  custom_facts_dir = \"%s\"\n", *profile.Project.Variables.CustomFactsDir))
-	}
-	if profile.Project.Variables.CustomFactsTimeout != nil {
-		content.WriteString(fmt.Sprintf("  custom_facts_timeout = \"%s\"\n", *profile.Project.Variables.CustomFactsTimeout))
-	}
-	if profile.Project.Variables.AuthTimeout != nil {
-		content.WriteString(fmt.Sprintf("  auth_timeout = \"%s\"\n", *profile.Project.Variables.AuthTimeout))
-	}
-	if profile.Project.Variables.ConnectionRetries != nil {
-		content.WriteString(fmt.Sprintf("  connection_retries = %d\n", *profile.Project.Variables.ConnectionRetries))
-	}
-	if profile.Project.Variables.AppName != nil {
-		content.WriteString(fmt.Sprintf("  app_name = \"%s\"\n", *profile.Project.Variables.AppName))
-	}
-	if profile.Project.Variables.AppVersion != nil {
-		content.WriteString(fmt.Sprintf("  app_version = \"%s\"\n", *profile.Project.Variables.AppVersion))
-	}
-	if profile.Project.Variables.Environment != nil {
-		content.WriteString(fmt.Sprintf("  environment = \"%s\"\n", *profile.Project.Variables.Environment))
-	}
-	if profile.Project.Variables.MaxConnections != nil {
-		content.WriteString(fmt.Sprintf("  max_connections = %d\n", *profile.Project.Variables.MaxConnections))
-	}
-	if profile.Project.Variables.LogLevel != nil {
-		content.WriteString(fmt.Sprintf("  log_level = \"%s\"\n", *profile.Project.Variables.LogLevel))
-	}
-	if profile.Project.Variables.SyncMode != nil {
-		content.WriteString(fmt.Sprintf("  sync_mode = \"%s\"\n", *profile.Project.Variables.SyncMode))
-	}
-	if profile.Project.Variables.IgnorePatterns != nil && len(*profile.Project.Variables.IgnorePatterns) > 0 {
-		content.WriteString("  ignore_patterns = [\n")
-		for _, pattern := range *profile.Project.Variables.IgnorePatterns {
-			content.WriteString(fmt.Sprintf("    \"%s\",\n", pattern))
-		}
-		content.WriteString("  ]\n")
-	}
-	if profile.Project.Variables.SyncInterval != nil {
-		content.WriteString(fmt.Sprintf("  sync_interval = \"%s\"\n", *profile.Project.Variables.SyncInterval))
-	}
-
-	content.WriteString("}\n")
-
-	return os.WriteFile(filepath.Join(projectDir, "variables.hcl"), []byte(content.String()), 0o644)
+	return os.WriteFile(filepath.Join(projectDir, "variables.hcl"), []byte(content), 0o644)
 }
 
 // generateActionsHCL creates the actions.hcl file
 func (bg *BundleGenerator) generateActionsHCL(profile *profiles.Profile, projectDir string) error {
-	var content strings.Builder
-	content.WriteString("actions {\n")
+	// For now, generate a minimal actions.hcl since the profile actions are test-specific
+	// and don't map directly to Spooky's actions schema
+	content := `actions {
+  # Test-specific actions for this bundle
+  # These are not part of the standard Spooky actions schema
+  # but are used for test configuration
+}
+`
 
-	// Generate actions based on what's configured
-	if profile.Project.Actions != nil {
-		actions := []struct {
-			name   string
-			action *profiles.ActionConfig
-		}{
-			{"gather_facts", profile.Project.Actions.GatherFacts},
-			{"verify_facts", profile.Project.Actions.VerifyFacts},
-			{"compare_facts", profile.Project.Actions.CompareFacts},
-			{"setup_custom_facts", profile.Project.Actions.SetupCustomFacts},
-			{"gather_custom_facts", profile.Project.Actions.GatherCustomFacts},
-			{"verify_custom_facts", profile.Project.Actions.VerifyCustomFacts},
-			{"test_custom_facts_execution", profile.Project.Actions.TestCustomFactsExecution},
-			{"test_password_connection", profile.Project.Actions.TestPasswordConnection},
-			{"verify_password_auth", profile.Project.Actions.VerifyPasswordAuth},
-			{"test_invalid_password", profile.Project.Actions.TestInvalidPassword},
-			{"gather_facts_via_password", profile.Project.Actions.GatherFactsViaPassword},
-			{"render_templates", profile.Project.Actions.RenderTemplates},
-			{"verify_templates", profile.Project.Actions.VerifyTemplates},
-			{"test_template_variables", profile.Project.Actions.TestTemplateVariables},
-			{"deploy_templates", profile.Project.Actions.DeployTemplates},
-			{"restart_services", profile.Project.Actions.RestartServices},
-			{"setup_sync_directories", profile.Project.Actions.SetupSyncDirectories},
-			{"create_test_files", profile.Project.Actions.CreateTestFiles},
-			{"start_sync", profile.Project.Actions.StartSync},
-			{"verify_sync", profile.Project.Actions.VerifySync},
-			{"test_file_modifications", profile.Project.Actions.TestFileModifications},
-			{"test_conflict_resolution", profile.Project.Actions.TestConflictResolution},
-			{"stop_sync", profile.Project.Actions.StopSync},
-			{"cleanup_sync", profile.Project.Actions.CleanupSync},
-		}
+	return os.WriteFile(filepath.Join(projectDir, "actions.hcl"), []byte(content), 0o644)
+}
 
-		for _, action := range actions {
-			if action.action != nil {
-				content.WriteString(fmt.Sprintf("  %s {\n", action.name))
-				content.WriteString(fmt.Sprintf("    name = \"%s\"\n", action.action.Name))
-				content.WriteString(fmt.Sprintf("    description = \"%s\"\n", action.action.Description))
-				content.WriteString(fmt.Sprintf("    command = \"%s\"\n", action.action.Command))
-
-				if action.action.Tags != nil && len(*action.action.Tags) > 0 {
-					content.WriteString("    tags = [\n")
-					for _, tag := range *action.action.Tags {
-						content.WriteString(fmt.Sprintf("      \"%s\",\n", tag))
-					}
-					content.WriteString("    ]\n")
-				}
-
-				if action.action.Parallel != nil {
-					content.WriteString(fmt.Sprintf("    parallel = %t\n", *action.action.Parallel))
-				}
-
-				content.WriteString(fmt.Sprintf("    timeout = \"%s\"\n", action.action.Timeout))
-
-				if action.action.DependsOn != nil && len(*action.action.DependsOn) > 0 {
-					content.WriteString("    depends_on = [\n")
-					for _, dep := range *action.action.DependsOn {
-						content.WriteString(fmt.Sprintf("      \"%s\",\n", dep))
-					}
-					content.WriteString("    ]\n")
-				}
-
-				content.WriteString("  }\n\n")
-			}
-		}
+// generateSpookyRunner creates a minimal Go container to run Spooky commands
+func (bg *BundleGenerator) generateSpookyRunner(profile *profiles.Profile, outputPath string) error {
+	runnerDir := filepath.Join(outputPath, "spooky-runner")
+	if err := os.MkdirAll(runnerDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create spooky-runner directory: %w", err)
 	}
 
-	content.WriteString("}\n")
+	// Generate Containerfile for the runner
+	containerfilePath := filepath.Join(runnerDir, "Containerfile")
+	content := `FROM golang:1.24-alpine AS builder
 
-	return os.WriteFile(filepath.Join(projectDir, "actions.hcl"), []byte(content.String()), 0o644)
+# Install build dependencies
+RUN apk add --no-cache git
+
+# Set working directory
+WORKDIR /build
+
+# Copy the entire spooky source code
+COPY spooky-source /build/spooky
+
+# Build spooky binary
+WORKDIR /build/spooky
+RUN go build -o /build/spooky-bin ./main.go
+
+# Build spooky-test-bundle-generator
+WORKDIR /build/spooky/tools/spooky-test-bundle-generator
+RUN go build -o /build/bundle-generator ./main.go
+
+# Final stage
+FROM alpine:3.19
+
+# Copy built binaries
+COPY --from=builder /build/spooky-bin /usr/local/bin/spooky
+COPY --from=builder /build/bundle-generator /usr/local/bin/spooky-test-bundle-generator
+
+# Copy spooky project files
+COPY spooky-project /app/spooky-project
+
+# Set working directory
+WORKDIR /app
+
+# Set permissions
+RUN chmod +x /usr/local/bin/spooky /usr/local/bin/spooky-test-bundle-generator
+
+# Default command
+CMD ["/usr/local/bin/spooky"]
+`
+
+	if err := os.WriteFile(containerfilePath, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("failed to write Containerfile: %w", err)
+	}
+
+	return nil
 }
 
 // generateTemplates creates the templates directory and files
@@ -641,6 +622,7 @@ cleanup:
         podman rm spooky-test-$os 2>/dev/null || true
         podman rmi spooky-test-$os 2>/dev/null || true
     done
+    podman rmi spooky-test-runner 2>/dev/null || true
     podman network rm spooky-test-net 2>/dev/null || true
 
 # Setup test network
@@ -649,13 +631,23 @@ setup-network:
     echo "Setting up test network..."
     podman network create --subnet 10.0.100.0/24 spooky-test-net 2>/dev/null || true
 
+# Build Spooky runner container
+build-runner:
+    #!/usr/bin/env bash
+    echo "Building Spooky runner container..."
+    # Copy entire spooky source code to runner directory
+    cp -r ../../.. spooky-runner/spooky-source
+    # Copy spooky project to runner directory
+    cp -r spooky-project spooky-runner/
+    # Build the runner container
+    podman build -t spooky-test-runner spooky-runner
+
 # Run Spooky tests
-test: setup-network build start
+test: setup-network build build-runner start
     #!/usr/bin/env bash
     echo "Running Spooky tests..."
-    cd spooky-project
-    ../../spooky facts --machines machines.hcl
-    ../../spooky actions --machines machines.hcl --actions actions.hcl
+    # Run spooky commands inside the runner container
+    podman run --rm --network spooky-test-net spooky-test-runner spooky facts gather
 
 # Show container status
 status:
@@ -783,13 +775,12 @@ func (bg *BundleGenerator) generateReadme(profile *profiles.Profile, outputPath 
 	content.WriteString("```bash\n")
 	content.WriteString("cd spooky-project\n\n")
 	content.WriteString("# Gather facts from all machines\n")
-	content.WriteString("../../spooky facts --machines machines.hcl\n\n")
-	content.WriteString("# Run specific actions\n")
-	content.WriteString("../../spooky actions --machines machines.hcl --actions actions.hcl\n\n")
-	content.WriteString("# Test specific functionality\n")
-	content.WriteString("../../spooky facts --machines machines.hcl --enhanced\n")
-	content.WriteString("../../spooky template --render-all\n")
-	content.WriteString("../../spooky sync --start\n")
+	content.WriteString("SPOOKY_BIN=\"../../../spooky\"\n")
+	content.WriteString("\"$SPOOKY_BIN\" facts gather\n\n")
+	content.WriteString("# Export facts to HCL format\n")
+	content.WriteString("\"$SPOOKY_BIN\" facts export\n\n")
+	content.WriteString("# Validate project configuration\n")
+	content.WriteString("\"$SPOOKY_BIN\" project validate .\n")
 	content.WriteString("```\n\n")
 
 	content.WriteString("## Troubleshooting\n\n")
@@ -805,8 +796,8 @@ func (bg *BundleGenerator) generateReadme(profile *profiles.Profile, outputPath 
 
 	content.WriteString("### Spooky Command Failures\n")
 	content.WriteString("1. Verify all containers are running: `just status`\n")
-	content.WriteString("2. Check machine connectivity: `../../spooky facts --machines machines.hcl --debug`\n")
-	content.WriteString("3. Review action logs: `../../spooky actions --machines machines.hcl --actions actions.hcl --verbose`\n\n")
+	content.WriteString("2. Check machine connectivity: `cd spooky-project && SPOOKY_BIN=\"../../../spooky\" && \"$SPOOKY_BIN\" facts gather --verbose`\n")
+	content.WriteString("3. Validate project configuration: `cd spooky-project && SPOOKY_BIN=\"../../../spooky\" && \"$SPOOKY_BIN\" project validate .`\n\n")
 
 	content.WriteString("## Cleanup\n\n")
 	content.WriteString("To completely clean up all test artifacts:\n\n")

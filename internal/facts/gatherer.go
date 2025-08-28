@@ -9,6 +9,9 @@ import (
 	"spooky/internal/schemas"
 	"spooky/internal/ssh"
 
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/gohcl"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/pkg/errors"
 )
 
@@ -378,12 +381,85 @@ func (g *Gatherer) gatherCustomFacts(ctx context.Context, machine *schemas.Machi
 
 // parseFactsHCL parses HCL content and returns facts structure
 func (g *Gatherer) parseFactsHCL(hclContent string) (*schemas.EnhancedFactsV1, error) {
-	// TODO: Implement HCL parsing for facts
-	// For now, return empty structure
-	// This would need to parse the HCL content and convert it to the schema structure
-	return &schemas.EnhancedFactsV1{
+	// Parse HCL content
+	file, diags := hclsyntax.ParseConfig([]byte(hclContent), "facts.hcl", hcl.Pos{Line: 1, Column: 1})
+	if diags.HasErrors() {
+		return nil, errors.Wrapf(errors.New("HCL parsing failed"), "failed to parse facts HCL: %v", diags)
+	}
+
+	// Define schema for facts blocks
+	schema := &hcl.BodySchema{
+		Blocks: []hcl.BlockHeaderSchema{
+			{
+				Type:       "fact",
+				LabelNames: []string{"name"},
+			},
+		},
+	}
+
+	// Extract fact blocks
+	bodyContent, diags := file.Body.Content(schema)
+	if diags.HasErrors() {
+		return nil, errors.Wrapf(errors.New("HCL decoding failed"), "failed to decode facts HCL: %v", diags)
+	}
+
+	// Create enhanced facts structure
+	enhancedFacts := &schemas.EnhancedFactsV1{
 		Facts: make(map[string]*schemas.FactV1),
-	}, nil
+	}
+
+	// Process each fact block
+	for _, block := range bodyContent.Blocks {
+		factName := block.Labels[0]
+
+		// Define schema for fact attributes
+		factSchema := &hcl.BodySchema{
+			Attributes: []hcl.AttributeSchema{
+				{Name: "value", Required: true},
+				{Name: "type", Required: false},
+				{Name: "description", Required: false},
+			},
+		}
+
+		// Extract fact attributes
+		factContent, diags := block.Body.Content(factSchema)
+		if diags.HasErrors() {
+			continue // Skip this fact if we can't parse it
+		}
+
+		// Get the fact value
+		if valueAttr, exists := factContent.Attributes["value"]; exists {
+			var factValue string
+			if diags := gohcl.DecodeExpression(valueAttr.Expr, nil, &factValue); diags.HasErrors() {
+				continue // Skip if we can't decode the value
+			}
+
+			// Create fact structure
+			fact := &schemas.FactV1{
+				Value: factValue,
+			}
+
+			// Get optional type
+			if typeAttr, exists := factContent.Attributes["type"]; exists {
+				var factType string
+				if diags := gohcl.DecodeExpression(typeAttr.Expr, nil, &factType); !diags.HasErrors() {
+					fact.Type = factType
+				}
+			}
+
+			// Get optional description
+			if descAttr, exists := factContent.Attributes["description"]; exists {
+				var description string
+				if diags := gohcl.DecodeExpression(descAttr.Expr, nil, &description); !diags.HasErrors() {
+					fact.Description = description
+				}
+			}
+
+			enhancedFacts.Facts[factName] = fact
+		}
+	}
+
+	return enhancedFacts, nil
 }
 
 // ExportFacts exports collected facts to HCL format

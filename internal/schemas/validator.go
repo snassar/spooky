@@ -1096,28 +1096,31 @@ func (v *Validator) validateMachinesBlockV1(machines map[string]interface{}, res
 	hasMachine := false
 	hasGroup := false
 
-	if machineList, exists := machines["machine"]; exists {
-		hasMachine = true
-		if machineArray, ok := machineList.([]interface{}); ok {
-			// Handle array of machines
-			for i, machine := range machineArray {
-				if machineMap, ok := machine.(map[string]interface{}); ok {
-					v.validateMachineV1(machineMap, fmt.Sprintf("machines.machine[%d]", i), result)
+	// In HCL, machine blocks are identified by their block labels (machine names)
+	// So we iterate through all keys in the machines map
+	for machineName, machineValue := range machines {
+		if machineName == "group" {
+			// Handle group blocks
+			hasGroup = true
+			if groupArray, ok := machineValue.([]interface{}); ok {
+				for i, group := range groupArray {
+					if groupMap, ok := group.(map[string]interface{}); ok {
+						v.validateGroupV1(groupMap, fmt.Sprintf("machines.group[%d]", i), result)
+					}
 				}
+			} else if groupMap, ok := machineValue.(map[string]interface{}); ok {
+				v.validateGroupV1(groupMap, "machines.group[0]", result)
 			}
-		} else if machineMap, ok := machineList.(map[string]interface{}); ok {
-			// Handle single machine
-			v.validateMachineV1(machineMap, "machines.machine[0]", result)
-		}
-	}
-
-	if groupList, exists := machines["group"]; exists {
-		hasGroup = true
-		if groupArray, ok := groupList.([]interface{}); ok {
-			for i, group := range groupArray {
-				if groupMap, ok := group.(map[string]interface{}); ok {
-					v.validateGroupV1(groupMap, fmt.Sprintf("machines.group[%d]", i), result)
+		} else {
+			// This is a machine block (machine name is the key)
+			hasMachine = true
+			if machineMap, ok := machineValue.(map[string]interface{}); ok {
+				keys := make([]string, 0, len(machineMap))
+				for k := range machineMap {
+					keys = append(keys, k)
 				}
+				fmt.Printf("DEBUG: Validating machine %s with keys: %v\n", machineName, keys)
+				v.validateMachineV1(machineMap, fmt.Sprintf("machines.%s", machineName), result)
 			}
 		}
 	}
@@ -1133,15 +1136,7 @@ func (v *Validator) validateMachinesBlockV1(machines map[string]interface{}, res
 // validateMachineV1 validates an individual machine against V1 schema
 func (v *Validator) validateMachineV1(machine map[string]interface{}, path string, result *ValidationResult) {
 	// Required fields
-	if name, exists := machine["name"]; !exists {
-		result.Errors = append(result.Errors, ValidationError{
-			Field:    fmt.Sprintf("%s.name", path),
-			Message:  "missing required field: name",
-			Severity: "error",
-		})
-	} else {
-		v.validateMachineNameV1(name, path, result)
-	}
+	// Note: machine name comes from the block label, not a field
 
 	if hostname, exists := machine["hostname"]; !exists {
 		result.Errors = append(result.Errors, ValidationError{
@@ -1170,6 +1165,7 @@ func (v *Validator) validateMachineV1(machine map[string]interface{}, path strin
 			Severity: "error",
 		})
 	} else {
+		fmt.Printf("DEBUG: Found authentication block for %s: %T\n", path, auth)
 		v.validateMachineAuthenticationV1(auth, path, result)
 	}
 }
@@ -1417,29 +1413,32 @@ func (v *Validator) validateMachineAuthenticationV1(auth interface{}, path strin
 		return
 	}
 
-	// Required method field
-	if method, exists := authMap["method"]; !exists {
-		result.Errors = append(result.Errors, ValidationError{
-			Field:    fmt.Sprintf("%s.authentication.method", path),
-			Message:  "missing required field: method",
-			Severity: "error",
-		})
-	} else {
-		v.validateAuthMethodV1(method, path, result)
-	}
-
-	// Validate method-specific fields
-	if method, exists := authMap["method"]; exists {
-		if methodStr, ok := method.(string); ok {
-			switch methodStr {
-			case "publickey":
-				v.validatePublicKeyAuthV1(authMap, path, result)
-			case "password":
-				v.validatePasswordAuthV1(authMap, path, result)
-			case "certificate":
-				v.validateCertificateAuthV1(authMap, path, result)
+	// In HCL, authentication method is a block label, not a field
+	// Look for authentication method blocks
+	hasValidMethod := false
+	for authMethod, authValue := range authMap {
+		if authMethod == "password" || authMethod == "publickey" || authMethod == "certificate" {
+			hasValidMethod = true
+			// Validate method-specific fields
+			if authMethodMap, ok := authValue.(map[string]interface{}); ok {
+				switch authMethod {
+				case "publickey":
+					v.validatePublicKeyAuthV1(authMethodMap, path, result)
+				case "password":
+					v.validatePasswordAuthV1(authMethodMap, path, result)
+				case "certificate":
+					v.validateCertificateAuthV1(authMethodMap, path, result)
+				}
 			}
 		}
+	}
+
+	if !hasValidMethod {
+		result.Errors = append(result.Errors, ValidationError{
+			Field:    fmt.Sprintf("%s.authentication", path),
+			Message:  "authentication must have a valid method block (password, publickey, or certificate)",
+			Severity: "error",
+		})
 	}
 }
 

@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
+
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/gohcl"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 
 	"github.com/pkg/errors"
 )
@@ -30,18 +33,69 @@ func (su *SimpleHCLUpdater) UpdateFile(filePath string) error {
 		return errors.Wrapf(err, "failed to read file: %s", filePath)
 	}
 
-	contentStr := string(content)
+	// Parse HCL content
+	file, diags := hclsyntax.ParseConfig(content, filepath.Base(filePath), hcl.Pos{Line: 1, Column: 1})
+	if diags.HasErrors() {
+		return errors.Wrapf(err, "failed to parse HCL file: %s", filePath)
+	}
+
+	// Define schema for variable blocks
+	schema := &hcl.BodySchema{
+		Blocks: []hcl.BlockHeaderSchema{
+			{
+				Type:       "variable",
+				LabelNames: []string{"name"},
+			},
+		},
+	}
+
+	// Extract variable blocks
+	bodyContent, diags := file.Body.Content(schema)
+	if diags.HasErrors() {
+		return errors.Wrapf(err, "failed to decode variable blocks: %s", filePath)
+	}
+
 	modified := false
+	contentStr := string(content)
 
-	// Find all variable blocks with encrypted = true
-	// This regex matches: variable "name" { ... value = "..." ... encrypted = true ... }
-	pattern := regexp.MustCompile(`variable\s+"([^"]+)"\s*\{[^}]*value\s*=\s*"([^"]*)"[^}]*encrypted\s*=\s*true[^}]*\}`)
+	// Process each variable block
+	for _, block := range bodyContent.Blocks {
+		variableName := block.Labels[0]
 
-	matches := pattern.FindAllStringSubmatch(contentStr, -1)
-	for _, match := range matches {
-		if len(match) >= 3 {
-			variableName := match[1]
-			originalValue := match[2]
+		// Define schema for variable attributes
+		varSchema := &hcl.BodySchema{
+			Attributes: []hcl.AttributeSchema{
+				{Name: "value", Required: false},
+				{Name: "encrypted", Required: false},
+			},
+		}
+
+		// Extract variable attributes
+		varContent, diags := block.Body.Content(varSchema)
+		if diags.HasErrors() {
+			continue // Skip this variable if we can't parse it
+		}
+
+		// Check if encrypted flag is set to true
+		if encryptedAttr, exists := varContent.Attributes["encrypted"]; exists {
+			var encrypted bool
+			if diags := gohcl.DecodeExpression(encryptedAttr.Expr, nil, &encrypted); diags.HasErrors() {
+				continue // Skip if we can't decode the encrypted flag
+			}
+
+			if !encrypted {
+				continue // Skip if not marked for encryption
+			}
+		} else {
+			continue // Skip if no encrypted flag
+		}
+
+		// Get the value to encrypt
+		if valueAttr, exists := varContent.Attributes["value"]; exists {
+			var originalValue string
+			if diags := gohcl.DecodeExpression(valueAttr.Expr, nil, &originalValue); diags.HasErrors() {
+				continue // Skip if we can't decode the value
+			}
 
 			// Check if already encrypted
 			if su.ageEncryption.IsEncrypted(originalValue) {
@@ -55,16 +109,20 @@ func (su *SimpleHCLUpdater) UpdateFile(filePath string) error {
 				return errors.Wrapf(err, "failed to encrypt value for variable %s", variableName)
 			}
 
-			// Replace the value in the content
-			oldValue := fmt.Sprintf(`value = "%s"`, originalValue)
-			newValue := fmt.Sprintf(`value = "%s"`, strings.ReplaceAll(encryptedValue, `"`, `\"`))
+			// Replace the value in the content using the original position
+			startPos := valueAttr.Expr.Range().Start
+			endPos := valueAttr.Expr.Range().End
 
-			contentStr = strings.Replace(contentStr, oldValue, newValue, 1)
-			modified = true
+			if startPos.Byte < len(content) && endPos.Byte <= len(content) {
+				newValue := fmt.Sprintf(`"%s"`, strings.ReplaceAll(encryptedValue, `"`, `\"`))
 
-			fmt.Printf("Encrypted variable %s\n", variableName)
-			fmt.Printf("Original value: %s\n", originalValue)
-			fmt.Printf("Encrypted value: %s\n", encryptedValue)
+				contentStr = contentStr[:startPos.Byte] + newValue + contentStr[endPos.Byte:]
+				modified = true
+
+				fmt.Printf("Encrypted variable %s\n", variableName)
+				fmt.Printf("Original value: %s\n", originalValue)
+				fmt.Printf("Encrypted value: %s\n", encryptedValue)
+			}
 		}
 	}
 

@@ -11,6 +11,8 @@ import (
 	"spooky/internal/schemas"
 	"spooky/internal/utilities"
 
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/spf13/cobra"
 )
 
@@ -1042,20 +1044,43 @@ actions {
 	return merged
 }
 
-// extractActionBlocks extracts complete action blocks with proper brace counting
+// extractActionBlocks extracts action blocks using proper HCL parsing
 func extractActionBlocks(content string) []string {
 	var blocks []string
-	lines := strings.Split(content, "\n")
 
-	for i, line := range lines {
-		// Look for action block start (action "name" {)
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "action \"") && strings.Contains(trimmed, "{") {
-			// Find the complete block by counting braces
-			block := extractCompleteBlock(lines, i)
-			if block != "" {
-				blocks = append(blocks, block)
-			}
+	// Parse HCL content
+	file, diags := hclsyntax.ParseConfig([]byte(content), "content.hcl", hcl.Pos{Line: 1, Column: 1})
+	if diags.HasErrors() {
+		// If parsing fails, return empty slice
+		return blocks
+	}
+
+	// Define schema for action blocks
+	schema := &hcl.BodySchema{
+		Blocks: []hcl.BlockHeaderSchema{
+			{
+				Type:       "action",
+				LabelNames: []string{"name"},
+			},
+		},
+	}
+
+	// Extract action blocks
+	bodyContent, diags := file.Body.Content(schema)
+	if diags.HasErrors() {
+		return blocks
+	}
+
+	// Convert blocks back to HCL strings by extracting the original content
+	for _, block := range bodyContent.Blocks {
+		// Get the range of the block in the original content
+		startPos := block.DefRange.Start
+		endPos := block.DefRange.End
+
+		// Extract the block content from the original string
+		if startPos.Byte < len(content) && endPos.Byte <= len(content) {
+			blockContent := content[startPos.Byte:endPos.Byte]
+			blocks = append(blocks, blockContent)
 		}
 	}
 
@@ -1091,19 +1116,43 @@ variables {
 	return merged
 }
 
-// extractVariableBlocks extracts complete variable blocks with proper brace counting
+// extractVariableBlocks extracts variable blocks using proper HCL parsing
 func extractVariableBlocks(content string) []string {
 	var blocks []string
-	lines := strings.Split(content, "\n")
 
-	for i, line := range lines {
-		// Look for variable block start (variable {)
-		if strings.TrimSpace(line) == "variable {" {
-			// Find the complete block by counting braces
-			block := extractCompleteBlock(lines, i)
-			if block != "" {
-				blocks = append(blocks, block)
-			}
+	// Parse HCL content
+	file, diags := hclsyntax.ParseConfig([]byte(content), "content.hcl", hcl.Pos{Line: 1, Column: 1})
+	if diags.HasErrors() {
+		// If parsing fails, return empty slice
+		return blocks
+	}
+
+	// Define schema for variable blocks
+	schema := &hcl.BodySchema{
+		Blocks: []hcl.BlockHeaderSchema{
+			{
+				Type:       "variable",
+				LabelNames: []string{},
+			},
+		},
+	}
+
+	// Extract variable blocks
+	bodyContent, diags := file.Body.Content(schema)
+	if diags.HasErrors() {
+		return blocks
+	}
+
+	// Convert blocks back to HCL strings by extracting the original content
+	for _, block := range bodyContent.Blocks {
+		// Get the range of the block in the original content
+		startPos := block.DefRange.Start
+		endPos := block.DefRange.End
+
+		// Extract the block content from the original string
+		if startPos.Byte < len(content) && endPos.Byte <= len(content) {
+			blockContent := content[startPos.Byte:endPos.Byte]
+			blocks = append(blocks, blockContent)
 		}
 	}
 
@@ -1139,61 +1188,47 @@ machines {
 	return merged
 }
 
-// extractMachineBlocks extracts complete machine blocks with proper brace counting
+// extractMachineBlocks extracts machine blocks using proper HCL parsing
 func extractMachineBlocks(content string) []string {
 	var blocks []string
-	lines := strings.Split(content, "\n")
 
-	for i, line := range lines {
-		// Look for machine block start
-		if strings.TrimSpace(line) == "machine {" {
-			// Find the complete block by counting braces
-			block := extractCompleteBlock(lines, i)
-			if block != "" {
-				blocks = append(blocks, block)
-			}
+	// Parse HCL content
+	file, diags := hclsyntax.ParseConfig([]byte(content), "content.hcl", hcl.Pos{Line: 1, Column: 1})
+	if diags.HasErrors() {
+		// If parsing fails, return empty slice
+		return blocks
+	}
+
+	// Define schema for machine blocks
+	schema := &hcl.BodySchema{
+		Blocks: []hcl.BlockHeaderSchema{
+			{
+				Type:       "machine",
+				LabelNames: []string{},
+			},
+		},
+	}
+
+	// Extract machine blocks
+	bodyContent, diags := file.Body.Content(schema)
+	if diags.HasErrors() {
+		return blocks
+	}
+
+	// Convert blocks back to HCL strings by extracting the original content
+	for _, block := range bodyContent.Blocks {
+		// Get the range of the block in the original content
+		startPos := block.DefRange.Start
+		endPos := block.DefRange.End
+
+		// Extract the block content from the original string
+		if startPos.Byte < len(content) && endPos.Byte <= len(content) {
+			blockContent := content[startPos.Byte:endPos.Byte]
+			blocks = append(blocks, blockContent)
 		}
 	}
 
 	return blocks
-}
-
-// extractCompleteBlock extracts a complete block from a given starting line
-func extractCompleteBlock(lines []string, startLine int) string {
-	var blockLines []string
-	braceCount := 0
-	started := false
-
-	for i := startLine; i < len(lines); i++ {
-		line := lines[i]
-
-		if !started {
-			started = true
-			braceCount = 0
-		}
-
-		// Count opening and closing braces
-		for _, char := range line {
-			if char == '{' {
-				braceCount++
-			} else if char == '}' {
-				braceCount--
-			}
-		}
-
-		blockLines = append(blockLines, line)
-
-		// If we've closed all braces, we're done
-		if braceCount == 0 && started {
-			break
-		}
-	}
-
-	if braceCount == 0 {
-		return strings.Join(blockLines, "\n")
-	}
-
-	return "" // Incomplete block
 }
 
 // getKeys returns a slice of keys from a map[string]interface{}
