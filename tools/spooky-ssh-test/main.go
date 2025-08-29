@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
 	"spooky/internal/encryption"
+	"spooky/internal/logging"
 	"spooky/internal/schemas"
 	"spooky/internal/ssh"
 )
@@ -29,7 +31,14 @@ func main() {
 	var ageEncryption *encryption.AgeEncryption
 	if os.Getenv("SSH_AUTH_SOCK") != "" {
 		// Try to create age encryption if SSH agent is available
-		ageEncryption, _ = encryption.NewAgeEncryption("", "")
+		var err error
+		ageEncryption, err = encryption.NewAgeEncryption("", "")
+		if err != nil {
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to initialize age encryption for SSH test, continuing without encryption support",
+				slog.String("error", err.Error()))
+			// Continue with nil encryption - SSH manager will handle this gracefully
+		}
 	}
 
 	// Create SSH manager
