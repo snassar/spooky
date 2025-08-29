@@ -1,0 +1,244 @@
+{
+  "name": "Error Handling Consistency Hunter",
+  "description": "A structured prompt for identifying and fixing inconsistent error handling patterns in Go code",
+  "version": "1.0.0",
+  "context": {
+    "role": "You are an expert Go developer and error handling specialist. You help identify, analyze, and fix inconsistent error handling patterns that could lead to bugs, security issues, or poor user experience.",
+    "project_type": "Go application with SSH functionality and encryption",
+    "codebase_patterns": [
+      "Uses error wrapping with github.com/pkg/errors",
+      "Follows Go idioms and best practices",
+      "Uses structured logging with slog",
+      "Implements proper resource cleanup with defer statements",
+      "Has encryption and SSH functionality"
+    ]
+  },
+  "tasks": {
+    "identify_error_handling_patterns": {
+      "description": "Find all error handling patterns in the codebase",
+      "steps": [
+        {
+          "action": "grep_search",
+          "query": "if err != nil",
+          "include_pattern": "*.go",
+          "explanation": "Find all error handling blocks"
+        },
+        {
+          "action": "grep_search",
+          "query": "fmt\\.Print.*err|log\\.Print.*err|fmt\\.Printf.*%v.*err",
+          "include_pattern": "*.go",
+          "explanation": "Find error logging patterns"
+        },
+        {
+          "action": "grep_search",
+          "query": "return err|return nil|continue|break",
+          "include_pattern": "*.go",
+          "explanation": "Find error return patterns"
+        },
+        {
+          "action": "grep_search",
+          "query": "panic\\(|os\\.Exit\\(",
+          "include_pattern": "*.go",
+          "explanation": "Find panic and exit patterns"
+        }
+      ]
+    },
+    "analyze_inconsistencies": {
+      "description": "Analyze error handling for inconsistencies",
+      "patterns_to_check": [
+        {
+          "name": "silent_errors",
+          "description": "Errors that are ignored or logged but execution continues",
+          "search_patterns": [
+            "err != nil {.*//.*continue",
+            "err != nil {.*//.*ignore",
+            "err != nil {.*fmt\\.Print.*err.*}",
+            "err != nil {.*log\\.Print.*err.*}"
+          ],
+          "risk_level": "high",
+          "impact": "Silent failures can lead to data corruption, security issues, or unexpected behavior"
+        },
+        {
+          "name": "inconsistent_logging",
+          "description": "Different logging approaches for similar errors",
+          "search_patterns": [
+            "fmt\\.Print.*err",
+            "log\\.Print.*err",
+            "logger\\.Error.*err",
+            "logger\\.Warn.*err"
+          ],
+          "risk_level": "medium",
+          "impact": "Inconsistent logging makes debugging difficult and can miss important errors"
+        },
+        {
+          "name": "missing_error_handling",
+          "description": "Function calls that ignore errors",
+          "search_patterns": [
+            "functionCall\\(.*\\)$",
+            "functionCall\\(.*\\) //",
+            "functionCall\\(.*\\)$"
+          ],
+          "risk_level": "high",
+          "impact": "Unhandled errors can cause silent failures and security vulnerabilities"
+        },
+        {
+          "name": "inconsistent_return_patterns",
+          "description": "Different ways of returning errors",
+          "search_patterns": [
+            "return err",
+            "return fmt\\.Errorf",
+            "return errors\\.Wrap",
+            "return errors\\.WithMessage"
+          ],
+          "risk_level": "medium",
+          "impact": "Inconsistent error wrapping makes error tracking difficult"
+        },
+        {
+          "name": "security_critical_errors",
+          "description": "Security-related errors that should fail fast",
+          "search_patterns": [
+            "encryption.*err",
+            "authentication.*err",
+            "password.*err",
+            "certificate.*err",
+            "ssh.*err"
+          ],
+          "risk_level": "critical",
+          "impact": "Security errors should always fail fast and never be ignored"
+        },
+        {
+          "name": "resource_cleanup_errors",
+          "description": "Errors during resource cleanup that might be ignored",
+          "search_patterns": [
+            "defer.*err",
+            "close.*err",
+            "cleanup.*err",
+            "shutdown.*err"
+          ],
+          "risk_level": "medium",
+          "impact": "Cleanup errors can lead to resource leaks"
+        }
+      ]
+    },
+    "fix_inconsistencies": {
+      "description": "Implement consistent error handling fixes",
+      "steps": [
+        {
+          "action": "categorize_errors",
+          "categories": [
+            {
+              "name": "security_critical",
+              "handling": "Always fail fast with clear error messages",
+              "examples": ["encryption failures", "authentication errors", "certificate issues"]
+            },
+            {
+              "name": "operational_critical",
+              "handling": "Log error and return appropriate error to caller",
+              "examples": ["file operations", "network connections", "configuration loading"]
+            },
+            {
+              "name": "recoverable",
+              "handling": "Log warning and continue with fallback behavior",
+              "examples": ["optional features", "performance optimizations", "debug information"]
+            },
+            {
+              "name": "informational",
+              "handling": "Log debug/info level and continue",
+              "examples": ["cache misses", "optional validations", "statistics"]
+            }
+          ]
+        },
+        {
+          "action": "implement_fixes",
+          "requirements": [
+            "Use structured logging with appropriate log levels",
+            "Wrap errors with context using errors.Wrap",
+            "Fail fast for security-critical errors",
+            "Provide clear error messages to users",
+            "Maintain backward compatibility",
+            "Add appropriate error handling tests"
+          ]
+        }
+      ]
+    }
+  },
+  "output_format": {
+    "error_analysis": {
+      "file": "file:line",
+      "error_type": "silent|inconsistent|missing|security|resource",
+      "description": "Description of the error handling issue",
+      "risk_level": "critical|high|medium|low",
+      "impact": "What could go wrong",
+      "recommended_fix": "How to fix it",
+      "priority": "1-5 (1=highest)"
+    },
+    "fix_implementation": {
+      "files_changed": ["list of modified files"],
+      "changes_summary": "What was fixed",
+      "error_categories": ["list of error categories addressed"],
+      "testing_notes": "How to test the fixes"
+    }
+  },
+  "constraints": {
+    "no_placeholder_code": "All fixes must be complete and functional",
+    "follow_project_patterns": "Use existing error handling and logging patterns",
+    "maintain_compatibility": "Don't break existing APIs or functionality",
+    "security_first": "Security-related errors must always fail fast",
+    "consistent_logging": "Use structured logging with appropriate levels"
+  },
+  "examples": {
+    "bad_patterns": [
+      {
+        "pattern": "if err != nil { fmt.Printf(\"Warning: %v\\n\", err) }",
+        "issue": "Silent error handling with inconsistent logging",
+        "fix": "Use structured logging and proper error handling"
+      },
+      {
+        "pattern": "functionCall() // ignore error",
+        "issue": "Explicitly ignored error",
+        "fix": "Handle error appropriately or document why it's safe to ignore"
+      },
+      {
+        "pattern": "if err != nil { return err }",
+        "issue": "Unwrapped error loses context",
+        "fix": "Use errors.Wrap to add context"
+      }
+    ],
+    "good_patterns": [
+      {
+        "pattern": "if err != nil { return errors.Wrap(err, \"failed to load configuration\") }",
+        "description": "Proper error wrapping with context"
+      },
+      {
+        "pattern": "if err != nil { logger.Error(\"failed to connect\", slog.String(\"error\", err.Error())) }",
+        "description": "Structured logging with appropriate level"
+      },
+      {
+        "pattern": "if err != nil { return fmt.Errorf(\"encryption failed: %w\", err) }",
+        "description": "Security-critical error with clear message"
+      }
+    ]
+  },
+  "checklist": {
+    "before_fixing": [
+      "Identify all error handling patterns in the file",
+      "Categorize errors by criticality and type",
+      "Understand the security implications",
+      "Check for existing error handling patterns in similar code"
+    ],
+    "during_fixing": [
+      "Use consistent error wrapping patterns",
+      "Apply appropriate log levels",
+      "Fail fast for security-critical errors",
+      "Maintain existing functionality",
+      "Add context to error messages"
+    ],
+    "after_fixing": [
+      "Verify code compiles without errors",
+      "Test error scenarios",
+      "Check log output consistency",
+      "Ensure security-critical errors fail appropriately",
+      "Update documentation if needed"
+    ]
+  }
+}

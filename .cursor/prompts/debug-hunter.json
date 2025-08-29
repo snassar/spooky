@@ -1,0 +1,140 @@
+{
+  "name": "Debug Code Hunter",
+  "description": "A structured prompt for identifying and fixing debug code left in production",
+  "version": "1.0.0",
+  "context": {
+    "role": "You are an expert code reviewer and debugging specialist. You help identify, analyze, and fix debug code that should not be in production.",
+    "project_type": "Go application with structured logging",
+    "codebase_patterns": [
+      "Uses structured logging with slog",
+      "Has comprehensive logging system in internal/logging/",
+      "Follows Go idioms and best practices",
+      "Uses proper error handling with github.com/pkg/errors"
+    ]
+  },
+  "tasks": {
+    "identify_debug_code": {
+      "description": "Find all debug code that should be removed or replaced",
+      "steps": [
+        {
+          "action": "grep_search",
+          "query": "fmt\\.Print.*DEBUG|fmt\\.Print.*TODO|fmt\\.Print.*FIXME|fmt\\.Print.*BUG",
+          "include_pattern": "*.go",
+          "explanation": "Find all debug print statements with common debug prefixes"
+        },
+        {
+          "action": "grep_search",
+          "query": "fmt\\.Printf.*%v|fmt\\.Printf.*%s.*debug|fmt\\.Printf.*debug.*%s",
+          "include_pattern": "*.go",
+          "explanation": "Find debug print statements with variable interpolation"
+        },
+        {
+          "action": "grep_search",
+          "query": "fmt\\.Println.*DEBUG|fmt\\.Println.*debug",
+          "include_pattern": "*.go",
+          "explanation": "Find simple debug print statements"
+        },
+        {
+          "action": "grep_search",
+          "query": "// TODO|// FIXME|// BUG|// DEBUG",
+          "include_pattern": "*.go",
+          "explanation": "Find debug comments that might indicate incomplete code"
+        },
+        {
+          "action": "grep_search",
+          "query": "panic\\(.*debug|panic\\(.*DEBUG",
+          "include_pattern": "*.go",
+          "explanation": "Find debug-related panic statements"
+        },
+        {
+          "action": "analyze",
+          "focus": [
+            "Debug print statements that should use structured logging",
+            "Temporary debug code that should be removed",
+            "Debug comments indicating incomplete implementation",
+            "Debug panic statements that should be proper error handling",
+            "Hardcoded debug values that should be configurable"
+          ]
+        }
+      ]
+    },
+    "fix_debug_code": {
+      "description": "Replace debug code with proper logging or remove it entirely",
+      "steps": [
+        {
+          "action": "read_file",
+          "target": "identified_debug_file",
+          "context_lines": 20,
+          "explanation": "Read the file containing debug code to understand context"
+        },
+        {
+          "action": "edit_file",
+          "requirements": [
+            "Replace fmt.Print* debug statements with structured logging",
+            "Use appropriate log levels (debug, info, warn, error)",
+            "Include relevant context in log messages",
+            "Remove temporary debug code entirely",
+            "Replace debug panics with proper error handling",
+            "Maintain existing functionality",
+            "Follow project logging patterns"
+          ]
+        },
+        {
+          "action": "validate",
+          "checks": [
+            "Code compiles without errors",
+            "No linter warnings",
+            "Debug statements replaced with proper logging",
+            "Log levels are appropriate",
+            "No debug code left in production"
+          ]
+        }
+      ]
+    }
+  },
+  "output_format": {
+    "debug_report": {
+      "severity": "high|medium|low",
+      "location": "file:line",
+      "type": "debug_print|debug_comment|debug_panic|temporary_code",
+      "description": "Description of the debug code found",
+      "impact": "What problems this could cause in production",
+      "fix_approach": "How to fix it (logging, removal, etc.)"
+    },
+    "fix_implementation": {
+      "files_changed": ["list of modified files"],
+      "debug_statements_removed": "count of debug statements removed",
+      "logging_statements_added": "count of logging statements added",
+      "testing_notes": "How to test the changes"
+    }
+  },
+  "logging_guidelines": {
+    "debug_level": "Use for detailed debugging information, function entry/exit, variable values",
+    "info_level": "Use for general information, successful operations, configuration loading",
+    "warn_level": "Use for warnings, deprecated features, non-critical issues",
+    "error_level": "Use for errors, failures, exceptions",
+    "structured_logging": "Use slog.With() for context, slog.String(), slog.Int(), etc.",
+    "log_format": "Use JSON format for machine parsing, text format for human readability"
+  },
+  "constraints": {
+    "no_debug_in_production": "All debug code must be removed or replaced with proper logging",
+    "follow_logging_patterns": "Use the existing logging system in internal/logging/",
+    "maintain_functionality": "Don't break existing functionality when removing debug code",
+    "appropriate_log_levels": "Choose appropriate log levels based on the information being logged"
+  },
+  "examples": {
+    "debug_print_to_logging": {
+      "before": "fmt.Printf(\"DEBUG: Processing action: %s\\n\", actionName)",
+      "after": "logger.Debug(\"processing action\", slog.String(\"action_name\", actionName))"
+    },
+    "debug_comment_to_logging": {
+      "before": "// TODO: Add proper error handling here",
+      "after": "logger.Warn(\"incomplete error handling\", slog.String(\"location\", \"function_name\"))"
+    },
+    "debug_panic_to_error": {
+      "before": "panic(\"debug: unexpected condition\")",
+      "after": "return fmt.Errorf(\"unexpected condition: %v\", condition)"
+    }
+  }
+}
+

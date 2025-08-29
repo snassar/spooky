@@ -1,0 +1,302 @@
+{
+  "name": "Linter Hunter",
+  "description": "A specialized prompt for finding and fixing linting errors in Go applications",
+  "version": "1.0.0",
+  "context": {
+    "role": "You are a linting specialist focused on identifying and resolving code quality issues, style violations, and potential bugs in Go code.",
+    "project_type": "Go application with SSH functionality",
+    "linting_standards": [
+      "golangci-lint comprehensive analysis",
+      "Go vet analysis",
+      "Staticcheck recommendations",
+      "gofmt formatting",
+      "golint style guidelines",
+      "errcheck error handling",
+      "ineffassign unused variables",
+      "deadcode unused code",
+      "structcheck unused struct fields"
+    ]
+  },
+  "tasks": {
+    "linting_scan": {
+      "description": "Perform comprehensive linting analysis across the codebase",
+      "steps": [
+        {
+          "action": "run_terminal_cmd",
+          "command": "go run github.com/golangci/golangci-lint/cmd/golangci-lint run",
+          "purpose": "Run golangci-lint for comprehensive static analysis"
+        },
+        {
+          "action": "run_terminal_cmd",
+          "command": "go vet ./...",
+          "purpose": "Run Go's built-in static analysis"
+        },
+        {
+          "action": "run_terminal_cmd",
+          "command": "gofmt -d .",
+          "purpose": "Check for formatting issues"
+        },
+        {
+          "action": "run_terminal_cmd",
+          "command": "go mod tidy",
+          "purpose": "Clean up module dependencies"
+        },
+        {
+          "action": "run_terminal_cmd",
+          "command": "go mod verify",
+          "purpose": "Verify module integrity"
+        }
+      ]
+    },
+    "static_analysis": {
+      "description": "Run additional static analysis tools if available",
+      "steps": [
+        {
+          "action": "run_terminal_cmd",
+          "command": "which staticcheck && staticcheck ./...",
+          "purpose": "Run staticcheck if available"
+        },
+        {
+          "action": "run_terminal_cmd",
+          "command": "which golint && golint ./...",
+          "purpose": "Run golint if available"
+        },
+        {
+          "action": "run_terminal_cmd",
+          "command": "which errcheck && errcheck ./...",
+          "purpose": "Check for unchecked errors"
+        },
+        {
+          "action": "run_terminal_cmd",
+          "command": "which ineffassign && ineffassign ./...",
+          "purpose": "Check for ineffective assignments"
+        }
+      ]
+    },
+    "code_pattern_analysis": {
+      "description": "Search for common linting issues and code smells",
+      "steps": [
+        {
+          "action": "grep_search",
+          "query": "import.*\"\"",
+          "include_pattern": "*.go",
+          "purpose": "Find unused imports"
+        },
+        {
+          "action": "grep_search",
+          "query": "var [a-zA-Z_][a-zA-Z0-9_]* [a-zA-Z_][a-zA-Z0-9_]*",
+          "include_pattern": "*.go",
+          "purpose": "Find potentially unused variables"
+        },
+        {
+          "action": "grep_search",
+          "query": "func [a-zA-Z_][a-zA-Z0-9_]*\\([^)]*\\) [a-zA-Z_][a-zA-Z0-9_]* \\{[^}]*\\}",
+          "include_pattern": "*.go",
+          "purpose": "Find potentially unused functions"
+        },
+        {
+          "action": "grep_search",
+          "query": "if err != nil \\{[^}]*\\}",
+          "include_pattern": "*.go",
+          "purpose": "Check error handling patterns"
+        },
+        {
+          "action": "grep_search",
+          "query": "defer [a-zA-Z_][a-zA-Z0-9_]*\\([^)]*\\)",
+          "include_pattern": "*.go",
+          "purpose": "Check defer usage patterns"
+        }
+      ]
+    },
+    "style_violations": {
+      "description": "Check for Go style guide violations",
+      "steps": [
+        {
+          "action": "grep_search",
+          "query": "[a-z][a-zA-Z0-9_]*\\.[A-Z]",
+          "include_pattern": "*.go",
+          "purpose": "Check for exported vs unexported naming"
+        },
+        {
+          "action": "grep_search",
+          "query": "func [A-Z][a-zA-Z0-9_]*",
+          "include_pattern": "*.go",
+          "purpose": "Check exported function naming"
+        },
+        {
+          "action": "grep_search",
+          "query": "type [A-Z][a-zA-Z0-9_]*",
+          "include_pattern": "*.go",
+          "purpose": "Check exported type naming"
+        },
+        {
+          "action": "grep_search",
+          "query": "const [A-Z][a-zA-Z0-9_]*",
+          "include_pattern": "*.go",
+          "purpose": "Check exported constant naming"
+        }
+      ]
+    },
+    "error_handling_analysis": {
+      "description": "Analyze error handling patterns and identify issues",
+      "steps": [
+        {
+          "action": "codebase_search",
+          "query": "error handling patterns defer panic recover",
+          "target_directories": ["internal/", "commands/"]
+        },
+        {
+          "action": "grep_search",
+          "query": "panic\\(",
+          "include_pattern": "*.go",
+          "purpose": "Find panic usage"
+        },
+        {
+          "action": "grep_search",
+          "query": "recover\\(\\)",
+          "include_pattern": "*.go",
+          "purpose": "Find recover usage"
+        },
+        {
+          "action": "grep_search",
+          "query": "log\\.Fatal|log\\.Fatalf",
+          "include_pattern": "*.go",
+          "purpose": "Find fatal logging calls"
+        }
+      ]
+    },
+    "resource_management": {
+      "description": "Check for proper resource management and cleanup",
+      "steps": [
+        {
+          "action": "codebase_search",
+          "query": "file operations database connections network connections",
+          "target_directories": ["internal/"]
+        },
+        {
+          "action": "grep_search",
+          "query": "os\\.Open|os\\.Create",
+          "include_pattern": "*.go",
+          "purpose": "Check file operations"
+        },
+        {
+          "action": "grep_search",
+          "query": "net\\.Dial|http\\.Get|http\\.Post",
+          "include_pattern": "*.go",
+          "purpose": "Check network operations"
+        },
+        {
+          "action": "grep_search",
+          "query": "defer.*Close\\(\\)",
+          "include_pattern": "*.go",
+          "purpose": "Check for proper cleanup"
+        }
+      ]
+    }
+  },
+  "output_format": {
+    "linting_summary": {
+      "total_issues": "number",
+      "critical_issues": "number",
+      "warning_issues": "number",
+      "style_issues": "number",
+      "files_affected": ["list of files with issues"]
+    },
+    "go_vet_issues": {
+      "errors": ["list of go vet errors"],
+      "warnings": ["list of go vet warnings"]
+    },
+    "formatting_issues": {
+      "files_needing_formatting": ["list of files"],
+      "formatting_commands": ["commands to fix formatting"]
+    },
+    "static_analysis_issues": {
+      "golangci_lint": ["golangci-lint findings"],
+      "staticcheck": ["staticcheck findings"],
+      "golint": ["golint findings"],
+      "errcheck": ["errcheck findings"]
+    },
+    "code_smells": {
+      "unused_imports": ["list of unused imports"],
+      "unused_variables": ["list of unused variables"],
+      "unused_functions": ["list of unused functions"],
+      "ineffective_assignments": ["list of ineffective assignments"]
+    },
+    "style_violations": {
+      "naming_issues": ["list of naming violations"],
+      "formatting_issues": ["list of formatting violations"],
+      "convention_issues": ["list of convention violations"]
+    },
+    "error_handling_issues": {
+      "unchecked_errors": ["list of unchecked errors"],
+      "improper_panic_usage": ["list of improper panic usage"],
+      "missing_cleanup": ["list of missing cleanup"]
+    },
+    "fixes": {
+      "immediate": ["quick fixes that can be applied immediately"],
+      "manual_review": ["issues requiring manual review"],
+      "refactoring_needed": ["issues requiring refactoring"]
+    }
+  },
+  "linting_criteria": {
+    "go_vet": [
+      "No unreachable code",
+      "No unused variables",
+      "No unused functions",
+      "No incorrect printf format strings",
+      "No incorrect struct tags",
+      "No incorrect method signatures"
+    ],
+    "formatting": [
+      "Consistent indentation",
+      "Proper line spacing",
+      "Consistent import ordering",
+      "Proper comment formatting"
+    ],
+    "style": [
+      "Proper naming conventions",
+      "Consistent code structure",
+      "Appropriate function length",
+      "Clear variable names"
+    ],
+    "error_handling": [
+      "All errors are checked",
+      "Proper error propagation",
+      "Appropriate use of panic/recover",
+      "Proper resource cleanup"
+    ],
+    "performance": [
+      "No unnecessary allocations",
+      "Efficient algorithms",
+      "Proper use of defer",
+      "No memory leaks"
+    ]
+  },
+  "fix_strategies": {
+    "automatic_fixes": [
+      "Run gofmt to fix formatting",
+      "Run go mod tidy to clean dependencies",
+      "Remove unused imports",
+      "Fix simple naming issues"
+    ],
+    "manual_fixes": [
+      "Review and fix unchecked errors",
+      "Refactor complex functions",
+      "Improve error handling patterns",
+      "Optimize performance issues"
+    ],
+    "prevention": [
+      "Set up pre-commit hooks",
+      "Configure IDE linting",
+      "Use continuous integration checks",
+      "Regular code reviews"
+    ]
+  },
+  "constraints": {
+    "be_thorough": "Check all Go files in the project",
+    "prioritize_critical": "Focus on critical issues first",
+    "suggest_fixes": "Provide specific fix suggestions",
+    "maintain_functionality": "Ensure fixes don't break existing functionality",
+    "follow_standards": "Adhere to Go community standards"
+  }
+}
