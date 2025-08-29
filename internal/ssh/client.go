@@ -98,19 +98,10 @@ type SSHConfig struct {
 	X11Display                string
 	X11AuthType               string
 	Environment               map[string]string
-	RequestTTY                bool
-	RequestPty                bool
-	TerminalType              string
-	TerminalSize              *TerminalSize
-	Stdin                     io.Reader
-	Stdout                    io.Writer
-	Stderr                    io.Writer
-}
 
-// TerminalSize represents terminal dimensions
-type TerminalSize struct {
-	Width  int
-	Height int
+	Stdin  io.Reader
+	Stdout io.Writer
+	Stderr io.Writer
 }
 
 // NewSSHClient creates a new SSH client with the given configuration
@@ -134,9 +125,6 @@ func NewSSHClient(config *SSHConfig) (*SSHClient, error) {
 	}
 	if config.KeyScanTimeout == 0 {
 		config.KeyScanTimeout = 10 * time.Second
-	}
-	if config.TerminalType == "" {
-		config.TerminalType = "xterm-256color"
 	}
 
 	client := &SSHClient{
@@ -257,53 +245,6 @@ func (sc *SSHClient) ExecuteCommandWithTimeout(ctx context.Context, command stri
 	defer cancel()
 
 	return sc.ExecuteCommand(ctx, command)
-}
-
-// ExecuteCommandInteractive executes a command with interactive input/output
-func (sc *SSHClient) ExecuteCommandInteractive(ctx context.Context, command string) error {
-	if sc.client == nil {
-		return errors.New("SSH client not connected")
-	}
-
-	// Create session
-	session, err := sc.client.NewSession()
-	if err != nil {
-		return errors.Wrap(err, "failed to create SSH session")
-	}
-	defer session.Close()
-
-	// Set up session for interactive mode
-	if err := sc.setupInteractiveSession(session); err != nil {
-		return errors.Wrap(err, "failed to setup interactive session")
-	}
-
-	// Execute command
-	if err := session.Run(command); err != nil {
-		return errors.Wrap(err, "failed to execute interactive command")
-	}
-	return nil
-}
-
-// CreateShell creates an interactive shell session
-func (sc *SSHClient) CreateShell(ctx context.Context) error {
-	if sc.client == nil {
-		return errors.New("SSH client not connected")
-	}
-
-	// Create session
-	session, err := sc.client.NewSession()
-	if err != nil {
-		return errors.Wrap(err, "failed to create SSH session")
-	}
-
-	// Set up session for shell
-	if err := sc.setupShellSession(session); err != nil {
-		session.Close()
-		return errors.Wrap(err, "failed to setup shell session")
-	}
-
-	sc.session = session
-	return nil
 }
 
 // UploadFile uploads a file to the remote host
@@ -661,70 +602,6 @@ func (sc *SSHClient) setupSession(session *ssh.Session) error {
 	}
 	if sc.config.Stdin != nil {
 		session.Stdin = sc.config.Stdin
-	}
-
-	return nil
-}
-
-// setupInteractiveSession configures a session for interactive use
-func (sc *SSHClient) setupInteractiveSession(session *ssh.Session) error {
-	if err := sc.setupSession(session); err != nil {
-		return errors.Wrap(err, "failed to setup interactive session")
-	}
-
-	// Request PTY for interactive mode
-	if sc.config.RequestPty || sc.config.RequestTTY {
-		if err := sc.requestPTY(session); err != nil {
-			return errors.Wrap(err, "failed to request PTY")
-		}
-	}
-
-	return nil
-}
-
-// setupShellSession configures a session for shell use
-func (sc *SSHClient) setupShellSession(session *ssh.Session) error {
-	if err := sc.setupInteractiveSession(session); err != nil {
-		return errors.Wrap(err, "failed to setup shell session")
-	}
-
-	// Set up I/O for shell
-	if sc.config.Stdout != nil {
-		session.Stdout = sc.config.Stdout
-	} else {
-		session.Stdout = os.Stdout
-	}
-	if sc.config.Stderr != nil {
-		session.Stderr = sc.config.Stderr
-	} else {
-		session.Stderr = os.Stderr
-	}
-	if sc.config.Stdin != nil {
-		session.Stdin = sc.config.Stdin
-	} else {
-		session.Stdin = os.Stdin
-	}
-
-	return nil
-}
-
-// requestPTY requests a PTY for the session
-func (sc *SSHClient) requestPTY(session *ssh.Session) error {
-	// Get terminal size
-	width := 80
-	height := 24
-	if sc.config.TerminalSize != nil {
-		width = sc.config.TerminalSize.Width
-		height = sc.config.TerminalSize.Height
-	}
-
-	// Request PTY
-	if err := session.RequestPty(sc.config.TerminalType, height, width, ssh.TerminalModes{
-		ssh.ECHO:          1,
-		ssh.TTY_OP_ISPEED: 14400,
-		ssh.TTY_OP_OSPEED: 14400,
-	}); err != nil {
-		return errors.Wrap(err, "failed to request PTY")
 	}
 
 	return nil

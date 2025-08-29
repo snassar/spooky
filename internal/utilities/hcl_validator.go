@@ -243,7 +243,28 @@ func IsValidHCL(content string) bool {
 	return result.IsValid
 }
 
-// ValidateHCLFile is a convenience function for quick file validation
+// ValidateHCLFile performs quick validation of an HCL file for syntax errors.
+//
+// Parameters:
+//   - filePath: Path to the HCL file to validate
+//
+// Returns:
+//   - bool: True if file is valid HCL, false if syntax errors found
+//   - error: File system or parsing errors
+//
+// Dependencies: github.com/hashicorp/hcl/v2 for HCL parsing
+//
+// Example usage:
+//
+//	valid, err := ValidateHCLFile("config.hcl")
+//	if err != nil {
+//	    return fmt.Errorf("validation failed: %w", err)
+//	}
+//	if !valid {
+//	    fmt.Println("HCL file has syntax errors")
+//	}
+//
+// Performance: ~1-10ms for typical HCL files
 func ValidateHCLFile(filePath string) (bool, error) {
 	validator := NewHCLValidator()
 	result, err := validator.ValidateFile(filePath)

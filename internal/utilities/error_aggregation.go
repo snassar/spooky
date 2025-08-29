@@ -42,7 +42,15 @@ func (ea *ErrorAggregator) AddWithContext(err error, context string) {
 	ea.Add(wrappedErr)
 }
 
-// HasErrors returns true if the aggregator has collected errors
+// HasErrors checks if any errors have been collected.
+//
+// Returns true if errors exist, false otherwise.
+//
+// Example:
+//
+//	if aggregator.HasErrors() {
+//	    fmt.Println("Errors found:", aggregator.ErrorCount())
+//	}
 func (ea *ErrorAggregator) HasErrors() bool {
 	return len(ea.errors) > 0
 }
