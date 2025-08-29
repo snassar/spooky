@@ -2,12 +2,14 @@ package commands
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"spooky/internal/encryption"
+	"spooky/internal/logging"
 	"spooky/internal/schemas"
 	"spooky/internal/utilities"
 
@@ -563,9 +565,12 @@ func runProjectValidate(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Printf("Project \"%s\" is valid\n", projectName)
 	} else {
-		fmt.Printf("Project validation failed with %d errors:\n", len(result.Errors))
+		logger := logging.GetGlobalLogger()
+		logger.Error("project validation failed",
+			slog.Int("error_count", len(result.Errors)))
 		for _, err := range result.Errors {
-			fmt.Printf("  - %s\n", err.Message)
+			logger.Error("validation error",
+				slog.String("message", err.Message))
 		}
 		return fmt.Errorf("project validation failed with %d errors", len(result.Errors))
 	}
@@ -784,7 +789,6 @@ func extractMachineNamesFromParsedData(data map[string]interface{}, fileName str
 	// Look for machine array
 	machineValue, exists := machinesMap["machine"]
 	if !exists {
-
 		return machines, nil // No machines defined
 	}
 
@@ -1370,28 +1374,37 @@ func extractVariableNamesFromParsedData(data map[string]interface{}, fileName st
 // extractActionNamesFromParsedData extracts action information from parsed HCL data
 func extractActionNamesFromParsedData(data map[string]interface{}, fileName string) ([]actionInfo, error) {
 	var actions []actionInfo
+	logger := logging.GetGlobalLogger()
 
 	// Look for actions block
 	actionsBlock, exists := data["actions"]
 	if !exists {
-		fmt.Printf("      🔍 [%s] No actions block found\n", fileName)
+		logger.Debug("no actions block found",
+			slog.String("file", fileName))
 		return actions, nil // No actions block, return empty
 	}
 
-	fmt.Printf("      🔍 [%s] Found actions block, type: %T\n", fileName, actionsBlock)
+	logger.Debug("found actions block",
+		slog.String("file", fileName),
+		slog.String("type", fmt.Sprintf("%T", actionsBlock)))
 
 	// Convert to map
 	actionsMap, ok := actionsBlock.(map[string]interface{})
 	if !ok {
-		fmt.Printf("      🔍 [%s] Actions block is not a map\n", fileName)
+		logger.Debug("actions block is not a map",
+			slog.String("file", fileName))
 		return actions, nil // Invalid structure, return empty
 	}
 
-	fmt.Printf("      🔍 [%s] Actions map keys: %v\n", fileName, getKeys(actionsMap))
+	logger.Debug("found actions map keys",
+		slog.String("file", fileName),
+		slog.Any("keys", getKeys(actionsMap)))
 
 	// Look for action blocks (action "name" { ... })
 	for actionName, actionValue := range actionsMap {
-		fmt.Printf("      🔍 [%s] Found action: %s\n", fileName, actionName)
+		logger.Debug("found action",
+			slog.String("file", fileName),
+			slog.String("action_name", actionName))
 
 		// Check if it's an action block (map with metadata)
 		if actionBlock, ok := actionValue.(map[string]interface{}); ok {

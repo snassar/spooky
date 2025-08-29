@@ -33,7 +33,7 @@ func NewFileEmbedder() (*FileEmbedder, error) {
 func (embedder *FileEmbedder) loadEmbeddedFiles() error {
 	return fs.WalkDir(embeddedFiles, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to walk embedded files at %s", path)
 		}
 
 		if d.IsDir() {

@@ -3,9 +3,11 @@ package facts
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
+	"spooky/internal/logging"
 	"spooky/internal/schemas"
 	"spooky/internal/ssh"
 
@@ -58,7 +60,10 @@ func (g *Gatherer) GatherFactsFromMachine(ctx context.Context, machine *schemas.
 	enhancedFacts, err := g.gatherEnhancedFacts(ctx, machine)
 	if err != nil {
 		// Enhanced facts are optional, so we don't fail the entire operation
-		fmt.Printf("Warning: Failed to gather enhanced facts from %s: %v\n", machine.Hostname, err)
+		logger := logging.GetGlobalLogger()
+		logger.Warn("failed to gather enhanced facts, continuing with basic facts only",
+			slog.String("machine", machine.Hostname),
+			slog.String("error", err.Error()))
 	}
 	result.EnhancedFacts = enhancedFacts
 
@@ -66,7 +71,10 @@ func (g *Gatherer) GatherFactsFromMachine(ctx context.Context, machine *schemas.
 	customFacts, err := g.gatherCustomFacts(ctx, machine)
 	if err != nil {
 		// Custom facts are optional, so we don't fail the entire operation
-		fmt.Printf("Warning: Failed to gather custom facts from %s: %v\n", machine.Hostname, err)
+		logger := logging.GetGlobalLogger()
+		logger.Warn("failed to gather custom facts, continuing with basic facts only",
+			slog.String("machine", machine.Hostname),
+			slog.String("error", err.Error()))
 	}
 	result.CustomFacts = customFacts
 
@@ -280,7 +288,11 @@ func (g *Gatherer) executeCommand(ctx context.Context, machine *schemas.Machines
 	result, err := g.sshManager.ExecuteCommandOnMachine(ctx, machine, command)
 	if err != nil {
 		// Skip failed commands, but log them
-		fmt.Printf("Warning: Failed to execute command '%s' on %s: %v\n", command, machine.Hostname, err)
+		logger := logging.GetGlobalLogger()
+		logger.Warn("failed to execute command, skipping fact collection",
+			slog.String("command", command),
+			slog.String("machine", machine.Hostname),
+			slog.String("error", err.Error()))
 		return nil
 	}
 

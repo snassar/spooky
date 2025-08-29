@@ -2,8 +2,8 @@ package encryption
 
 import (
 	"bufio"
-	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +12,7 @@ import (
 	"filippo.io/age/armor"
 	"github.com/pkg/errors"
 
+	"spooky/internal/logging"
 	"spooky/internal/schemas"
 	"spooky/internal/utilities"
 )
@@ -85,7 +86,10 @@ func (ae *AgeEncryption) loadIdentitiesFromDirectory() error {
 		identityPath := filepath.Join(ae.identitiesPath, entry.Name())
 		if err := ae.loadIdentityFromFile(identityPath); err != nil {
 			// Log error but continue loading other identities
-			fmt.Printf("Warning: failed to load identity from %s: %v\n", identityPath, err)
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to load identity file, continuing with other identities",
+				slog.String("identity_path", identityPath),
+				slog.String("error", err.Error()))
 		}
 	}
 
@@ -101,12 +105,16 @@ func (ae *AgeEncryption) loadIdentityFromFile(path string) error {
 	defer file.Close()
 
 	// Try to read as armored format first
-	file.Seek(0, 0)
+	if _, err := file.Seek(0, 0); err != nil {
+		return errors.Wrapf(err, "failed to seek to beginning of identity file: %s", path)
+	}
 	armoredReader := armor.NewReader(file)
 	identities, err := age.ParseIdentities(armoredReader)
 	if err != nil {
 		// Try as raw format
-		file.Seek(0, 0)
+		if _, err := file.Seek(0, 0); err != nil {
+			return errors.Wrapf(err, "failed to seek to beginning of identity file: %s", path)
+		}
 		identities, err = age.ParseIdentities(file)
 		if err != nil {
 			return errors.Wrapf(err, "failed to parse identity file: %s", path)
@@ -159,7 +167,10 @@ func (ae *AgeEncryption) loadRecipientsFromDirectory() error {
 		recipientPath := filepath.Join(ae.recipientsPath, entry.Name())
 		if err := ae.loadRecipientsFromFile(recipientPath); err != nil {
 			// Log error but continue loading other recipients
-			fmt.Printf("Warning: failed to load recipients from %s: %v\n", recipientPath, err)
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to load recipient file, continuing with other recipients",
+				slog.String("recipient_path", recipientPath),
+				slog.String("error", err.Error()))
 		}
 	}
 

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/pkg/errors"
 )
 
 // SyncMode defines the synchronization directionality and conflict resolution
@@ -138,7 +140,7 @@ func syncOneWayReplica(sourcePath, targetPath string, options *SyncOptions, resu
 	// Walk source directory and sync all files
 	err := filepath.Walk(sourcePath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to walk source path %s", path)
 		}
 
 		// Calculate relative path from source
@@ -178,14 +180,14 @@ func syncOneWayReplica(sourcePath, targetPath string, options *SyncOptions, resu
 	})
 
 	if err != nil {
-		result.Error = err
-		return result, err
+		result.Error = errors.Wrap(err, "failed to sync directory")
+		return result, result.Error
 	}
 
 	// Remove files in target that don't exist in source (cleanup)
 	err = filepath.Walk(targetPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to walk target path %s", path)
 		}
 
 		// Skip root directory
@@ -224,8 +226,8 @@ func syncOneWayReplica(sourcePath, targetPath string, options *SyncOptions, resu
 	})
 
 	if err != nil {
-		result.Error = err
-		return result, err
+		result.Error = errors.Wrap(err, "failed to cleanup target directory")
+		return result, result.Error
 	}
 
 	result.Success = true
@@ -242,7 +244,7 @@ func syncOneWaySafe(sourcePath, targetPath string, options *SyncOptions, result 
 	// Walk source directory and sync files, but preserve conflicts
 	err := filepath.Walk(sourcePath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to walk source path %s", path)
 		}
 
 		relPath, err := filepath.Rel(sourcePath, path)
@@ -375,24 +377,24 @@ func syncTwoWayResolved(sourcePath, targetPath string, options *SyncOptions, res
 func copyFile(src, dst string, options *SyncOptions) error {
 	source, err := os.Open(src)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to open source file %s", src)
 	}
 	defer source.Close()
 
 	// Create target directory if it doesn't exist
 	targetDir := filepath.Dir(dst)
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to create target directory %s", targetDir)
 	}
 
 	destination, err := os.Create(dst)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to create destination file %s", dst)
 	}
 	defer destination.Close()
 
 	_, err = destination.ReadFrom(source)
-	return err
+	return errors.Wrapf(err, "failed to copy data from %s to %s", src, dst)
 }
 
 // preserveAttributes preserves file attributes from source to target

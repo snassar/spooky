@@ -24,7 +24,7 @@ type HCLSyntaxError struct {
 
 func (e *HCLSyntaxError) Error() string {
 	if e.Line > 0 {
-		return errors.Errorf("HCL syntax error at %s:%d:%d: %s", 
+		return errors.Errorf("HCL syntax error at %s:%d:%d: %s",
 			e.File, e.Line, e.Column, e.Message).Error()
 	}
 	return errors.Errorf("HCL syntax error in %s: %s", e.File, e.Message).Error()
@@ -55,13 +55,13 @@ func (e *HCLValidationError) Unwrap() error {
 
 // HCLFileError provides file-related error information
 type HCLFileError struct {
-	FilePath string
+	FilePath  string
 	Operation string
 	Message   string
 }
 
 func (e *HCLFileError) Error() string {
-	return errors.Errorf("HCL file error for %s during %s: %s", 
+	return errors.Errorf("HCL file error for %s during %s: %s",
 		e.FilePath, e.Operation, e.Message).Error()
 }
 
@@ -78,7 +78,7 @@ type HCLBlockError struct {
 }
 
 func (e *HCLBlockError) Error() string {
-	return errors.Errorf("HCL block error in %s: %s block '%s': %s", 
+	return errors.Errorf("HCL block error in %s: %s block '%s': %s",
 		e.File, e.BlockType, e.BlockName, e.Message).Error()
 }
 
@@ -95,7 +95,7 @@ type HCLDirectoryError struct {
 }
 
 func (e *HCLDirectoryError) Error() string {
-	return errors.Errorf("HCL directory error for %s during %s: %s", 
+	return errors.Errorf("HCL directory error for %s during %s: %s",
 		e.Directory, e.Operation, e.Message).Error()
 }
 

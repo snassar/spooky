@@ -2,9 +2,12 @@ package encryption
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"spooky/internal/logging"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
@@ -54,7 +57,9 @@ func (hu *HCLUpdater) UpdateFile(filePath string) error {
 
 	// If no modifications were made, return early
 	if !modified {
-		fmt.Printf("No variables marked for encryption found in %s\n", filePath)
+		logger := logging.GetGlobalLogger()
+		logger.Debug("no variables marked for encryption found",
+			slog.String("file", filePath))
 		return nil
 	}
 
@@ -63,7 +68,9 @@ func (hu *HCLUpdater) UpdateFile(filePath string) error {
 		return errors.Wrapf(err, "failed to write modified file: %s", filePath)
 	}
 
-	fmt.Printf("Successfully encrypted variables in %s\n", filePath)
+	logger := logging.GetGlobalLogger()
+	logger.Info("successfully encrypted variables",
+		slog.String("file", filePath))
 	return nil
 }
 
@@ -176,9 +183,10 @@ func (hu *HCLUpdater) processVariableBlock(block *hclsyntax.Block, contentStr *s
 	// Reconstruct the content
 	*contentStr = before + newValue + after
 
-	fmt.Printf("Encrypted variable %s\n", block.Labels[0])
-	fmt.Printf("Original value: %s\n", currentValue)
-	fmt.Printf("Encrypted value: %s\n", encryptedValue)
+	logger := logging.GetGlobalLogger()
+	logger.Info("encrypted variable",
+		slog.String("variable", block.Labels[0]),
+		slog.String("encrypted_value", encryptedValue))
 
 	return true, nil
 }
@@ -225,7 +233,10 @@ func (hu *HCLUpdater) UpdateDirectory(dirPath string) error {
 
 		filePath := filepath.Join(dirPath, entry.Name())
 		if err := hu.UpdateFile(filePath); err != nil {
-			fmt.Printf("Warning: failed to process %s: %v\n", filePath, err)
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to process file",
+				slog.String("file", filePath),
+				slog.String("error", err.Error()))
 		}
 	}
 

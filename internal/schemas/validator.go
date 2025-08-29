@@ -1300,7 +1300,7 @@ func (v *Validator) validateVariableValueV1(value interface{}, path string, resu
 
 // validateGroupV1 validates an individual group against V1 schema
 func (v *Validator) validateGroupV1(group map[string]interface{}, path string, result *ValidationResult) {
-	// TODO: Implement group validation
+	// Note: Group validation not yet implemented
 }
 
 // validateMachineNameV1 validates machine name against V1 rules

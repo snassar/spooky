@@ -3,9 +3,11 @@ package ssh
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"spooky/internal/encryption"
+	"spooky/internal/logging"
 	"spooky/internal/schemas"
 
 	"github.com/pkg/errors"
@@ -67,7 +69,13 @@ func (sm *SimpleSSHManager) ExecuteCommandOnMachine(ctx context.Context, machine
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create SSH client")
 	}
-	defer client.Disconnect()
+	defer func() {
+		if err := client.Disconnect(); err != nil {
+			// Log the disconnect error but don't fail the operation
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to disconnect SSH client", slog.String("error", err.Error()))
+		}
+	}()
 
 	// Connect to machine
 	if err := client.Connect(ctx); err != nil {
@@ -96,13 +104,18 @@ func (sm *SimpleSSHManager) setupAuthentication(config *SSHConfig, machine *sche
 			passphrase := auth.Passphrase.Value
 
 			// Decrypt passphrase if it's encrypted
-			if auth.Passphrase.Encrypted && sm.ageEncryption != nil {
+			if auth.Passphrase.Encrypted {
+				if sm.ageEncryption == nil {
+					return errors.New("encrypted passphrase requires age encryption, but encryption is not available")
+				}
 				if sm.ageEncryption.IsEncrypted(passphrase) {
 					decrypted, err := sm.ageEncryption.Decrypt(passphrase)
 					if err != nil {
 						return errors.Wrap(err, "failed to decrypt SSH key passphrase")
 					}
 					passphrase = decrypted
+				} else {
+					return errors.New("passphrase marked as encrypted but does not appear to be age-encrypted")
 				}
 			}
 
@@ -116,13 +129,18 @@ func (sm *SimpleSSHManager) setupAuthentication(config *SSHConfig, machine *sche
 		passphrase := auth.Password.Value
 
 		// Decrypt password if it's encrypted
-		if auth.Password.Encrypted && sm.ageEncryption != nil {
+		if auth.Password.Encrypted {
+			if sm.ageEncryption == nil {
+				return errors.New("encrypted password requires age encryption, but encryption is not available")
+			}
 			if sm.ageEncryption.IsEncrypted(passphrase) {
 				decrypted, err := sm.ageEncryption.Decrypt(passphrase)
 				if err != nil {
 					return errors.Wrap(err, "failed to decrypt SSH password")
 				}
 				passphrase = decrypted
+			} else {
+				return errors.New("password marked as encrypted but does not appear to be age-encrypted")
 			}
 		}
 
@@ -139,13 +157,18 @@ func (sm *SimpleSSHManager) setupAuthentication(config *SSHConfig, machine *sche
 			passphrase := auth.CertificatePassphrase.Value
 
 			// Decrypt passphrase if it's encrypted
-			if auth.CertificatePassphrase.Encrypted && sm.ageEncryption != nil {
+			if auth.CertificatePassphrase.Encrypted {
+				if sm.ageEncryption == nil {
+					return errors.New("encrypted certificate passphrase requires age encryption, but encryption is not available")
+				}
 				if sm.ageEncryption.IsEncrypted(passphrase) {
 					decrypted, err := sm.ageEncryption.Decrypt(passphrase)
 					if err != nil {
 						return errors.Wrap(err, "failed to decrypt certificate passphrase")
 					}
 					passphrase = decrypted
+				} else {
+					return errors.New("certificate passphrase marked as encrypted but does not appear to be age-encrypted")
 				}
 			}
 
@@ -214,7 +237,13 @@ func (sm *SimpleSSHManager) UploadFileToMachine(ctx context.Context, machine *sc
 	if err != nil {
 		return errors.Wrap(err, "failed to create SSH client")
 	}
-	defer client.Disconnect()
+	defer func() {
+		if err := client.Disconnect(); err != nil {
+			// Log the disconnect error but don't fail the operation
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to disconnect SSH client", slog.String("error", err.Error()))
+		}
+	}()
 
 	// Connect to machine
 	if err := client.Connect(ctx); err != nil {

@@ -26,7 +26,7 @@ func (ea *ErrorAggregator) Add(err error) {
 	if err == nil {
 		return
 	}
-	
+
 	if len(ea.errors) < ea.limit {
 		ea.errors = append(ea.errors, err)
 	}
@@ -37,7 +37,7 @@ func (ea *ErrorAggregator) AddWithContext(err error, context string) {
 	if err == nil {
 		return
 	}
-	
+
 	wrappedErr := errors.Wrap(err, context)
 	ea.Add(wrappedErr)
 }
@@ -62,12 +62,12 @@ func (ea *ErrorAggregator) Error() string {
 	if len(ea.errors) == 0 {
 		return ""
 	}
-	
+
 	if len(ea.errors) == 1 {
 		return ea.errors[0].Error()
 	}
-	
-	return fmt.Sprintf("multiple errors occurred (%d total): %s", 
+
+	return fmt.Sprintf("multiple errors occurred (%d total): %s",
 		len(ea.errors), ea.errors[0].Error())
 }
 
@@ -76,11 +76,11 @@ func (ea *ErrorAggregator) CombinedError() error {
 	if len(ea.errors) == 0 {
 		return nil
 	}
-	
+
 	if len(ea.errors) == 1 {
 		return ea.errors[0]
 	}
-	
+
 	// Create a combined error with the first error as the base
 	combined := errors.Wrap(ea.errors[0], fmt.Sprintf("and %d more errors", len(ea.errors)-1))
 	return combined
@@ -113,38 +113,38 @@ func RetryWithBackoff(operation RetryableOperation, config *RetryConfig) error {
 	if config == nil {
 		config = DefaultRetryConfig()
 	}
-	
+
 	var lastErr error
 	delay := config.InitialDelay
-	
+
 	for attempt := 1; attempt <= config.MaxAttempts; attempt++ {
 		err := operation()
 		if err == nil {
 			return nil
 		}
-		
+
 		lastErr = err
-		
+
 		// Check if this is the last attempt
 		if attempt == config.MaxAttempts {
 			break
 		}
-		
+
 		// Check if error is retryable
 		if !isRetryableError(err, config.RetryableErrors) {
 			break
 		}
-		
+
 		// Wait before retry
 		time.Sleep(delay)
-		
+
 		// Calculate next delay with exponential backoff
 		delay = time.Duration(float64(delay) * config.BackoffFactor)
 		if delay > config.MaxDelay {
 			delay = config.MaxDelay
 		}
 	}
-	
+
 	return errors.Wrapf(lastErr, "operation failed after %d attempts", config.MaxAttempts)
 }
 
@@ -154,13 +154,13 @@ func isRetryableError(err error, retryableErrors []error) bool {
 		// Default retryable errors
 		return isDefaultRetryableError(err)
 	}
-	
+
 	for _, retryableErr := range retryableErrors {
 		if errors.Is(err, retryableErr) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -168,24 +168,24 @@ func isRetryableError(err error, retryableErrors []error) bool {
 func isDefaultRetryableError(err error) bool {
 	// Add logic to identify retryable errors
 	// For now, we'll retry most errors except validation errors
-	
+
 	// Don't retry validation errors
-	if errors.Is(err, ErrHCLValidationFailed) || 
-	   errors.Is(err, ErrHCLSyntaxError) {
+	if errors.Is(err, ErrHCLValidationFailed) ||
+		errors.Is(err, ErrHCLSyntaxError) {
 		return false
 	}
-	
+
 	// Don't retry file not found errors
 	if errors.Is(err, ErrHCLFileNotFound) {
 		return false
 	}
-	
+
 	return true
 }
 
 // BatchProcessor processes items in batches with error aggregation
 type BatchProcessor struct {
-	BatchSize int
+	BatchSize  int
 	Aggregator *ErrorAggregator
 }
 
@@ -204,7 +204,7 @@ func (bp *BatchProcessor) ProcessItems(items []string, processor func(string) er
 		if end > len(items) {
 			end = len(items)
 		}
-		
+
 		batch := items[i:end]
 		for _, item := range batch {
 			if err := processor(item); err != nil {
@@ -212,7 +212,7 @@ func (bp *BatchProcessor) ProcessItems(items []string, processor func(string) er
 			}
 		}
 	}
-	
+
 	return bp.Aggregator.CombinedError()
 }
 

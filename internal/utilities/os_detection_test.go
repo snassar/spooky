@@ -75,7 +75,7 @@ func TestGetPathConfig(t *testing.T) {
 		t.Error("CacheFile should not be empty")
 	}
 
-	t.Logf("Config: ConfigDir=%s, LogDir=%s, CacheDir=%s", 
+	t.Logf("Config: ConfigDir=%s, LogDir=%s, CacheDir=%s",
 		config.ConfigDir, config.LogDir, config.CacheDir)
 }
 

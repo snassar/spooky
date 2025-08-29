@@ -310,7 +310,7 @@ func initDatabaseSchema(db *sql.DB) error {
 	`
 
 	_, err := db.Exec(schema)
-	return err
+	return errors.Wrap(err, "failed to create database schema")
 }
 
 // LogToDatabase logs an entry to the SQLite database
@@ -356,7 +356,7 @@ func (l *Logger) LogToDatabase(entry LogEntry) error {
 		tagsJSON,
 	)
 
-	return err
+	return errors.Wrap(err, "failed to insert log entry to database")
 }
 
 // QueryLogs retrieves log entries from the database

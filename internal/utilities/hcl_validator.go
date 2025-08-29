@@ -162,7 +162,7 @@ func (v *HCLValidator) ValidateDirectory(dirPath string) (map[string]*Validation
 
 	err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to walk directory %s", path)
 		}
 
 		// Skip directories
@@ -191,7 +191,7 @@ func (v *HCLValidator) ValidateDirectory(dirPath string) (map[string]*Validation
 		return nil
 	})
 
-	return results, err
+	return results, errors.Wrap(err, "failed to validate directory")
 }
 
 // FormatValidationResult formats a validation result for display

@@ -1,13 +1,19 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"time"
 
+	"spooky/internal/encryption"
+	"spooky/internal/logging"
 	"spooky/internal/schemas"
+	"spooky/internal/ssh"
+	"spooky/internal/utilities"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
@@ -243,46 +249,19 @@ func getMachinesWithNames() ([]MachineWithName, error) {
 			machine.User = user
 		}
 
+		// Validate required fields after parsing
+		if machine.User == "" {
+			return nil, fmt.Errorf("machine %s missing required user field in machines.hcl", machineName)
+		}
+
 		// Handle authentication blocks
 		if len(content.Blocks) > 0 {
 			authBlock := content.Blocks[0]
-			authMethod := authBlock.Labels[0]
-
-			if authMethod == "password" {
-				var passwordData struct {
-					Password struct {
-						Value     string `hcl:"value,attr"`
-						Encrypted bool   `hcl:"encrypted,attr"`
-					} `hcl:"password,block"`
-				}
-
-				if diags := gohcl.DecodeBody(authBlock.Body, nil, &passwordData); diags.HasErrors() {
-					return nil, fmt.Errorf("failed to decode password auth for machine %s: %v", machineName, diags)
-				}
-
-				machine.Authentication.Password = schemas.MachinesMachineAuthenticationPasswordV1{
-					Value:     passwordData.Password.Value,
-					Encrypted: passwordData.Password.Encrypted,
-				}
-			} else if authMethod == "publickey" {
-				var publicKeyData struct {
-					PublicKeyPath string `hcl:"public_key_path,attr"`
-					Passphrase    struct {
-						Value     string `hcl:"value,attr"`
-						Encrypted bool   `hcl:"encrypted,attr"`
-					} `hcl:"passphrase,block"`
-				}
-
-				if diags := gohcl.DecodeBody(authBlock.Body, nil, &publicKeyData); diags.HasErrors() {
-					return nil, fmt.Errorf("failed to decode publickey auth for machine %s: %v", machineName, diags)
-				}
-
-				machine.Authentication.PublicKeyPath = publicKeyData.PublicKeyPath
-				machine.Authentication.Passphrase = schemas.MachinesMachineAuthenticationPassphraseV1{
-					Value:     publicKeyData.Passphrase.Value,
-					Encrypted: publicKeyData.Passphrase.Encrypted,
-				}
+			authConfig, err := utilities.ParseAuthenticationBlock(authBlock, machineName)
+			if err != nil {
+				return nil, err
 			}
+			machine.Authentication = *authConfig
 		}
 
 		machinesWithNames = append(machinesWithNames, MachineWithName{
@@ -356,9 +335,71 @@ func testSSHConnection(ip string, port int, timeout int) string {
 
 // testAuthentication attempts to authenticate with the machine
 func testAuthentication(machine *schemas.MachinesMachineV1, timeout int) string {
-	// TODO: Implement actual SSH authentication
-	// For now, return "no" as placeholder
-	return "no"
+	// Create a basic SSH configuration for testing
+	sshConfig := &schemas.SpookySSHV1{
+		Timeout:            timeout,
+		KeepaliveInterval:  60,
+		KeepaliveCount:     3,
+		KeyScanTimeout:     10,
+		KnownHostsStrict:   false, // For testing, be more permissive
+		KnownHostsMode:     "accept-new",
+		ConnectionPoolSize: 1,
+	}
+
+	// Create age encryption (optional)
+	var ageEncryption *encryption.AgeEncryption
+	if os.Getenv("SSH_AUTH_SOCK") != "" {
+		// Try to create age encryption if SSH agent is available
+		var err error
+		ageEncryption, err = encryption.NewAgeEncryption("", "")
+		if err != nil {
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to initialize age encryption for authentication testing, continuing without encryption support",
+				slog.String("error", err.Error()))
+			// Continue with nil encryption - SSH manager will handle this gracefully
+		}
+	}
+
+	// Create SSH manager
+	manager := ssh.NewSimpleSSHManager(ageEncryption, sshConfig)
+
+	// Test connection with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	err := manager.TestConnection(ctx, machine)
+	if err != nil {
+		// Return specific error messages based on the type of failure
+		errMsg := err.Error()
+		if contains(errMsg, "authentication") || contains(errMsg, "password") || contains(errMsg, "publickey") {
+			return "failed"
+		} else if contains(errMsg, "connection") || contains(errMsg, "timeout") || contains(errMsg, "refused") {
+			return "unavailable"
+		} else {
+			return "failed"
+		}
+	}
+
+	return "success"
+}
+
+// contains checks if a string contains a substring (case-insensitive)
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr ||
+		(len(s) > len(substr) &&
+			(s[:len(substr)] == substr ||
+				s[len(s)-len(substr):] == substr ||
+				containsSubstring(s, substr))))
+}
+
+// containsSubstring performs a simple substring search
+func containsSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 // filterMachinesByTargets filters machines by target names
@@ -396,7 +437,8 @@ func outputText(result PingResult) {
 func outputJSON(result PingResult) {
 	jsonData, err := json.Marshal(result)
 	if err != nil {
-		fmt.Printf("Error marshaling JSON: %v\n", err)
+		logger := logging.GetGlobalLogger()
+		logger.Error("failed to marshal JSON output", slog.String("error", err.Error()))
 		return
 	}
 	fmt.Println(string(jsonData))

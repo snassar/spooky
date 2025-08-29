@@ -828,7 +828,7 @@ func (p *OSFactsParser) parseOSRelease() (map[string]*schemas.FactV1, error) {
 	data, err := os.ReadFile("/etc/os-release")
 	if err != nil {
 		// Fallback to /etc/redhat-release or /etc/debian_version
-		if data, err = os.ReadFile("/etc/redhat-release"); err == nil {
+		if _, err = os.ReadFile("/etc/redhat-release"); err == nil {
 			facts["distribution"] = &schemas.FactV1{
 				Value:       "RedHat",
 				Type:        "string",

@@ -3,11 +3,13 @@ package commands
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
 
 	"spooky/internal/encryption"
+	"spooky/internal/logging"
 	"spooky/internal/schemas"
 	"spooky/internal/ssh"
 
@@ -145,10 +147,13 @@ func runAction(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load SSH configuration: %w", err)
 	}
 
-	// Create SSH manager
+	// Create SSH manager with encryption
 	ageEncryption, err := encryption.NewAgeEncryption("", "")
 	if err != nil {
-		fmt.Printf("Warning: Failed to initialize age encryption: %v\n", err)
+		logger := logging.GetGlobalLogger()
+		logger.Warn("failed to initialize age encryption, continuing without encryption support",
+			slog.String("error", err.Error()))
+		// Continue with nil encryption - SSH manager will handle this gracefully
 	}
 
 	sshManager := ssh.NewSimpleSSHManager(ageEncryption, sshConfig)
@@ -316,7 +321,8 @@ func loadMachinesConfig() ([]*schemas.MachinesMachineV1, error) {
 
 // loadActionsConfig loads the actions configuration from actions.hcl
 func loadActionsConfig() ([]*schemas.ActionsActionV1, error) {
-	fmt.Println("DEBUG: loadActionsConfig called")
+	logger := logging.GetGlobalLogger()
+	logger.Debug("loading actions configuration")
 
 	// Look for actions.hcl in current directory
 	actionsHCLPath := "actions.hcl"
@@ -389,7 +395,7 @@ func loadActionsConfig() ([]*schemas.ActionsActionV1, error) {
 		return nil, fmt.Errorf("failed to decode action blocks: %v", diags)
 	}
 
-	fmt.Printf("DEBUG: Found %d action blocks\n", len(actionContent.Blocks))
+	logger.Debug("found action blocks", slog.Int("count", len(actionContent.Blocks)))
 
 	// Create actions slice
 	var actions []*schemas.ActionsActionV1
@@ -397,7 +403,7 @@ func loadActionsConfig() ([]*schemas.ActionsActionV1, error) {
 	// Process each action block
 	for _, actionBlock := range actionContent.Blocks {
 		actionName := actionBlock.Labels[0]
-		fmt.Printf("DEBUG: Processing action: %s\n", actionName)
+		logger.Debug("processing action", slog.String("action_name", actionName))
 
 		// Create a new action struct
 		action := &schemas.ActionsActionV1{
@@ -517,10 +523,12 @@ func loadActionsConfig() ([]*schemas.ActionsActionV1, error) {
 		action.Description = fmt.Sprintf("%s: %s", actionName, action.Description)
 
 		actions = append(actions, action)
-		fmt.Printf("DEBUG: Successfully parsed action: %s (%s)\n", actionName, action.Description)
+		logger.Debug("successfully parsed action",
+			slog.String("action_name", actionName),
+			slog.String("description", action.Description))
 	}
 
-	fmt.Printf("DEBUG: loadActionsConfig returning %d actions\n", len(actions))
+	logger.Debug("loadActionsConfig completed", slog.Int("action_count", len(actions)))
 	return actions, nil
 }
 
@@ -596,7 +604,7 @@ func displayActionResults(results []*ActionResult) {
 			fmt.Printf("✅ %s: %s\n", result.Machine.Hostname, result.Message)
 		} else {
 			failureCount++
-			fmt.Printf("❌ %s: %s\n", result.Machine.Hostname, result.Error)
+			fmt.Printf("❌ %s: %v\n", result.Machine.Hostname, result.Error)
 		}
 	}
 

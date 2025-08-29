@@ -332,7 +332,7 @@ func (cm *ConfigManager) BackupConfig() (string, error) {
 
 	content, err := cm.ReadConfig()
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "failed to read configuration for backup")
 	}
 
 	backupPath := cm.config.ConfigFile + ".backup"
@@ -353,7 +353,7 @@ func (cm *ConfigManager) RestoreConfig() error {
 
 	content, err := cm.ReadConfigFile(backupPath)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to read backup configuration")
 	}
 
 	return cm.WriteConfig(content)

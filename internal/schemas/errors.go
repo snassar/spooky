@@ -4,15 +4,15 @@ import "github.com/pkg/errors"
 
 // Schema-specific error types
 var (
-	ErrSchemaNotFound        = errors.New("schema not found")
-	ErrSchemaInvalid         = errors.New("schema is invalid")
-	ErrSchemaVersionMismatch = errors.New("schema version mismatch")
-	ErrSchemaParseFailed     = errors.New("failed to parse schema")
-	ErrSchemaEmbedFailed     = errors.New("failed to embed schema")
-	ErrSchemaLoadFailed      = errors.New("failed to load schema")
+	ErrSchemaNotFound         = errors.New("schema not found")
+	ErrSchemaInvalid          = errors.New("schema is invalid")
+	ErrSchemaVersionMismatch  = errors.New("schema version mismatch")
+	ErrSchemaParseFailed      = errors.New("failed to parse schema")
+	ErrSchemaEmbedFailed      = errors.New("failed to embed schema")
+	ErrSchemaLoadFailed       = errors.New("failed to load schema")
 	ErrValidationRuleNotFound = errors.New("validation rule not found")
-	ErrTestDataNotFound      = errors.New("test data not found")
-	ErrMetadataNotFound      = errors.New("metadata not found")
+	ErrTestDataNotFound       = errors.New("test data not found")
+	ErrMetadataNotFound       = errors.New("metadata not found")
 )
 
 // SchemaNotFoundError provides structured error information
@@ -39,7 +39,7 @@ type SchemaValidationError struct {
 }
 
 func (e *SchemaValidationError) Error() string {
-	return errors.Errorf("schema '%s' validation failed for field '%s': %s", 
+	return errors.Errorf("schema '%s' validation failed for field '%s': %s",
 		e.SchemaName, e.Field, e.Message).Error()
 }
 
@@ -56,7 +56,7 @@ type SchemaVersionError struct {
 }
 
 func (e *SchemaVersionError) Error() string {
-	return errors.Errorf("schema '%s' version mismatch: expected %s, got %s", 
+	return errors.Errorf("schema '%s' version mismatch: expected %s, got %s",
 		e.SchemaName, e.Expected, e.Actual).Error()
 }
 
@@ -75,10 +75,10 @@ type SchemaParseError struct {
 
 func (e *SchemaParseError) Error() string {
 	if e.Line > 0 {
-		return errors.Errorf("failed to parse schema '%s' at %s:%d:%d: %s", 
+		return errors.Errorf("failed to parse schema '%s' at %s:%d:%d: %s",
 			e.SchemaName, e.FilePath, e.Line, e.Column, e.Message).Error()
 	}
-	return errors.Errorf("failed to parse schema '%s' from %s: %s", 
+	return errors.Errorf("failed to parse schema '%s' from %s: %s",
 		e.SchemaName, e.FilePath, e.Message).Error()
 }
 

@@ -212,7 +212,9 @@ func TestAgeEncryptionErrors(t *testing.T) {
 		defer os.Remove(tempFile.Name())
 
 		// Write invalid content
-		tempFile.WriteString("invalid-age-identity-content")
+		if _, err := tempFile.WriteString("invalid-age-identity-content"); err != nil {
+			t.Fatal("Failed to write to temp file:", err)
+		}
 
 		_, err = NewAgeEncryption(tempFile.Name(), "")
 		if err == nil {

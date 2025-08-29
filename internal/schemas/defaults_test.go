@@ -99,7 +99,7 @@ func TestDefaultConfigGeneratorHCL(t *testing.T) {
 		t.Error("Expected non-empty HCL output")
 	}
 
-	// Debug: print the actual HCL output
+	// Note: print the actual HCL output for test verification
 	t.Logf("Generated HCL:\n%s", hcl)
 
 	// Check for specific values in HCL (now in block format)

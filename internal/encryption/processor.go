@@ -1,10 +1,12 @@
 package encryption
 
 import (
-	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"spooky/internal/logging"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
@@ -45,7 +47,9 @@ func (hp *HCLProcessor) ProcessFile(filePath string) error {
 
 	// If no modifications were made, return early
 	if !modified {
-		fmt.Printf("No variables marked for encryption found in %s\n", filePath)
+		logger := logging.GetGlobalLogger()
+		logger.Debug("no variables marked for encryption found",
+			slog.String("file", filePath))
 		return nil
 	}
 
@@ -54,7 +58,9 @@ func (hp *HCLProcessor) ProcessFile(filePath string) error {
 		return errors.Wrapf(err, "failed to write modified file: %s", filePath)
 	}
 
-	fmt.Printf("Successfully encrypted variables in %s\n", filePath)
+	logger := logging.GetGlobalLogger()
+	logger.Info("successfully encrypted variables",
+		slog.String("file", filePath))
 	return nil
 }
 
@@ -142,7 +148,9 @@ func (hp *HCLProcessor) processVariableBlock(block *hclsyntax.Block) (bool, erro
 
 	// Check if already encrypted
 	if hp.ageEncryption.IsEncrypted(currentValue) {
-		fmt.Printf("Variable %s is already encrypted, skipping\n", block.Labels[0])
+		logger := logging.GetGlobalLogger()
+		logger.Debug("variable already encrypted, skipping",
+			slog.String("variable", block.Labels[0]))
 		return false, nil
 	}
 
@@ -155,9 +163,10 @@ func (hp *HCLProcessor) processVariableBlock(block *hclsyntax.Block) (bool, erro
 	// Update the value in the HCL content
 	// This is a simplified approach - in a real implementation, you'd want to
 	// properly update the HCL AST and regenerate the content
-	fmt.Printf("Encrypted variable %s\n", block.Labels[0])
-	fmt.Printf("Original value: %s\n", currentValue)
-	fmt.Printf("Encrypted value: %s\n", encryptedValue)
+	logger := logging.GetGlobalLogger()
+	logger.Info("encrypted variable",
+		slog.String("variable", block.Labels[0]),
+		slog.String("encrypted_value", encryptedValue))
 
 	return true, nil
 }
@@ -204,7 +213,10 @@ func (hp *HCLProcessor) ProcessDirectory(dirPath string) error {
 
 		filePath := filepath.Join(dirPath, entry.Name())
 		if err := hp.ProcessFile(filePath); err != nil {
-			fmt.Printf("Warning: failed to process %s: %v\n", filePath, err)
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to process file",
+				slog.String("file", filePath),
+				slog.String("error", err.Error()))
 		}
 	}
 

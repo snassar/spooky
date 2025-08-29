@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -20,6 +21,8 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/knownhosts"
+
+	"spooky/internal/logging"
 )
 
 // SSHClient represents a comprehensive SSH client for Spooky.
@@ -203,7 +206,7 @@ func (sc *SSHClient) Disconnect() error {
 	if sc.client != nil {
 		err := sc.client.Close()
 		sc.client = nil
-		return err
+		return errors.Wrap(err, "failed to close SSH client")
 	}
 
 	return nil
@@ -275,7 +278,10 @@ func (sc *SSHClient) ExecuteCommandInteractive(ctx context.Context, command stri
 	}
 
 	// Execute command
-	return session.Run(command)
+	if err := session.Run(command); err != nil {
+		return errors.Wrap(err, "failed to execute interactive command")
+	}
+	return nil
 }
 
 // CreateShell creates an interactive shell session
@@ -494,9 +500,15 @@ func (sc *SSHClient) loadPrivateKey() (ssh.Signer, error) {
 	}
 
 	// Try to parse as PEM
-	block, _ := pem.Decode(keyData)
+	block, rest := pem.Decode(keyData)
 	if block == nil {
 		return nil, errors.New("failed to decode PEM block")
+	}
+	if len(rest) > 0 {
+		// Log warning about extra data but continue
+		logger := logging.GetGlobalLogger()
+		logger.Warn("PEM block contains extra data after first block",
+			slog.Int("extra_bytes", len(rest)))
 	}
 
 	// Handle encrypted private keys
@@ -657,7 +669,7 @@ func (sc *SSHClient) setupSession(session *ssh.Session) error {
 // setupInteractiveSession configures a session for interactive use
 func (sc *SSHClient) setupInteractiveSession(session *ssh.Session) error {
 	if err := sc.setupSession(session); err != nil {
-		return err
+		return errors.Wrap(err, "failed to setup interactive session")
 	}
 
 	// Request PTY for interactive mode
@@ -673,7 +685,7 @@ func (sc *SSHClient) setupInteractiveSession(session *ssh.Session) error {
 // setupShellSession configures a session for shell use
 func (sc *SSHClient) setupShellSession(session *ssh.Session) error {
 	if err := sc.setupInteractiveSession(session); err != nil {
-		return err
+		return errors.Wrap(err, "failed to setup shell session")
 	}
 
 	// Set up I/O for shell
