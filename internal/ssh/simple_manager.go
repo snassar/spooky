@@ -49,7 +49,7 @@ func NewSimpleSSHManager(ageEncryption *encryption.AgeEncryption, config *schema
 //	fmt.Printf("Exit code: %d\n", result.ExitCode)
 //
 // Performance: 100ms-30s depending on command complexity and network latency
-func (sm *SimpleSSHManager) ExecuteCommandOnMachine(ctx context.Context, machine *schemas.MachinesMachineV1, command string) (*CommandResult, error) {
+func (sm *SimpleSSHManager) RunCommandOnMachine(ctx context.Context, machine *schemas.MachinesMachineV1, command string) (*schemas.CommandResult, error) {
 	// Create SSH config
 	sshConfig := &SSHConfig{
 		Host:           machine.Hostname,
@@ -203,7 +203,7 @@ func (sm *SimpleSSHManager) setupAuthentication(config *SSHConfig, machine *sche
 
 // TestConnection tests the SSH connection to a machine
 func (sm *SimpleSSHManager) TestConnection(ctx context.Context, machine *schemas.MachinesMachineV1) error {
-	result, err := sm.ExecuteCommandOnMachine(ctx, machine, "echo 'SSH connection test successful'")
+	result, err := sm.RunCommandOnMachine(ctx, machine, "echo 'SSH connection test successful'")
 	if err != nil {
 		return errors.Wrapf(err, "failed to test connection to machine %s", machine.Hostname)
 	}

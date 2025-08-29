@@ -10,6 +10,7 @@ import (
 	"spooky/internal/logging"
 	"spooky/internal/schemas"
 	"spooky/internal/ssh"
+	"spooky/internal/utilities"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
@@ -227,7 +228,7 @@ func (g *Gatherer) gatherBasicFacts(ctx context.Context, machine *schemas.Machin
 
 	// Execute system commands
 	for factName, command := range systemCommands {
-		if fact := g.executeCommand(ctx, machine, command, factName, "string"); fact != nil {
+		if fact := g.runCommand(ctx, machine, command, factName, "string"); fact != nil {
 			basicFacts.SystemFacts.Facts[factName] = fact
 		}
 	}
@@ -243,28 +244,28 @@ func (g *Gatherer) gatherBasicFacts(ctx context.Context, machine *schemas.Machin
 			factName == "processor_threads_per_core" {
 			factType = "number"
 		}
-		if fact := g.executeCommand(ctx, machine, command, factName, factType); fact != nil {
+		if fact := g.runCommand(ctx, machine, command, factName, factType); fact != nil {
 			basicFacts.HardwareFacts.Facts[factName] = fact
 		}
 	}
 
 	// Execute network commands
 	for factName, command := range networkCommands {
-		if fact := g.executeCommand(ctx, machine, command, factName, "string"); fact != nil {
+		if fact := g.runCommand(ctx, machine, command, factName, "string"); fact != nil {
 			basicFacts.NetworkFacts.Facts[factName] = fact
 		}
 	}
 
 	// Execute OS commands
 	for factName, command := range osCommands {
-		if fact := g.executeCommand(ctx, machine, command, factName, "string"); fact != nil {
+		if fact := g.runCommand(ctx, machine, command, factName, "string"); fact != nil {
 			basicFacts.OSFacts.Facts[factName] = fact
 		}
 	}
 
 	// Execute user commands
 	for factName, command := range userCommands {
-		if fact := g.executeCommand(ctx, machine, command, factName, "string"); fact != nil {
+		if fact := g.runCommand(ctx, machine, command, factName, "string"); fact != nil {
 			basicFacts.UserFacts.Facts[factName] = fact
 		}
 	}
@@ -275,7 +276,7 @@ func (g *Gatherer) gatherBasicFacts(ctx context.Context, machine *schemas.Machin
 		if factName == "uptime" || factName == "uptime_seconds" {
 			factType = "number"
 		}
-		if fact := g.executeCommand(ctx, machine, command, factName, factType); fact != nil {
+		if fact := g.runCommand(ctx, machine, command, factName, factType); fact != nil {
 			basicFacts.RuntimeFacts.Facts[factName] = fact
 		}
 	}
@@ -283,9 +284,9 @@ func (g *Gatherer) gatherBasicFacts(ctx context.Context, machine *schemas.Machin
 	return basicFacts, nil
 }
 
-// executeCommand executes a command on a machine and returns a FactV1 if successful
-func (g *Gatherer) executeCommand(ctx context.Context, machine *schemas.MachinesMachineV1, command, factName, factType string) *schemas.FactV1 {
-	result, err := g.sshManager.ExecuteCommandOnMachine(ctx, machine, command)
+// runCommand executes a command on a machine and returns a FactV1 if successful
+func (g *Gatherer) runCommand(ctx context.Context, machine *schemas.MachinesMachineV1, command, factName, factType string) *schemas.FactV1 {
+	result, err := utilities.RunCommand(ctx, machine.Hostname, command, machine, g.sshManager, 0, 0, 0)
 	if err != nil {
 		// Skip failed commands, but log them
 		logger := logging.GetGlobalLogger()
@@ -313,13 +314,13 @@ func (g *Gatherer) executeCommand(ctx context.Context, machine *schemas.Machines
 // gatherEnhancedFacts collects enhanced facts from spooky-facts tool
 func (g *Gatherer) gatherEnhancedFacts(ctx context.Context, machine *schemas.MachinesMachineV1) (*schemas.EnhancedFactsV1, error) {
 	// Check if spooky-facts is available
-	result, err := g.sshManager.ExecuteCommandOnMachine(ctx, machine, "which spooky-facts")
+	result, err := g.sshManager.RunCommandOnMachine(ctx, machine, "which spooky-facts")
 	if err != nil || result.ExitCode != 0 {
 		return nil, errors.New("spooky-facts not available on remote machine")
 	}
 
 	// Run spooky-facts to generate facts
-	result, err = g.sshManager.ExecuteCommandOnMachine(ctx, machine, "spooky-facts gather")
+	result, err = g.sshManager.RunCommandOnMachine(ctx, machine, "spooky-facts gather")
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to run spooky-facts")
 	}
@@ -329,10 +330,10 @@ func (g *Gatherer) gatherEnhancedFacts(ctx context.Context, machine *schemas.Mac
 	}
 
 	// Read the generated facts file
-	result, err = g.sshManager.ExecuteCommandOnMachine(ctx, machine, "cat /etc/spooky/facts.hcl")
+	result, err = g.sshManager.RunCommandOnMachine(ctx, machine, "cat /etc/spooky/facts.hcl")
 	if err != nil {
 		// Try alternative location
-		result, err = g.sshManager.ExecuteCommandOnMachine(ctx, machine, "cat ~/.config/spooky/facts.hcl")
+		result, err = g.sshManager.RunCommandOnMachine(ctx, machine, "cat ~/.config/spooky/facts.hcl")
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to read facts file")
 		}
@@ -354,20 +355,20 @@ func (g *Gatherer) gatherEnhancedFacts(ctx context.Context, machine *schemas.Mac
 // gatherCustomFacts collects custom facts (may contain age-encrypted facts)
 func (g *Gatherer) gatherCustomFacts(ctx context.Context, machine *schemas.MachinesMachineV1) (*schemas.CustomFactsV1, error) {
 	// Check if custom facts file exists
-	result, err := g.sshManager.ExecuteCommandOnMachine(ctx, machine, "test -f /etc/spooky/custom.hcl && echo 'exists'")
+	result, err := g.sshManager.RunCommandOnMachine(ctx, machine, "test -f /etc/spooky/custom.hcl && echo 'exists'")
 	if err != nil || result.ExitCode != 0 {
 		// Try alternative location
-		result, err = g.sshManager.ExecuteCommandOnMachine(ctx, machine, "test -f ~/.config/spooky/custom.hcl && echo 'exists'")
+		result, err = g.sshManager.RunCommandOnMachine(ctx, machine, "test -f ~/.config/spooky/custom.hcl && echo 'exists'")
 		if err != nil || result.ExitCode != 0 {
 			return nil, errors.New("custom facts file not found")
 		}
 	}
 
 	// Read the custom facts file
-	result, err = g.sshManager.ExecuteCommandOnMachine(ctx, machine, "cat /etc/spooky/custom.hcl")
+	result, err = g.sshManager.RunCommandOnMachine(ctx, machine, "cat /etc/spooky/custom.hcl")
 	if err != nil {
 		// Try alternative location
-		result, err = g.sshManager.ExecuteCommandOnMachine(ctx, machine, "cat ~/.config/spooky/custom.hcl")
+		result, err = g.sshManager.RunCommandOnMachine(ctx, machine, "cat ~/.config/spooky/custom.hcl")
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to read custom facts file")
 		}

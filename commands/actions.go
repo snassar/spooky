@@ -12,6 +12,7 @@ import (
 	"spooky/internal/logging"
 	"spooky/internal/schemas"
 	"spooky/internal/ssh"
+	"spooky/internal/utilities"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
@@ -170,7 +171,7 @@ func runAction(cmd *cobra.Command, args []string) error {
 
 	// Execute the action
 	ctx := context.Background()
-	results, err := executor.ExecuteAction(ctx, action, targetMachines, actionDryRun)
+	results, err := executor.RunAction(ctx, action, targetMachines, actionDryRun)
 	if err != nil {
 		return fmt.Errorf("failed to execute action: %w", err)
 	}
@@ -618,7 +619,7 @@ func NewActionExecutor(sshManager *ssh.SimpleSSHManager, projectConfig *schemas.
 }
 
 // ExecuteAction executes an action across target machines
-func (ae *ActionExecutor) ExecuteAction(ctx context.Context, action *schemas.ActionsActionV1, machines []*schemas.MachinesMachineV1, dryRun bool) ([]*ActionResult, error) {
+func (ae *ActionExecutor) RunAction(ctx context.Context, action *schemas.ActionsActionV1, machines []*schemas.MachinesMachineV1, dryRun bool) ([]*ActionResult, error) {
 	var results []*ActionResult
 
 	for _, machine := range machines {
@@ -631,7 +632,7 @@ func (ae *ActionExecutor) ExecuteAction(ctx context.Context, action *schemas.Act
 			result.Message = fmt.Sprintf("Would execute %s action", action.Type)
 		} else {
 			// Execute the action based on its type
-			err := ae.executeActionOnMachine(ctx, action, machine)
+			err := ae.runActionOnMachine(ctx, action, machine)
 			if err != nil {
 				result.Success = false
 				result.Error = err.Error()
@@ -648,7 +649,7 @@ func (ae *ActionExecutor) ExecuteAction(ctx context.Context, action *schemas.Act
 }
 
 // executeActionOnMachine executes an action on a specific machine
-func (ae *ActionExecutor) executeActionOnMachine(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
+func (ae *ActionExecutor) runActionOnMachine(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
 	// Check conditions first
 	if err := ae.checkConditions(ctx, action, machine); err != nil {
 		return fmt.Errorf("condition check failed: %w", err)
@@ -657,14 +658,14 @@ func (ae *ActionExecutor) executeActionOnMachine(ctx context.Context, action *sc
 	// Execute based on action type
 	switch action.Type {
 	case "command":
-		return ae.executeCommandAction(ctx, action, machine)
+		return ae.runCommandAction(ctx, action, machine)
 
 	case "template_deploy":
-		return ae.executeTemplateDeployAction(ctx, action, machine)
+		return ae.runTemplateDeployAction(ctx, action, machine)
 	case "file_sync":
-		return ae.executeFileSyncAction(ctx, action, machine)
+		return ae.runFileSyncAction(ctx, action, machine)
 	case "service_control":
-		return ae.executeServiceControlAction(ctx, action, machine)
+		return ae.runServiceControlAction(ctx, action, machine)
 	default:
 		return fmt.Errorf("unsupported action type: %s", action.Type)
 	}
@@ -674,7 +675,7 @@ func (ae *ActionExecutor) executeActionOnMachine(ctx context.Context, action *sc
 func (ae *ActionExecutor) checkConditions(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
 	// Check OnlyIf condition
 	if action.OnlyIf != "" {
-		result, err := ae.sshManager.ExecuteCommandOnMachine(ctx, machine, action.OnlyIf)
+		result, err := utilities.RunCommand(ctx, machine.Hostname, action.OnlyIf, machine, ae.sshManager, 0, 0, 0)
 		if err != nil {
 			return fmt.Errorf("only_if condition failed: %w", err)
 		}
@@ -685,7 +686,7 @@ func (ae *ActionExecutor) checkConditions(ctx context.Context, action *schemas.A
 
 	// Check Unless condition
 	if action.Unless != "" {
-		result, err := ae.sshManager.ExecuteCommandOnMachine(ctx, machine, action.Unless)
+		result, err := utilities.RunCommand(ctx, machine.Hostname, action.Unless, machine, ae.sshManager, 0, 0, 0)
 		if err != nil {
 			return fmt.Errorf("unless condition failed: %w", err)
 		}
@@ -698,7 +699,7 @@ func (ae *ActionExecutor) checkConditions(ctx context.Context, action *schemas.A
 }
 
 // executeCommandAction executes a command action
-func (ae *ActionExecutor) executeCommandAction(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
+func (ae *ActionExecutor) runCommandAction(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
 	if action.Command == "" {
 		return fmt.Errorf("command action requires a command field")
 	}
@@ -709,12 +710,21 @@ func (ae *ActionExecutor) executeCommandAction(ctx context.Context, action *sche
 		command = "sudo " + command
 	}
 
-	// Execute with retries
-	return ae.executeWithRetries(ctx, machine, command, action.Retries, action.RetryDelay)
+	// Execute with unified command runner
+	result, err := utilities.RunCommand(ctx, machine.Hostname, command, machine, ae.sshManager, time.Duration(action.Timeout)*time.Second, action.Retries, time.Duration(action.RetryDelay)*time.Second)
+	if err != nil {
+		return fmt.Errorf("command execution failed: %w", err)
+	}
+
+	if result.ExitCode != 0 {
+		return fmt.Errorf("command returned non-zero exit code: %d", result.ExitCode)
+	}
+
+	return nil
 }
 
 // executeTemplateDeployAction executes a template deploy action
-func (ae *ActionExecutor) executeTemplateDeployAction(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
+func (ae *ActionExecutor) runTemplateDeployAction(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
 	// This is a placeholder implementation
 	// In a full implementation, we'd:
 	// 1. Render the template with variables
@@ -724,14 +734,14 @@ func (ae *ActionExecutor) executeTemplateDeployAction(ctx context.Context, actio
 }
 
 // executeFileSyncAction executes a file sync action
-func (ae *ActionExecutor) executeFileSyncAction(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
+func (ae *ActionExecutor) runFileSyncAction(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
 	// This is a placeholder implementation
 	// In a full implementation, we'd use rsync or similar to sync files
 	return fmt.Errorf("file_sync action not yet implemented")
 }
 
 // executeServiceControlAction executes a service control action
-func (ae *ActionExecutor) executeServiceControlAction(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
+func (ae *ActionExecutor) runServiceControlAction(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
 	if action.ServiceName == "" || action.ServiceAction == "" {
 		return fmt.Errorf("service_control action requires service_name and service_action fields")
 	}
@@ -741,31 +751,15 @@ func (ae *ActionExecutor) executeServiceControlAction(ctx context.Context, actio
 		command = "sudo " + command
 	}
 
-	return ae.executeWithRetries(ctx, machine, command, action.Retries, action.RetryDelay)
-}
-
-// executeWithRetries executes a command with retry logic
-func (ae *ActionExecutor) executeWithRetries(ctx context.Context, machine *schemas.MachinesMachineV1, command string, retries, retryDelay int) error {
-	var lastErr error
-
-	for attempt := 0; attempt <= retries; attempt++ {
-		if attempt > 0 {
-			fmt.Printf("Retrying command on %s (attempt %d/%d)...\n", machine.Hostname, attempt+1, retries+1)
-			time.Sleep(time.Duration(retryDelay) * time.Second)
-		}
-
-		result, err := ae.sshManager.ExecuteCommandOnMachine(ctx, machine, command)
-		if err != nil {
-			lastErr = fmt.Errorf("command execution failed: %w", err)
-			continue
-		}
-
-		if result.ExitCode == 0 {
-			return nil // Success
-		}
-
-		lastErr = fmt.Errorf("command returned non-zero exit code: %d", result.ExitCode)
+	// Execute with unified command runner
+	result, err := utilities.RunCommand(ctx, machine.Hostname, command, machine, ae.sshManager, time.Duration(action.Timeout)*time.Second, action.Retries, time.Duration(action.RetryDelay)*time.Second)
+	if err != nil {
+		return fmt.Errorf("command execution failed: %w", err)
 	}
 
-	return lastErr
+	if result.ExitCode != 0 {
+		return fmt.Errorf("command returned non-zero exit code: %d", result.ExitCode)
+	}
+
+	return nil
 }

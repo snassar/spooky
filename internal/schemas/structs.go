@@ -9,6 +9,18 @@ const SchemaVersion = "1"
 var SupportedVersions = []string{"1"}
 
 // ============================================================================
+// COMMON TYPES
+// ============================================================================
+
+// CommandResult represents the result of executing a command
+type CommandResult struct {
+	ExitCode int    `json:"exit_code"`
+	Stdout   string `json:"stdout"`
+	Stderr   string `json:"stderr"`
+	Error    error  `json:"error,omitempty"`
+}
+
+// ============================================================================
 // VALIDATION TYPES
 // ============================================================================
 

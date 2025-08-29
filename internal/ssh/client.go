@@ -23,6 +23,7 @@ import (
 	"golang.org/x/crypto/ssh/knownhosts"
 
 	"spooky/internal/logging"
+	"spooky/internal/schemas"
 )
 
 // SSHClient represents a comprehensive SSH client for Spooky.
@@ -201,7 +202,7 @@ func (sc *SSHClient) Disconnect() error {
 }
 
 // RunCommand executes a command on the remote host with configurable timeout
-func (sc *SSHClient) RunCommand(ctx context.Context, command string) (*CommandResult, error) {
+func (sc *SSHClient) RunCommand(ctx context.Context, command string) (*schemas.CommandResult, error) {
 	if sc.client == nil {
 		return nil, errors.New("SSH client not connected")
 	}
@@ -231,7 +232,7 @@ func (sc *SSHClient) RunCommand(ctx context.Context, command string) (*CommandRe
 	session.Stderr = &stderr
 
 	if err := session.Run(command); err != nil {
-		return &CommandResult{
+		return &schemas.CommandResult{
 			ExitCode: 1,
 			Stdout:   stdout.String(),
 			Stderr:   stderr.String(),
@@ -239,7 +240,7 @@ func (sc *SSHClient) RunCommand(ctx context.Context, command string) (*CommandRe
 		}, nil
 	}
 
-	return &CommandResult{
+	return &schemas.CommandResult{
 		ExitCode: 0,
 		Stdout:   stdout.String(),
 		Stderr:   stderr.String(),
@@ -370,14 +371,6 @@ func (sc *SSHClient) DownloadFile(ctx context.Context, remotePath, localPath str
 	fmt.Fprint(os.Stdout, "\x00")
 
 	return session.Wait()
-}
-
-// CommandResult represents the result of a command execution
-type CommandResult struct {
-	ExitCode int
-	Stdout   string
-	Stderr   string
-	Error    error
 }
 
 // createSSHConfig creates the SSH client configuration

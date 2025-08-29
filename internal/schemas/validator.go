@@ -189,15 +189,33 @@ func (v *Validator) parseBlock(block *hclsyntax.Block) map[string]interface{} {
 		// Handle blocks with labels (like "action "name" {")
 		if len(nestedBlock.Labels) > 0 {
 			label := nestedBlock.Labels[0]
-			if existing, exists := result[label]; exists {
-				// Convert to array if multiple blocks with same label
-				if arr, ok := existing.([]map[string]interface{}); ok {
-					result[label] = append(arr, nestedData)
+			// Add the name as a field to the nested data for validation
+			nestedData["name"] = label
+
+			// For action blocks, store under "action" key, not the label
+			if nestedBlock.Type == "action" {
+				if existing, exists := result["action"]; exists {
+					// Convert to array if multiple blocks with same label
+					if arr, ok := existing.([]map[string]interface{}); ok {
+						result["action"] = append(arr, nestedData)
+					} else {
+						result["action"] = []map[string]interface{}{existing.(map[string]interface{}), nestedData}
+					}
 				} else {
-					result[label] = []map[string]interface{}{existing.(map[string]interface{}), nestedData}
+					result["action"] = nestedData
 				}
 			} else {
-				result[label] = nestedData
+				// For other block types, use the label as key
+				if existing, exists := result[label]; exists {
+					// Convert to array if multiple blocks with same label
+					if arr, ok := existing.([]map[string]interface{}); ok {
+						result[label] = append(arr, nestedData)
+					} else {
+						result[label] = []map[string]interface{}{existing.(map[string]interface{}), nestedData}
+					}
+				} else {
+					result[label] = nestedData
+				}
 			}
 		} else {
 			// Handle blocks without labels
