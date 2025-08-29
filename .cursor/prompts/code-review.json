@@ -1,203 +1,343 @@
 {
-  "name": "Code Review Assistant",
-  "description": "A structured prompt for conducting comprehensive code reviews in Go applications",
-  "version": "1.0.0",
-  "context": {
-    "role": "You are a senior Go developer conducting a thorough code review. You focus on code quality, security, performance, and maintainability.",
-    "project_type": "Go application with SSH functionality",
-    "review_standards": [
-      "Go best practices and idioms",
-      "Security considerations for SSH operations",
-      "Error handling and logging patterns",
-      "Resource management and cleanup",
-      "Test coverage and quality"
-    ]
-  },
-  "tasks": {
-    "pre_review_analysis": {
-      "description": "Analyze the codebase structure and identify areas for review",
-      "steps": [
-        {
-          "action": "list_dir",
-          "relative_workspace_path": ".",
-          "focus": ["Identify main components", "Understand project structure"]
-        },
-        {
-          "action": "codebase_search",
-          "query": "recent changes modified files new functionality",
-          "target_directories": ["internal/", "commands/", "cmd/"]
-        },
-        {
-          "action": "grep_search",
-          "query": "func|type|interface",
-          "include_pattern": "*.go",
-          "purpose": "Identify functions and types to review"
-        }
+  "prompt": "Generate a comprehensive code review for the latest git commit in the Spooky project. Follow this structure and analysis approach:",
+  "structure": {
+    "executive_summary": {
+      "description": "Brief overview of the commit and its impact",
+      "required_fields": [
+        "commit_hash",
+        "commit_date", 
+        "review_type",
+        "overall_assessment"
       ]
     },
-    "security_review": {
-      "description": "Review code for security vulnerabilities, especially in SSH operations",
-      "steps": [
+    "project_overview": {
+      "description": "Context about the project and the changes",
+      "required_fields": [
+        "purpose",
+        "key_features_affected",
+        "scope_of_changes"
+      ]
+    },
+    "architecture_analysis": {
+      "description": "Analysis of architectural impact and patterns",
+      "sections": [
         {
-          "action": "codebase_search",
-          "query": "authentication password key handling encryption",
-          "target_directories": ["internal/ssh/", "internal/encryption/"]
+          "name": "overall_architecture",
+          "description": "How changes fit into the existing architecture"
         },
         {
-          "action": "grep_search",
-          "query": "password|secret|key|token|credential",
-          "include_pattern": "*.go",
-          "case_sensitive": false
-        },
-        {
-          "action": "analyze",
-          "focus": [
-            "Hardcoded credentials",
-            "Insecure authentication methods",
-            "Missing input validation",
-            "Insecure file operations",
-            "Command injection vulnerabilities"
+          "name": "design_patterns",
+          "description": "Patterns used and their appropriateness",
+          "patterns_to_analyze": [
+            "Command Pattern",
+            "Builder Pattern", 
+            "Validator Pattern",
+            "Factory Pattern"
           ]
         }
       ]
     },
-    "code_quality_review": {
-      "description": "Review code for quality, maintainability, and Go best practices",
-      "steps": [
+    "code_quality_assessment": {
+      "description": "Detailed code quality analysis",
+      "sections": [
         {
-          "action": "read_file",
-          "target": "selected_files",
-          "context_lines": 50
-        },
-        {
-          "action": "analyze",
-          "focus": [
-            "Error handling patterns",
-            "Resource cleanup with defer",
-            "Function complexity and length",
-            "Variable naming and conventions",
-            "Code organization and structure",
-            "Documentation and comments"
+          "name": "strengths",
+          "description": "Positive aspects of the code",
+          "areas_to_evaluate": [
+            "Testing coverage and quality",
+            "Type safety and error handling",
+            "Modular design and separation of concerns",
+            "Documentation quality"
           ]
         },
         {
-          "action": "grep_search",
-          "query": "TODO|FIXME|XXX|HACK",
-          "include_pattern": "*.go"
-        }
-      ]
-    },
-    "performance_review": {
-      "description": "Review code for performance issues and optimization opportunities",
-      "steps": [
-        {
-          "action": "codebase_search",
-          "query": "loops database queries file operations network calls",
-          "target_directories": ["internal/"]
-        },
-        {
-          "action": "analyze",
-          "focus": [
-            "Inefficient algorithms",
-            "Memory leaks",
-            "Unnecessary allocations",
-            "Blocking operations",
-            "Resource contention"
+          "name": "areas_for_improvement",
+          "description": "Issues and recommendations",
+          "areas_to_evaluate": [
+            "Error handling consistency",
+            "Configuration complexity",
+            "Performance considerations",
+            "Code organization"
           ]
         }
       ]
     },
-    "test_review": {
-      "description": "Review test coverage and test quality",
-      "steps": [
+    "security_analysis": {
+      "description": "Security implications of the changes",
+      "sections": [
         {
-          "action": "grep_search",
-          "query": "_test\\.go",
-          "include_pattern": "*.go"
+          "name": "strengths",
+          "description": "Security-positive aspects"
         },
         {
-          "action": "read_file",
-          "target": "test_files",
-          "context_lines": 30
-        },
-        {
-          "action": "analyze",
-          "focus": [
-            "Test coverage completeness",
-            "Test quality and readability",
-            "Edge case testing",
-            "Integration test coverage",
-            "Test data management"
-          ]
+          "name": "security_considerations",
+          "description": "Potential security issues and recommendations"
         }
       ]
-    }
-  },
-  "output_format": {
-    "review_summary": {
-      "files_reviewed": ["list of files"],
-      "overall_quality": "excellent|good|fair|poor",
-      "security_score": "1-10",
-      "performance_score": "1-10",
-      "maintainability_score": "1-10"
     },
-    "security_issues": {
-      "critical": ["list of critical security issues"],
-      "high": ["list of high priority security issues"],
-      "medium": ["list of medium priority security issues"],
-      "low": ["list of low priority security issues"]
+    "performance_analysis": {
+      "description": "Performance impact assessment",
+      "sections": [
+        {
+          "name": "current_performance_characteristics",
+          "description": "Performance aspects of the changes"
+        },
+        {
+          "name": "performance_recommendations",
+          "description": "Optimization suggestions"
+        }
+      ]
     },
-    "code_quality_issues": {
-      "critical": ["list of critical quality issues"],
-      "high": ["list of high priority quality issues"],
-      "medium": ["list of medium priority quality issues"],
-      "low": ["list of low priority quality issues"]
+    "maintainability_assessment": {
+      "description": "Long-term maintainability analysis",
+      "sections": [
+        {
+          "name": "code_organization",
+          "description": "Structure and organization quality"
+        },
+        {
+          "name": "code_quality_metrics",
+          "description": "Complexity, duplication, documentation metrics"
+        }
+      ]
+    },
+    "testing_analysis": {
+      "description": "Testing coverage and quality assessment",
+      "sections": [
+        {
+          "name": "test_coverage",
+          "description": "Coverage analysis for different test types"
+        },
+        {
+          "name": "testing_recommendations",
+          "description": "Suggestions for improving testing"
+        }
+      ]
+    },
+    "dependencies_analysis": {
+      "description": "Impact on dependencies and external libraries",
+      "sections": [
+        {
+          "name": "external_dependencies",
+          "description": "New or changed external dependencies"
+        },
+        {
+          "name": "dependency_health",
+          "description": "Dependency management and security"
+        }
+      ]
     },
     "recommendations": {
-      "immediate": ["actions to take immediately"],
-      "short_term": ["actions to take in the next sprint"],
-      "long_term": ["actions to take in future iterations"]
+      "description": "Actionable recommendations",
+      "sections": [
+        {
+          "name": "immediate_actions",
+          "description": "High-priority fixes and improvements"
+        },
+        {
+          "name": "medium_term_improvements",
+          "description": "Medium-priority enhancements"
+        },
+        {
+          "name": "long_term_vision",
+          "description": "Strategic improvements and future direction"
+        }
+      ]
     },
-    "positive_findings": {
-      "well_written_code": ["examples of good code"],
-      "good_patterns": ["examples of good patterns"],
-      "strong_tests": ["examples of good tests"]
+    "conclusion": {
+      "description": "Overall assessment and summary",
+      "required_fields": [
+        "key_strengths",
+        "priority_improvements", 
+        "overall_assessment_grade"
+      ]
+    },
+    "appendices": {
+      "description": "Supporting data and metrics",
+      "sections": [
+        {
+          "name": "code_metrics_summary",
+          "description": "Quantitative metrics about the changes"
+        },
+        {
+          "name": "security_checklist",
+          "description": "Security validation checklist"
+        },
+        {
+          "name": "performance_benchmarks",
+          "description": "Performance measurements if applicable"
+        },
+        {
+          "name": "testing_summary",
+          "description": "Testing statistics and coverage"
+        }
+      ]
     }
   },
-  "review_criteria": {
-    "security": [
-      "No hardcoded credentials",
-      "Proper input validation",
-      "Secure authentication methods",
-      "Safe file operations",
-      "No command injection vulnerabilities"
+  "analysis_guidelines": {
+    "code_quality_focus": [
+      "No placeholder/stub code (follow workspace rules)",
+      "Functional completeness",
+      "Error handling consistency",
+      "Type safety and validation",
+      "Documentation quality"
     ],
-    "code_quality": [
-      "Follows Go idioms",
-      "Proper error handling",
-      "Good function design",
-      "Clear variable naming",
-      "Adequate documentation"
+    "security_focus": [
+      "Input validation",
+      "Encryption for sensitive data",
+      "SSH security handling",
+      "Configuration file permissions",
+      "Logging security"
     ],
-    "performance": [
-      "Efficient algorithms",
-      "Proper resource management",
-      "No memory leaks",
-      "Minimal allocations",
-      "Non-blocking operations where appropriate"
+    "performance_focus": [
+      "Reflection-heavy operations",
+      "Memory usage patterns",
+      "Caching opportunities",
+      "Parallel processing potential"
     ],
-    "maintainability": [
-      "Clear code structure",
-      "Good separation of concerns",
-      "Consistent patterns",
-      "Adequate test coverage",
-      "Clear documentation"
+    "maintainability_focus": [
+      "Code organization",
+      "Dependency management",
+      "Testing coverage",
+      "Documentation completeness"
     ]
   },
-  "constraints": {
-    "be_constructive": "Provide actionable feedback",
-    "focus_on_impact": "Prioritize issues by impact",
-    "suggest_solutions": "Don't just identify problems, suggest fixes",
-    "consider_context": "Understand the project's constraints and goals"
+  "output_format": {
+    "markdown": true,
+    "include_code_examples": true,
+    "include_diagrams": false,
+    "detailed_explanations": true
+  },
+  "grading_criteria": {
+    "10": "Perfect - No issues, excellent architecture, comprehensive testing, production-ready",
+    "9": "Excellent - Minor issues, strong architecture, comprehensive testing",
+    "8": "Very Good - Some minor issues, solid foundation, good testing",
+    "7": "Good - Several minor issues, generally well-structured, adequate testing",
+    "6": "Adequate - Some issues, needs improvement, testing gaps",
+    "5": "Average - Multiple issues, architectural concerns, limited testing",
+    "4": "Below Average - Significant issues, poor architecture, minimal testing",
+    "3": "Poor - Major issues, architectural problems, inadequate testing",
+    "2": "Very Poor - Critical issues, broken functionality, no testing",
+    "1": "Failing - Unusable code, severe problems, no redeeming qualities",
+    "0": "Complete Failure - Code doesn't work, violates all best practices"
+  },
+  "grading_framework": {
+    "description": "Specific criteria for assigning points across assessment areas",
+    "scoring_breakdown": {
+      "code_quality": {
+        "weight": 3,
+        "max_points": 3,
+        "criteria": {
+          "3": "Excellent code quality - Clean, readable, follows best practices, no placeholder code",
+          "2": "Good code quality - Generally clean, minor issues, some placeholder code",
+          "1": "Poor code quality - Significant issues, placeholder code, poor practices",
+          "0": "Very poor code quality - Unreadable, broken, violates all practices"
+        }
+      },
+      "architecture": {
+        "weight": 2,
+        "max_points": 2,
+        "criteria": {
+          "2": "Excellent architecture - Clean separation, good patterns, scalable design",
+          "1": "Good architecture - Generally well-structured, minor architectural concerns",
+          "0": "Poor architecture - No clear structure, anti-patterns, unscalable"
+        }
+      },
+      "testing": {
+        "weight": 2,
+        "max_points": 2,
+        "criteria": {
+          "2": "Comprehensive testing - High coverage, good test quality, edge cases covered",
+          "1": "Adequate testing - Some coverage, basic tests, missing edge cases",
+          "0": "Poor testing - Low coverage, poor test quality, no edge cases"
+        }
+      },
+      "security": {
+        "weight": 1.5,
+        "max_points": 1.5,
+        "criteria": {
+          "1.5": "Excellent security - Proper validation, encryption, secure practices",
+          "1": "Good security - Basic validation, some security considerations",
+          "0.5": "Poor security - Minimal validation, security concerns",
+          "0": "Very poor security - No validation, security vulnerabilities"
+        }
+      },
+      "performance": {
+        "weight": 1,
+        "max_points": 1,
+        "criteria": {
+          "1": "Excellent performance - Optimized, efficient, no bottlenecks",
+          "0.5": "Good performance - Generally efficient, minor optimizations needed",
+          "0": "Poor performance - Inefficient, bottlenecks, optimization needed"
+        }
+      },
+      "documentation": {
+        "weight": 0.5,
+        "max_points": 0.5,
+        "criteria": {
+          "0.5": "Excellent documentation - Clear, comprehensive, up-to-date",
+          "0.25": "Good documentation - Generally clear, some gaps",
+          "0": "Poor documentation - Unclear, incomplete, outdated"
+        }
+      }
+    },
+    "scoring_guidelines": {
+      "calculation": "Sum all weighted scores to get total out of 10",
+      "rounding": "Round to nearest 0.5 for final score",
+      "bonus_points": {
+        "innovation": "Up to +0.5 for innovative solutions or approaches",
+        "efficiency": "Up to +0.5 for exceptional efficiency or optimization",
+        "maintainability": "Up to +0.5 for exceptional maintainability features"
+      },
+      "penalty_points": {
+        "critical_bugs": "-1 to -2 for critical functionality issues",
+        "security_vulnerabilities": "-1 to -2 for security vulnerabilities",
+        "performance_critical": "-0.5 to -1 for performance-critical issues"
+      }
+    },
+    "assessment_questions": {
+      "code_quality": [
+        "Is the code clean and readable?",
+        "Does it follow Go best practices?",
+        "Is there any placeholder or stub code?",
+        "Are error handling patterns consistent?",
+        "Is the code functionally complete?"
+      ],
+      "architecture": [
+        "Is there clear separation of concerns?",
+        "Are appropriate design patterns used?",
+        "Is the code modular and extensible?",
+        "Are dependencies well-managed?",
+        "Is the architecture scalable?"
+      ],
+      "testing": [
+        "What is the test coverage percentage?",
+        "Are edge cases and error conditions tested?",
+        "Is the test quality high (not just quantity)?",
+        "Are integration tests included where needed?",
+        "Are tests maintainable and readable?"
+      ],
+      "security": [
+        "Is input validation comprehensive?",
+        "Are sensitive operations properly secured?",
+        "Is encryption used appropriately?",
+        "Are there any obvious security vulnerabilities?",
+        "Is authentication/authorization handled correctly?"
+      ],
+      "performance": [
+        "Are there any obvious performance bottlenecks?",
+        "Is memory usage reasonable?",
+        "Are algorithms efficient?",
+        "Is there unnecessary I/O or computation?",
+        "Would this scale to expected load?"
+      ],
+      "documentation": [
+        "Is the code self-documenting?",
+        "Are complex algorithms explained?",
+        "Is API documentation clear?",
+        "Are there usage examples?",
+        "Is documentation up-to-date?"
+      ]
+    }
   }
 }

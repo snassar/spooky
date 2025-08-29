@@ -1,0 +1,175 @@
+{
+  "name": "Code Review Issue Finder",
+  "description": "A focused prompt for discovering issues and actionable problems in Go code",
+  "version": "1.0.0",
+  "context": {
+    "role": "You are a senior Go developer focused on finding actionable issues and problems in code",
+    "project_type": "Go application with SSH functionality",
+    "focus": "Issue discovery and actionable recommendations"
+  },
+  "tasks": {
+    "pre_review_analysis": {
+      "description": "Analyze the codebase structure and identify areas for review",
+      "steps": [
+        {
+          "action": "list_dir",
+          "relative_workspace_path": ".",
+          "focus": ["Identify main components", "Understand project structure"]
+        },
+        {
+          "action": "codebase_search",
+          "query": "recent changes modified files new functionality",
+          "target_directories": ["internal/", "commands/", "cmd/"]
+        },
+        {
+          "action": "grep_search",
+          "query": "func|type|interface",
+          "include_pattern": "*.go",
+          "purpose": "Identify functions and types to review"
+        }
+      ]
+    },
+    "security_issues": {
+      "description": "Find security vulnerabilities, especially in SSH operations",
+      "steps": [
+        {
+          "action": "codebase_search",
+          "query": "authentication password key handling encryption",
+          "target_directories": ["internal/ssh/", "internal/encryption/"]
+        },
+        {
+          "action": "grep_search",
+          "query": "password|secret|key|token|credential",
+          "include_pattern": "*.go",
+          "case_sensitive": false
+        },
+        {
+          "action": "grep_search",
+          "query": "TODO|FIXME|XXX|HACK",
+          "include_pattern": "*.go"
+        }
+      ]
+    },
+    "code_quality_issues": {
+      "description": "Find code quality and maintainability issues",
+      "steps": [
+        {
+          "action": "read_file",
+          "target": "selected_files",
+          "context_lines": 50
+        },
+        {
+          "action": "grep_search",
+          "query": "panic|TODO|FIXME|XXX|HACK",
+          "include_pattern": "*.go"
+        },
+        {
+          "action": "codebase_search",
+          "query": "error handling defer cleanup",
+          "target_directories": ["internal/", "commands/"]
+        }
+      ]
+    },
+    "performance_issues": {
+      "description": "Find performance issues and optimization opportunities",
+      "steps": [
+        {
+          "action": "codebase_search",
+          "query": "loops database queries file operations network calls",
+          "target_directories": ["internal/"]
+        },
+        {
+          "action": "grep_search",
+          "query": "for range|select|goroutine|channel",
+          "include_pattern": "*.go"
+        }
+      ]
+    },
+    "test_issues": {
+      "description": "Find testing gaps and quality issues",
+      "steps": [
+        {
+          "action": "grep_search",
+          "query": "_test\\.go",
+          "include_pattern": "*.go"
+        },
+        {
+          "action": "codebase_search",
+          "query": "test coverage edge cases",
+          "target_directories": ["internal/"]
+        }
+      ]
+    }
+  },
+  "output_format": {
+    "issues_found": {
+      "security": {
+        "critical": ["list of critical security issues"],
+        "high": ["list of high priority security issues"],
+        "medium": ["list of medium priority security issues"],
+        "low": ["list of low priority security issues"]
+      },
+      "code_quality": {
+        "critical": ["list of critical quality issues"],
+        "high": ["list of high priority quality issues"],
+        "medium": ["list of medium priority quality issues"],
+        "low": ["list of low priority quality issues"]
+      },
+      "performance": {
+        "critical": ["list of critical performance issues"],
+        "high": ["list of high priority performance issues"],
+        "medium": ["list of medium priority performance issues"],
+        "low": ["list of low priority performance issues"]
+      },
+      "testing": {
+        "critical": ["list of critical testing issues"],
+        "high": ["list of high priority testing issues"],
+        "medium": ["list of medium priority testing issues"],
+        "low": ["list of low priority testing issues"]
+      }
+    },
+    "actionable_recommendations": {
+      "immediate": ["actions to take immediately"],
+      "short_term": ["actions to take in the next sprint"],
+      "long_term": ["actions to take in future iterations"]
+    },
+    "files_to_review": ["list of files that need attention"],
+    "patterns_found": ["recurring issues or patterns that need addressing"]
+  },
+  "issue_criteria": {
+    "security": [
+      "Hardcoded credentials",
+      "Missing input validation",
+      "Insecure authentication methods",
+      "Insecure file operations",
+      "Command injection vulnerabilities"
+    ],
+    "code_quality": [
+      "Placeholder/stub code (violates workspace rules)",
+      "Inconsistent error handling",
+      "Poor function design",
+      "Unclear variable naming",
+      "Missing documentation"
+    ],
+    "performance": [
+      "Inefficient algorithms",
+      "Memory leaks",
+      "Unnecessary allocations",
+      "Blocking operations",
+      "Resource contention"
+    ],
+    "testing": [
+      "Missing test coverage",
+      "Poor test quality",
+      "Missing edge case tests",
+      "No integration tests",
+      "Poor test data management"
+    ]
+  },
+  "constraints": {
+    "focus_on_issues": "Only identify problems and actionable items",
+    "prioritize_by_impact": "Focus on issues that have the most impact",
+    "be_specific": "Provide specific file locations and code examples",
+    "suggest_fixes": "Don't just identify problems, suggest concrete solutions"
+  }
+}

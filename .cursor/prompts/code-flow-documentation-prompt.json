@@ -1,0 +1,312 @@
+{
+  "prompt": "Generate comprehensive code flow documentation for every verb of every noun in the Spooky CLI. Follow this structure and analysis approach:",
+  "structure": {
+    "overview": {
+      "description": "Brief description of the command and its purpose",
+      "required_fields": [
+        "command_signature",
+        "commit_hash",
+        "date_generated",
+        "purpose"
+      ]
+    },
+    "code_flow_diagram": {
+      "description": "Mermaid flowchart showing the complete code execution path",
+      "requirements": [
+        "Start with user command input",
+        "Show all major decision points",
+        "Include error handling paths",
+        "Show file operations and external calls",
+        "End with success/failure output"
+      ]
+    },
+    "detailed_flow_description": {
+      "description": "Step-by-step explanation of the code execution",
+      "sections": [
+        {
+          "name": "command_entry_point",
+          "description": "Initial command handling and validation",
+          "required_fields": [
+            "file_path",
+            "function_name",
+            "validation_steps"
+          ]
+        },
+        {
+          "name": "argument_validation",
+          "description": "Input validation and processing",
+          "required_fields": [
+            "validation_rules",
+            "error_handling",
+            "default_values"
+          ]
+        },
+        {
+          "name": "core_execution",
+          "description": "Main business logic execution",
+          "required_fields": [
+            "key_functions",
+            "data_processing",
+            "external_calls"
+          ]
+        },
+        {
+          "name": "output_generation",
+          "description": "Result formatting and display",
+          "required_fields": [
+            "success_output",
+            "error_output",
+            "file_operations"
+          ]
+        }
+      ]
+    },
+    "key_components": {
+      "description": "Analysis of major components involved",
+      "sections": [
+        {
+          "name": "core_components",
+          "description": "Main business logic components",
+          "required_fields": [
+            "file_path",
+            "purpose",
+            "key_features"
+          ]
+        },
+        {
+          "name": "utility_components",
+          "description": "Supporting utilities and helpers",
+          "required_fields": [
+            "file_path",
+            "purpose",
+            "usage_patterns"
+          ]
+        },
+        {
+          "name": "external_libraries",
+          "description": "Third-party dependencies used",
+          "required_fields": [
+            "library_name",
+            "purpose",
+            "key_functions"
+          ]
+        }
+      ]
+    },
+    "example_output": {
+      "description": "Sample command output and generated files",
+      "sections": [
+        {
+          "name": "success_scenarios",
+          "description": "Example successful command execution"
+        },
+        {
+          "name": "error_scenarios",
+          "description": "Example error conditions and output"
+        },
+        {
+          "name": "generated_files",
+          "description": "Sample output files if applicable"
+        }
+      ]
+    },
+    "dependencies": {
+      "description": "Internal and external dependencies",
+      "sections": [
+        {
+          "name": "internal_dependencies",
+          "description": "Project-internal packages and modules"
+        },
+        {
+          "name": "external_dependencies",
+          "description": "Third-party libraries and frameworks"
+        }
+      ]
+    },
+    "error_scenarios": {
+      "description": "Common error conditions and handling",
+      "required_fields": [
+        "error_types",
+        "error_handling",
+        "recovery_mechanisms"
+      ]
+    },
+    "testing": {
+      "description": "Testing approach and coverage",
+      "required_fields": [
+        "test_types",
+        "test_files",
+        "coverage_areas"
+      ]
+    }
+  },
+  "command_categories": {
+    "project_commands": {
+      "description": "Project management commands",
+      "verbs": [
+        "init",
+        "validate",
+        "status",
+        "clean",
+        "backup",
+        "restore"
+      ]
+    },
+    "facts_commands": {
+      "description": "System facts collection commands",
+      "verbs": [
+        "gather",
+        "list",
+        "show",
+        "export",
+        "validate",
+        "clean"
+      ]
+    },
+    "machines_commands": {
+      "description": "Machine inventory management",
+      "verbs": [
+        "list",
+        "show",
+        "add",
+        "remove",
+        "update",
+        "test",
+        "ping"
+      ]
+    },
+    "actions_commands": {
+      "description": "Action execution and management",
+      "verbs": [
+        "run",
+        "list",
+        "show",
+        "validate",
+        "dry-run",
+        "cancel",
+        "status"
+      ]
+    },
+    "templates_commands": {
+      "description": "Template management and rendering",
+      "verbs": [
+        "render",
+        "validate",
+        "list",
+        "show",
+        "deploy"
+      ]
+    },
+    "sync_commands": {
+      "description": "File synchronization operations",
+      "verbs": [
+        "start",
+        "stop",
+        "status",
+        "list",
+        "clean"
+      ]
+    },
+    "encryption_commands": {
+      "description": "Encryption and key management",
+      "verbs": [
+        "encrypt",
+        "decrypt",
+        "generate-key",
+        "list-keys",
+        "rotate"
+      ]
+    },
+    "ssh_commands": {
+      "description": "SSH connection management",
+      "verbs": [
+        "connect",
+        "test",
+        "list-connections",
+        "close"
+      ]
+    }
+  },
+  "analysis_guidelines": {
+    "flow_tracking": [
+      "Follow the complete execution path from user input to output",
+      "Identify all major decision points and branching logic",
+      "Document error handling and recovery paths",
+      "Show file system operations and external API calls",
+      "Include performance-critical sections"
+    ],
+    "component_analysis": [
+      "Identify the main business logic components",
+      "Document utility functions and helper methods",
+      "Analyze external library usage and integration",
+      "Show data flow between components",
+      "Document configuration and state management"
+    ],
+    "error_handling": [
+      "Document all error conditions and their handling",
+      "Show user-friendly error messages",
+      "Include recovery mechanisms and fallbacks",
+      "Document logging and debugging information"
+    ],
+    "testing_coverage": [
+      "Identify unit test coverage",
+      "Document integration test scenarios",
+      "Show test data and mock objects",
+      "Include performance and stress testing"
+    ]
+  },
+  "output_format": {
+    "markdown": true,
+    "include_mermaid_diagrams": true,
+    "include_code_examples": true,
+    "include_file_paths": true,
+    "detailed_explanations": true
+  },
+  "documentation_standards": {
+    "naming_conventions": [
+      "Use consistent file naming: spooky-{noun}-{verb}-flow-{commit}.md",
+      "Include commit hash in filename for version tracking",
+      "Use descriptive section headings",
+      "Include line numbers for code references when relevant"
+    ],
+    "diagram_standards": [
+      "Use Mermaid flowchart syntax",
+      "Start with user input and end with output",
+      "Show all major decision points with diamond shapes",
+      "Use rectangles for processes and operations",
+      "Include error paths and handling"
+    ],
+    "code_examples": [
+      "Include actual code snippets from the codebase",
+      "Show function signatures and key logic",
+      "Include error handling examples",
+      "Show configuration examples when relevant"
+    ]
+  },
+  "quality_requirements": {
+    "completeness": [
+      "Cover every command verb for every noun",
+      "Include all major execution paths",
+      "Document error conditions and handling",
+      "Show dependencies and relationships"
+    ],
+    "accuracy": [
+      "Verify all file paths and function names",
+      "Confirm command signatures and options",
+      "Validate error messages and output formats",
+      "Check dependency versions and usage"
+    ],
+    "clarity": [
+      "Use clear and concise language",
+      "Provide context for technical decisions",
+      "Explain complex logic and algorithms",
+      "Include examples and use cases"
+    ],
+    "maintainability": [
+      "Structure documentation for easy updates",
+      "Include version information for tracking",
+      "Use consistent formatting and style",
+      "Provide clear navigation and organization"
+    ]
+  }
+}
