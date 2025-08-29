@@ -187,15 +187,11 @@ type ActionsV1 struct {
 type ActionsActionV1 struct {
 	// Action identification (name comes from block label)
 	Description string   `json:"description" required:"true" min_length:"1" max_length:"500" description:"Action description"`
-	Type        string   `json:"type" required:"true" enum:"command,script,template_deploy,file_sync,service_control" description:"Action run type"`
+	Type        string   `json:"type" required:"true" enum:"command,template_deploy,file_sync,service_control" description:"Action run type"`
 	Tags        []string `json:"tags" description:"Tags for categorizing and filtering actions"`
 
 	// Command type fields
 	Command string `json:"command" min_length:"1" max_length:"1000" description:"Command to run (for command type)"`
-
-	// Script type fields
-	Script    string            `json:"script" pattern:"^(files|templates)/[a-zA-Z0-9/._-]+(\\.sh|\\.tmpl)?$" description:"Script file path in files/ or templates/ directory (for script type)"`
-	Variables map[string]string `json:"variables" description:"Variables for templated scripts (for script type with .tmpl files)"`
 
 	// Template deploy type fields
 	Source      string `json:"source" pattern:"^templates/[a-zA-Z0-9/._-]+\\.tmpl$" description:"Source template file path (for template_deploy type)"`

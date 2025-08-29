@@ -304,13 +304,7 @@ func (v *Validator) loadEnhancedRules() error {
 			Condition: "type == 'command' && command == null",
 			Severity:  "error",
 		},
-		{
-			Name:      "script_type_validation",
-			Type:      "type_validation",
-			Message:   "Script actions must have a 'script' field",
-			Condition: "type == 'script' && script == null",
-			Severity:  "error",
-		},
+
 		{
 			Name:      "template_deploy_validation",
 			Type:      "type_validation",
@@ -506,11 +500,6 @@ func (v *Validator) evaluatePatternRule(rule EnhancedValidationRule, data map[st
 
 	switch rule.Name {
 	case "shell_operators_forbidden":
-		if script, exists := data["script"]; exists {
-			if scriptStr, ok := script.(string); ok {
-				return regex.MatchString(scriptStr) // Return true if pattern matches (violation)
-			}
-		}
 		if command, exists := data["command"]; exists {
 			if commandStr, ok := command.(string); ok {
 				return regex.MatchString(commandStr) // Return true if pattern matches (violation)
@@ -593,8 +582,7 @@ func (v *Validator) evaluateTypeValidationRule(rule EnhancedValidationRule, data
 	switch rule.Name {
 	case "command_type_validation":
 		return v.checkCommandTypeValidation(data)
-	case "script_type_validation":
-		return v.checkScriptTypeValidation(data)
+
 	case "template_deploy_validation":
 		return v.checkTemplateDeployValidation(data)
 	case "file_sync_validation":
@@ -690,15 +678,6 @@ func (v *Validator) checkCommandTypeValidation(data map[string]interface{}) bool
 	return false // Return false if there's no violation
 }
 
-func (v *Validator) checkScriptTypeValidation(data map[string]interface{}) bool {
-	if actionType, exists := data["type"]; exists && actionType == "script" {
-		if _, hasScript := data["script"]; !hasScript {
-			return true // Return true if there's a violation (missing script)
-		}
-	}
-	return false // Return false if there's no violation
-}
-
 func (v *Validator) checkTemplateDeployValidation(data map[string]interface{}) bool {
 	if actionType, exists := data["type"]; exists && actionType == "template_deploy" {
 		if _, hasSource := data["source"]; !hasSource {
@@ -738,8 +717,7 @@ func (v *Validator) checkServiceControlValidation(data map[string]interface{}) b
 // getFieldValue extracts field value from data based on rule name
 func (v *Validator) getFieldValue(ruleName string, data map[string]interface{}) interface{} {
 	switch ruleName {
-	case "script_file_path_format":
-		return data["script"]
+
 	case "tags_count_limit_exceeded":
 		if tags, exists := data["tags"]; exists {
 			if tagsSlice, ok := tags.([]interface{}); ok {
@@ -1233,7 +1211,7 @@ func (v *Validator) validateActionTypeV1(actionType interface{}, path string, re
 	}
 
 	// Enum validation
-	validTypes := []string{"command", "script", "template_deploy", "file_sync", "service_control"}
+	validTypes := []string{"command", "template_deploy", "file_sync", "service_control"}
 	valid := false
 	for _, validType := range validTypes {
 		if typeStr == validType {

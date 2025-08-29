@@ -104,7 +104,7 @@ func (sm *SimpleSSHManager) ExecuteCommandOnMachine(ctx context.Context, machine
 	}
 
 	// Execute command
-	result, err := client.ExecuteCommand(ctx, command)
+	result, err := client.RunCommand(ctx, command)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to execute command on machine %s", machine.Hostname)
 	}

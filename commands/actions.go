@@ -27,7 +27,6 @@ var (
 
 Actions can be of various types:
 - command: Execute a single command
-- script: Execute a script file
 - template_deploy: Deploy a template file
 - file_sync: Synchronize files
 - service_control: Control system services
@@ -244,14 +243,7 @@ func showAction(cmd *cobra.Command, args []string) error {
 	switch action.Type {
 	case "command":
 		fmt.Printf("Command: %s\n", action.Command)
-	case "script":
-		fmt.Printf("Script: %s\n", action.Script)
-		if len(action.Variables) > 0 {
-			fmt.Println("Variables:")
-			for k, v := range action.Variables {
-				fmt.Printf("  %s: %s\n", k, v)
-			}
-		}
+
 	case "template_deploy":
 		fmt.Printf("Source: %s\n", action.Source)
 		fmt.Printf("Destination: %s\n", action.Destination)
@@ -422,7 +414,7 @@ func loadActionsConfig() ([]*schemas.ActionsActionV1, error) {
 				{Name: "description", Required: true},
 				{Name: "type", Required: true},
 				{Name: "command", Required: false},
-				{Name: "script", Required: false},
+
 				{Name: "targets", Required: false},
 				{Name: "timeout", Required: false},
 				{Name: "retries", Required: false},
@@ -462,15 +454,6 @@ func loadActionsConfig() ([]*schemas.ActionsActionV1, error) {
 				return nil, fmt.Errorf("failed to decode command for action %s: %v", actionName, diags)
 			}
 			action.Command = command
-		}
-
-		// Extract script
-		if scriptAttr, exists := actionAttrContent.Attributes["script"]; exists {
-			var script string
-			if diags := gohcl.DecodeExpression(scriptAttr.Expr, nil, &script); diags.HasErrors() {
-				return nil, fmt.Errorf("failed to decode script for action %s: %v", actionName, diags)
-			}
-			action.Script = script
 		}
 
 		// Extract targets
@@ -675,8 +658,7 @@ func (ae *ActionExecutor) executeActionOnMachine(ctx context.Context, action *sc
 	switch action.Type {
 	case "command":
 		return ae.executeCommandAction(ctx, action, machine)
-	case "script":
-		return ae.executeScriptAction(ctx, action, machine)
+
 	case "template_deploy":
 		return ae.executeTemplateDeployAction(ctx, action, machine)
 	case "file_sync":
@@ -728,22 +710,6 @@ func (ae *ActionExecutor) executeCommandAction(ctx context.Context, action *sche
 	}
 
 	// Execute with retries
-	return ae.executeWithRetries(ctx, machine, command, action.Retries, action.RetryDelay)
-}
-
-// executeScriptAction executes a script action
-func (ae *ActionExecutor) executeScriptAction(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
-	if action.Script == "" {
-		return fmt.Errorf("script action requires a script field")
-	}
-
-	// For now, we'll just execute the script path as a command
-	// In a full implementation, we'd upload the script and execute it
-	command := fmt.Sprintf("bash %s", action.Script)
-	if action.Sudo {
-		command = "sudo " + command
-	}
-
 	return ae.executeWithRetries(ctx, machine, command, action.Retries, action.RetryDelay)
 }
 

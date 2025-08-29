@@ -200,10 +200,17 @@ func (sc *SSHClient) Disconnect() error {
 	return nil
 }
 
-// ExecuteCommand executes a command on the remote host
-func (sc *SSHClient) ExecuteCommand(ctx context.Context, command string) (*CommandResult, error) {
+// RunCommand executes a command on the remote host with configurable timeout
+func (sc *SSHClient) RunCommand(ctx context.Context, command string) (*CommandResult, error) {
 	if sc.client == nil {
 		return nil, errors.New("SSH client not connected")
+	}
+
+	// Apply timeout from config if context doesn't have one
+	if _, ok := ctx.Deadline(); !ok && sc.config.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, sc.config.Timeout)
+		defer cancel()
 	}
 
 	// Create session
@@ -237,14 +244,6 @@ func (sc *SSHClient) ExecuteCommand(ctx context.Context, command string) (*Comma
 		Stdout:   stdout.String(),
 		Stderr:   stderr.String(),
 	}, nil
-}
-
-// ExecuteCommandWithTimeout executes a command with a timeout
-func (sc *SSHClient) ExecuteCommandWithTimeout(ctx context.Context, command string, timeout time.Duration) (*CommandResult, error) {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	return sc.ExecuteCommand(ctx, command)
 }
 
 // UploadFile uploads a file to the remote host

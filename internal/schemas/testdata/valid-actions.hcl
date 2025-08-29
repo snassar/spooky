@@ -9,13 +9,8 @@ metadata {
 actions {
   action "deploy_webapp" {
     description = "Deploy web application to servers"
-    type = "script"
-    script = "files/deploy.sh"
-    
-    variables = {
-      app_version = "1.2.3"
-      environment = "production"
-    }
+    type = "command"
+    command = "cd /opt/app && ./deploy.sh --version 1.2.3 --env production"
     
     targets = ["web-server-01", "web-server-02"]
     
