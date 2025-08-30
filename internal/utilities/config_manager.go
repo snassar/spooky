@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"spooky/internal/hcl"
 	"spooky/internal/schemas"
 
 	"github.com/pkg/errors"
@@ -42,27 +43,6 @@ func (cm *ConfigManager) GetConfigDir() string {
 	return cm.config.ConfigDir
 }
 
-// WriteConfig writes a configuration file
-func (cm *ConfigManager) WriteConfig(content string) error {
-	return cm.WriteConfigFile(cm.config.ConfigFile, content)
-}
-
-// WriteConfigFile writes a configuration file to a specific path
-func (cm *ConfigManager) WriteConfigFile(path, content string) error {
-	// Ensure directory exists
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return errors.Wrapf(err, "failed to create config directory: %s", dir)
-	}
-
-	// Write file
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		return errors.Wrapf(err, "failed to write config file: %s", path)
-	}
-
-	return nil
-}
-
 // GetStructBasedDefaultConfig returns the default configuration using struct-based defaults
 func (cm *ConfigManager) GetStructBasedDefaultConfig() string {
 	// Import the schemas package to use the default config generator
@@ -71,7 +51,7 @@ func (cm *ConfigManager) GetStructBasedDefaultConfig() string {
 	defaultConfig := defaultGen.GetDefaultSpookyConfig()
 
 	// Convert to HCL
-	hclConfig, err := defaultGen.ToHCL(defaultConfig)
+	hclConfig, err := hcl.GenerateConfigHCL(defaultConfig, "spooky")
 	if err != nil {
 		// Fallback to a simple default if HCL generation fails
 		return cm.getFallbackDefaultConfig()
@@ -195,80 +175,6 @@ func (cm *ConfigManager) ConfigFileExists(path string) bool {
 	return err == nil
 }
 
-// CreateDefaultConfig creates a default configuration file
-func (cm *ConfigManager) CreateDefaultConfig() error {
-	// Get embedded default config
-	fileEmbedder, err := NewFileEmbedder()
-	if err != nil {
-		return errors.Wrap(err, "failed to get file embedder")
-	}
-
-	defaultConfig, err := fileEmbedder.GetDefaultConfig()
-	if err != nil {
-		return errors.Wrap(err, "failed to get default config")
-	}
-
-	// Validate the HCL before writing
-	validator := NewHCLValidator()
-	result, err := validator.ValidateContent(defaultConfig, "default-config.hcl")
-	if err != nil {
-		return errors.Wrap(err, "failed to validate default config")
-	}
-
-	if !result.IsValid {
-		return errors.Errorf("default config is not valid HCL: %v", result.Errors)
-	}
-
-	return cm.WriteConfig(defaultConfig)
-}
-
-// CreateDefaultConfigFromStructs creates a default configuration file from Go structs
-func (cm *ConfigManager) CreateDefaultConfigFromStructs() error {
-	// Import the schemas package to access generation functions
-	// This will be implemented when we integrate the schemas package
-	defaultConfig := `# Spooky Global Configuration
-# Generated from Go struct schemas
-
-spooky {
-  # SSH Configuration
-  ssh {
-    timeout = 30  # SSH connection timeout in seconds
-    keepalive_interval = 60  # SSH keepalive interval in seconds
-  }
-  
-  # Security Configuration
-  security {
-    allow_unsafe_commands = false  # Allow potentially unsafe commands
-  }
-  
-  # Age Encryption Configuration
-  age {
-    identities = "~/.config/spooky/age/identities.txt"  # Path to age identities
-  }
-  
-  # Logging Configuration
-  logging {
-    level = "info"  # debug, info, warn, error, fatal
-    format = "structured"  # json, text, structured
-    output = "stdout"  # stdout, stderr, file, null
-    # file_path = "/var/log/spooky.log"  # Required when output is 'file'
-  }
-}`
-
-	// Validate the HCL before writing
-	validator := NewHCLValidator()
-	result, err := validator.ValidateContent(defaultConfig, "default-config.hcl")
-	if err != nil {
-		return errors.Wrap(err, "failed to validate default config")
-	}
-
-	if !result.IsValid {
-		return errors.Errorf("default config is not valid HCL: %v", result.Errors)
-	}
-
-	return cm.WriteConfig(defaultConfig)
-}
-
 // GetConfigInfo returns information about the configuration
 func (cm *ConfigManager) GetConfigInfo() (*ConfigInfo, error) {
 	info := &ConfigInfo{
@@ -322,41 +228,6 @@ func (cm *ConfigManager) ListConfigFiles() ([]string, error) {
 	}
 
 	return configFiles, nil
-}
-
-// BackupConfig creates a backup of the current configuration
-func (cm *ConfigManager) BackupConfig() (string, error) {
-	if !cm.ConfigExists() {
-		return "", errors.New("no configuration file to backup")
-	}
-
-	content, err := cm.ReadConfig()
-	if err != nil {
-		return "", errors.Wrap(err, "failed to read configuration for backup")
-	}
-
-	backupPath := cm.config.ConfigFile + ".backup"
-	if err := cm.WriteConfigFile(backupPath, content); err != nil {
-		return "", errors.Wrap(err, "failed to create backup")
-	}
-
-	return backupPath, nil
-}
-
-// RestoreConfig restores configuration from backup
-func (cm *ConfigManager) RestoreConfig() error {
-	backupPath := cm.config.ConfigFile + ".backup"
-
-	if !cm.ConfigFileExists(backupPath) {
-		return errors.New("no backup file found")
-	}
-
-	content, err := cm.ReadConfigFile(backupPath)
-	if err != nil {
-		return errors.Wrap(err, "failed to read backup configuration")
-	}
-
-	return cm.WriteConfig(content)
 }
 
 // ValidateConfig validates the configuration file

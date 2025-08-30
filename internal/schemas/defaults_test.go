@@ -89,7 +89,7 @@ func TestDefaultConfigGeneratorHCL(t *testing.T) {
 
 	// Test HCL generation
 	sshDefaults := dcg.GetDefaultSpookySSH()
-	hcl, err := dcg.ToHCL(sshDefaults)
+	hcl, err := dcg.ToHCLWithBlockName(sshDefaults, "ssh")
 	if err != nil {
 		t.Errorf("Expected no error generating HCL, got %v", err)
 	}
@@ -113,8 +113,8 @@ func TestDefaultConfigGeneratorHCL(t *testing.T) {
 		t.Error("Expected HCL to contain 'known_hosts_strict' and 'true'")
 	}
 	// Check for block format
-	if !contains(hcl, "SpookySSHV1 {") {
-		t.Error("Expected HCL to contain 'SpookySSHV1 {' block")
+	if !contains(hcl, "ssh {") {
+		t.Error("Expected HCL to contain 'ssh {' block")
 	}
 }
 
@@ -145,7 +145,7 @@ func TestDefaultConfigGenerator_ToHCL(t *testing.T) {
 
 	// Test with SpookySSH config
 	sshConfig := dcg.GetDefaultSpookySSH()
-	hclOutput, err := dcg.ToHCL(sshConfig)
+	hclOutput, err := dcg.ToHCLWithBlockName(sshConfig, "ssh")
 	if err != nil {
 		t.Fatalf("ToHCL failed: %v", err)
 	}
@@ -171,8 +171,8 @@ func TestDefaultConfigGenerator_ToHCL(t *testing.T) {
 	}
 
 	// Verify the output is valid HCL format
-	if !strings.Contains(hclOutput, "SpookySSHV1") {
-		t.Error("HCL output should contain the struct name as a block")
+	if !strings.Contains(hclOutput, "ssh") {
+		t.Error("HCL output should contain the ssh block")
 	}
 
 	t.Logf("Generated HCL:\n%s", hclOutput)
@@ -183,7 +183,7 @@ func TestDefaultConfigGenerator_ToHCL_ComplexStruct(t *testing.T) {
 
 	// Test with full Spooky config
 	spookyConfig := dcg.GetDefaultSpookyConfig()
-	hclOutput, err := dcg.ToHCL(spookyConfig)
+	hclOutput, err := dcg.ToHCLWithBlockName(spookyConfig, "spooky")
 	if err != nil {
 		t.Fatalf("ToHCL failed: %v", err)
 	}
@@ -203,8 +203,8 @@ func TestDefaultConfigGenerator_ToHCL_ComplexStruct(t *testing.T) {
 	}
 
 	// Verify the output is valid HCL format
-	if !strings.Contains(hclOutput, "SpookyV1") {
-		t.Error("HCL output should contain the struct name as a block")
+	if !strings.Contains(hclOutput, "spooky") {
+		t.Error("HCL output should contain the spooky block")
 	}
 
 	t.Logf("Generated HCL:\n%s", hclOutput)
@@ -217,14 +217,14 @@ func TestDefaultConfigGenerator_ToHCL_EmptyStruct(t *testing.T) {
 	type EmptyStruct struct{}
 	empty := EmptyStruct{}
 
-	hclOutput, err := dcg.ToHCL(empty)
+	hclOutput, err := dcg.ToHCLWithBlockName(empty, "empty")
 	if err != nil {
 		t.Fatalf("ToHCL failed: %v", err)
 	}
 
 	// Should generate an empty block
-	if !strings.Contains(hclOutput, "EmptyStruct") {
-		t.Error("HCL output should contain the struct name as a block")
+	if !strings.Contains(hclOutput, "empty") {
+		t.Error("HCL output should contain the empty block")
 	}
 
 	t.Logf("Generated HCL for empty struct:\n%s", hclOutput)

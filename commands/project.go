@@ -188,138 +188,36 @@ func validateProjectName(name string) error {
 	return nil
 }
 
+// createProjectConfigFile creates a project configuration file with the specified content and filename
+func createProjectConfigFile(targetDir, filename, content string) error {
+	return os.WriteFile(filepath.Join(targetDir, filename), []byte(content), 0o644)
+}
+
 func createProjectHCL(targetDir, name, description string) error {
 	// Generate project configuration directly from Go structs
 	content := schemas.GenerateProjectConfigFromStructs(name, description)
-	return os.WriteFile(filepath.Join(targetDir, "project.hcl"), []byte(content), 0o644)
+	return createProjectConfigFile(targetDir, "project.hcl", content)
 }
 
 func createMachinesHCL(targetDir string) error {
-	// Generate machines configuration with the new simplified format
-	content := `machines {
-  # Example machine using IP address as identifier
-  machine "192.168.1.100" {
-    port = 22
-    user = "root"
-    authentication "password" {
-      password {
-        value = "your_password_here"
-        encrypted = false
-      }
-    }
-  }
-
-  # Example machine using FQDN as identifier
-  # machine "web-server.example.com" {
-  #   port = 22
-  #   user = "admin"
-  #   authentication "publickey" {
-  #     public_key_path = "~/.ssh/id_rsa"
-  #   }
-  # }
-
-  # Example machine using IPv6 address as identifier
-  # machine "2001:db8::1" {
-  #   port = 22
-  #   user = "root"
-  #   authentication "password" {
-  #     password {
-  #       value = "your_password_here"
-  #       encrypted = false
-  #     }
-  #   }
-  # }
-}`
-	return os.WriteFile(filepath.Join(targetDir, "machines.hcl"), []byte(content), 0o644)
+	// Generate machines configuration directly from Go structs
+	content := schemas.GenerateMachinesConfigFromStructs()
+	return createProjectConfigFile(targetDir, "machines.hcl", content)
 }
 
 func createActionsHCL(targetDir string) error {
 	// Generate actions configuration directly from Go structs
 	content := schemas.GenerateActionsConfigFromStructs()
-	return os.WriteFile(filepath.Join(targetDir, "actions.hcl"), []byte(content), 0o644)
+	return createProjectConfigFile(targetDir, "actions.hcl", content)
 }
 
 func createVariablesHCL(targetDir string) error {
 	// Generate variables configuration directly from Go structs
 	content := schemas.GenerateVariablesConfigFromStructs()
-
-	return os.WriteFile(filepath.Join(targetDir, "variables.hcl"), []byte(content), 0o644)
+	return createProjectConfigFile(targetDir, "variables.hcl", content)
 }
 
-// generateProjectConfigFromSchema creates a project configuration based on schema understanding
-func generateProjectConfigFromSchema(name, description string, schemaData map[string]interface{}) string {
-	var content strings.Builder
-
-	// Generate header from schema metadata if available
-	if metadata, ok := schemaData["metadata"].(map[string]interface{}); ok {
-		if version, hasVersion := metadata["version"]; hasVersion {
-			content.WriteString(fmt.Sprintf("# Spooky Project Configuration Schema v%v\n", version))
-		}
-		if desc, hasDesc := metadata["description"]; hasDesc {
-			content.WriteString(fmt.Sprintf("# %v\n", desc))
-		}
-		content.WriteString("# Generated based on embedded schema\n\n")
-	} else {
-		content.WriteString("# Spooky Project Configuration\n# Generated based on embedded schema\n\n")
-	}
-
-	// Generate configuration blocks entirely from schema structure
-	for blockName, blockData := range schemaData {
-		if blockName == "metadata" {
-			continue // Skip metadata block, already handled above
-		}
-
-		// Generate block header
-		content.WriteString(fmt.Sprintf("%s {\n", blockName))
-
-		// Handle special case for project block - add required name and description
-		if blockName == "project" {
-			content.WriteString(fmt.Sprintf("  name = \"%s\"\n", name))
-			content.WriteString(fmt.Sprintf("  description = \"%s\"\n", description))
-		}
-
-		// Generate fields from schema understanding
-		if blockInfo, ok := blockData.(map[string]interface{}); ok {
-			for fieldName, fieldData := range blockInfo {
-				// Skip name and description if we already added them for project block
-				if blockName == "project" && (fieldName == "name" || fieldName == "description") {
-					continue
-				}
-
-				if fieldInfo, ok := fieldData.(map[string]interface{}); ok {
-					// Check if field is required
-					if required, hasRequired := fieldInfo["required"]; hasRequired && required == true {
-						// For required fields, add placeholder with description
-						if desc, hasDesc := fieldInfo["description"]; hasDesc {
-							content.WriteString(fmt.Sprintf("  # %s = <required>  # %v\n", fieldName, desc))
-						} else {
-							content.WriteString(fmt.Sprintf("  # %s = <required>\n", fieldName))
-						}
-					} else {
-						// For optional fields, add commented default or placeholder
-						if defaultValue, hasDefault := fieldInfo["default"]; hasDefault {
-							if desc, hasDesc := fieldInfo["description"]; hasDesc {
-								content.WriteString(fmt.Sprintf("  # %s = %v  # %v\n", fieldName, defaultValue, desc))
-							} else {
-								content.WriteString(fmt.Sprintf("  # %s = %v\n", fieldName, defaultValue))
-							}
-						} else {
-							if desc, hasDesc := fieldInfo["description"]; hasDesc {
-								content.WriteString(fmt.Sprintf("  # %s = <value>  # %v\n", fieldName, desc))
-							} else {
-								content.WriteString(fmt.Sprintf("  # %s = <value>\n", fieldName))
-							}
-						}
-					}
-				}
-			}
-		}
-
-		content.WriteString("}\n\n")
-	}
-
-	return strings.TrimSpace(content.String())
-}
+// Note: Schema-based generation functions removed - using struct-based generation instead
 
 // generateVariablesConfigFromSchema creates a variables configuration based on schema understanding
 func generateVariablesConfigFromSchema(schemaData map[string]interface{}) string {
@@ -1520,7 +1418,7 @@ func runProjectEncrypt(cmd *cobra.Command, args []string) error {
 		ageEncryption.GetIdentitiesCount(), ageEncryption.GetRecipientsCount())
 
 	// Create HCL updater
-	updater := encryption.NewSimpleHCLUpdater(ageEncryption)
+	updater := encryption.NewHCLUpdater(ageEncryption)
 
 	// Process the project directory
 	fmt.Printf("Processing project directory: %s\n", targetDir)

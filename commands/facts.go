@@ -6,8 +6,10 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 
 	"spooky/internal/facts"
+	internalhcl "spooky/internal/hcl"
 	"spooky/internal/logging"
 	"spooky/internal/schemas"
 	"spooky/internal/ssh"
@@ -406,18 +408,21 @@ func writeFactsToFile(facts *schemas.FactsV1, outputPath string) error {
 		}
 	}
 
-	// Note: HCL writing not yet implemented
-	// For now, just create an empty file
-	file, err := os.Create(outputPath)
+	// Generate HCL from facts using the generic HCL generator
+	hclContent, err := internalhcl.GenerateHCL(facts, "facts")
 	if err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
+		return fmt.Errorf("failed to generate HCL from facts: %w", err)
 	}
-	defer file.Close()
 
-	// Write a placeholder comment
-	_, err = file.WriteString("# Facts gathered by spooky\n# Note: HCL generation not yet implemented\n")
+	// Add header comments
+	hclContent = "# Facts gathered by spooky\n" +
+		fmt.Sprintf("# Generated at: %s\n\n", time.Now().Format(time.RFC3339)) +
+		hclContent
+
+	// Write HCL content to file
+	err = os.WriteFile(outputPath, []byte(hclContent), 0644)
 	if err != nil {
-		return fmt.Errorf("failed to write to output file: %w", err)
+		return fmt.Errorf("failed to write HCL to file: %w", err)
 	}
 
 	return nil
