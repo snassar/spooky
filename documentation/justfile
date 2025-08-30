@@ -1,0 +1,98 @@
+# Justfile for documentation generation tasks
+
+# Generate SVG files from MMD files in all commit directories
+generate-svg:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    
+    # Get the current user's UID
+    USER_UID=$(id -u)
+    
+    # Find all commit directories (directories named after short commit hashes)
+    for commit_dir in codeflow/*/; do
+        # Check if directory name looks like a commit hash (alphanumeric, 7+ chars)
+        dir_name=$(basename "$commit_dir")
+        if [[ "$dir_name" =~ ^[a-f0-9]{7,}$ ]]; then
+            echo "Processing commit directory: $commit_dir"
+            
+            # Check if mmd directory exists
+            mmd_dir="$commit_dir/mmd"
+            svg_dir="$commit_dir/svg"
+            
+            if [[ -d "$mmd_dir" ]]; then
+                # Create svg directory if it doesn't exist
+                mkdir -p "$svg_dir"
+                
+                # Process each .mmd file
+                for mmd_file in "$mmd_dir"/*.mmd; do
+                    if [[ -f "$mmd_file" ]]; then
+                        filename=$(basename "$mmd_file" .mmd)
+                        svg_file="$svg_dir/$filename.svg"
+                        
+                        echo "  Generating SVG for: $filename"
+                        
+                        # Run mermaid-cli to generate SVG
+                        podman run --userns keep-id --user "$USER_UID" --rm \
+                            -v "$(pwd)/$commit_dir:/data:z" \
+                            ghcr.io/mermaid-js/mermaid-cli/mermaid-cli \
+                            -i "/data/mmd/$filename.mmd" \
+                            -o "/data/svg/$filename.svg"
+                        
+                        echo "    ✓ Generated: $svg_file"
+                    fi
+                done
+            else
+                echo "  No mmd directory found in $commit_dir"
+            fi
+        fi
+    done
+    
+    echo "SVG generation completed!"
+
+# List all commit directories and their MMD files
+list-commits:
+    #!/usr/bin/env bash
+    echo "Commit directories and their MMD files:"
+    echo "======================================"
+    
+    for commit_dir in codeflow/*/; do
+        dir_name=$(basename "$commit_dir")
+        if [[ "$dir_name" =~ ^[a-f0-9]{7,}$ ]]; then
+            echo "📁 $dir_name"
+            
+            mmd_dir="$commit_dir/mmd"
+            if [[ -d "$mmd_dir" ]]; then
+                for mmd_file in "$mmd_dir"/*.mmd; do
+                    if [[ -f "$mmd_file" ]]; then
+                        filename=$(basename "$mmd_file")
+                        echo "  📄 $filename"
+                    fi
+                done
+            else
+                echo "  ❌ No mmd directory"
+            fi
+            echo ""
+        fi
+    done
+
+# Clean generated SVG files
+clean-svg:
+    #!/usr/bin/env bash
+    echo "Cleaning generated SVG files..."
+    
+    for commit_dir in codeflow/*/; do
+        dir_name=$(basename "$commit_dir")
+        if [[ "$dir_name" =~ ^[a-f0-9]{7,}$ ]]; then
+            svg_dir="$commit_dir/svg"
+            if [[ -d "$svg_dir" ]]; then
+                echo "Removing SVG files from: $svg_dir"
+                rm -f "$svg_dir"/*.svg
+            fi
+        fi
+    done
+    
+    echo "SVG cleanup completed!"
+
+# Show help
+default:
+    @just --list

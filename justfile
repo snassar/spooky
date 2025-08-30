@@ -68,6 +68,7 @@ clean:
     echo "🧹 Cleaning build artifacts..."
     rm -rf build/
     rm -rf testing/
+    rm -rf tools/spooky-test-bundle-generator/bundles/
     go clean -cache -testcache
     echo "✅ Clean complete"
 
@@ -193,16 +194,26 @@ clean-bundle-generator:
     rm -f tools/spooky-test-bundle-generator/spooky-test-bundle-generator
     echo "✅ Cleanup completed"
 
+# Clean test bundle generated files
+clean-test-bundles:
+    #!/usr/bin/env bash
+    echo "🧹 Cleaning test bundle generated files..."
+    rm -rf tools/spooky-test-bundle-generator/bundles/
+    echo "✅ Test bundle files cleaned"
+
 # Show project statistics
 stats:
     #!/usr/bin/env bash
     echo "📊 Project Statistics:"
-    echo "Go files: $(find . -name "*.go" | wc -l)"
-    echo "Total lines: $(find . -name "*.go" | xargs wc -l | tail -1)"
-    echo "Test files: $(find . -name "*_test.go" | wc -l)"
+    echo "Go files (excluding test bundles): $(find . -name "*.go" -not -path "./tools/spooky-test-bundle-generator/bundles/*" | wc -l)"
+    echo "Total lines (excluding test bundles): $(find . -name "*.go" -not -path "./tools/spooky-test-bundle-generator/bundles/*" | xargs wc -l | tail -1)"
+    echo "Test files (excluding test bundles): $(find . -name "*_test.go" -not -path "./tools/spooky-test-bundle-generator/bundles/*" | wc -l)"
     echo "Documentation files: $(find . -name "*.md" | wc -l)"
     echo "Build artifacts: $(find build/ -type f 2>/dev/null | wc -l || echo 0)"
     echo "Test artifacts: $(find testing/ -type f 2>/dev/null | wc -l || echo 0)"
+    echo ""
+    echo "📦 Test Bundle Files (excluded from main stats):"
+    echo "Test bundle Go files: $(find ./tools/spooky-test-bundle-generator/bundles -name "*.go" 2>/dev/null | wc -l || echo 0)"
 
 # Show all available commands
 list:

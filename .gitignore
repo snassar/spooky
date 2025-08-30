@@ -70,3 +70,6 @@ documentation/schemafiles/
 
 # Testing directories
 testing/
+
+# Test bundle generator output (deeply nested duplicates)
+tools/spooky-test-bundle-generator/bundles/
