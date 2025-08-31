@@ -72,11 +72,11 @@ var gatherFactsCmd = &cobra.Command{
 		}
 
 		if len(machines) == 0 {
-			fmt.Println("No machines configured for facts gathering")
+			logger.Info("No machines configured for facts gathering")
 			return
 		}
 
-		fmt.Printf("Gathering facts from %d machines...\n", len(machines))
+		logger.Info("Gathering facts from machines", slog.Int("machine_count", len(machines)))
 
 		// Gather facts from all machines
 		ctx := context.Background()
@@ -91,15 +91,20 @@ var gatherFactsCmd = &cobra.Command{
 		errorCount := 0
 		for _, machineFact := range machineFacts {
 			if machineFact.Error != nil {
-				fmt.Printf("❌ Failed to gather facts from %s: %v\n", machineFact.Machine.Hostname, machineFact.Error)
+				logger.Error("❌ Failed to gather facts from machine",
+					slog.String("hostname", machineFact.Machine.Hostname),
+					slog.String("error", machineFact.Error.Error()))
 				errorCount++
 			} else {
-				fmt.Printf("✅ Successfully gathered facts from %s\n", machineFact.Machine.Hostname)
+				logger.Info("✅ Successfully gathered facts from machine",
+					slog.String("hostname", machineFact.Machine.Hostname))
 				successCount++
 			}
 		}
 
-		fmt.Printf("\nFacts gathering completed: %d successful, %d failed\n", successCount, errorCount)
+		logger.Info("Facts gathering completed",
+			slog.Int("successful", successCount),
+			slog.Int("failed", errorCount))
 
 		// Export facts to HCL
 		combinedFacts, err := gatherer.ExportFacts(machineFacts)
@@ -122,7 +127,7 @@ var gatherFactsCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		fmt.Printf("Facts written to: %s\n", outputPath)
+		logger.Info("Facts written to file", slog.String("file", outputPath))
 	},
 }
 
@@ -130,9 +135,10 @@ var exportFactsCmd = &cobra.Command{
 	Use:   "export [output-file]",
 	Short: "Export gathered facts to HCL format",
 	Run: func(cmd *cobra.Command, args []string) {
+		logger := logging.GetGlobalLogger()
 		// This would be used to export facts that were previously gathered
 		// For now, it's a placeholder
-		fmt.Println("Export command not yet implemented")
+		logger.Info("Export command not yet implemented")
 	},
 }
 

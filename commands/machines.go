@@ -106,7 +106,8 @@ func pingMachines(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Printf("Pinging %d machines...\n", len(machinesWithNames))
+	logger := logging.GetGlobalLogger()
+	logger.Info("Pinging machines", slog.Int("machine_count", len(machinesWithNames)))
 
 	// Ping each machine
 	for _, machineWithName := range machinesWithNames {

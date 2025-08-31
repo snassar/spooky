@@ -103,7 +103,8 @@ func init() {
 // runAction executes a specific action
 func runAction(cmd *cobra.Command, args []string) error {
 	actionName := args[0]
-	fmt.Printf("🔧 Running action: %s\n", actionName)
+	logger := logging.GetGlobalLogger()
+	logger.Info("🔧 Running action", slog.String("action_name", actionName))
 
 	// Load project configuration
 	projectConfig, err := loadProjectConfig()
@@ -139,7 +140,7 @@ func runAction(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no target machines found for action '%s'", actionName)
 	}
 
-	fmt.Printf("🎯 Target machines: %s\n", formatMachineList(targetMachines))
+	logger.Info("🎯 Target machines", slog.String("machines", formatMachineList(targetMachines)))
 
 	// Load SSH configuration
 	sshConfig, err := loadSSHConfig()
@@ -184,8 +185,10 @@ func runAction(cmd *cobra.Command, args []string) error {
 
 // listActions lists all available actions
 func listActions(cmd *cobra.Command, args []string) error {
-	fmt.Println("📋 Available Actions")
-	fmt.Println("===================")
+	logger := logging.GetGlobalLogger()
+
+	logger.Info("📋 Available Actions")
+	logger.Info("===================")
 
 	// Load actions configuration
 	actions, err := loadActionsConfig()
@@ -194,21 +197,23 @@ func listActions(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(actions) == 0 {
-		fmt.Println("No actions found in actions.hcl")
+		logger.Info("No actions found in actions.hcl")
 		return nil
 	}
 
 	for _, action := range actions {
-		fmt.Printf("\n🔧 %s\n", action.Description)
-		fmt.Printf("   Type: %s\n", action.Type)
+		logger.Info("🔧 Action details",
+			slog.String("description", action.Description),
+			slog.String("type", action.Type))
+
 		if len(action.Targets) > 0 {
-			fmt.Printf("   Targets: %s\n", strings.Join(action.Targets, ", "))
+			logger.Info("   Targets", slog.String("targets", strings.Join(action.Targets, ", ")))
 		}
 		if action.Timeout > 0 {
-			fmt.Printf("   Timeout: %ds\n", action.Timeout)
+			logger.Info("   Timeout", slog.Int("timeout_seconds", action.Timeout))
 		}
 		if action.Retries > 0 {
-			fmt.Printf("   Retries: %d\n", action.Retries)
+			logger.Info("   Retries", slog.Int("retries", action.Retries))
 		}
 	}
 
@@ -218,6 +223,7 @@ func listActions(cmd *cobra.Command, args []string) error {
 // showAction shows details of a specific action
 func showAction(cmd *cobra.Command, args []string) error {
 	actionName := args[0]
+	logger := logging.GetGlobalLogger()
 
 	// Load actions configuration
 	actions, err := loadActionsConfig()
@@ -231,65 +237,69 @@ func showAction(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("action '%s' not found in actions configuration", actionName)
 	}
 
-	fmt.Printf("🔧 Action: %s\n", actionName)
-	fmt.Println("================")
-	fmt.Printf("Description: %s\n", action.Description)
-	fmt.Printf("Type: %s\n", action.Type)
+	logger.Info("🔧 Action details",
+		slog.String("action_name", actionName),
+		slog.String("description", action.Description),
+		slog.String("type", action.Type))
 
 	if len(action.Tags) > 0 {
-		fmt.Printf("Tags: %s\n", strings.Join(action.Tags, ", "))
+		logger.Info("Action tags", slog.String("tags", strings.Join(action.Tags, ", ")))
 	}
 
 	// Show type-specific fields
 	switch action.Type {
 	case "command":
-		fmt.Printf("Command: %s\n", action.Command)
+		logger.Info("Command action details", slog.String("command", action.Command))
 
 	case "template_deploy":
-		fmt.Printf("Source: %s\n", action.Source)
-		fmt.Printf("Destination: %s\n", action.Destination)
-		fmt.Printf("Validate: %t\n", action.Validate)
-		fmt.Printf("Backup: %t\n", action.Backup)
+		logger.Info("Template deploy action details",
+			slog.String("source", action.Source),
+			slog.String("destination", action.Destination),
+			slog.Bool("validate", action.Validate),
+			slog.Bool("backup", action.Backup))
 		if action.Permissions != "" {
-			fmt.Printf("Permissions: %s\n", action.Permissions)
+			logger.Info("Template permissions", slog.String("permissions", action.Permissions))
 		}
 		if action.Owner != "" {
-			fmt.Printf("Owner: %s\n", action.Owner)
+			logger.Info("Template owner", slog.String("owner", action.Owner))
 		}
 		if action.Group != "" {
-			fmt.Printf("Group: %s\n", action.Group)
+			logger.Info("Template group", slog.String("group", action.Group))
 		}
 	case "file_sync":
-		fmt.Printf("Source: %s\n", action.SyncSource)
-		fmt.Printf("Destination: %s\n", action.SyncDestination)
-		fmt.Printf("Delete: %t\n", action.SyncDelete)
-		fmt.Printf("Preserve: %t\n", action.SyncPreserve)
+		logger.Info("File sync action details",
+			slog.String("source", action.SyncSource),
+			slog.String("destination", action.SyncDestination),
+			slog.Bool("delete", action.SyncDelete),
+			slog.Bool("preserve", action.SyncPreserve))
 	case "service_control":
-		fmt.Printf("Service: %s\n", action.ServiceName)
-		fmt.Printf("Action: %s\n", action.ServiceAction)
+		logger.Info("Service control action details",
+			slog.String("service", action.ServiceName),
+			slog.String("action", action.ServiceAction))
 	}
 
 	// Show execution configuration
 	if len(action.Targets) > 0 {
-		fmt.Printf("Targets: %s\n", strings.Join(action.Targets, ", "))
+		logger.Info("Action targets", slog.String("targets", strings.Join(action.Targets, ", ")))
 	}
 	if action.RunAs != "" {
-		fmt.Printf("Run As: %s\n", action.RunAs)
+		logger.Info("Action run as", slog.String("run_as", action.RunAs))
 	}
-	fmt.Printf("Sudo: %t\n", action.Sudo)
-	fmt.Printf("Timeout: %ds\n", action.Timeout)
-	fmt.Printf("Retries: %d\n", action.Retries)
-	fmt.Printf("Retry Delay: %ds\n", action.RetryDelay)
+	logger.Info("Action sudo configuration", slog.Bool("sudo", action.Sudo))
+	logger.Info("Action timeout configuration",
+		slog.Int("timeout_seconds", action.Timeout),
+		slog.Int("retries", action.Retries),
+		slog.Int("retry_delay_seconds", action.RetryDelay))
 
 	// Show conditional execution
 	if action.When != "" {
-		fmt.Printf("When: %s\n", action.When)
+		logger.Info("Action when condition", slog.String("when", action.When))
 	}
 	if action.OnlyIf != "" {
-		fmt.Printf("Only If: %s\n", action.OnlyIf)
+		logger.Info("Action only_if condition", slog.String("only_if", action.OnlyIf))
 	}
 	if action.Unless != "" {
-		fmt.Printf("Unless: %s\n", action.Unless)
+		logger.Info("Action unless condition", slog.String("unless", action.Unless))
 	}
 
 	return nil
@@ -576,8 +586,10 @@ func formatMachineList(machines []*schemas.MachinesMachineV1) string {
 
 // displayActionResults displays the results of action execution
 func displayActionResults(results []*ActionResult) {
-	fmt.Println("\n📊 Action Results")
-	fmt.Println("================")
+	logger := logging.GetGlobalLogger()
+
+	logger.Info("📊 Action Results")
+	logger.Info("================")
 
 	successCount := 0
 	failureCount := 0
@@ -585,14 +597,20 @@ func displayActionResults(results []*ActionResult) {
 	for _, result := range results {
 		if result.Success {
 			successCount++
-			fmt.Printf("✅ %s: %s\n", result.Machine.Hostname, result.Message)
+			logger.Info("✅ Action succeeded",
+				slog.String("machine", result.Machine.Hostname),
+				slog.String("message", result.Message))
 		} else {
 			failureCount++
-			fmt.Printf("❌ %s: %v\n", result.Machine.Hostname, result.Error)
+			logger.Error("❌ Action failed",
+				slog.String("machine", result.Machine.Hostname),
+				slog.String("error", result.Error))
 		}
 	}
 
-	fmt.Printf("\nSummary: %d successful, %d failed\n", successCount, failureCount)
+	logger.Info("Action execution summary",
+		slog.Int("successful", successCount),
+		slog.Int("failed", failureCount))
 }
 
 // ActionResult represents the result of executing an action on a machine

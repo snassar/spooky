@@ -156,17 +156,22 @@ func runProjectInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to create README.md: %w", err)
 	}
 
-	fmt.Printf("✅ Successfully initialized spooky project '%s' in %s\n", projectName, targetDir)
-	fmt.Printf("📁 Project files created:\n")
-	fmt.Printf("   - project.hcl\n")
-	fmt.Printf("   - machines.hcl\n")
-	fmt.Printf("   - actions.hcl\n")
-	fmt.Printf("   - variables.hcl\n")
-	fmt.Printf("   - README.md\n")
-	fmt.Printf("\n🚀 Next steps:\n")
-	fmt.Printf("   1. cd %s\n", targetDir)
-	fmt.Printf("   2. Edit the configuration files as needed\n")
-	fmt.Printf("   3. Run 'spooky project validate' to check configuration\n")
+	logger := logging.GetGlobalLogger()
+	logger.Info("✅ Successfully initialized spooky project",
+		slog.String("project_name", projectName),
+		slog.String("target_directory", targetDir))
+
+	logger.Info("📁 Project files created",
+		slog.String("project_hcl", "project.hcl"),
+		slog.String("machines_hcl", "machines.hcl"),
+		slog.String("actions_hcl", "actions.hcl"),
+		slog.String("variables_hcl", "variables.hcl"),
+		slog.String("readme", "README.md"))
+
+	logger.Info("🚀 Next steps",
+		slog.String("step1", fmt.Sprintf("cd %s", targetDir)),
+		slog.String("step2", "Edit the configuration files as needed"),
+		slog.String("step3", "Run 'spooky project validate' to check configuration"))
 
 	return nil
 }
@@ -461,7 +466,8 @@ func runProjectValidate(cmd *cobra.Command, args []string) error {
 		if projectName == "" {
 			projectName = "unknown"
 		}
-		fmt.Printf("Project \"%s\" is valid\n", projectName)
+		logger := logging.GetGlobalLogger()
+		logger.Info("Project validation successful", slog.String("project_name", projectName))
 	} else {
 		logger := logging.GetGlobalLogger()
 		logger.Error("project validation failed",
@@ -1414,19 +1420,21 @@ func runProjectEncrypt(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("age encryption configuration invalid: %w", err)
 	}
 
-	fmt.Printf("Age encryption configured with %d identities and %d recipients\n",
-		ageEncryption.GetIdentitiesCount(), ageEncryption.GetRecipientsCount())
+	logger := logging.GetGlobalLogger()
+	logger.Info("Age encryption configured",
+		slog.Int("identities_count", ageEncryption.GetIdentitiesCount()),
+		slog.Int("recipients_count", ageEncryption.GetRecipientsCount()))
 
 	// Create HCL updater
 	updater := encryption.NewHCLUpdater(ageEncryption)
 
 	// Process the project directory
-	fmt.Printf("Processing project directory: %s\n", targetDir)
+	logger.Info("Processing project directory", slog.String("target_directory", targetDir))
 	if err := updater.UpdateDirectory(targetDir); err != nil {
 		return fmt.Errorf("failed to process project directory: %w", err)
 	}
 
-	fmt.Println("Project encryption completed successfully!")
+	logger.Info("Project encryption completed successfully!")
 	return nil
 }
 
@@ -1434,8 +1442,8 @@ func runProjectConfig(cmd *cobra.Command, args []string) error {
 	// Get custom config file from --config flag
 	customConfigFile := GetConfigFile()
 
-	fmt.Println("=== Spooky Configuration Information ===")
-	fmt.Println()
+	logger := logging.GetGlobalLogger()
+	logger.Info("=== Spooky Configuration Information ===")
 
 	// Create config manager
 	configManager, err := utilities.NewConfigManager()
@@ -1450,31 +1458,32 @@ func runProjectConfig(cmd *cobra.Command, args []string) error {
 	}
 
 	// Display configuration information
-	fmt.Printf("Configuration Source: %s\n", effectiveInfo.Source)
-	fmt.Printf("Configuration File: %s\n", effectiveInfo.ConfigFile)
+	logger.Info("Configuration information",
+		slog.String("source", effectiveInfo.Source),
+		slog.String("config_file", effectiveInfo.ConfigFile))
 
 	if effectiveInfo.Exists {
-		fmt.Printf("File Size: %d bytes\n", effectiveInfo.Size)
+		logger.Info("Configuration file details",
+			slog.Int64("size_bytes", effectiveInfo.Size))
 		if effectiveInfo.ModTime != "" {
-			fmt.Printf("Last Modified: %s\n", effectiveInfo.ModTime)
+			logger.Info("Configuration file modified", slog.String("modified_time", effectiveInfo.ModTime))
 		}
 	} else {
-		fmt.Println("File Status: Does not exist")
+		logger.Info("Configuration file status", slog.String("status", "Does not exist"))
 	}
 
 	// Show config priority
-	fmt.Println()
-	fmt.Println("Configuration Priority:")
-	fmt.Println("  1. Custom config file (--config flag)")
-	fmt.Println("  2. User config (~/.config/spooky/spooky.hcl)")
-	fmt.Println("  3. Embedded default")
+	logger.Info("Configuration priority information",
+		slog.String("priority1", "Custom config file (--config flag)"),
+		slog.String("priority2", "User config (~/.config/spooky/spooky.hcl)"),
+		slog.String("priority3", "Embedded default"))
 
 	// Show current --config flag status
-	fmt.Println()
+	logger.Info("Configuration flag status")
 	if customConfigFile != "" {
-		fmt.Printf("--config flag: %s\n", customConfigFile)
+		logger.Info("Custom config file specified", slog.String("config_file", customConfigFile))
 	} else {
-		fmt.Println("--config flag: Not specified")
+		logger.Info("Custom config file not specified")
 	}
 
 	return nil
