@@ -146,13 +146,8 @@ var demoConfigCmd = &cobra.Command{
 				fmt.Printf("   Modified: %s\n", info.ModTime)
 			}
 
-			// Create backup
-			backupPath, err := configManager.BackupConfig()
-			if err != nil {
-				fmt.Printf("⚠️  Could not create backup: %v\n", err)
-			} else {
-				fmt.Printf("💾 Backup created: %s\n", backupPath)
-			}
+			// Backup functionality is not supported
+			fmt.Println("💾 Backup functionality is not supported")
 		} else {
 			fmt.Println("📝 No user configuration found - using embedded default")
 
@@ -240,47 +235,17 @@ var createConfigCmd = &cobra.Command{
 			return
 		}
 
-		// Create default config
-		if err := configManager.CreateDefaultConfig(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating default config: %v\n", err)
-			os.Exit(1)
-		}
-
-		fmt.Println("✅ User configuration created!")
-		fmt.Printf("   Path: %s\n", configManager.GetConfigPath())
-		fmt.Println("💡 You can now edit this file to customize your settings")
+		fmt.Println("⚠️  Default config creation is not supported")
+		fmt.Println("💡 Configuration files are not managed by this tool")
 	},
 }
 
 var backupConfigCmd = &cobra.Command{
 	Use:   "backup",
-	Short: "Create a backup of the current user configuration",
+	Short: "Configuration backup is not supported",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("💾 Creating configuration backup...")
-
-		// Create config manager
-		configManager, err := utilities.NewConfigManager()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating config manager: %v\n", err)
-			os.Exit(1)
-		}
-
-		// Check if user config exists
-		if !configManager.ConfigExists() {
-			fmt.Println("⚠️  No user configuration to backup")
-			fmt.Println("💡 Create one first with 'spooky-demo config create'")
-			return
-		}
-
-		// Create backup
-		backupPath, err := configManager.BackupConfig()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating backup: %v\n", err)
-			os.Exit(1)
-		}
-
-		fmt.Println("✅ Configuration backup created!")
-		fmt.Printf("   Backup: %s\n", backupPath)
+		fmt.Println("⚠️  Configuration backup is not supported")
+		fmt.Println("💡 Configuration files are not managed by this tool")
 	},
 }
 

@@ -39,7 +39,7 @@ func main() {
 	// Generate HCL
 	fmt.Println("\n📝 Generated HCL Configuration:")
 	fmt.Println("--------------------------------")
-	hclConfig, err := dcg.ToHCL(spookyDefaults)
+	hclConfig, err := dcg.ToHCLWithBlockName(spookyDefaults, "spooky")
 	if err != nil {
 		fmt.Printf("❌ Error generating HCL: %v\n", err)
 		return

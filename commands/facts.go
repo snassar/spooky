@@ -403,7 +403,7 @@ func writeFactsToFile(facts *schemas.FactsV1, outputPath string) error {
 	// Create output directory if it doesn't exist
 	outputDir := filepath.Dir(outputPath)
 	if outputDir != "." {
-		if err := os.MkdirAll(outputDir, 0755); err != nil {
+		if err := os.MkdirAll(outputDir, 0o755); err != nil {
 			return fmt.Errorf("failed to create output directory: %w", err)
 		}
 	}
@@ -420,7 +420,7 @@ func writeFactsToFile(facts *schemas.FactsV1, outputPath string) error {
 		hclContent
 
 	// Write HCL content to file
-	err = os.WriteFile(outputPath, []byte(hclContent), 0644)
+	err = utilities.WriteFile(outputPath, hclContent)
 	if err != nil {
 		return fmt.Errorf("failed to write HCL to file: %w", err)
 	}

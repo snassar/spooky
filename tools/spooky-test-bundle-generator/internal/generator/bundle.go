@@ -292,24 +292,34 @@ func (bg *BundleGenerator) generateProject(profile *profiles.Profile, outputPath
 		return fmt.Errorf("failed to create project directory: %w", err)
 	}
 
-	// Generate project.hcl
-	if err := bg.generateProjectHCL(profile, projectDir); err != nil {
-		return fmt.Errorf("failed to generate project.hcl: %w", err)
+	// Get the current working directory (where the generator is running from)
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
 	}
 
-	// Generate machines.hcl
-	if err := bg.generateMachinesHCL(profile, projectDir); err != nil {
-		return fmt.Errorf("failed to generate machines.hcl: %w", err)
+	// Look for spooky binary in the generator directory
+	spookyPath := filepath.Join(currentDir, "spooky")
+	if _, err := os.Stat(spookyPath); os.IsNotExist(err) {
+		return fmt.Errorf("spooky binary not found at %s. Please build it first: just build-spooky-test-bundle-generator", spookyPath)
 	}
 
-	// Generate variables.hcl
-	if err := bg.generateVariablesHCL(profile, projectDir); err != nil {
-		return fmt.Errorf("failed to generate variables.hcl: %w", err)
+	// Use spooky project init to generate all base HCL files
+	cmd := exec.Command(spookyPath, "project", "init",
+		"--name", profile.Project.Name,
+		"--description", profile.Project.Description,
+		projectDir)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to run spooky project init: %w\nOutput: %s", string(output), err)
 	}
 
-	// Generate actions.hcl
-	if err := bg.generateActionsHCL(profile, projectDir); err != nil {
-		return fmt.Errorf("failed to generate actions.hcl: %w", err)
+	// Now customize the generated files for test bundle specific needs
+	if err := bg.customizeProjectHCL(profile, projectDir); err != nil {
+		return fmt.Errorf("failed to customize project.hcl: %w", err)
+	}
+
+	if err := bg.customizeMachinesHCL(profile, projectDir); err != nil {
+		return fmt.Errorf("failed to customize machines.hcl: %w", err)
 	}
 
 	// Generate templates directory
@@ -330,55 +340,27 @@ func (bg *BundleGenerator) generateProject(profile *profiles.Profile, outputPath
 	return nil
 }
 
-// generateProjectHCL creates the project.hcl file
-func (bg *BundleGenerator) generateProjectHCL(profile *profiles.Profile, projectDir string) error {
-	// Generate project configuration in the correct HCL format
-	content := fmt.Sprintf(`# Spooky Project Configuration
-# Generated for test bundle: %s
+// customizeProjectHCL customizes the project.hcl file for the test bundle
+// We still customize this because we need to use the profile's project name and description
+// rather than the generic template from spooky project init
+func (bg *BundleGenerator) customizeProjectHCL(profile *profiles.Profile, projectDir string) error {
+	projectHCLPath := filepath.Join(projectDir, "project.hcl")
 
-project "%s" {
-  description = "%s"
+	var content strings.Builder
+	content.WriteString("# Spooky Project Configuration\n")
+	content.WriteString(fmt.Sprintf("project \"%s\" {\n", profile.Project.Name))
+	content.WriteString(fmt.Sprintf("  description = \"%s\"\n", profile.Project.Description))
+	content.WriteString("}\n")
+
+	return os.WriteFile(projectHCLPath, []byte(content.String()), 0o644)
 }
-`, profile.Name, profile.Project.Name, profile.Project.Description)
 
-	return os.WriteFile(filepath.Join(projectDir, "project.hcl"), []byte(content), 0o644)
-}
+// customizeMachinesHCL customizes the machines.hcl file for the test bundle
+// We still customize this because we need to add test-specific machine configurations
+// for the different OS containers in the test bundle
+func (bg *BundleGenerator) customizeMachinesHCL(profile *profiles.Profile, projectDir string) error {
+	machinesHCLPath := filepath.Join(projectDir, "machines.hcl")
 
-// generateMachinesHCL creates the machines.hcl file
-func (bg *BundleGenerator) generateMachinesHCL(profile *profiles.Profile, projectDir string) error {
-	// Get the current working directory (where the generator is running from)
-	currentDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current directory: %w", err)
-	}
-
-	// Look for spooky binary in the generator directory
-	spookyPath := filepath.Join(currentDir, "spooky")
-	if _, err := os.Stat(spookyPath); os.IsNotExist(err) {
-		return fmt.Errorf("spooky binary not found at %s. Please build it first: just build-spooky-test-bundle-generator", spookyPath)
-	}
-
-	// First, generate a temporary project to get the base machines.hcl
-	tempDir := filepath.Join(projectDir, "temp-init")
-	if err := os.MkdirAll(tempDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create temp directory: %w", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Use spooky project init to generate base files
-	cmd := exec.Command(spookyPath, "project", "init", "--name", "temp-project", "--description", "Temporary project for schema generation", tempDir)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to run spooky project init: %w\nOutput: %s", err, string(output))
-	}
-
-	// Read the generated machines.hcl to understand the structure
-	baseMachinesPath := filepath.Join(tempDir, "machines.hcl")
-	_, err = os.ReadFile(baseMachinesPath)
-	if err != nil {
-		return fmt.Errorf("failed to read base machines.hcl: %w", err)
-	}
-
-	// Now build the actual machines.hcl content using the same structure
 	var content strings.Builder
 	content.WriteString("machines {\n")
 
@@ -422,36 +404,12 @@ func (bg *BundleGenerator) generateMachinesHCL(profile *profiles.Profile, projec
 
 	content.WriteString("}\n")
 
-	return os.WriteFile(filepath.Join(projectDir, "machines.hcl"), []byte(content.String()), 0o644)
+	return os.WriteFile(machinesHCLPath, []byte(content.String()), 0o644)
 }
 
-// generateVariablesHCL creates the variables.hcl file
-func (bg *BundleGenerator) generateVariablesHCL(profile *profiles.Profile, projectDir string) error {
-	// For now, generate a minimal variables.hcl since the profile variables are test-specific
-	// and don't map directly to Spooky's variables schema
-	content := `variables {
-  # Test-specific variables for this bundle
-  # These are not part of the standard Spooky variables schema
-  # but are used for test configuration
-}
-`
+// Note: variables.hcl is now generated by spooky project init
 
-	return os.WriteFile(filepath.Join(projectDir, "variables.hcl"), []byte(content), 0o644)
-}
-
-// generateActionsHCL creates the actions.hcl file
-func (bg *BundleGenerator) generateActionsHCL(profile *profiles.Profile, projectDir string) error {
-	// For now, generate a minimal actions.hcl since the profile actions are test-specific
-	// and don't map directly to Spooky's actions schema
-	content := `actions {
-  # Test-specific actions for this bundle
-  # These are not part of the standard Spooky actions schema
-  # but are used for test configuration
-}
-`
-
-	return os.WriteFile(filepath.Join(projectDir, "actions.hcl"), []byte(content), 0o644)
-}
+// Note: actions.hcl is now generated by spooky project init
 
 // generateSpookyRunner creates a minimal Go container to run Spooky commands
 func (bg *BundleGenerator) generateSpookyRunner(profile *profiles.Profile, outputPath string) error {

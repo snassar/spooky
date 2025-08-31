@@ -8,6 +8,7 @@ import (
 	"text/template"
 
 	"spooky/internal/encryption"
+	"spooky/internal/utilities"
 
 	"github.com/pkg/errors"
 )
@@ -144,7 +145,7 @@ func (tr *TemplateRenderer) RenderTemplateToFile(templatePath, outputPath string
 	}
 
 	// Write the rendered content to file
-	if err := os.WriteFile(outputPath, []byte(rendered), 0o644); err != nil {
+	if err := utilities.WriteFile(outputPath, rendered); err != nil {
 		return errors.Wrapf(err, "failed to write rendered template to: %s", outputPath)
 	}
 

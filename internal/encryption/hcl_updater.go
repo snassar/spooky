@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"spooky/internal/logging"
+	"spooky/internal/utilities"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
@@ -64,7 +65,7 @@ func (hu *HCLUpdater) UpdateFile(filePath string) error {
 	}
 
 	// Write the modified content back to the file
-	if err := os.WriteFile(filePath, []byte(contentStr), 0o644); err != nil {
+	if err := utilities.WriteFile(filePath, contentStr); err != nil {
 		return errors.Wrapf(err, "failed to write modified file: %s", filePath)
 	}
 

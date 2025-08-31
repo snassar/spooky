@@ -153,14 +153,10 @@ var configCmd = &cobra.Command{
 		}
 
 		if !configManager.ConfigExists() {
-			fmt.Println("📝 Creating default configuration file...")
-			if err := configManager.CreateDefaultConfig(); err != nil {
-				fmt.Fprintf(os.Stderr, "Error creating default config: %v\n", err)
-				os.Exit(1)
-			}
-			fmt.Printf("✅ Default configuration created at: %s\n", configManager.GetConfigPath())
+			fmt.Println("📝 Default configuration file creation is not supported")
+			fmt.Println("💡 Configuration files are not managed by this tool")
 		} else {
-			fmt.Printf("✅ Configuration already exists at: %s\n", configManager.GetConfigPath())
+			fmt.Printf("✅ Configuration exists at: %s\n", configManager.GetConfigPath())
 		}
 	},
 }
