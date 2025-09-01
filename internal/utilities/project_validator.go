@@ -87,8 +87,8 @@ func (pv *ProjectValidator) validateProjectDirectoryWithSchema(projectDir map[st
 		},
 	}
 
-	// Validate using unified validator
-	validator := schemas.NewValidator()
+	// Validate using simplified validator
+	validator := schemas.NewSimpleValidator()
 	result := validator.ValidateData("project_directory", schemaData)
 
 	// Add schema validation errors to our result
@@ -286,8 +286,8 @@ func (pv *ProjectValidator) validateProjectConfig(targetDir string) {
 		return
 	}
 
-	// Validate syntax and schema using unified validator
-	validator := schemas.NewValidator()
+	// Validate syntax and schema using simplified validator
+	validator := schemas.NewSimpleValidator()
 	content, err := os.ReadFile(projectHCLPath)
 	if err != nil {
 		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
@@ -343,7 +343,7 @@ func (pv *ProjectValidator) validateMachines(projectPath string) {
 
 // validateMachinesFile validates a single machines.hcl file
 func (pv *ProjectValidator) validateMachinesFile(filePath string) {
-	validator := schemas.NewValidator()
+	validator := schemas.NewSimpleValidator()
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
@@ -411,7 +411,7 @@ func (pv *ProjectValidator) validateActions(projectPath string) {
 
 // validateActionsFile validates a single actions.hcl file
 func (pv *ProjectValidator) validateActionsFile(filePath string) {
-	validator := schemas.NewValidator()
+	validator := schemas.NewSimpleValidator()
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
@@ -479,7 +479,7 @@ func (pv *ProjectValidator) validateVariablesConfig(projectPath string) {
 
 // validateVariablesFile validates a single variables.hcl file
 func (pv *ProjectValidator) validateVariablesFile(filePath string) {
-	validator := schemas.NewValidator()
+	validator := schemas.NewSimpleValidator()
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{

@@ -164,8 +164,8 @@ func loadProjectConfig() (*schemas.ProjectV1, error) {
 		return nil, fmt.Errorf("failed to read project.hcl: %w", err)
 	}
 
-	// Use the validator to parse and validate the project configuration
-	validator := schemas.NewValidator()
+	// Use the simplified validator to parse and validate the project configuration
+	validator := schemas.NewSimpleValidator()
 	result, err := validator.ValidateHCLContent("project", string(content))
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate project.hcl: %w", err)

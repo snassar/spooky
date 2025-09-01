@@ -222,221 +222,6 @@ func createVariablesHCL(targetDir string) error {
 	return createProjectConfigFile(targetDir, "variables.hcl", content)
 }
 
-// Note: Schema-based generation functions removed - using struct-based generation instead
-
-// generateVariablesConfigFromSchema creates a variables configuration based on schema understanding
-func generateVariablesConfigFromSchema(schemaData map[string]interface{}) string {
-	var content strings.Builder
-
-	// Generate header from schema metadata if available
-	if metadata, ok := schemaData["metadata"].(map[string]interface{}); ok {
-		if version, hasVersion := metadata["version"]; hasVersion {
-			content.WriteString(fmt.Sprintf("# Variables Configuration Schema v%v\n", version))
-		}
-		if desc, hasDesc := metadata["description"]; hasDesc {
-			content.WriteString(fmt.Sprintf("# %v\n", desc))
-		}
-		content.WriteString("# Generated based on embedded schema\n\n")
-	} else {
-		content.WriteString("# Variables Configuration\n# Generated based on embedded schema\n\n")
-	}
-
-	// Generate configuration blocks entirely from schema structure
-	for blockName, blockData := range schemaData {
-		if blockName == "metadata" {
-			continue // Skip metadata block, already handled above
-		}
-
-		// Generate block header
-		content.WriteString(fmt.Sprintf("%s \"example-%s\" {\n", blockName, blockName))
-
-		// Generate fields from schema understanding
-		if blockInfo, ok := blockData.(map[string]interface{}); ok {
-			for fieldName, fieldData := range blockInfo {
-				if fieldInfo, ok := fieldData.(map[string]interface{}); ok {
-					// Check if field is required
-					if required, hasRequired := fieldInfo["required"]; hasRequired && required == true {
-						// For required fields, add placeholder with description
-						if desc, hasDesc := fieldInfo["description"]; hasDesc {
-							content.WriteString(fmt.Sprintf("  # %s = <required>  # %v\n", fieldName, desc))
-						} else {
-							content.WriteString(fmt.Sprintf("  # %s = <required>\n", fieldName))
-						}
-					} else {
-						// For optional fields, add commented default or placeholder
-						if defaultValue, hasDefault := fieldInfo["default"]; hasDefault {
-							if desc, hasDesc := fieldInfo["description"]; hasDesc {
-								content.WriteString(fmt.Sprintf("  # %s = %v  # %v\n", fieldName, defaultValue, desc))
-							} else {
-								content.WriteString(fmt.Sprintf("  # %s = %v\n", fieldName, defaultValue))
-							}
-						} else {
-							if desc, hasDesc := fieldInfo["description"]; hasDesc {
-								content.WriteString(fmt.Sprintf("  # %s = <value>  # %v\n", fieldName, desc))
-							} else {
-								content.WriteString(fmt.Sprintf("  # %s = <value>\n", fieldName))
-							}
-						}
-					}
-				}
-			}
-		}
-
-		content.WriteString("}\n\n")
-	}
-
-	// Add usage guidance
-	content.WriteString("# Usage:\n")
-	content.WriteString("# 1. Replace 'example-*' with your actual variable names\n")
-	content.WriteString("# 2. Fill in required fields marked with <required>\n")
-	content.WriteString("# 3. Uncomment and configure optional fields as needed\n")
-	content.WriteString("# 4. Add more variables by copying and modifying the examples\n")
-
-	return strings.TrimSpace(content.String())
-}
-
-// generateMachinesConfigFromSchema creates a machines configuration based on schema understanding
-func generateMachinesConfigFromSchema(schemaData map[string]interface{}) string {
-	var content strings.Builder
-
-	// Generate header from schema metadata if available
-	if metadata, ok := schemaData["metadata"].(map[string]interface{}); ok {
-		if version, hasVersion := metadata["version"]; hasVersion {
-			content.WriteString(fmt.Sprintf("# Machines Configuration Schema v%v\n", version))
-		}
-		if desc, hasDesc := metadata["description"]; hasDesc {
-			content.WriteString(fmt.Sprintf("# %v\n", desc))
-		}
-		content.WriteString("# Generated based on embedded schema\n\n")
-	} else {
-		content.WriteString("# Machines Configuration\n# Generated based on embedded schema\n\n")
-	}
-
-	// Generate configuration blocks entirely from schema structure
-	for blockName, blockData := range schemaData {
-		if blockName == "metadata" {
-			continue // Skip metadata block, already handled above
-		}
-
-		// Generate block header
-		content.WriteString(fmt.Sprintf("%s \"example-%s\" {\n", blockName, blockName))
-
-		// Generate fields from schema understanding
-		if blockInfo, ok := blockData.(map[string]interface{}); ok {
-			for fieldName, fieldData := range blockInfo {
-				if fieldInfo, ok := fieldData.(map[string]interface{}); ok {
-					// Check if field is required
-					if required, hasRequired := fieldInfo["required"]; hasRequired && required == true {
-						// For required fields, add placeholder with description
-						if desc, hasDesc := fieldInfo["description"]; hasDesc {
-							content.WriteString(fmt.Sprintf("  # %s = <required>  # %v\n", fieldName, desc))
-						} else {
-							content.WriteString(fmt.Sprintf("  # %s = <required>\n", fieldName))
-						}
-					} else {
-						// For optional fields, add commented default or placeholder
-						if defaultValue, hasDefault := fieldInfo["default"]; hasDefault {
-							if desc, hasDesc := fieldInfo["description"]; hasDesc {
-								content.WriteString(fmt.Sprintf("  # %s = %v  # %v\n", fieldName, defaultValue, desc))
-							} else {
-								content.WriteString(fmt.Sprintf("  # %s = %v\n", fieldName, defaultValue))
-							}
-						} else {
-							if desc, hasDesc := fieldInfo["description"]; hasDesc {
-								content.WriteString(fmt.Sprintf("  # %s = <value>  # %v\n", fieldName, desc))
-							} else {
-								content.WriteString(fmt.Sprintf("  # %s = <value>\n", fieldName))
-							}
-						}
-					}
-				}
-			}
-		}
-
-		content.WriteString("}\n\n")
-	}
-
-	// Add usage guidance
-	content.WriteString("# Usage:\n")
-	content.WriteString("# 1. Replace 'example-*' with your actual machine/group names\n")
-	content.WriteString("# 2. Fill in required fields marked with <required>\n")
-	content.WriteString("# 3. Uncomment and configure optional fields as needed\n")
-	content.WriteString("# 4. Add more machines/groups by copying and modifying the examples\n")
-
-	return strings.TrimSpace(content.String())
-}
-
-// generateActionsConfigFromSchema creates an actions configuration based on schema understanding
-func generateActionsConfigFromSchema(schemaData map[string]interface{}) string {
-	var content strings.Builder
-
-	// Generate header from schema metadata if available
-	if metadata, ok := schemaData["metadata"].(map[string]interface{}); ok {
-		if version, hasVersion := metadata["version"]; hasVersion {
-			content.WriteString(fmt.Sprintf("# Actions Configuration Schema v%v\n", version))
-		}
-		if desc, hasDesc := metadata["description"]; hasDesc {
-			content.WriteString(fmt.Sprintf("# %v\n", desc))
-		}
-		content.WriteString("# Generated based on embedded schema\n\n")
-	} else {
-		content.WriteString("# Actions Configuration\n# Generated based on embedded schema\n\n")
-	}
-
-	// Generate configuration blocks entirely from schema structure
-	for blockName, blockData := range schemaData {
-		if blockName == "metadata" {
-			continue // Skip metadata block, already handled above
-		}
-
-		// Generate block header
-		content.WriteString(fmt.Sprintf("%s \"example-%s\" {\n", blockName, blockName))
-
-		// Generate fields from schema understanding
-		if blockInfo, ok := blockData.(map[string]interface{}); ok {
-			for fieldName, fieldData := range blockInfo {
-				if fieldInfo, ok := fieldData.(map[string]interface{}); ok {
-					// Check if field is required
-					if required, hasRequired := fieldInfo["required"]; hasRequired && required == true {
-						// For required fields, add placeholder with description
-						if desc, hasDesc := fieldInfo["description"]; hasDesc {
-							content.WriteString(fmt.Sprintf("  # %s = <required>  # %v\n", fieldName, desc))
-						} else {
-							content.WriteString(fmt.Sprintf("  # %s = <required>\n", fieldName))
-						}
-					} else {
-						// For optional fields, add commented default or placeholder
-						if defaultValue, hasDefault := fieldInfo["default"]; hasDefault {
-							if desc, hasDesc := fieldInfo["description"]; hasDesc {
-								content.WriteString(fmt.Sprintf("  # %s = %v  # %v\n", fieldName, defaultValue, desc))
-							} else {
-								content.WriteString(fmt.Sprintf("  # %s = %v\n", fieldName, defaultValue))
-							}
-						} else {
-							if desc, hasDesc := fieldInfo["description"]; hasDesc {
-								content.WriteString(fmt.Sprintf("  # %s = <value>  # %v\n", fieldName, desc))
-							} else {
-								content.WriteString(fmt.Sprintf("  # %s = <value>\n", fieldName))
-							}
-						}
-					}
-				}
-			}
-		}
-
-		content.WriteString("}\n\n")
-	}
-
-	// Add usage guidance
-	content.WriteString("# Usage:\n")
-	content.WriteString("# 1. Replace 'example-*' with your actual action names\n")
-	content.WriteString("# 2. Fill in required fields marked with <required>\n")
-	content.WriteString("# 3. Uncomment and configure optional fields as needed\n")
-	content.WriteString("# 4. Add more actions by copying and modifying the examples\n")
-
-	return strings.TrimSpace(content.String())
-}
-
 func createREADME(targetDir, name, description string) error {
 	content := fmt.Sprintf("# %s\n\n%s\n\n## Overview\n\nThis is a Spooky automation project that defines configuration management, \ndeployment automation, and infrastructure management tasks.\n\n## Project Structure\n\n- project.hcl - Project configuration and metadata\n- machines.hcl - Machine inventory and connectivity settings\n- actions.hcl - Automation tasks and deployment actions\n- variables.hcl - Project-wide variables and configuration values\n- templates/ - Template files for deployment (create as needed)\n- files/ - Static files for deployment (create as needed)\n\n## Getting Started\n\n1. **Configure Machines**: Edit machines.hcl to define your target machines\n2. **Define Actions**: Edit actions.hcl to create automation tasks\n3. **Set Variables**: Edit variables.hcl to configure project variables\n4. **Validate**: Run 'spooky project validate' to check configuration\n5. **Execute**: Run 'spooky run <action-name>' to execute actions\n\n## Examples\n\n### Running Actions\n```bash\n# Run a specific action\nspooky run deploy-application\n\n# Run actions with specific tags\nspooky run --tags deployment\n\n# Dry run to see what would happen\nspooky run --dry-run deploy-application\n```\n\n### Managing Machines\n```bash\n# List all machines\nspooky machines list\n\n# Test connectivity\nspooky machines test-connection\n\n# Collect facts\nspooky machines collect-facts\n```\n\n## Documentation\n\nFor more information about Spooky, visit the project documentation or run:\n```bash\nspooky --help\nspooky project --help\nspooky machines --help\nspooky actions --help\n```\n\n## Support\n\nIf you encounter issues or have questions, please refer to the Spooky documentation\nor create an issue in the project repository.", name, description)
 
@@ -484,8 +269,8 @@ func runProjectValidate(cmd *cobra.Command, args []string) error {
 
 // validateAgainstSchema validates HCL content against embedded schemas
 func validateAgainstSchema(schemaName, content string) error {
-	// Use the new unified validator for proper schema validation
-	validator := schemas.NewValidator()
+	// Use the simplified validator for essential schema validation
+	validator := schemas.NewSimpleValidator()
 
 	result, err := validator.ValidateHCLContent(schemaName, content)
 	if err != nil {
@@ -500,6 +285,174 @@ func validateAgainstSchema(schemaName, content string) error {
 	}
 
 	return nil
+}
+
+// validateMergedContent validates merged HCL content for collisions and schema compliance
+// This unified function replaces the duplicate validateMergedMachines, validateMergedVariables, and validateMergedActions functions
+func validateMergedContent(contents []string, fileNames []string, contentType string) error {
+	// Parse HCL and extract resource information using proper HCL parsing
+	resourceMap := make(map[string]interface{})
+
+	for i, content := range contents {
+		fileName := fileNames[i]
+
+		// Use simplified parsing for collision detection
+		validator := schemas.NewSimpleValidator()
+
+		// Parse the content using the simplified validator
+		parsedData, err := validator.ParseHCLContent(content)
+		if err != nil {
+			return fmt.Errorf("failed to parse %s: %w", fileName, err)
+		}
+
+		// Extract resource names from parsed data using unified function
+		resources, err2 := extractResourceNamesFromParsedData(parsedData, fileName, contentType, getResourceType(contentType))
+		if err2 != nil {
+			return fmt.Errorf("failed to extract %s from %s: %w", contentType, fileName, err2)
+		}
+
+		// Check for duplicates and conflicts
+		for _, resource := range resources {
+			var name string
+			var resourceFileName string
+
+			// Extract name and fileName based on resource type
+			switch r := resource.(type) {
+			case machineInfo:
+				name = r.name
+				resourceFileName = r.fileName
+			case variableInfo:
+				name = r.name
+				resourceFileName = r.fileName
+			case actionInfo:
+				name = r.name
+				resourceFileName = r.fileName
+			default:
+				return fmt.Errorf("unsupported resource type: %T", resource)
+			}
+
+			if existing, exists := resourceMap[name]; exists {
+				var existingFileName string
+				switch e := existing.(type) {
+				case machineInfo:
+					existingFileName = e.fileName
+				case variableInfo:
+					existingFileName = e.fileName
+				case actionInfo:
+					existingFileName = e.fileName
+				}
+
+				return fmt.Errorf("%s name collision: '%s' defined in both %s and %s",
+					contentType, name, existingFileName, resourceFileName)
+			}
+			resourceMap[name] = resource
+		}
+	}
+
+	// Now validate the merged content against the schema
+	var mergedContent string
+	switch contentType {
+	case "machines":
+		mergedContent = mergeHCLContent(contents, "machine", "machines")
+	case "variables":
+		mergedContent = mergeHCLContent(contents, "variable", "variables")
+	case "actions":
+		mergedContent = mergeHCLContent(contents, "action", "actions")
+	}
+
+	if err := validateAgainstSchema(contentType, mergedContent); err != nil {
+		return fmt.Errorf("merged %s schema validation failed: %w", contentType, err)
+	}
+
+	return nil
+}
+
+// convertToString converts various HCL value types to string
+func convertToString(value interface{}) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case fmt.Stringer:
+		return v.String()
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
+
+// mergeHCLContent merges multiple HCL files into a single configuration
+// This unified function replaces the duplicate mergeActionsContent, mergeVariablesContent, and mergeMachinesContent functions
+func mergeHCLContent(contents []string, blockType, blockName string) string {
+	merged := fmt.Sprintf(`# Merged %s Configuration
+# Generated from multiple files
+
+metadata {
+  version = "1"
+  description = "Merged %s configuration"
+}
+
+%s {
+`, strings.Title(blockType), blockType, blockName)
+
+	for _, content := range contents {
+		blocks := extractHCLBlocks(content, blockType)
+		for _, block := range blocks {
+			cleaned := strings.TrimSpace(block)
+			merged += "\n  " + cleaned + "\n"
+		}
+	}
+	merged += "}\n"
+	return merged
+}
+
+// extractHCLBlocks extracts HCL blocks of the specified type using proper HCL parsing
+// This unified function replaces the duplicate extractMachineBlocks, extractActionBlocks, and extractVariableBlocks functions
+func extractHCLBlocks(content, blockType string) []string {
+	var blocks []string
+	file, diags := hclsyntax.ParseConfig([]byte(content), "content.hcl", hcl.Pos{Line: 1, Column: 1})
+	if diags.HasErrors() {
+		return blocks
+	}
+	schema := &hcl.BodySchema{
+		Blocks: []hcl.BlockHeaderSchema{
+			{Type: blockType, LabelNames: []string{"name"}},
+		},
+	}
+	bodyContent, diags := file.Body.Content(schema)
+	if diags.HasErrors() {
+		return blocks
+	}
+	for _, block := range bodyContent.Blocks {
+		startPos := block.DefRange.Start
+		endPos := block.DefRange.End
+		if startPos.Byte < len(content) && endPos.Byte <= len(content) {
+			blockContent := content[startPos.Byte:endPos.Byte]
+			blocks = append(blocks, blockContent)
+		}
+	}
+	return blocks
+}
+
+// getKeys returns the keys from a map as a slice of strings
+func getKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// getResourceType returns the resource type name for a given content type
+func getResourceType(contentType string) string {
+	switch contentType {
+	case "machines":
+		return "machine"
+	case "variables":
+		return "variable"
+	case "actions":
+		return "action"
+	default:
+		return contentType
+	}
 }
 
 // mergeAndValidateMachines merges multiple machines HCL files and validates for collisions
@@ -549,49 +502,7 @@ func mergeAndValidateMachines(targetDir string) error {
 	}
 
 	// Merge all contents and validate
-	return validateMergedMachines(allContents, fileNames)
-}
-
-func validateMergedMachines(contents []string, fileNames []string) error {
-	// Parse HCL and extract machine information using proper HCL parsing
-	machineMap := make(map[string]machineInfo)
-
-	for i, content := range contents {
-		fileName := fileNames[i]
-
-		// Use schema-aware parsing for collision detection
-		validator := schemas.NewValidator()
-
-		// Parse the content using the unified validator
-		parsedData, err := validator.ParseHCLContent(content)
-		if err != nil {
-			return fmt.Errorf("failed to parse %s: %w", fileName, err)
-		}
-
-		// Extract machine names from parsed data (schema-aware)
-		machines, err := extractMachineNamesFromParsedData(parsedData, fileName)
-		if err != nil {
-			return fmt.Errorf("failed to extract machines from %s: %w", fileName, err)
-		}
-
-		// Check for duplicates and conflicts
-		for _, machine := range machines {
-			if existing, exists := machineMap[machine.name]; exists {
-				return fmt.Errorf("machine name collision: '%s' defined in both %s and %s",
-					machine.name, existing.fileName, fileName)
-			}
-			machineMap[machine.name] = machine
-		}
-	}
-
-	// Now validate the merged content against the schema
-	mergedContent := mergeMachinesContent(contents)
-
-	if err := validateAgainstSchema("machines", mergedContent); err != nil {
-		return fmt.Errorf("merged machines schema validation failed: %w", err)
-	}
-
-	return nil
+	return validateMergedContent(allContents, fileNames, "machines")
 }
 
 type machineInfo struct {
@@ -599,6 +510,21 @@ type machineInfo struct {
 	fileName string
 	hostname string
 	user     string
+}
+
+type variableInfo struct {
+	name        string
+	fileName    string
+	description string
+	sensitive   bool
+	encrypted   bool
+}
+
+type actionInfo struct {
+	name        string
+	fileName    string
+	description string
+	actionType  string
 }
 
 // extractMachinesFromParsedData extracts machine information from parsed HCL data
@@ -674,39 +600,55 @@ func extractMachineFromBlock(block map[string]interface{}, fileName, blockIndex 
 	return machine
 }
 
-// extractMachineNamesFromParsedData extracts machine information from parsed HCL data
-func extractMachineNamesFromParsedData(data map[string]interface{}, fileName string) ([]machineInfo, error) {
-	var machines []machineInfo
+// extractResourceNamesFromParsedData extracts resource information from parsed HCL data
+// This unified function replaces the duplicate extractMachineNamesFromParsedData, extractVariableNamesFromParsedData, and extractActionNamesFromParsedData functions
+func extractResourceNamesFromParsedData(data map[string]interface{}, fileName, blockType, resourceType string) ([]interface{}, error) {
+	var resources []interface{}
 
-	// Look for machines block
-	machinesBlock, exists := data["machines"]
+	// Look for the main block (e.g., "machines", "variables", "actions")
+	mainBlock, exists := data[blockType]
 	if !exists {
-		return machines, nil // No machines block, return empty
+		return resources, nil // No main block, return empty
 	}
 
 	// Convert to map
-	machinesMap, ok := machinesBlock.(map[string]interface{})
+	mainMap, ok := mainBlock.(map[string]interface{})
 	if !ok {
-		return machines, nil // Invalid structure, return empty
+		return resources, nil // Invalid structure, return empty
 	}
 
+	// Handle different resource structures based on type
+	switch blockType {
+	case "machines":
+		return extractMachineResources(mainMap, fileName, resourceType)
+	case "variables":
+		return extractVariableResources(mainMap, fileName, resourceType)
+	case "actions":
+		return extractActionResources(mainMap, fileName, resourceType)
+	default:
+		return nil, fmt.Errorf("unsupported block type: %s", blockType)
+	}
+}
+
+// extractMachineResources extracts machine resources from the main block
+func extractMachineResources(mainMap map[string]interface{}, fileName, resourceType string) ([]interface{}, error) {
+	var resources []interface{}
+
 	// Look for machine array
-	machineValue, exists := machinesMap["machine"]
+	machineValue, exists := mainMap[resourceType]
 	if !exists {
-		return machines, nil // No machines defined
+		return resources, nil // No machines defined
 	}
 
 	// Handle machine blocks array
 	if machineBlocks, ok := machineValue.([]map[string]interface{}); ok {
-
 		// Multiple machine blocks (correct type assertion)
 		for _, machineBlock := range machineBlocks {
-
 			if name, exists := machineBlock["name"]; exists {
 				nameStr := convertToString(name)
 				// Filter out placeholder values that indicate parsing errors
 				if nameStr != "" && nameStr != "complex_expression" && !strings.HasPrefix(nameStr, "complex_") {
-					machines = append(machines, machineInfo{
+					resources = append(resources, machineInfo{
 						name:     nameStr,
 						fileName: fileName,
 					})
@@ -714,7 +656,6 @@ func extractMachineNamesFromParsedData(data map[string]interface{}, fileName str
 			}
 		}
 	} else if machineBlocks, ok := machineValue.([]interface{}); ok {
-
 		// Multiple machine blocks (fallback for interface array)
 		for _, block := range machineBlocks {
 			if machineBlock, ok := block.(map[string]interface{}); ok {
@@ -722,7 +663,7 @@ func extractMachineNamesFromParsedData(data map[string]interface{}, fileName str
 					nameStr := convertToString(name)
 					// Filter out placeholder values that indicate parsing errors
 					if nameStr != "" && nameStr != "complex_expression" && !strings.HasPrefix(nameStr, "complex_") {
-						machines = append(machines, machineInfo{
+						resources = append(resources, machineInfo{
 							name:     nameStr,
 							fileName: fileName,
 						})
@@ -736,7 +677,7 @@ func extractMachineNamesFromParsedData(data map[string]interface{}, fileName str
 			nameStr := convertToString(name)
 			// Filter out placeholder values that indicate parsing errors
 			if nameStr != "" && nameStr != "complex_expression" && !strings.HasPrefix(nameStr, "complex_") {
-				machines = append(machines, machineInfo{
+				resources = append(resources, machineInfo{
 					name:     nameStr,
 					fileName: fileName,
 				})
@@ -744,468 +685,21 @@ func extractMachineNamesFromParsedData(data map[string]interface{}, fileName str
 		}
 	}
 
-	return machines, nil
+	return resources, nil
 }
 
-// convertToString converts various HCL value types to string
-func convertToString(value interface{}) string {
-	switch v := value.(type) {
-	case string:
-		return v
-	case fmt.Stringer:
-		return v.String()
-	default:
-		return fmt.Sprintf("%v", v)
-	}
-}
-
-// mergeAndValidateVariables merges multiple variables HCL files and validates for collisions
-func mergeAndValidateVariables(targetDir string) error {
-	variablesHCLPath := filepath.Join(targetDir, "variables.hcl")
-	variablesDirPath := filepath.Join(targetDir, "variables")
-
-	var allContents []string
-	var fileNames []string
-
-	// Check if variables.hcl exists
-	if _, err := os.Stat(variablesHCLPath); err == nil {
-		content, err := os.ReadFile(variablesHCLPath)
-		if err != nil {
-			return fmt.Errorf("failed to read variables.hcl: %w", err)
-		}
-		allContents = append(allContents, string(content))
-		fileNames = append(fileNames, "variables.hcl")
-	}
-
-	// Check if variables/ directory exists
-	if _, err := os.Stat(variablesDirPath); err == nil {
-		// Read all .hcl files in directory
-		entries, err := os.ReadDir(variablesDirPath)
-		if err != nil {
-			return fmt.Errorf("failed to read variables directory: %w", err)
-		}
-
-		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".hcl") {
-				filePath := filepath.Join(variablesDirPath, entry.Name())
-				content, err := os.ReadFile(filePath)
-				if err != nil {
-					return fmt.Errorf("failed to read %s: %w", entry.Name(), err)
-				}
-				allContents = append(allContents, string(content))
-				fileNames = append(fileNames, "variables/"+entry.Name())
-			}
-		}
-	}
-
-	if len(allContents) == 0 {
-		return fmt.Errorf("neither variables.hcl nor variables/ directory found")
-	}
-
-	// Merge all contents and validate
-	return validateMergedVariables(allContents, fileNames)
-}
-
-func validateMergedVariables(contents []string, fileNames []string) error {
-	// Parse HCL and extract variable information using proper HCL parsing
-	variableMap := make(map[string]variableInfo)
-
-	for i, content := range contents {
-		fileName := fileNames[i]
-
-		// Use schema-aware parsing for collision detection
-		validator := schemas.NewValidator()
-
-		// Parse the content using the unified validator
-		parsedData, err := validator.ParseHCLContent(content)
-		if err != nil {
-			return fmt.Errorf("failed to parse %s: %w", fileName, err)
-		}
-
-		// Extract variable names from parsed data (schema-aware)
-		variables, err := extractVariableNamesFromParsedData(parsedData, fileName)
-		if err != nil {
-			return fmt.Errorf("failed to extract variables from %s: %w", fileName, err)
-		}
-
-		// Check for duplicates and conflicts
-		for _, variable := range variables {
-			if existing, exists := variableMap[variable.name]; exists {
-				return fmt.Errorf("variable name collision: '%s' defined in both %s and %s",
-					variable.name, existing.fileName, fileName)
-			}
-			variableMap[variable.name] = variable
-		}
-	}
-
-	// Now validate the merged content against the schema
-	mergedContent := mergeVariablesContent(contents)
-
-	if err := validateAgainstSchema("variables", mergedContent); err != nil {
-		return fmt.Errorf("merged variables schema validation failed: %w", err)
-	}
-
-	return nil
-}
-
-type variableInfo struct {
-	name        string
-	fileName    string
-	description string
-	sensitive   bool
-	encrypted   bool
-}
-
-func validateVariablesConfig(targetDir string) error {
-	// Use the new merged validation approach
-	return mergeAndValidateVariables(targetDir)
-}
-
-// mergeAndValidateActions merges multiple actions HCL files and validates for collisions
-func mergeAndValidateActions(targetDir string) error {
-	actionsHCLPath := filepath.Join(targetDir, "actions.hcl")
-	actionsDirPath := filepath.Join(targetDir, "actions")
-
-	var allContents []string
-	var fileNames []string
-
-	// Check if actions.hcl exists
-	if _, err := os.Stat(actionsHCLPath); err == nil {
-		content, err := os.ReadFile(actionsHCLPath)
-		if err != nil {
-			return fmt.Errorf("failed to read actions.hcl: %w", err)
-		}
-		allContents = append(allContents, string(content))
-		fileNames = append(fileNames, "actions.hcl")
-	}
-
-	// Check if actions/ directory exists
-	if _, err := os.Stat(actionsDirPath); err == nil {
-		// Read all .hcl files in directory
-		entries, err := os.ReadDir(actionsDirPath)
-		if err != nil {
-			return fmt.Errorf("failed to read actions directory: %w", err)
-		}
-
-		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".hcl") {
-				filePath := filepath.Join(actionsDirPath, entry.Name())
-				content, err := os.ReadFile(filePath)
-				if err != nil {
-					return fmt.Errorf("failed to read %s: %w", entry.Name(), err)
-				}
-				allContents = append(allContents, string(content))
-				fileNames = append(fileNames, "actions/"+entry.Name())
-			}
-		}
-	}
-
-	if len(allContents) == 0 {
-		return fmt.Errorf("neither actions.hcl nor actions/ directory found")
-	}
-
-	// Merge all contents and validate
-	return validateMergedActions(allContents, fileNames)
-}
-
-func validateMergedActions(contents []string, fileNames []string) error {
-	// Parse HCL and extract action information using proper HCL parsing
-	actionMap := make(map[string]actionInfo)
-
-	for i, content := range contents {
-		fileName := fileNames[i]
-
-		// Use schema-aware parsing for collision detection
-		validator := schemas.NewValidator()
-
-		// Parse the content using the unified validator
-		parsedData, err := validator.ParseHCLContent(content)
-		if err != nil {
-			return fmt.Errorf("failed to parse %s: %w", fileName, err)
-		}
-
-		// Extract action names from parsed data (schema-aware)
-		actions, err := extractActionNamesFromParsedData(parsedData, fileName)
-		if err != nil {
-			return fmt.Errorf("failed to extract actions from %s: %w", fileName, err)
-		}
-
-		// Check for duplicates and conflicts
-		for _, action := range actions {
-			if existing, exists := actionMap[action.name]; exists {
-				return fmt.Errorf("action name collision: '%s' defined in both %s and %s",
-					action.name, existing.fileName, fileName)
-			}
-			actionMap[action.name] = action
-		}
-	}
-
-	// Now validate the merged content against the schema
-	mergedContent := mergeActionsContent(contents)
-	if err := validateAgainstSchema("actions", mergedContent); err != nil {
-		return fmt.Errorf("merged actions schema validation failed: %w", err)
-	}
-
-	return nil
-}
-
-type actionInfo struct {
-	name        string
-	fileName    string
-	description string
-	actionType  string
-}
-
-func mergeActionsContent(contents []string) string {
-	// Create a merged actions.hcl content
-	merged := `# Merged Actions Configuration
-# Generated from multiple files
-
-metadata {
-  version = "1"
-  description = "Merged actions configuration"
-}
-
-actions {
-`
-
-	// Extract action blocks from each content
-	for _, content := range contents {
-		// Find all action blocks with proper brace counting
-		actionBlocks := extractActionBlocks(content)
-
-		for _, block := range actionBlocks {
-			// Clean up the block and add it to merged content
-			cleaned := strings.TrimSpace(block)
-			merged += "\n  " + cleaned + "\n"
-		}
-	}
-
-	merged += "}\n"
-	return merged
-}
-
-// extractActionBlocks extracts action blocks using proper HCL parsing
-func extractActionBlocks(content string) []string {
-	var blocks []string
-
-	// Parse HCL content
-	file, diags := hclsyntax.ParseConfig([]byte(content), "content.hcl", hcl.Pos{Line: 1, Column: 1})
-	if diags.HasErrors() {
-		// If parsing fails, return empty slice
-		return blocks
-	}
-
-	// Define schema for action blocks
-	schema := &hcl.BodySchema{
-		Blocks: []hcl.BlockHeaderSchema{
-			{
-				Type:       "action",
-				LabelNames: []string{"name"},
-			},
-		},
-	}
-
-	// Extract action blocks
-	bodyContent, diags := file.Body.Content(schema)
-	if diags.HasErrors() {
-		return blocks
-	}
-
-	// Convert blocks back to HCL strings by extracting the original content
-	for _, block := range bodyContent.Blocks {
-		// Get the range of the block in the original content
-		startPos := block.DefRange.Start
-		endPos := block.DefRange.End
-
-		// Extract the block content from the original string
-		if startPos.Byte < len(content) && endPos.Byte <= len(content) {
-			blockContent := content[startPos.Byte:endPos.Byte]
-			blocks = append(blocks, blockContent)
-		}
-	}
-
-	return blocks
-}
-
-func mergeVariablesContent(contents []string) string {
-	// Create a merged variables.hcl content
-	merged := `# Merged Variables Configuration
-# Generated from multiple files
-
-metadata {
-  version = "1"
-  description = "Merged variables configuration"
-}
-
-variables {
-`
-
-	// Extract variable blocks from each content
-	for _, content := range contents {
-		// Find all variable blocks with proper brace counting
-		variableBlocks := extractVariableBlocks(content)
-
-		for _, block := range variableBlocks {
-			// Clean up the block and add it to merged content
-			cleaned := strings.TrimSpace(block)
-			merged += "\n  " + cleaned + "\n"
-		}
-	}
-
-	merged += "}\n"
-	return merged
-}
-
-// extractVariableBlocks extracts variable blocks using proper HCL parsing
-func extractVariableBlocks(content string) []string {
-	var blocks []string
-
-	// Parse HCL content
-	file, diags := hclsyntax.ParseConfig([]byte(content), "content.hcl", hcl.Pos{Line: 1, Column: 1})
-	if diags.HasErrors() {
-		// If parsing fails, return empty slice
-		return blocks
-	}
-
-	// Define schema for variable blocks
-	schema := &hcl.BodySchema{
-		Blocks: []hcl.BlockHeaderSchema{
-			{
-				Type:       "variable",
-				LabelNames: []string{},
-			},
-		},
-	}
-
-	// Extract variable blocks
-	bodyContent, diags := file.Body.Content(schema)
-	if diags.HasErrors() {
-		return blocks
-	}
-
-	// Convert blocks back to HCL strings by extracting the original content
-	for _, block := range bodyContent.Blocks {
-		// Get the range of the block in the original content
-		startPos := block.DefRange.Start
-		endPos := block.DefRange.End
-
-		// Extract the block content from the original string
-		if startPos.Byte < len(content) && endPos.Byte <= len(content) {
-			blockContent := content[startPos.Byte:endPos.Byte]
-			blocks = append(blocks, blockContent)
-		}
-	}
-
-	return blocks
-}
-
-func mergeMachinesContent(contents []string) string {
-	// Create a merged machines.hcl content
-	merged := `# Merged Machines Configuration
-# Generated from multiple files
-
-metadata {
-  version = "1"
-  description = "Merged machines configuration"
-}
-
-machines {
-`
-
-	// Extract machine blocks from each content
-	for _, content := range contents {
-		// Find all machine blocks with proper brace counting
-		machineBlocks := extractMachineBlocks(content)
-
-		for _, block := range machineBlocks {
-			// Clean up the block and add it to merged content
-			cleaned := strings.TrimSpace(block)
-			merged += "\n  " + cleaned + "\n"
-		}
-	}
-
-	merged += "}\n"
-	return merged
-}
-
-// extractMachineBlocks extracts machine blocks using proper HCL parsing
-func extractMachineBlocks(content string) []string {
-	var blocks []string
-
-	// Parse HCL content
-	file, diags := hclsyntax.ParseConfig([]byte(content), "content.hcl", hcl.Pos{Line: 1, Column: 1})
-	if diags.HasErrors() {
-		// If parsing fails, return empty slice
-		return blocks
-	}
-
-	// Define schema for machine blocks
-	schema := &hcl.BodySchema{
-		Blocks: []hcl.BlockHeaderSchema{
-			{
-				Type:       "machine",
-				LabelNames: []string{},
-			},
-		},
-	}
-
-	// Extract machine blocks
-	bodyContent, diags := file.Body.Content(schema)
-	if diags.HasErrors() {
-		return blocks
-	}
-
-	// Convert blocks back to HCL strings by extracting the original content
-	for _, block := range bodyContent.Blocks {
-		// Get the range of the block in the original content
-		startPos := block.DefRange.Start
-		endPos := block.DefRange.End
-
-		// Extract the block content from the original string
-		if startPos.Byte < len(content) && endPos.Byte <= len(content) {
-			blockContent := content[startPos.Byte:endPos.Byte]
-			blocks = append(blocks, blockContent)
-		}
-	}
-
-	return blocks
-}
-
-// getKeys returns a slice of keys from a map[string]interface{}
-func getKeys(m map[string]interface{}) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
-// extractVariableNamesFromParsedData extracts variable information from parsed HCL data
-func extractVariableNamesFromParsedData(data map[string]interface{}, fileName string) ([]variableInfo, error) {
-	var variables []variableInfo
-
-	// Look for variables block
-	variablesBlock, exists := data["variables"]
-	if !exists {
-		return variables, nil // No variables block, return empty
-	}
-
-	// Convert to map
-	variablesMap, ok := variablesBlock.(map[string]interface{})
-	if !ok {
-		return variables, nil // Invalid structure, return empty
-	}
+// extractVariableResources extracts variable resources from the main block
+func extractVariableResources(mainMap map[string]interface{}, fileName, resourceType string) ([]interface{}, error) {
+	var resources []interface{}
 
 	// Look for variable blocks (variable { ... })
-	variableBlocks, exists := variablesMap["variable"]
+	variableBlocks, exists := mainMap[resourceType]
 	if !exists {
-		return variables, nil
+		return resources, nil
 	}
 
 	// Handle array of variable blocks
 	if variableArray, ok := variableBlocks.([]map[string]interface{}); ok {
-
 		for _, block := range variableArray {
 			if name, exists := block["name"]; exists {
 				nameStr := convertToString(name)
@@ -1234,7 +728,7 @@ func extractVariableNamesFromParsedData(data map[string]interface{}, fileName st
 						}
 					}
 
-					variables = append(variables, variable)
+					resources = append(resources, variable)
 				}
 			}
 		}
@@ -1267,12 +761,54 @@ func extractVariableNamesFromParsedData(data map[string]interface{}, fileName st
 					}
 				}
 
-				variables = append(variables, variable)
+				resources = append(resources, variable)
 			}
 		}
 	}
 
-	return variables, nil
+	return resources, nil
+}
+
+// extractActionResources extracts action resources from the main block
+func extractActionResources(mainMap map[string]interface{}, fileName, resourceType string) ([]interface{}, error) {
+	var resources []interface{}
+	logger := logging.GetGlobalLogger()
+
+	// Look for action blocks (action "name" { ... })
+	for actionName, actionValue := range mainMap {
+		logger.Debug("found action",
+			slog.String("file", fileName),
+			slog.String("action_name", actionName))
+
+		// Check if it's an action block (map with metadata)
+		if actionBlock, ok := actionValue.(map[string]interface{}); ok {
+			action := actionInfo{
+				name:     actionName,
+				fileName: fileName,
+			}
+
+			// Extract description
+			if desc, exists := actionBlock["description"]; exists {
+				action.description = convertToString(desc)
+			}
+
+			// Extract action type
+			if actionType, exists := actionBlock["type"]; exists {
+				action.actionType = convertToString(actionType)
+			}
+
+			resources = append(resources, action)
+		} else {
+			// Simple action block without metadata
+			action := actionInfo{
+				name:     actionName,
+				fileName: fileName,
+			}
+			resources = append(resources, action)
+		}
+	}
+
+	return resources, nil
 }
 
 // extractActionNamesFromParsedData extracts action information from parsed HCL data

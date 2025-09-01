@@ -339,8 +339,8 @@ func loadActionsConfig() ([]*schemas.ActionsActionV1, error) {
 		return nil, fmt.Errorf("failed to read actions.hcl: %w", err)
 	}
 
-	// Use the validator to parse and validate the actions configuration
-	validator := schemas.NewValidator()
+	// Use the simplified validator to parse and validate the actions configuration
+	validator := schemas.NewSimpleValidator()
 	result, err := validator.ValidateHCLContent("actions", string(content))
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate actions.hcl: %w", err)
