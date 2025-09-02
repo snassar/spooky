@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"spooky/internal/logging"
+
 	"github.com/spf13/cobra"
 )
 
@@ -42,15 +44,15 @@ func IsCustomConfig() bool {
 // GetLogLevel returns the effective log level based on flags
 func GetLogLevel() string {
 	if quiet {
-		return "error"
+		return logging.LevelError
 	}
 	if verbose {
-		return "debug"
+		return logging.LevelDebug
 	}
 	if logLevel != "" {
 		return logLevel
 	}
-	return "info" // default
+	return logging.LevelInfo // default
 }
 
 // IsQuiet returns true if quiet mode is enabled

@@ -2,8 +2,11 @@ package sync
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"spooky/internal/logging"
+	"syscall"
 
 	"github.com/pkg/errors"
 )
@@ -134,7 +137,10 @@ func SyncDirectory(sourcePath, targetPath string, options *SyncOptions) (*FileSy
 // Target becomes exact copy of source, overwriting any local changes
 func syncOneWayReplica(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
 	if options.Verbose {
-		fmt.Printf("Performing one-way replica sync: %s → %s\n", sourcePath, targetPath)
+		logger := logging.GetGlobalLogger()
+		logger.Info("performing one-way replica sync",
+			slog.String("source", sourcePath),
+			slog.String("target", targetPath))
 	}
 
 	// Walk source directory and sync all files
@@ -162,7 +168,8 @@ func syncOneWayReplica(sourcePath, targetPath string, options *SyncOptions, resu
 				return fmt.Errorf("failed to create directory %s: %v", targetFile, err)
 			}
 			if options.Verbose {
-				fmt.Printf("Created directory: %s\n", targetFile)
+				logger := logging.GetGlobalLogger()
+				logger.Info("created directory", slog.String("path", targetFile))
 			}
 		} else {
 			// Sync file using existing SyncFile function
@@ -204,7 +211,8 @@ func syncOneWayReplica(sourcePath, targetPath string, options *SyncOptions, resu
 		if _, err := os.Stat(sourceFile); os.IsNotExist(err) {
 			if options.DryRun {
 				if options.Verbose {
-					fmt.Printf("Would remove: %s\n", path)
+					logger := logging.GetGlobalLogger()
+					logger.Info("would remove file", slog.String("path", path))
 				}
 			} else {
 				if info.IsDir() {
@@ -217,7 +225,8 @@ func syncOneWayReplica(sourcePath, targetPath string, options *SyncOptions, resu
 					}
 				}
 				if options.Verbose {
-					fmt.Printf("Removed: %s\n", path)
+					logger := logging.GetGlobalLogger()
+					logger.Info("removed file", slog.String("path", path))
 				}
 			}
 		}
@@ -238,7 +247,10 @@ func syncOneWayReplica(sourcePath, targetPath string, options *SyncOptions, resu
 // Changes only propagate from source to target, conflicts are preserved
 func syncOneWaySafe(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
 	if options.Verbose {
-		fmt.Printf("Performing one-way safe sync: %s → %s\n", sourcePath, targetPath)
+		logger := logging.GetGlobalLogger()
+		logger.Info("performing one-way safe sync",
+			slog.String("source", sourcePath),
+			slog.String("target", targetPath))
 	}
 
 	// Walk source directory and sync files, but preserve conflicts
@@ -269,7 +281,8 @@ func syncOneWaySafe(sourcePath, targetPath string, options *SyncOptions, result 
 				if targetInfo.ModTime().After(info.ModTime()) {
 					// Target is newer, preserve it (conflict)
 					if options.Verbose {
-						fmt.Printf("Conflict detected, preserving target: %s\n", targetFile)
+						logger := logging.GetGlobalLogger()
+						logger.Info("conflict detected, preserving target", slog.String("path", targetFile))
 					}
 					result.Conflicts = append(result.Conflicts, targetFile)
 					return nil
@@ -323,7 +336,10 @@ func applyCombinedResults(result *FileSyncResult, combined *FileSyncResult) {
 // Both endpoints can modify, conflicts are detected and preserved
 func syncTwoWaySafe(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
 	if options.Verbose {
-		fmt.Printf("Performing two-way safe sync: %s ↔ %s\n", sourcePath, targetPath)
+		logger := logging.GetGlobalLogger()
+		logger.Info("performing two-way safe sync",
+			slog.String("source", sourcePath),
+			slog.String("target", targetPath))
 	}
 
 	// First, sync source → target (one-way safe)
@@ -357,7 +373,10 @@ func syncTwoWaySafe(sourcePath, targetPath string, options *SyncOptions, result 
 // Both endpoints can modify, source always wins conflicts
 func syncTwoWayResolved(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
 	if options.Verbose {
-		fmt.Printf("Performing two-way resolved sync (source wins): %s ↔ %s\n", sourcePath, targetPath)
+		logger := logging.GetGlobalLogger()
+		logger.Info("performing two-way resolved sync (source wins)",
+			slog.String("source", sourcePath),
+			slog.String("target", targetPath))
 	}
 
 	// Use one-way replica for source → target (source always wins)
@@ -413,8 +432,59 @@ func copyFile(src, dst string, options *SyncOptions) error {
 
 // preserveAttributes preserves file attributes from source to target
 func preserveAttributes(sourcePath, targetPath string, options *SyncOptions) error {
-	// This is a simplified implementation
-	// In a full implementation, you would use syscall to preserve
-	// permissions, owner, group, timestamps, etc.
+	if !options.PreservePerms && !options.PreserveOwner && !options.PreserveGroup {
+		return nil // No attributes to preserve
+	}
+
+	sourceInfo, err := os.Stat(sourcePath)
+	if err != nil {
+		return errors.Wrapf(err, "failed to stat source file %s", sourcePath)
+	}
+
+	if options.PreservePerms {
+		if err := os.Chmod(targetPath, sourceInfo.Mode()); err != nil {
+			return errors.Wrapf(err, "failed to preserve permissions for %s", targetPath)
+		}
+	}
+
+	if options.PreserveOwner || options.PreserveGroup {
+		stat, ok := sourceInfo.Sys().(*syscall.Stat_t)
+		if !ok {
+			return errors.New("failed to get system-specific file info")
+		}
+
+		if options.PreserveOwner && options.PreserveGroup {
+			if err := os.Chown(targetPath, int(stat.Uid), int(stat.Gid)); err != nil {
+				return errors.Wrapf(err, "failed to preserve owner and group for %s", targetPath)
+			}
+		} else if options.PreserveOwner {
+			// Get current group of target
+			targetInfo, err := os.Stat(targetPath)
+			if err != nil {
+				return errors.Wrapf(err, "failed to stat target file %s", targetPath)
+			}
+			targetStat, ok := targetInfo.Sys().(*syscall.Stat_t)
+			if !ok {
+				return errors.New("failed to get target system-specific file info")
+			}
+			if err := os.Chown(targetPath, int(stat.Uid), int(targetStat.Gid)); err != nil {
+				return errors.Wrapf(err, "failed to preserve owner for %s", targetPath)
+			}
+		} else if options.PreserveGroup {
+			// Get current owner of target
+			targetInfo, err := os.Stat(targetPath)
+			if err != nil {
+				return errors.Wrapf(err, "failed to stat target file %s", targetPath)
+			}
+			targetStat, ok := targetInfo.Sys().(*syscall.Stat_t)
+			if !ok {
+				return errors.New("failed to get target system-specific file info")
+			}
+			if err := os.Chown(targetPath, int(targetStat.Uid), int(stat.Gid)); err != nil {
+				return errors.Wrapf(err, "failed to preserve group for %s", targetPath)
+			}
+		}
+	}
+
 	return nil
 }

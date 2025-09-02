@@ -9,15 +9,15 @@ import (
 
 func main() {
 	// Check for logging flags before command execution
-	logLevel := "warn" // default to warn level to avoid INFO noise
+	logLevel := logging.LevelWarn // default to warn level to avoid INFO noise
 
 	// Simple flag checking for logging control
 	for i, arg := range os.Args[1:] {
 		switch arg {
 		case "--quiet", "-q":
-			logLevel = "error"
+			logLevel = logging.LevelError
 		case "--verbose", "-v":
-			logLevel = "debug"
+			logLevel = logging.LevelDebug
 		case "--log-level":
 			if i+1 < len(os.Args[1:]) {
 				logLevel = os.Args[i+2]

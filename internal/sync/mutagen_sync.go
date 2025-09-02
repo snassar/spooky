@@ -7,6 +7,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"spooky/internal/logging"
+
+	"log/slog"
+
 	"github.com/mutagen-io/mutagen/pkg/synchronization/rsync"
 )
 
@@ -103,7 +107,10 @@ func (m *MutagenSyncEngine) handleNewFile(sourcePath, targetPath string, options
 // handleDryRunNewFile handles dry run for new files
 func (m *MutagenSyncEngine) handleDryRunNewFile(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
 	if options.Verbose {
-		fmt.Printf("Would copy %s to %s (new file)\n", sourcePath, targetPath)
+		logger := logging.GetGlobalLogger()
+		logger.Info("would copy file (new file)",
+			slog.String("source", sourcePath),
+			slog.String("target", targetPath))
 	}
 	result.BytesTransferred = sourceInfo.Size()
 	result.Operations = 1
@@ -151,7 +158,8 @@ func (m *MutagenSyncEngine) filesAreIdentical(sourcePath, targetPath string, res
 
 	if bytes.Equal(sourceChecksum, targetChecksum) {
 		if options.Verbose {
-			fmt.Printf("Files are identical, no sync needed\n")
+			logger := logging.GetGlobalLogger()
+			logger.Info("files are identical, no sync needed")
 		}
 		result.Success = true
 		return true
@@ -178,7 +186,10 @@ func (m *MutagenSyncEngine) syncDifferentFiles(sourcePath, targetPath string, op
 // handleDryRunSync handles dry run for file syncing
 func (m *MutagenSyncEngine) handleDryRunSync(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
 	if options.Verbose {
-		fmt.Printf("Would sync %s to %s using Mutagen rsync algorithm\n", sourcePath, targetPath)
+		logger := logging.GetGlobalLogger()
+		logger.Info("would sync file using Mutagen rsync algorithm",
+			slog.String("source", sourcePath),
+			slog.String("target", targetPath))
 	}
 	result.BytesTransferred = sourceInfo.Size()
 	result.Operations = 1
@@ -198,7 +209,8 @@ func (m *MutagenSyncEngine) createBackupIfNeeded(targetPath string, options *Syn
 	}
 
 	if options.Verbose {
-		fmt.Printf("Created backup: %s\n", backupPath)
+		logger := logging.GetGlobalLogger()
+		logger.Info("created backup", slog.String("path", backupPath))
 	}
 
 	return nil
@@ -207,7 +219,8 @@ func (m *MutagenSyncEngine) createBackupIfNeeded(targetPath string, options *Syn
 // performMutagenSync performs the actual file synchronization using Mutagen's rsync algorithm
 func (m *MutagenSyncEngine) performMutagenSync(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
 	if options.Verbose {
-		fmt.Printf("Using Mutagen rsync to sync files...\n")
+		logger := logging.GetGlobalLogger()
+		logger.Info("using Mutagen rsync to sync files")
 	}
 
 	// Open source file for reading
@@ -234,7 +247,8 @@ func (m *MutagenSyncEngine) performMutagenSync(sourcePath, targetPath string, op
 	}
 
 	if options.Verbose {
-		fmt.Printf("Generated signature with %d blocks\n", len(signature.Hashes))
+		logger := logging.GetGlobalLogger()
+		logger.Info("generated signature", slog.Int("blocks", len(signature.Hashes)))
 	}
 
 	// Create delta operations by comparing source with target signature
@@ -289,8 +303,11 @@ func (m *MutagenSyncEngine) performMutagenSync(sourcePath, targetPath string, op
 	result.Operations = len(operations)
 
 	if options.Verbose {
-		fmt.Printf("Delta: %d literal bytes, %d copy bytes, %d operations\n",
-			literalBytes, copyBytes, result.Operations)
+		logger := logging.GetGlobalLogger()
+		logger.Info("delta generated",
+			slog.Int64("literal_bytes", literalBytes),
+			slog.Int64("copy_bytes", copyBytes),
+			slog.Int("operations", result.Operations))
 	}
 
 	// Apply delta to create new target file

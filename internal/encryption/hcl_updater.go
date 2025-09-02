@@ -138,7 +138,8 @@ func (hu *HCLUpdater) processVariableBlock(block *hclsyntax.Block, contentStr *s
 
 	// Check if already encrypted
 	if hu.ageEncryption.IsEncrypted(currentValue) {
-		fmt.Printf("Variable %s is already encrypted, skipping\n", block.Labels[0])
+		logger := logging.GetGlobalLogger()
+		logger.Info("variable already encrypted, skipping", slog.String("variable", block.Labels[0]))
 		return false, nil
 	}
 

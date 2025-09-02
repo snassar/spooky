@@ -2,7 +2,6 @@ package ssh
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -217,7 +216,8 @@ func (sm *SimpleSSHManager) TestConnection(ctx context.Context, machine *schemas
 		return errors.Errorf("test command failed on machine %s: %s", machine.Hostname, result.Stderr)
 	}
 
-	fmt.Printf("SSH connection test successful for machine %s\n", machine.Hostname)
+	logger := logging.GetGlobalLogger()
+	logger.Info("SSH connection test successful", slog.String("machine", machine.Hostname))
 	return nil
 }
 
