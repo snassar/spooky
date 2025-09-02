@@ -395,6 +395,156 @@ func (sc *SSHClient) DownloadFile(ctx context.Context, remotePath, localPath str
 	return session.Wait()
 }
 
+// CopyFile copies a file from local to remote using SCP
+func (sc *SSHClient) CopyFile(localPath, remotePath string) error {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+
+	if sc.client == nil {
+		return errors.New("SSH client not connected")
+	}
+
+	// Open local file
+	localFile, err := os.Open(localPath)
+	if err != nil {
+		return errors.Wrapf(err, "failed to open local file: %s", localPath)
+	}
+	defer localFile.Close()
+
+	// Get file info for permissions
+	fileInfo, err := localFile.Stat()
+	if err != nil {
+		return errors.Wrapf(err, "failed to get file info: %s", localPath)
+	}
+
+	// Create SCP session
+	session, err := sc.client.NewSession()
+	if err != nil {
+		return errors.Wrap(err, "failed to create SCP session")
+	}
+	defer session.Close()
+
+	// Create pipe for SCP protocol
+	stdin, err := session.StdinPipe()
+	if err != nil {
+		return errors.Wrap(err, "failed to create stdin pipe")
+	}
+
+	// Start SCP command
+	if err := session.Start(fmt.Sprintf("scp -t %s", remotePath)); err != nil {
+		return errors.Wrap(err, "failed to start SCP command")
+	}
+
+	// Send file header
+	fmt.Fprintf(stdin, "C%04o %d %s\n", fileInfo.Mode().Perm(), fileInfo.Size(), filepath.Base(remotePath))
+
+	// Copy file content
+	if _, err := io.Copy(stdin, localFile); err != nil {
+		return errors.Wrap(err, "failed to copy file content")
+	}
+
+	// Send end marker
+	fmt.Fprint(stdin, "\x00")
+
+	// Close stdin and wait for session to complete
+	stdin.Close()
+	if err := session.Wait(); err != nil {
+		return errors.Wrap(err, "SCP session failed")
+	}
+
+	return nil
+}
+
+// CopyFileContent copies file content (string) to remote path using SCP
+func (sc *SSHClient) CopyFileContent(content, remotePath string, permissions os.FileMode) error {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+
+	if sc.client == nil {
+		return errors.New("SSH client not connected")
+	}
+
+	// Create SCP session
+	session, err := sc.client.NewSession()
+	if err != nil {
+		return errors.Wrap(err, "failed to create SCP session")
+	}
+	defer session.Close()
+
+	// Create pipe for SCP protocol
+	stdin, err := session.StdinPipe()
+	if err != nil {
+		return errors.Wrap(err, "failed to create stdin pipe")
+	}
+
+	// Start SCP command
+	if err := session.Start(fmt.Sprintf("scp -t %s", remotePath)); err != nil {
+		return errors.Wrap(err, "failed to start SCP command")
+	}
+
+	// Send file header
+	fmt.Fprintf(stdin, "C%04o %d %s\n", permissions, len(content), filepath.Base(remotePath))
+
+	// Copy content
+	if _, err := io.Copy(stdin, strings.NewReader(content)); err != nil {
+		return errors.Wrap(err, "failed to copy file content")
+	}
+
+	// Send end marker
+	fmt.Fprint(stdin, "\x00")
+
+	// Close stdin and wait for session to complete
+	stdin.Close()
+	if err := session.Wait(); err != nil {
+		return errors.Wrap(err, "SCP session failed")
+	}
+
+	return nil
+}
+
+// SetFileAttributes sets file permissions, owner, and group on a remote file
+func (sc *SSHClient) SetFileAttributes(remotePath, permissions, owner, group string) error {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+
+	if sc.client == nil {
+		return errors.New("SSH client not connected")
+	}
+
+	// Create session for chmod/chown commands
+	session, err := sc.client.NewSession()
+	if err != nil {
+		return errors.Wrap(err, "failed to create session")
+	}
+	defer session.Close()
+
+	// Set permissions if specified
+	if permissions != "" {
+		chmodCmd := fmt.Sprintf("chmod %s %s", permissions, remotePath)
+		if err := session.Run(chmodCmd); err != nil {
+			return errors.Wrapf(err, "failed to set permissions: %s", chmodCmd)
+		}
+	}
+
+	// Set owner and group if specified
+	if owner != "" || group != "" {
+		var chownCmd string
+		if owner != "" && group != "" {
+			chownCmd = fmt.Sprintf("chown %s:%s %s", owner, group, remotePath)
+		} else if owner != "" {
+			chownCmd = fmt.Sprintf("chown %s %s", owner, remotePath)
+		} else {
+			chownCmd = fmt.Sprintf("chgrp %s %s", group, remotePath)
+		}
+
+		if err := session.Run(chownCmd); err != nil {
+			return errors.Wrapf(err, "failed to set ownership: %s", chownCmd)
+		}
+	}
+
+	return nil
+}
+
 // createSSHConfig creates the SSH client configuration
 func (sc *SSHClient) createSSHConfig() (*ssh.ClientConfig, error) {
 	config := &ssh.ClientConfig{

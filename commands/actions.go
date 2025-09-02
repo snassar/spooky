@@ -12,6 +12,8 @@ import (
 	"spooky/internal/logging"
 	"spooky/internal/schemas"
 	"spooky/internal/ssh"
+	"spooky/internal/sync"
+	"spooky/internal/templates"
 	"spooky/internal/utilities"
 
 	"github.com/hashicorp/hcl/v2"
@@ -503,6 +505,19 @@ func extractActionAttributes(actionBlock *hcl.Block) (*hcl.BodyContent, error) {
 			{Name: "retries", Required: false},
 			{Name: "retry_delay", Required: false},
 			{Name: "sudo", Required: false},
+			// Template deploy specific fields
+			{Name: "source", Required: false},
+			{Name: "destination", Required: false},
+			{Name: "validate", Required: false},
+			{Name: "backup", Required: false},
+			{Name: "permissions", Required: false},
+			{Name: "owner", Required: false},
+			{Name: "group", Required: false},
+			// File sync specific fields
+			{Name: "sync_source", Required: false},
+			{Name: "sync_destination", Required: false},
+			{Name: "sync_delete", Required: false},
+			{Name: "sync_preserve", Required: false},
 		},
 	}
 
@@ -540,6 +555,43 @@ func parseActionAttributes(action *schemas.ActionsActionV1, attrContent *hcl.Bod
 		return err
 	}
 	if err := parseBoolAttribute(attrContent, "sudo", &action.Sudo, actionName); err != nil {
+		return err
+	}
+
+	// Parse template deploy specific fields
+	if err := parseStringAttribute(attrContent, "source", &action.Source, actionName); err != nil {
+		return err
+	}
+	if err := parseStringAttribute(attrContent, "destination", &action.Destination, actionName); err != nil {
+		return err
+	}
+	if err := parseBoolAttribute(attrContent, "validate", &action.Validate, actionName); err != nil {
+		return err
+	}
+	if err := parseBoolAttribute(attrContent, "backup", &action.Backup, actionName); err != nil {
+		return err
+	}
+	if err := parseStringAttribute(attrContent, "permissions", &action.Permissions, actionName); err != nil {
+		return err
+	}
+	if err := parseStringAttribute(attrContent, "owner", &action.Owner, actionName); err != nil {
+		return err
+	}
+	if err := parseStringAttribute(attrContent, "group", &action.Group, actionName); err != nil {
+		return err
+	}
+
+	// Parse file sync specific fields
+	if err := parseStringAttribute(attrContent, "sync_source", &action.SyncSource, actionName); err != nil {
+		return err
+	}
+	if err := parseStringAttribute(attrContent, "sync_destination", &action.SyncDestination, actionName); err != nil {
+		return err
+	}
+	if err := parseBoolAttribute(attrContent, "sync_delete", &action.SyncDelete, actionName); err != nil {
+		return err
+	}
+	if err := parseBoolAttribute(attrContent, "sync_preserve", &action.SyncPreserve, actionName); err != nil {
 		return err
 	}
 
@@ -811,19 +863,232 @@ func (ae *ActionExecutor) runCommandAction(ctx context.Context, action *schemas.
 
 // executeTemplateDeployAction executes a template deploy action
 func (ae *ActionExecutor) runTemplateDeployAction(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
-	// This is a placeholder implementation
-	// In a full implementation, we'd:
-	// 1. Render the template with variables
-	// 2. Upload the rendered file to the destination
-	// 3. Set permissions and ownership if specified
-	return fmt.Errorf("template_deploy action not yet implemented")
+	logger := logging.GetGlobalLogger()
+	logger.Info("📄 Executing template_deploy action",
+		slog.String("source", action.Source),
+		slog.String("destination", action.Destination),
+		slog.String("machine", machine.Hostname))
+
+	// Validate required fields
+	if action.Source == "" {
+		return fmt.Errorf("template_deploy action requires a source field")
+	}
+	if action.Destination == "" {
+		return fmt.Errorf("template_deploy action requires a destination field")
+	}
+
+	// Load variables configuration for template rendering
+	variables, err := loadVariablesConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load variables configuration: %w", err)
+	}
+
+	// Create template context
+	templateContext := &templates.TemplateContext{
+		Variables: variables,
+		Machines:  make(map[string]interface{}),
+		Facts:     make(map[string]interface{}),
+		Environment: map[string]string{
+			"HOSTNAME": machine.Hostname,
+			"USER":     machine.User,
+		},
+		Project: map[string]interface{}{
+			"name":        ae.projectConfig.Name,
+			"description": ae.projectConfig.Description,
+		},
+	}
+
+	// Add machine information to context
+	// Note: machine.Variables is not implemented in the current schema
+	// This is a placeholder for future enhancement
+	templateContext.Machines[machine.Hostname] = map[string]interface{}{
+		"hostname": machine.Hostname,
+		"user":     machine.User,
+		"port":     machine.Port,
+	}
+
+	// Create transparent decryptor for template rendering
+	ageEncryption, err := encryption.NewAgeEncryption("", "")
+	if err != nil {
+		logger.Warn("failed to initialize age encryption, continuing without decryption support",
+			slog.String("error", err.Error()))
+		// Continue with nil encryption - template renderer will handle this gracefully
+	}
+
+	transparentDecryptor := encryption.NewTransparentDecryptor(ageEncryption)
+	templateRenderer := templates.NewTemplateRenderer(transparentDecryptor)
+
+	// Validate template if requested
+	if action.Validate {
+		logger.Debug("Validating template syntax", slog.String("template_path", action.Source))
+		if err := templateRenderer.ValidateTemplate(action.Source); err != nil {
+			return fmt.Errorf("template validation failed: %w", err)
+		}
+		logger.Debug("Template validation successful")
+	}
+
+	// Render template
+	logger.Debug("Rendering template", slog.String("template_path", action.Source))
+	renderedContent, err := templateRenderer.RenderTemplate(action.Source, templateContext)
+	if err != nil {
+		return fmt.Errorf("failed to render template: %s: %w", action.Source, err)
+	}
+
+	// Create backup if requested
+	if action.Backup {
+		logger.Debug("Creating backup of existing file", slog.String("destination", action.Destination))
+		backupCmd := fmt.Sprintf("cp %s %s.backup.$(date +%%Y%%m%%d_%%H%%M%%S)", action.Destination, action.Destination)
+		result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, backupCmd)
+		if err != nil {
+			logger.Warn("failed to create backup, continuing with deployment",
+				slog.String("error", err.Error()))
+		} else if result.ExitCode != 0 {
+			logger.Warn("backup command returned non-zero exit code, continuing with deployment",
+				slog.Int("exit_code", result.ExitCode))
+		}
+	}
+
+	// Upload rendered content to destination
+	logger.Debug("Uploading rendered template to destination",
+		slog.String("destination", action.Destination),
+		slog.String("machine", machine.Hostname))
+
+	// For now, we'll use a simplified approach with echo and redirection
+	// In a full implementation, you'd want to use proper SCP or SFTP
+	escapedContent := strings.ReplaceAll(renderedContent, "'", "'\"'\"'")
+	uploadCmd := fmt.Sprintf("echo '%s' > %s", escapedContent, action.Destination)
+
+	result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, uploadCmd)
+	if err != nil {
+		return fmt.Errorf("failed to upload template content: %w", err)
+	}
+
+	if result.ExitCode != 0 {
+		return fmt.Errorf("upload command returned non-zero exit code: %d", result.ExitCode)
+	}
+
+	// Set file attributes (permissions, owner, group)
+	if action.Permissions != "" || action.Owner != "" || action.Group != "" {
+		logger.Debug("Setting file attributes",
+			slog.String("permissions", action.Permissions),
+			slog.String("owner", action.Owner),
+			slog.String("group", action.Group))
+
+		// Set permissions
+		if action.Permissions != "" {
+			chmodCmd := fmt.Sprintf("chmod %s %s", action.Permissions, action.Destination)
+			result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, chmodCmd)
+			if err != nil {
+				logger.Warn("failed to set file permissions", slog.String("error", err.Error()))
+			} else if result.ExitCode != 0 {
+				logger.Warn("chmod command returned non-zero exit code", slog.Int("exit_code", result.ExitCode))
+			}
+		}
+
+		// Set owner
+		if action.Owner != "" {
+			chownCmd := fmt.Sprintf("chown %s %s", action.Owner, action.Destination)
+			result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, chownCmd)
+			if err != nil {
+				logger.Warn("failed to set file owner", slog.String("error", err.Error()))
+			} else if result.ExitCode != 0 {
+				logger.Warn("chown command returned non-zero exit code", slog.Int("exit_code", result.ExitCode))
+			}
+		}
+
+		// Set group
+		if action.Group != "" {
+			chgrpCmd := fmt.Sprintf("chgrp %s %s", action.Group, action.Destination)
+			result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, chgrpCmd)
+			if err != nil {
+				logger.Warn("failed to set file group", slog.String("error", err.Error()))
+			} else if result.ExitCode != 0 {
+				logger.Warn("chgrp command returned non-zero exit code", slog.Int("exit_code", result.ExitCode))
+			}
+		}
+	}
+
+	logger.Info("✅ Template deployed successfully",
+		slog.String("source", action.Source),
+		slog.String("destination", action.Destination),
+		slog.String("machine", machine.Hostname))
+
+	return nil
 }
 
 // executeFileSyncAction executes a file sync action
 func (ae *ActionExecutor) runFileSyncAction(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
-	// This is a placeholder implementation
-	// In a full implementation, we'd use rsync or similar to sync files
-	return fmt.Errorf("file_sync action not yet implemented")
+	if action.SyncSource == "" || action.SyncDestination == "" {
+		return fmt.Errorf("file_sync action requires sync_source and sync_destination fields")
+	}
+
+	logger := logging.GetGlobalLogger()
+	logger.Info("🔄 Starting file synchronization",
+		slog.String("source", action.SyncSource),
+		slog.String("destination", action.SyncDestination),
+		slog.String("machine", machine.Hostname))
+
+	// Create remote sync engine
+	remoteSyncEngine := sync.NewRemoteSyncEngine(ae.sshManager)
+
+	// Determine sync mode based on action configuration
+	syncMode := sync.SyncModeOneWayReplica // Default mode
+	if action.SyncPreserve {
+		syncMode = sync.SyncModeOneWaySafe
+	}
+
+	// Create sync options
+	syncOptions := &sync.RemoteSyncOptions{
+		SyncOptions: &sync.SyncOptions{
+			BlockLength:   sync.DefaultBlockLength,
+			CreateBackup:  true,
+			PreservePerms: action.SyncPreserve,
+			PreserveOwner: false, // Could be configurable
+			PreserveGroup: false, // Could be configurable
+			DryRun:        false,
+			Verbose:       true,
+			SyncMode:      syncMode,
+		},
+		Machine:         machine,
+		ProgressReport:  ae.createProgressReporter(action),
+		ConflictResolve: sync.ConflictResolutionBackup,
+		SyncDelete:      action.SyncDelete,
+	}
+
+	// Determine if this is a local-to-remote or remote-to-local sync
+	// For now, we'll assume local-to-remote (source is local, destination is remote)
+	localPath := action.SyncSource
+	remotePath := action.SyncDestination
+
+	// Validate local path exists
+	if _, err := os.Stat(localPath); os.IsNotExist(err) {
+		return fmt.Errorf("local source path does not exist: %s", localPath)
+	}
+
+	// Perform the synchronization
+	result, err := remoteSyncEngine.SyncRemoteDirectory(ctx, localPath, remotePath, syncOptions)
+	if err != nil {
+		return fmt.Errorf("file synchronization failed: %v", err)
+	}
+
+	// Log results
+	if result.Success {
+		logger.Info("✅ File synchronization completed successfully",
+			slog.String("machine", machine.Hostname),
+			slog.Int64("bytes_transferred", result.BytesTransferred),
+			slog.Int64("bytes_saved", result.BytesSaved),
+			slog.Int("operations", result.Operations))
+
+		if len(result.Conflicts) > 0 {
+			logger.Info("⚠️ Conflicts detected during sync",
+				slog.String("machine", machine.Hostname),
+				slog.Int("conflict_count", len(result.Conflicts)))
+		}
+	} else {
+		return fmt.Errorf("file synchronization failed: %v", result.Error)
+	}
+
+	return nil
 }
 
 // executeServiceControlAction executes a service control action
@@ -848,4 +1113,211 @@ func (ae *ActionExecutor) runServiceControlAction(ctx context.Context, action *s
 	}
 
 	return nil
+}
+
+// loadVariablesConfig loads the variables configuration from variables.hcl
+func loadVariablesConfig() (map[string]interface{}, error) {
+	logger := logging.GetGlobalLogger()
+	logger.Debug("loading variables configuration")
+
+	// Look for variables.hcl in current directory
+	variablesHCLPath := "variables.hcl"
+	if _, err := os.Stat(variablesHCLPath); os.IsNotExist(err) {
+		logger.Debug("variables.hcl not found, using empty variables")
+		return make(map[string]interface{}), nil
+	}
+
+	// Read and parse variables.hcl using the HCL library
+	content, err := os.ReadFile(variablesHCLPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read variables.hcl: %w", err)
+	}
+
+	// Use the simplified validator to parse and validate the variables configuration
+	validator := schemas.NewSimpleValidator()
+	result, err := validator.ValidateHCLContent("variables", string(content))
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate variables.hcl: %w", err)
+	}
+
+	if !result.IsValid {
+		return nil, fmt.Errorf("variables.hcl validation failed: %s", result.Errors[0].Message)
+	}
+
+	// Parse HCL using the library
+	file, diags := hclsyntax.ParseConfig(content, variablesHCLPath, hcl.Pos{Line: 1, Column: 1})
+	if diags.HasErrors() {
+		return nil, fmt.Errorf("failed to parse variables.hcl: %v", diags)
+	}
+
+	// Extract variables block
+	variablesBlock, err := extractVariablesBlock(file)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract variable blocks
+	variables, err := extractVariableBlocks(variablesBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Debug("found variable blocks", slog.Int("count", len(variables.Blocks)))
+
+	// Process variable blocks
+	variablesMap, err := processVariableBlocks(variables)
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Debug("loadVariablesConfig completed", slog.Int("variable_count", len(variablesMap)))
+	return variablesMap, nil
+}
+
+// extractVariablesBlock extracts the variables block from the parsed HCL file
+func extractVariablesBlock(file *hcl.File) (*hcl.Block, error) {
+	// Parse the file body to find variables block
+	body := file.Body
+	content, diags := body.Content(&hcl.BodySchema{
+		Blocks: []hcl.BlockHeaderSchema{
+			{Type: "variables"},
+		},
+	})
+
+	if diags.HasErrors() {
+		return nil, fmt.Errorf("failed to decode variables block: %v", diags)
+	}
+
+	if len(content.Blocks) == 0 {
+		return nil, fmt.Errorf("no variables block found in variables.hcl")
+	}
+
+	return content.Blocks[0], nil
+}
+
+// extractVariableBlocks extracts variable blocks from the variables block
+func extractVariableBlocks(variablesBlock *hcl.Block) (*hcl.BodyContent, error) {
+	// Define schema for variable blocks
+	variableBlockSchema := &hcl.BodySchema{
+		Blocks: []hcl.BlockHeaderSchema{
+			{Type: "variable", LabelNames: []string{"name"}},
+		},
+	}
+
+	// Extract variable blocks
+	content, diags := variablesBlock.Body.Content(variableBlockSchema)
+	if diags.HasErrors() {
+		return nil, fmt.Errorf("failed to decode variable blocks: %v", diags)
+	}
+
+	return content, nil
+}
+
+// processVariableBlocks processes variable blocks into a map
+func processVariableBlocks(content *hcl.BodyContent) (map[string]interface{}, error) {
+	variables := make(map[string]interface{})
+
+	for _, block := range content.Blocks {
+		variableName := block.Labels[0]
+		logger := logging.GetGlobalLogger()
+		logger.Debug("processing variable", slog.String("variable_name", variableName))
+
+		// Extract variable attributes
+		variableAttrContent, err := extractVariableAttributes(block)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode variable %s attributes: %v", variableName, err)
+		}
+
+		// Parse variable attributes
+		variableValue, err := parseVariableAttributes(variableAttrContent, variableName)
+		if err != nil {
+			return nil, err
+		}
+
+		variables[variableName] = variableValue
+		logger.Debug("successfully parsed variable",
+			slog.String("variable_name", variableName),
+			slog.String("value_type", fmt.Sprintf("%T", variableValue)))
+	}
+
+	return variables, nil
+}
+
+// extractVariableAttributes extracts attributes from a variable block
+func extractVariableAttributes(variableBlock *hcl.Block) (*hcl.BodyContent, error) {
+	// Define schema for variable attributes
+	variableAttrSchema := &hcl.BodySchema{
+		Attributes: []hcl.AttributeSchema{
+			{Name: "value", Required: false},
+			{Name: "encrypted_value", Required: false},
+			{Name: "description", Required: false},
+			{Name: "encrypted", Required: false},
+		},
+	}
+
+	// Extract variable attributes
+	content, diags := variableBlock.Body.Content(variableAttrSchema)
+	if diags.HasErrors() {
+		return nil, fmt.Errorf("failed to decode variable attributes: %v", diags)
+	}
+
+	return content, nil
+}
+
+// parseVariableAttributes parses all attributes for a variable
+func parseVariableAttributes(attrContent *hcl.BodyContent, variableName string) (interface{}, error) {
+	// Check for encrypted_value first (highest priority)
+	if attr, exists := attrContent.Attributes["encrypted_value"]; exists {
+		var encryptedValue map[string]interface{}
+		if err := gohcl.DecodeExpression(attr.Expr, nil, &encryptedValue); err != nil {
+			return nil, fmt.Errorf("failed to decode encrypted_value for variable %s: %v", variableName, err)
+		}
+		return encryptedValue, nil
+	}
+
+	// Check for plain value
+	if attr, exists := attrContent.Attributes["value"]; exists {
+		var value interface{}
+		if err := gohcl.DecodeExpression(attr.Expr, nil, &value); err != nil {
+			return nil, fmt.Errorf("failed to decode value for variable %s: %v", variableName, err)
+		}
+		return value, nil
+	}
+
+	// Check for description
+	if attr, exists := attrContent.Attributes["description"]; exists {
+		var description string
+		if err := gohcl.DecodeExpression(attr.Expr, nil, &description); err != nil {
+			return nil, fmt.Errorf("failed to decode description for variable %s: %v", variableName, err)
+		}
+		return description, nil
+	}
+
+	// Return empty string if no value found
+	return "", nil
+}
+
+// createProgressReporter creates a progress reporting function for file synchronization
+func (ae *ActionExecutor) createProgressReporter(action *schemas.ActionsActionV1) func(progress *sync.SyncProgress) {
+	return func(progress *sync.SyncProgress) {
+		logger := logging.GetGlobalLogger()
+
+		// Calculate percentage
+		if progress.TotalFiles > 0 {
+			progress.Percentage = float64(progress.FilesProcessed) / float64(progress.TotalFiles) * 100
+		}
+
+		// Log progress at appropriate intervals
+		if progress.FilesProcessed%10 == 0 || progress.FilesProcessed == progress.TotalFiles {
+			logger.Info("🔄 File sync progress",
+				slog.String("action", action.Description),
+				slog.String("current_file", progress.CurrentFile),
+				slog.String("operation", progress.CurrentOperation),
+				slog.Int("files_processed", progress.FilesProcessed),
+				slog.Int("total_files", progress.TotalFiles),
+				slog.Float64("percentage", progress.Percentage),
+				slog.Int64("bytes_transferred", progress.BytesTransferred),
+				slog.Int64("bytes_saved", progress.BytesSaved))
+		}
+	}
 }

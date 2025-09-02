@@ -256,3 +256,22 @@ func (sm *SimpleSSHManager) UploadFileToMachine(ctx context.Context, machine *sc
 
 	return nil
 }
+
+// GetSSHClient gets an SSH client for a specific machine
+func (sm *SimpleSSHManager) GetSSHClient(hostname string, machine *schemas.MachinesMachineV1) (*SSHClient, error) {
+	// Create SSH config
+	sshConfig := sm.createSSHConfig(machine)
+
+	// Set up authentication
+	if err := sm.setupAuthentication(sshConfig, machine); err != nil {
+		return nil, errors.Wrap(err, "failed to setup authentication")
+	}
+
+	// Create and return SSH client
+	client, err := NewSSHClient(sshConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create SSH client")
+	}
+
+	return client, nil
+}
