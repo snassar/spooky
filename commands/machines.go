@@ -23,7 +23,7 @@ import (
 
 var (
 	machinesCmd = &cobra.Command{
-		Use:   "machines",
+		Use:   ResourceTypeMachines,
 		Short: "Manage and interact with remote machines",
 		Long: `Manage and interact with remote machines defined in your project configuration.
 
@@ -151,7 +151,7 @@ func getMachinesWithNames() ([]MachineWithName, error) {
 	schema := &hcl.BodySchema{
 		Blocks: []hcl.BlockHeaderSchema{
 			{
-				Type:       "machines",
+				Type:       ResourceTypeMachines,
 				LabelNames: []string{},
 			},
 		},

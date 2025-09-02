@@ -132,7 +132,7 @@ func (t *Transformer) TransformMachine(machine map[string]interface{}) (map[stri
 
 	for key, value := range machine {
 		switch key {
-		case "variables":
+		case ResourceTypeVariables:
 			// Transform machine variables
 			if variablesMap, ok := value.(map[string]interface{}); ok {
 				transformedVariables, err := t.TransformVariablesMap(variablesMap)
@@ -186,10 +186,20 @@ func (t *Transformer) TransformMachinesMap(machines map[string]interface{}) (map
 
 // CreateEncryptedValue creates a structured encrypted value
 func (t *Transformer) CreateEncryptedValue(plaintext string) (map[string]interface{}, error) {
+	// Security-critical: Validate input before encryption
+	if plaintext == "" {
+		return nil, errors.New("cannot encrypt empty plaintext - this could lead to data loss")
+	}
+
 	// Encrypt the plaintext
 	encryptedArmored, err := t.ageEncryption.Encrypt(plaintext)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to encrypt value")
+		return nil, errors.Wrap(err, "failed to encrypt value - encryption operation failed")
+	}
+
+	// Security-critical: Validate encrypted result
+	if encryptedArmored == "" {
+		return nil, errors.New("encryption produced empty result - this may indicate a security issue")
 	}
 
 	// Extract the base64 content (remove headers and footers)
@@ -203,6 +213,11 @@ func (t *Transformer) CreateEncryptedValue(plaintext string) (map[string]interfa
 			line != "" {
 			base64Content = append(base64Content, line)
 		}
+	}
+
+	// Security-critical: Validate extracted content
+	if len(base64Content) == 0 {
+		return nil, errors.New("failed to extract encrypted content - encryption result is malformed")
 	}
 
 	data := strings.Join(base64Content, "")

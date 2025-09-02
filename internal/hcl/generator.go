@@ -15,6 +15,9 @@ type HCLGenerator struct {
 	// Configuration options
 	UseDefaults bool // Whether to include fields with default values
 	IndentSize  int  // Number of spaces for indentation
+
+	// Shared utilities
+	sharedUtils *SharedHCLUtils
 }
 
 // NewHCLGenerator creates a new HCL generator with default settings
@@ -22,6 +25,7 @@ func NewHCLGenerator() *HCLGenerator {
 	return &HCLGenerator{
 		UseDefaults: true,
 		IndentSize:  2,
+		sharedUtils: NewSharedHCLUtils(),
 	}
 }
 
@@ -97,110 +101,143 @@ func (hg *HCLGenerator) structToCty(config interface{}) (cty.Value, error) {
 func (hg *HCLGenerator) fieldToCty(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
 	switch field.Kind() {
 	case reflect.Ptr:
-		// Handle pointers
-		if field.IsNil() {
-			// Check if there's a default value in the tag
-			if defaultValue := fieldType.Tag.Get("default"); defaultValue != "" {
-				return hg.parseDefaultValue(defaultValue, fieldType)
-			}
-			return cty.NilVal, nil
-		}
-		return hg.fieldToCty(field.Elem(), fieldType)
+		return hg.handlePointerField(field, fieldType)
 	case reflect.String:
-		value := field.String()
-		if value == "" {
-			// Check for default value
-			if defaultValue := fieldType.Tag.Get("default"); defaultValue != "" {
-				return cty.StringVal(defaultValue), nil
-			}
-		}
-		return cty.StringVal(value), nil
+		return hg.handleStringField(field, fieldType)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		value := field.Int()
-		if value == 0 {
-			// Check for default value
-			if defaultValue := fieldType.Tag.Get("default"); defaultValue != "" {
-				return hg.parseDefaultValue(defaultValue, fieldType)
-			}
-		}
-		return cty.NumberIntVal(value), nil
+		return hg.handleIntField(field, fieldType)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		value := field.Uint()
-		if value == 0 {
-			// Check for default value
-			if defaultValue := fieldType.Tag.Get("default"); defaultValue != "" {
-				return hg.parseDefaultValue(defaultValue, fieldType)
-			}
-		}
-		return cty.NumberUIntVal(value), nil
+		return hg.handleUintField(field, fieldType)
 	case reflect.Float32, reflect.Float64:
-		value := field.Float()
-		if value == 0 {
-			// Check for default value
-			if defaultValue := fieldType.Tag.Get("default"); defaultValue != "" {
-				return hg.parseDefaultValue(defaultValue, fieldType)
-			}
-		}
-		return cty.NumberFloatVal(value), nil
+		return hg.handleFloatField(field, fieldType)
 	case reflect.Bool:
-		value := field.Bool()
-		if !value {
-			// Check for default value
-			if defaultValue := fieldType.Tag.Get("default"); defaultValue != "" {
-				return hg.parseDefaultValue(defaultValue, fieldType)
-			}
-		}
-		return cty.BoolVal(value), nil
+		return hg.handleBoolField(field, fieldType)
 	case reflect.Struct:
-		// Handle nested structs
-		if field.CanInterface() {
-			return hg.structToCty(field.Interface())
-		}
-		return cty.NilVal, fmt.Errorf("cannot convert unexported struct field")
+		return hg.handleStructField(field)
 	case reflect.Slice:
-		// Handle slices
-		if field.Len() == 0 {
-			return cty.ListValEmpty(cty.String), nil
-		}
-
-		values := make([]cty.Value, field.Len())
-		for i := 0; i < field.Len(); i++ {
-			val, err := hg.fieldToCty(field.Index(i), fieldType)
-			if err != nil {
-				return cty.NilVal, err
-			}
-			values[i] = val
-		}
-		return cty.ListVal(values), nil
+		return hg.handleSliceField(field, fieldType)
 	case reflect.Map:
-		// Handle maps
-		if field.Len() == 0 {
-			return cty.MapValEmpty(cty.String), nil
-		}
-
-		valueMap := make(map[string]cty.Value)
-		iter := field.MapRange()
-		for iter.Next() {
-			key := iter.Key().String()
-			val, err := hg.fieldToCty(iter.Value(), fieldType)
-			if err != nil {
-				return cty.NilVal, err
-			}
-			valueMap[key] = val
-		}
-		return cty.MapVal(valueMap), nil
-	case reflect.Interface:
-		// Handle interface{} types
-		if field.IsNil() {
-			return cty.NilVal, nil
-		}
-
-		// Get the concrete value
-		concreteValue := field.Elem()
-		return hg.fieldToCty(concreteValue, fieldType)
+		return hg.handleMapField(field, fieldType)
 	default:
-		return cty.NilVal, fmt.Errorf("unsupported field type: %s", field.Kind())
+		return cty.NilVal, fmt.Errorf("unsupported field type: %v", field.Kind())
 	}
+}
+
+// handlePointerField handles pointer type fields
+func (hg *HCLGenerator) handlePointerField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+	if field.IsNil() {
+		// Check if there's a default value in the tag
+		if defaultValue := fieldType.Tag.Get("default"); defaultValue != "" {
+			return hg.parseDefaultValue(defaultValue, fieldType)
+		}
+		return cty.NilVal, nil
+	}
+	return hg.fieldToCty(field.Elem(), fieldType)
+}
+
+// handleStringField handles string type fields
+func (hg *HCLGenerator) handleStringField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+	value := field.String()
+	if value == "" {
+		// Check for default value
+		if defaultValue := fieldType.Tag.Get("default"); defaultValue != "" {
+			return cty.StringVal(defaultValue), nil
+		}
+	}
+	return cty.StringVal(value), nil
+}
+
+// handleIntField handles integer type fields
+func (hg *HCLGenerator) handleIntField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+	value := field.Int()
+	if value == 0 {
+		// Check for default value
+		if defaultValue := fieldType.Tag.Get("default"); defaultValue != "" {
+			return hg.parseDefaultValue(defaultValue, fieldType)
+		}
+	}
+	return cty.NumberIntVal(value), nil
+}
+
+// handleUintField handles unsigned integer type fields
+func (hg *HCLGenerator) handleUintField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+	value := field.Uint()
+	if value == 0 {
+		// Check for default value
+		if defaultValue := fieldType.Tag.Get("default"); defaultValue != "" {
+			return hg.parseDefaultValue(defaultValue, fieldType)
+		}
+	}
+	return cty.NumberUIntVal(value), nil
+}
+
+// handleFloatField handles float type fields
+func (hg *HCLGenerator) handleFloatField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+	value := field.Float()
+	if value == 0 {
+		// Check for default value
+		if defaultValue := fieldType.Tag.Get("default"); defaultValue != "" {
+			return hg.parseDefaultValue(defaultValue, fieldType)
+		}
+	}
+	return cty.NumberFloatVal(value), nil
+}
+
+// handleBoolField handles boolean type fields
+func (hg *HCLGenerator) handleBoolField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+	value := field.Bool()
+	if !value {
+		// Check for default value
+		if defaultValue := fieldType.Tag.Get("default"); defaultValue != "" {
+			return hg.parseDefaultValue(defaultValue, fieldType)
+		}
+	}
+	return cty.BoolVal(value), nil
+}
+
+// handleStructField handles struct type fields
+func (hg *HCLGenerator) handleStructField(field reflect.Value) (cty.Value, error) {
+	// Handle nested structs
+	if field.CanInterface() {
+		return hg.structToCty(field.Interface())
+	}
+	return cty.NilVal, fmt.Errorf("cannot convert unexported struct field")
+}
+
+// handleSliceField handles slice type fields
+func (hg *HCLGenerator) handleSliceField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+	if field.Len() == 0 {
+		return cty.ListValEmpty(cty.String), nil
+	}
+
+	values := make([]cty.Value, field.Len())
+	for i := 0; i < field.Len(); i++ {
+		val, err := hg.fieldToCty(field.Index(i), fieldType)
+		if err != nil {
+			return cty.NilVal, err
+		}
+		values[i] = val
+	}
+	return cty.ListVal(values), nil
+}
+
+// handleMapField handles map type fields
+func (hg *HCLGenerator) handleMapField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+	if field.Len() == 0 {
+		return cty.MapValEmpty(cty.String), nil
+	}
+
+	valueMap := make(map[string]cty.Value)
+	iter := field.MapRange()
+	for iter.Next() {
+		key := iter.Key().String()
+		val, err := hg.fieldToCty(iter.Value(), fieldType)
+		if err != nil {
+			return cty.NilVal, err
+		}
+		valueMap[key] = val
+	}
+	return cty.MapVal(valueMap), nil
 }
 
 // parseDefaultValue parses a default value string based on the field type
@@ -262,64 +299,7 @@ func (hg *HCLGenerator) shouldIncludeField(field reflect.Value, fieldType reflec
 
 // ctyValueToHCL converts a cty.Value to HCL and writes it to the body
 func (hg *HCLGenerator) ctyValueToHCL(value cty.Value, body *hclwrite.Body, blockName string) error {
-	if !value.IsKnown() {
-		return fmt.Errorf("cannot convert unknown value to HCL")
-	}
-
-	if value.IsNull() {
-		return nil
-	}
-
-	valueType := value.Type()
-	if valueType.IsObjectType() {
-		// Create a block for objects
-		block := body.AppendNewBlock(blockName, nil)
-		blockBody := block.Body()
-
-		// Add each field to the block
-		for key, val := range value.AsValueMap() {
-			if !val.IsNull() {
-				err := hg.ctyValueToHCL(val, blockBody, key)
-				if err != nil {
-					return fmt.Errorf("failed to convert field %s: %v", key, err)
-				}
-			}
-		}
-
-	} else if valueType.IsListType() {
-		// Handle lists by creating blocks for each element
-		values := value.AsValueSlice()
-		for _, val := range values {
-			if !val.IsNull() {
-				err := hg.ctyValueToHCL(val, body, blockName)
-				if err != nil {
-					return fmt.Errorf("failed to convert list element: %v", err)
-				}
-			}
-		}
-
-	} else if valueType.IsMapType() {
-		// Handle maps by creating blocks for each key-value pair
-		valueMap := value.AsValueMap()
-		for key, val := range valueMap {
-			if !val.IsNull() {
-				// For maps, we create a block with the key as the label
-				block := body.AppendNewBlock(blockName, []string{key})
-				blockBody := block.Body()
-
-				err := hg.ctyValueToHCL(val, blockBody, "")
-				if err != nil {
-					return fmt.Errorf("failed to convert map value for key %s: %v", key, err)
-				}
-			}
-		}
-
-	} else {
-		// For primitive types, set as attribute
-		body.SetAttributeValue(blockName, value)
-	}
-
-	return nil
+	return hg.sharedUtils.CtyValueToHCL(value, body, blockName)
 }
 
 // GenerateHCL is a convenience function for quick HCL generation

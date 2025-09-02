@@ -9,6 +9,22 @@ import (
 	"spooky/internal/schemas"
 )
 
+// Validation context constants to avoid repeated string literals
+const (
+	ValidationContextSchema    = "Schema validation"
+	ValidationContextProject   = "Project configuration validation"
+	ValidationContextMachines  = "Machines validation"
+	ValidationContextActions   = "Actions validation"
+	ValidationContextVariables = "Variables validation"
+)
+
+// Resource type constants to avoid repeated string literals
+const (
+	ResourceTypeMachines  = "machines"
+	ResourceTypeActions   = "actions"
+	ResourceTypeVariables = "variables"
+)
+
 // ProjectValidator validates spooky projects with comprehensive error collection
 type ProjectValidator struct {
 	result *schemas.ValidationResult
@@ -111,10 +127,22 @@ func (pv *ProjectValidator) validateProjectDirectoryWithSchema(projectDir map[st
 	pv.validateAlternativeConfigurations(targetDir)
 }
 
+// convertToSchema is a generic function that converts items to schema format
+func (pv *ProjectValidator) convertToSchema(items []string, expectedItems map[string]map[string]interface{}) []map[string]interface{} {
+	var schemaItems []map[string]interface{}
+
+	// Add found items to schema
+	for _, itemName := range items {
+		if expectedItem, exists := expectedItems[itemName]; exists {
+			schemaItems = append(schemaItems, expectedItem)
+		}
+	}
+
+	return schemaItems
+}
+
 // convertFilesToSchema converts file names to schema format
 func (pv *ProjectValidator) convertFilesToSchema(files []string) []map[string]interface{} {
-	var schemaFiles []map[string]interface{}
-
 	// Define expected files based on schema
 	expectedFiles := map[string]map[string]interface{}{
 		"project.hcl": {
@@ -154,20 +182,11 @@ func (pv *ProjectValidator) convertFilesToSchema(files []string) []map[string]in
 		},
 	}
 
-	// Add found files to schema
-	for _, fileName := range files {
-		if expectedFile, exists := expectedFiles[fileName]; exists {
-			schemaFiles = append(schemaFiles, expectedFile)
-		}
-	}
-
-	return schemaFiles
+	return pv.convertToSchema(files, expectedFiles)
 }
 
 // convertDirectoriesToSchema converts directory names to schema format
 func (pv *ProjectValidator) convertDirectoriesToSchema(directories []string) []map[string]interface{} {
-	var schemaDirs []map[string]interface{}
-
 	// Define expected directories based on schema
 	expectedDirs := map[string]map[string]interface{}{
 		"machines": {
@@ -207,54 +226,53 @@ func (pv *ProjectValidator) convertDirectoriesToSchema(directories []string) []m
 		},
 	}
 
-	// Add found directories to schema
-	for _, dirName := range directories {
-		if expectedDir, exists := expectedDirs[dirName]; exists {
-			schemaDirs = append(schemaDirs, expectedDir)
-		}
-	}
-
-	return schemaDirs
+	return pv.convertToSchema(directories, expectedDirs)
 }
 
 // validateAlternativeConfigurations validates that at least one configuration option exists for each type
 func (pv *ProjectValidator) validateAlternativeConfigurations(targetDir string) {
-	// Check for machines configuration (either file or directory)
-	machinesHCLPath := filepath.Join(targetDir, "machines.hcl")
-	machinesDirPath := filepath.Join(targetDir, "machines")
-
-	if _, err := os.Stat(machinesHCLPath); os.IsNotExist(err) {
-		if _, err := os.Stat(machinesDirPath); os.IsNotExist(err) {
-			pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
-				Message: "either machines.hcl file or machines/ directory must exist",
-				File:    targetDir,
-				Context: "Project structure validation",
-			})
-		}
+	// Define resource types to validate
+	resourceTypes := []struct {
+		name         string
+		filePath     string
+		dirPath      string
+		resourceType string
+	}{
+		{
+			name:         "machines",
+			filePath:     "machines.hcl",
+			dirPath:      ResourceTypeMachines,
+			resourceType: "machines",
+		},
+		{
+			name:         "actions",
+			filePath:     "actions.hcl",
+			dirPath:      ResourceTypeActions,
+			resourceType: "actions",
+		},
+		{
+			name:         "variables",
+			filePath:     "variables.hcl",
+			dirPath:      ResourceTypeVariables,
+			resourceType: "variables",
+		},
 	}
 
-	// Check for actions configuration (either file or directory)
-	actionsHCLPath := filepath.Join(targetDir, "actions.hcl")
-	actionsDirPath := filepath.Join(targetDir, "actions")
-
-	if _, err := os.Stat(actionsHCLPath); os.IsNotExist(err) {
-		if _, err := os.Stat(actionsDirPath); os.IsNotExist(err) {
-			pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
-				Message: "either actions.hcl file or actions/ directory must exist",
-				File:    targetDir,
-				Context: "Project structure validation",
-			})
-		}
+	// Validate each resource type
+	for _, resource := range resourceTypes {
+		pv.validateResourceType(targetDir, resource.name, resource.filePath, resource.dirPath, resource.resourceType)
 	}
+}
 
-	// Check for variables configuration (either file or directory)
-	variablesHCLPath := filepath.Join(targetDir, "variables.hcl")
-	variablesDirPath := filepath.Join(targetDir, "variables")
+// validateResourceType validates that a specific resource type has either a file or directory configuration
+func (pv *ProjectValidator) validateResourceType(targetDir, name, filePath, dirPath, resourceType string) {
+	hclPath := filepath.Join(targetDir, filePath)
+	dirPathFull := filepath.Join(targetDir, dirPath)
 
-	if _, err := os.Stat(variablesHCLPath); os.IsNotExist(err) {
-		if _, err := os.Stat(variablesDirPath); os.IsNotExist(err) {
+	if _, err := os.Stat(hclPath); os.IsNotExist(err) {
+		if _, err := os.Stat(dirPathFull); os.IsNotExist(err) {
 			pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
-				Message: "either variables.hcl file or variables/ directory must exist",
+				Message: fmt.Sprintf("either %s file or %s/ directory must exist", filePath, resourceType),
 				File:    targetDir,
 				Context: "Project structure validation",
 			})
@@ -293,7 +311,7 @@ func (pv *ProjectValidator) validateProjectConfig(targetDir string) {
 		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
 			Message: fmt.Sprintf("failed to read project.hcl: %v", err),
 			File:    projectHCLPath,
-			Context: "Project configuration validation",
+			Context: ValidationContextProject,
 		})
 		return
 	}
@@ -304,7 +322,7 @@ func (pv *ProjectValidator) validateProjectConfig(targetDir string) {
 		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
 			Message: fmt.Sprintf("project.hcl schema validation failed: %v", err),
 			File:    projectHCLPath,
-			Context: "Project configuration validation",
+			Context: ValidationContextProject,
 		})
 		return
 	}
@@ -313,13 +331,13 @@ func (pv *ProjectValidator) validateProjectConfig(targetDir string) {
 		// Add schema validation errors with file context
 		for _, schemaErr := range result.Errors {
 			schemaErr.File = projectHCLPath
-			schemaErr.Context = "Schema validation"
+			schemaErr.Context = ValidationContextSchema
 			pv.result.Errors = append(pv.result.Errors, schemaErr)
 		}
 
 		for _, schemaWarning := range result.Warnings {
 			schemaWarning.File = projectHCLPath
-			schemaWarning.Context = "Schema validation"
+			schemaWarning.Context = ValidationContextSchema
 			pv.result.Warnings = append(pv.result.Warnings, schemaWarning)
 		}
 	}
@@ -328,7 +346,7 @@ func (pv *ProjectValidator) validateProjectConfig(targetDir string) {
 // validateMachines validates machine configurations
 func (pv *ProjectValidator) validateMachines(projectPath string) {
 	machinesHCLPath := filepath.Join(projectPath, "machines.hcl")
-	machinesDirPath := filepath.Join(projectPath, "machines")
+	machinesDirPath := filepath.Join(projectPath, ResourceTypeMachines)
 
 	// Always validate machines.hcl if it exists
 	if _, err := os.Stat(machinesHCLPath); err == nil {
@@ -341,25 +359,25 @@ func (pv *ProjectValidator) validateMachines(projectPath string) {
 	}
 }
 
-// validateMachinesFile validates a single machines.hcl file
-func (pv *ProjectValidator) validateMachinesFile(filePath string) {
+// validateHCLFile is a generic function to validate HCL files with a given schema type
+func (pv *ProjectValidator) validateHCLFile(filePath, schemaType, context string) {
 	validator := schemas.NewSimpleValidator()
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
 			Message: fmt.Sprintf("failed to read %s: %v", filepath.Base(filePath), err),
 			File:    filePath,
-			Context: "Machines validation",
+			Context: context,
 		})
 		return
 	}
 
-	result, err := validator.ValidateHCLContent("machines", string(content))
+	result, err := validator.ValidateHCLContent(schemaType, string(content))
 	if err != nil {
 		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
 			Message: fmt.Sprintf("schema validation failed: %v", err),
 			File:    filePath,
-			Context: "Machines validation",
+			Context: context,
 		})
 		return
 	}
@@ -367,10 +385,15 @@ func (pv *ProjectValidator) validateMachinesFile(filePath string) {
 	if !result.IsValid {
 		for _, schemaErr := range result.Errors {
 			schemaErr.File = filePath
-			schemaErr.Context = "Schema validation"
+			schemaErr.Context = context
 			pv.result.Errors = append(pv.result.Errors, schemaErr)
 		}
 	}
+}
+
+// validateMachinesFile validates a single machines.hcl file
+func (pv *ProjectValidator) validateMachinesFile(filePath string) {
+	pv.validateHCLFile(filePath, ResourceTypeMachines, ValidationContextMachines)
 }
 
 // validateMachinesDirectory validates all .hcl files in the machines directory
@@ -380,7 +403,7 @@ func (pv *ProjectValidator) validateMachinesDirectory(dirPath string) {
 		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
 			Message: fmt.Sprintf("failed to read machines directory: %v", err),
 			File:    dirPath,
-			Context: "Machines validation",
+			Context: ValidationContextMachines,
 		})
 		return
 	}
@@ -396,7 +419,7 @@ func (pv *ProjectValidator) validateMachinesDirectory(dirPath string) {
 // validateActions validates action configurations
 func (pv *ProjectValidator) validateActions(projectPath string) {
 	actionsHCLPath := filepath.Join(projectPath, "actions.hcl")
-	actionsDirPath := filepath.Join(projectPath, "actions")
+	actionsDirPath := filepath.Join(projectPath, ResourceTypeActions)
 
 	// Always validate actions.hcl if it exists
 	if _, err := os.Stat(actionsHCLPath); err == nil {
@@ -411,34 +434,7 @@ func (pv *ProjectValidator) validateActions(projectPath string) {
 
 // validateActionsFile validates a single actions.hcl file
 func (pv *ProjectValidator) validateActionsFile(filePath string) {
-	validator := schemas.NewSimpleValidator()
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
-			Message: fmt.Sprintf("failed to read %s: %v", filepath.Base(filePath), err),
-			File:    filePath,
-			Context: "Actions validation",
-		})
-		return
-	}
-
-	result, err := validator.ValidateHCLContent("actions", string(content))
-	if err != nil {
-		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
-			Message: fmt.Sprintf("schema validation failed: %v", err),
-			File:    filePath,
-			Context: "Actions validation",
-		})
-		return
-	}
-
-	if !result.IsValid {
-		for _, schemaErr := range result.Errors {
-			schemaErr.File = filePath
-			schemaErr.Context = "Schema validation"
-			pv.result.Errors = append(pv.result.Errors, schemaErr)
-		}
-	}
+	pv.validateHCLFile(filePath, ResourceTypeActions, ValidationContextActions)
 }
 
 // validateActionsDirectory validates all .hcl files in the actions directory
@@ -448,7 +444,7 @@ func (pv *ProjectValidator) validateActionsDirectory(dirPath string) {
 		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
 			Message: fmt.Sprintf("failed to read actions directory: %v", err),
 			File:    dirPath,
-			Context: "Actions validation",
+			Context: ValidationContextActions,
 		})
 		return
 	}
@@ -464,7 +460,7 @@ func (pv *ProjectValidator) validateActionsDirectory(dirPath string) {
 // validateVariablesConfig validates variable configurations
 func (pv *ProjectValidator) validateVariablesConfig(projectPath string) {
 	variablesHCLPath := filepath.Join(projectPath, "variables.hcl")
-	variablesDirPath := filepath.Join(projectPath, "variables")
+	variablesDirPath := filepath.Join(projectPath, ResourceTypeVariables)
 
 	// Always validate variables.hcl if it exists
 	if _, err := os.Stat(variablesHCLPath); err == nil {
@@ -479,34 +475,7 @@ func (pv *ProjectValidator) validateVariablesConfig(projectPath string) {
 
 // validateVariablesFile validates a single variables.hcl file
 func (pv *ProjectValidator) validateVariablesFile(filePath string) {
-	validator := schemas.NewSimpleValidator()
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
-			Message: fmt.Sprintf("failed to read %s: %v", filepath.Base(filePath), err),
-			File:    filePath,
-			Context: "Variables validation",
-		})
-		return
-	}
-
-	result, err := validator.ValidateHCLContent("variables", string(content))
-	if err != nil {
-		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
-			Message: fmt.Sprintf("schema validation failed: %v", err),
-			File:    filePath,
-			Context: "Variables validation",
-		})
-		return
-	}
-
-	if !result.IsValid {
-		for _, schemaErr := range result.Errors {
-			schemaErr.File = filePath
-			schemaErr.Context = "Schema validation"
-			pv.result.Errors = append(pv.result.Errors, schemaErr)
-		}
-	}
+	pv.validateHCLFile(filePath, ResourceTypeVariables, ValidationContextVariables)
 }
 
 // validateVariablesDirectory validates all .hcl files in the variables directory
@@ -516,7 +485,7 @@ func (pv *ProjectValidator) validateVariablesDirectory(dirPath string) {
 		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
 			Message: fmt.Sprintf("failed to read variables directory: %v", err),
 			File:    dirPath,
-			Context: "Variables validation",
+			Context: ValidationContextVariables,
 		})
 		return
 	}

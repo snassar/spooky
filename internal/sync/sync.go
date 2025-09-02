@@ -299,6 +299,26 @@ func syncOneWaySafe(sourcePath, targetPath string, options *SyncOptions, result 
 	return result, nil
 }
 
+// combineSyncResults combines results from two sync operations
+func combineSyncResults(source, target *FileSyncResult) *FileSyncResult {
+	return &FileSyncResult{
+		BytesTransferred: source.BytesTransferred + target.BytesTransferred,
+		BytesSaved:       source.BytesSaved + target.BytesSaved,
+		Operations:       source.Operations + target.Operations,
+		Conflicts:        append(source.Conflicts, target.Conflicts...),
+		Success:          true,
+	}
+}
+
+// applyCombinedResults applies combined results to the target result struct
+func applyCombinedResults(result *FileSyncResult, combined *FileSyncResult) {
+	result.BytesTransferred = combined.BytesTransferred
+	result.BytesSaved = combined.BytesSaved
+	result.Operations = combined.Operations
+	result.Conflicts = combined.Conflicts
+	result.Success = combined.Success
+}
+
 // syncTwoWaySafe performs bidirectional sync with conflict detection
 // Both endpoints can modify, conflicts are detected and preserved
 func syncTwoWaySafe(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
@@ -326,12 +346,9 @@ func syncTwoWaySafe(sourcePath, targetPath string, options *SyncOptions, result 
 		return result, err
 	}
 
-	// Combine results
-	result.BytesTransferred = sourceToTarget.BytesTransferred + targetToSource.BytesTransferred
-	result.BytesSaved = sourceToTarget.BytesSaved + targetToSource.BytesSaved
-	result.Operations = sourceToTarget.Operations + targetToSource.Operations
-	result.Conflicts = append(sourceToTarget.Conflicts, targetToSource.Conflicts...)
-	result.Success = true
+	// Combine results using helper function
+	combined := combineSyncResults(sourceToTarget, targetToSource)
+	applyCombinedResults(result, combined)
 
 	return result, nil
 }
@@ -363,12 +380,9 @@ func syncTwoWayResolved(sourcePath, targetPath string, options *SyncOptions, res
 		return result, err
 	}
 
-	// Combine results
-	result.BytesTransferred = sourceToTarget.BytesTransferred + targetToSource.BytesTransferred
-	result.BytesSaved = sourceToTarget.BytesSaved + targetToSource.BytesSaved
-	result.Operations = sourceToTarget.Operations + targetToSource.Operations
-	result.Conflicts = append(sourceToTarget.Conflicts, targetToSource.Conflicts...)
-	result.Success = true
+	// Combine results using helper function
+	combined := combineSyncResults(sourceToTarget, targetToSource)
+	applyCombinedResults(result, combined)
 
 	return result, nil
 }

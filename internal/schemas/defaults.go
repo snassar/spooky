@@ -215,8 +215,13 @@ func (dcg *DefaultConfigGenerator) extractDefaultTag(field reflect.StructField) 
 	return ""
 }
 
+// ToHCLWithBlockName converts any configuration struct to HCL string with a custom block name
+func (dcg *DefaultConfigGenerator) ToHCLWithBlockName(config interface{}, blockName string) (string, error) {
+	return hcl.GenerateConfigHCL(config, blockName)
+}
+
 // GenerateProjectConfigFromStructs generates a project configuration HCL string from Go structs
-func GenerateProjectConfigFromStructs(name, description string) string {
+func GenerateProjectConfigFromStructs(name, description string) (string, error) {
 	generator := NewDefaultConfigGenerator()
 	config := generator.GetDefaultProjectConfig()
 
@@ -226,8 +231,7 @@ func GenerateProjectConfigFromStructs(name, description string) string {
 
 	hcl, err := hcl.GenerateConfigHCL(config, "project")
 	if err != nil {
-		// This is a critical bug - struct generation should never fail
-		panic(fmt.Sprintf("failed to generate project config from struct: %v", err))
+		return "", fmt.Errorf("failed to generate project config from struct: %w", err)
 	}
 
 	// Convert from project { name = "..." } to project "..." { }
@@ -236,7 +240,7 @@ func GenerateProjectConfigFromStructs(name, description string) string {
 	hcl = strings.Replace(hcl, fmt.Sprintf(`  name = "%s"`, name), "", 1)
 	hcl = strings.Replace(hcl, "project {", fmt.Sprintf(`project "%s" {`, name), 1)
 
-	return hcl
+	return hcl, nil
 }
 
 // GenerateMachinesConfigFromStructs generates a machines configuration HCL string from Go structs
@@ -244,7 +248,7 @@ func GenerateMachinesConfigFromStructs() string {
 	generator := NewDefaultConfigGenerator()
 	config := generator.GetDefaultMachinesConfig()
 
-	hcl, err := hcl.GenerateConfigHCL(config, "machines")
+	hcl, err := hcl.GenerateConfigHCL(config, ResourceTypeMachines)
 	if err != nil {
 		return fmt.Sprintf("machines {\n  # Error generating from struct: %v\n}", err)
 	}
@@ -257,7 +261,7 @@ func GenerateActionsConfigFromStructs() string {
 	generator := NewDefaultConfigGenerator()
 	config := generator.GetDefaultActionsConfig()
 
-	hcl, err := hcl.GenerateConfigHCL(config, "actions")
+	hcl, err := hcl.GenerateConfigHCL(config, ResourceTypeActions)
 	if err != nil {
 		return fmt.Sprintf("actions {\n  # Error generating from struct: %v\n}", err)
 	}
@@ -269,7 +273,7 @@ func GenerateVariablesConfigFromStructs() string {
 	generator := NewDefaultConfigGenerator()
 	config := generator.GetDefaultVariablesConfig()
 
-	hcl, err := hcl.GenerateConfigHCL(config, "variables")
+	hcl, err := hcl.GenerateConfigHCL(config, ResourceTypeVariables)
 	if err != nil {
 		return fmt.Sprintf("variables {\n  # Error generating from struct: %v\n}", err)
 	}

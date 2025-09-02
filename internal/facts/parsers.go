@@ -13,6 +13,39 @@ import (
 )
 
 // ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const (
+	// VirtualizationRoleGuest represents a guest VM role
+	VirtualizationRoleGuest = "guest"
+	// VirtualizationRoleHost represents a host VM role
+	VirtualizationRoleHost = "host"
+
+	// Common file paths
+	ProcScsiScsiPath = "/proc/scsi/scsi"
+	ProcCPUInfoPath  = "/proc/cpuinfo"
+
+	// System types
+	SystemTypeDesktop = "desktop"
+	SystemTypeLaptop  = "laptop"
+	SystemTypeServer  = "server"
+
+	// SELinux related
+	SELinuxConfigPath = "/etc/selinux/config"
+	SELinuxPrefix     = "SELINUX="
+	SELinuxTypePrefix = "SELINUXTYPE="
+
+	// Hardware detection
+	HardwareLaptopIndicator  = "laptop"
+	HardwareDesktopIndicator = "desktop"
+	HardwareServerIndicator  = "server"
+
+	// Network routing
+	DefaultRouteDestination = "00000000"
+)
+
+// ============================================================================
 // COMMAND OUTPUT PARSERS
 // ============================================================================
 
@@ -146,13 +179,13 @@ func (p *SystemFactsParser) parseVirtualization() (map[string]*schemas.FactV1, e
 	virtRole := "host"
 
 	// Check /proc/cpuinfo for hypervisor info
-	if data, err := os.ReadFile("/proc/cpuinfo"); err == nil {
+	if data, err := os.ReadFile(ProcCPUInfoPath); err == nil {
 		scanner := bufio.NewScanner(strings.NewReader(string(data)))
 		for scanner.Scan() {
 			line := scanner.Text()
 			if strings.Contains(line, "hypervisor") {
 				virtType = "kvm"
-				virtRole = "guest"
+				virtRole = VirtualizationRoleGuest
 				break
 			}
 		}
@@ -161,22 +194,22 @@ func (p *SystemFactsParser) parseVirtualization() (map[string]*schemas.FactV1, e
 	// Check for Xen
 	if _, err := os.Stat("/proc/xen"); err == nil {
 		virtType = "xen"
-		virtRole = "guest"
+		virtRole = VirtualizationRoleGuest
 	}
 
 	// Check for VMware
-	if data, err := os.ReadFile("/proc/scsi/scsi"); err == nil {
+	if data, err := os.ReadFile(ProcScsiScsiPath); err == nil {
 		if strings.Contains(string(data), "VMware") {
 			virtType = "vmware"
-			virtRole = "guest"
+			virtRole = VirtualizationRoleGuest
 		}
 	}
 
 	// Check for VirtualBox
-	if data, err := os.ReadFile("/proc/scsi/scsi"); err == nil {
+	if data, err := os.ReadFile(ProcScsiScsiPath); err == nil {
 		if strings.Contains(string(data), "VBOX") {
 			virtType = "virtualbox"
-			virtRole = "guest"
+			virtRole = VirtualizationRoleGuest
 		}
 	}
 
@@ -244,7 +277,7 @@ func (p *HardwareFactsParser) ParseHardwareFacts() map[string]*schemas.FactV1 {
 func (p *HardwareFactsParser) parseCPUInfo() (map[string]*schemas.FactV1, error) {
 	facts := make(map[string]*schemas.FactV1)
 
-	data, err := os.ReadFile("/proc/cpuinfo")
+	data, err := os.ReadFile(ProcCPUInfoPath)
 	if err != nil {
 		return facts, err
 	}
@@ -500,11 +533,11 @@ func (p *HardwareFactsParser) detectFormFactor() string {
 		chassisType := strings.TrimSpace(string(data))
 		switch chassisType {
 		case "1", "2", "3", "4", "5", "6", "7":
-			return "desktop"
+			return SystemTypeDesktop
 		case "8", "9", "10", "11", "12", "13", "14":
-			return "laptop"
+			return SystemTypeLaptop
 		case "15", "16", "17", "18", "19", "20", "21", "22", "23":
-			return "server"
+			return SystemTypeServer
 		case "30", "31", "32", "33", "34":
 			return "tablet"
 		}
@@ -512,17 +545,17 @@ func (p *HardwareFactsParser) detectFormFactor() string {
 
 	// Fallback detection based on system characteristics
 	if _, err := os.Stat("/sys/class/power_supply/BAT0"); err == nil {
-		return "laptop" // Has battery
+		return SystemTypeLaptop // Has battery
 	}
 
 	// Check if it's a server by looking for server-specific indicators
-	if data, err := os.ReadFile("/proc/cpuinfo"); err == nil {
+	if data, err := os.ReadFile(ProcCPUInfoPath); err == nil {
 		if strings.Contains(string(data), "Xeon") || strings.Contains(string(data), "EPYC") {
-			return "server"
+			return SystemTypeServer
 		}
 	}
 
-	return "desktop" // Default fallback
+	return SystemTypeDesktop // Default fallback
 }
 
 // parseLoadAverage parses /proc/loadavg
@@ -744,7 +777,7 @@ func (p *NetworkFactsParser) parseRoutingInfo() (map[string]*schemas.FactV1, err
 				iface := parts[0]
 
 				// Look for default route (destination 00000000)
-				if destination == "00000000" && gateway != "00000000" {
+				if destination == DefaultRouteDestination && gateway != DefaultRouteDestination {
 					facts["default_ipv4"] = &schemas.FactV1{
 						Value: map[string]interface{}{
 							"gateway":   gateway,
@@ -930,20 +963,20 @@ func (p *OSFactsParser) parseSecurityModules() (map[string]*schemas.FactV1, erro
 	facts := make(map[string]*schemas.FactV1)
 
 	// Check for SELinux
-	if _, err := os.Stat("/etc/selinux/config"); err == nil {
-		if data, err := os.ReadFile("/etc/selinux/config"); err == nil {
+	if _, err := os.Stat(SELinuxConfigPath); err == nil {
+		if data, err := os.ReadFile(SELinuxConfigPath); err == nil {
 			content := string(data)
 			scanner := bufio.NewScanner(strings.NewReader(content))
 			selinuxInfo := make(map[string]interface{})
 
 			for scanner.Scan() {
 				line := scanner.Text()
-				if strings.HasPrefix(line, "SELINUX=") {
-					mode := strings.TrimPrefix(line, "SELINUX=")
+				if strings.HasPrefix(line, SELinuxPrefix) {
+					mode := strings.TrimPrefix(line, SELinuxPrefix)
 					selinuxInfo["status"] = mode
 					selinuxInfo["mode"] = mode
-				} else if strings.HasPrefix(line, "SELINUXTYPE=") {
-					selinuxType := strings.TrimPrefix(line, "SELINUXTYPE=")
+				} else if strings.HasPrefix(line, SELinuxTypePrefix) {
+					selinuxType := strings.TrimPrefix(line, SELinuxTypePrefix)
 					selinuxInfo["type"] = selinuxType
 				}
 			}

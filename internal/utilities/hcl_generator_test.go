@@ -3,6 +3,8 @@ package utilities
 import (
 	"strings"
 	"testing"
+
+	"spooky/internal/hcl"
 )
 
 // TestStruct is a simple struct for testing HCL generation
@@ -22,7 +24,7 @@ type TestNestedStruct struct {
 }
 
 func TestHCLGenerator_Basic(t *testing.T) {
-	generator := NewHCLGenerator()
+	generator := hcl.NewHCLGenerator()
 
 	testData := TestStruct{
 		Name:        "example",
@@ -59,7 +61,7 @@ func TestHCLGenerator_Basic(t *testing.T) {
 }
 
 func TestHCLGenerator_WithDefaults(t *testing.T) {
-	generator := NewHCLGenerator()
+	generator := hcl.NewHCLGenerator()
 	generator.UseDefaults = true
 
 	// Test with empty struct (should use defaults)
@@ -92,7 +94,7 @@ func TestHCLGenerator_WithDefaults(t *testing.T) {
 }
 
 func TestHCLGenerator_WithoutDefaults(t *testing.T) {
-	generator := NewHCLGenerator()
+	generator := hcl.NewHCLGenerator()
 	generator.UseDefaults = false
 
 	// Test with empty struct (should not use defaults)
@@ -124,29 +126,29 @@ func TestHCLGenerator_ConvenienceFunctions(t *testing.T) {
 	}
 
 	// Test GenerateHCL
-	hcl, err := GenerateHCL(testData, "convenience")
+	hclOutput, err := hcl.GenerateHCL(testData, "convenience")
 	if err != nil {
 		t.Fatalf("GenerateHCL failed: %v", err)
 	}
-	if !strings.Contains(hcl, "convenience {") {
+	if !strings.Contains(hclOutput, "convenience {") {
 		t.Error("GenerateHCL should generate correct block name")
 	}
 
 	// Test GenerateHCLWithDefaults
-	hcl, err = GenerateHCLWithDefaults(testData, "with_defaults")
+	hclOutput, err = hcl.GenerateHCLWithDefaults(testData, "with_defaults")
 	if err != nil {
 		t.Fatalf("GenerateHCLWithDefaults failed: %v", err)
 	}
-	if !strings.Contains(hcl, "with_defaults {") {
+	if !strings.Contains(hclOutput, "with_defaults {") {
 		t.Error("GenerateHCLWithDefaults should generate correct block name")
 	}
 
 	// Test GenerateHCLWithoutDefaults
-	hcl, err = GenerateHCLWithoutDefaults(testData, "without_defaults")
+	hclOutput, err = hcl.GenerateHCLWithoutDefaults(testData, "without_defaults")
 	if err != nil {
 		t.Fatalf("GenerateHCLWithoutDefaults failed: %v", err)
 	}
-	if !strings.Contains(hcl, "without_defaults {") {
+	if !strings.Contains(hclOutput, "without_defaults {") {
 		t.Error("GenerateHCLWithoutDefaults should generate correct block name")
 	}
 }

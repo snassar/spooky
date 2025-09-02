@@ -71,7 +71,12 @@ func TestAgeKeyGenerationAndLoading(t *testing.T) {
 			t.Fatal("Failed to encrypt:", err)
 		}
 
-		fmt.Printf("Encrypted: %s...\n", truncateString(encrypted, 100))
+		// Show truncated encrypted value for testing output
+		truncated := encrypted
+		if len(encrypted) > 100 {
+			truncated = encrypted[:100] + "..."
+		}
+		fmt.Printf("Encrypted: %s\n", truncated)
 
 		// Verify it looks encrypted
 		if !ae.IsEncrypted(encrypted) {
@@ -366,6 +371,76 @@ func TestDirectoryBasedRecipients(t *testing.T) {
 		}
 
 		fmt.Printf("Loaded %d recipients from directory\n", recipientCount)
+	})
+}
+
+// TestAgeSecurityImprovements tests the security improvements we've implemented
+func TestAgeSecurityImprovements(t *testing.T) {
+	t.Run("Security: Enhanced Error Context", func(t *testing.T) {
+		// Test that we get proper error messages for configuration issues
+		// This tests the enhanced error context without requiring valid keys
+
+		// Test empty plaintext encryption (should fail on configuration first)
+		ae, err := NewAgeEncryption("", "")
+		if err != nil {
+			t.Fatal("Failed to create age encryption:", err)
+		}
+
+		_, err = ae.Encrypt("")
+		if err == nil {
+			t.Error("Expected error when encrypting empty plaintext")
+		}
+		// Should fail on configuration first, then on empty plaintext
+		if !strings.Contains(err.Error(), "no recipients available") && !strings.Contains(err.Error(), "cannot encrypt empty plaintext") {
+			t.Errorf("Expected error about recipients or empty plaintext, got: %v", err)
+		}
+
+		// Test empty encrypted value decryption (should fail on configuration first)
+		_, err = ae.Decrypt("")
+		if err == nil {
+			t.Error("Expected error when decrypting empty value")
+		}
+		// Should fail on configuration first, then on empty encrypted value
+		if !strings.Contains(err.Error(), "no identities available") && !strings.Contains(err.Error(), "cannot decrypt empty encrypted value") {
+			t.Errorf("Expected error about identities or empty encrypted value, got: %v", err)
+		}
+
+		// Test non-age encrypted value (should fail on configuration first)
+		_, err = ae.Decrypt("not-encrypted")
+		if err == nil {
+			t.Error("Expected error when decrypting non-encrypted value")
+		}
+		// Should fail on configuration first, then on non-age encrypted value
+		if !strings.Contains(err.Error(), "no identities available") && !strings.Contains(err.Error(), "does not appear to be age-encrypted") {
+			t.Errorf("Expected error about identities or non-age encrypted value, got: %v", err)
+		}
+	})
+
+	t.Run("Security: Fail Fast When No Valid Files", func(t *testing.T) {
+		// Create empty directory
+		tempDir, err := os.MkdirTemp("", "empty-age-dir-*")
+		if err != nil {
+			t.Fatal("Failed to create temp directory:", err)
+		}
+		defer os.RemoveAll(tempDir)
+
+		// Test that loading from empty directory fails fast
+		_, err = NewAgeEncryption(tempDir, "")
+		if err == nil {
+			t.Error("Expected error when loading from empty identity directory")
+		}
+		if !strings.Contains(err.Error(), "no valid identity files found") {
+			t.Errorf("Expected error about no valid files, got: %v", err)
+		}
+
+		// Test that loading from empty recipients directory fails fast
+		_, err = NewAgeEncryption("", tempDir)
+		if err == nil {
+			t.Error("Expected error when loading from empty recipients directory")
+		}
+		if !strings.Contains(err.Error(), "no valid recipient files found") {
+			t.Errorf("Expected error about no valid files, got: %v", err)
+		}
 	})
 }
 

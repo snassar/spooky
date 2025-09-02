@@ -66,18 +66,23 @@ func (td *TransparentDecryptor) decryptEncryptedValue(encryptedValue interface{}
 	case map[string]interface{}:
 		encryptedMap = ev
 	default:
-		return "", errors.New("encrypted_value must be a map")
+		return "", errors.New("encrypted_value must be a map - decryption cannot proceed")
 	}
 
 	// Extract the data field
 	data, exists := encryptedMap["data"]
 	if !exists {
-		return "", errors.New("encrypted_value missing required 'data' field")
+		return "", errors.New("encrypted_value missing required 'data' field - decryption cannot proceed")
 	}
 
 	dataStr, ok := data.(string)
 	if !ok {
-		return "", errors.New("encrypted_value.data must be a string")
+		return "", errors.New("encrypted_value.data must be a string - decryption cannot proceed")
+	}
+
+	// Security-critical: Validate data before decryption
+	if dataStr == "" {
+		return "", errors.New("encrypted_value.data is empty - decryption cannot proceed")
 	}
 
 	// Get the format (default to base64)
@@ -102,11 +107,26 @@ func (td *TransparentDecryptor) decryptEncryptedValue(encryptedValue interface{}
 		cleanData := strings.ReplaceAll(dataStr, "\n", "")
 		encryptedData = fmt.Sprintf("-----BEGIN AGE ENCRYPTED FILE-----%s-----END AGE ENCRYPTED FILE-----", cleanData)
 	default:
-		return "", errors.Errorf("unsupported encryption format: %s", format)
+		return "", errors.Errorf("unsupported encryption format: %s - decryption cannot proceed", format)
+	}
+
+	// Security-critical: Validate reconstructed data
+	if encryptedData == "" {
+		return "", errors.New("failed to reconstruct encrypted data - decryption cannot proceed")
 	}
 
 	// Decrypt using age encryption
-	return td.ageEncryption.Decrypt(encryptedData)
+	decrypted, err := td.ageEncryption.Decrypt(encryptedData)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to decrypt value - decryption operation failed")
+	}
+
+	// Security-critical: Validate decrypted result
+	if decrypted == "" {
+		return "", errors.New("decryption produced empty result - this may indicate a security issue or corrupted data")
+	}
+
+	return decrypted, nil
 }
 
 // DecryptVariablesMap decrypts all encrypted variables in a map
@@ -127,7 +147,7 @@ func (td *TransparentDecryptor) DecryptVariablesMap(variables map[string]interfa
 // DecryptMachineVariables decrypts machine-specific variables
 func (td *TransparentDecryptor) DecryptMachineVariables(machine map[string]interface{}) (map[string]interface{}, error) {
 	// Check if machine has variables
-	if variables, exists := machine["variables"]; exists {
+	if variables, exists := machine[ResourceTypeVariables]; exists {
 		if variablesMap, ok := variables.(map[string]interface{}); ok {
 			decryptedVariables, err := td.DecryptVariablesMap(variablesMap)
 			if err != nil {
@@ -139,7 +159,7 @@ func (td *TransparentDecryptor) DecryptMachineVariables(machine map[string]inter
 			for k, v := range machine {
 				result[k] = v
 			}
-			result["variables"] = decryptedVariables
+			result[ResourceTypeVariables] = decryptedVariables
 			return result, nil
 		}
 	}
@@ -203,10 +223,20 @@ func (td *TransparentDecryptor) decryptAuthentication(auth map[string]interface{
 
 // CreateEncryptedValue creates a structured encrypted value
 func (td *TransparentDecryptor) CreateEncryptedValue(plaintext string) (*EncryptedValueV1, error) {
+	// Security-critical: Validate input before encryption
+	if plaintext == "" {
+		return nil, errors.New("cannot encrypt empty plaintext - this could lead to data loss")
+	}
+
 	// Encrypt the plaintext
 	encryptedArmored, err := td.ageEncryption.Encrypt(plaintext)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to encrypt value")
+		return nil, errors.Wrap(err, "failed to encrypt value - encryption operation failed")
+	}
+
+	// Security-critical: Validate encrypted result
+	if encryptedArmored == "" {
+		return nil, errors.New("encryption produced empty result - this may indicate a security issue")
 	}
 
 	// Extract the base64 content (remove headers and footers)
@@ -220,6 +250,11 @@ func (td *TransparentDecryptor) CreateEncryptedValue(plaintext string) (*Encrypt
 			line != "" {
 			base64Content = append(base64Content, line)
 		}
+	}
+
+	// Security-critical: Validate extracted content
+	if len(base64Content) == 0 {
+		return nil, errors.New("failed to extract encrypted content - encryption result is malformed")
 	}
 
 	data := strings.Join(base64Content, "")

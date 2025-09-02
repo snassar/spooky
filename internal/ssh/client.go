@@ -4,7 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -18,6 +22,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/knownhosts"
@@ -148,7 +153,7 @@ func (sc *SSHClient) Connect(ctx context.Context) error {
 	// Create SSH client config
 	sshConfig, err := sc.createSSHConfig()
 	if err != nil {
-		return errors.Wrap(err, "failed to create SSH config")
+		return errors.Wrap(err, "failed to create SSH config - connection cannot be established")
 	}
 
 	// Create connection address
@@ -161,14 +166,14 @@ func (sc *SSHClient) Connect(ctx context.Context) error {
 
 	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
-		return errors.Wrapf(err, "failed to connect to %s", addr)
+		return errors.Wrapf(err, "failed to connect to %s - network connection failed", addr)
 	}
 
 	// Create SSH connection
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, sshConfig)
 	if err != nil {
 		conn.Close()
-		return errors.Wrap(err, "failed to establish SSH connection")
+		return errors.Wrapf(err, "failed to establish SSH connection to %s - authentication or protocol negotiation failed", addr)
 	}
 
 	// Create SSH client
@@ -208,10 +213,14 @@ func (sc *SSHClient) RunCommand(ctx context.Context, command string) (*schemas.C
 	}
 
 	// Apply timeout from config if context doesn't have one
+	var timeoutCtx context.Context
+	var cancel context.CancelFunc
+
 	if _, ok := ctx.Deadline(); !ok && sc.config.Timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, sc.config.Timeout)
+		timeoutCtx, cancel = context.WithTimeout(ctx, sc.config.Timeout)
 		defer cancel()
+	} else {
+		timeoutCtx = ctx
 	}
 
 	// Create session
@@ -230,6 +239,19 @@ func (sc *SSHClient) RunCommand(ctx context.Context, command string) (*schemas.C
 	var stdout, stderr bytes.Buffer
 	session.Stdout = &stdout
 	session.Stderr = &stderr
+
+	// Check for context cancellation before running command
+	select {
+	case <-timeoutCtx.Done():
+		return &schemas.CommandResult{
+			ExitCode: 1,
+			Stdout:   "",
+			Stderr:   "command cancelled due to timeout or context cancellation",
+			Error:    timeoutCtx.Err(),
+		}, nil
+	default:
+		// Continue with command execution
+	}
 
 	if err := session.Run(command); err != nil {
 		return &schemas.CommandResult{
@@ -424,18 +446,53 @@ func (sc *SSHClient) loadPrivateKey() (ssh.Signer, error) {
 	if sc.config.PrivateKeyPath != "" {
 		keyData, err = os.ReadFile(sc.config.PrivateKeyPath)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to read private key file: %s", sc.config.PrivateKeyPath)
+			return nil, errors.Wrapf(err, "failed to read private key file: %s - authentication cannot proceed", sc.config.PrivateKeyPath)
 		}
 	} else if len(sc.config.PrivateKeyData) > 0 {
 		keyData = sc.config.PrivateKeyData
 	} else {
-		return nil, errors.New("no private key provided")
+		return nil, errors.New("no private key provided - authentication configuration is incomplete")
+	}
+
+	// Security-critical: Validate key data
+	if len(keyData) == 0 {
+		return nil, errors.New("private key data is empty - authentication cannot proceed")
+	}
+
+	// Try modern SSH parsing first (supports PKCS#8 and other encrypted formats)
+	if sc.config.Passphrase != "" {
+		// Try parsing with passphrase first - this handles PKCS#8 and other modern formats
+		signer, err := ssh.ParsePrivateKeyWithPassphrase(keyData, []byte(sc.config.Passphrase))
+		if err == nil {
+			return signer, nil
+		}
+
+		// If that fails, try our custom PKCS#8 decryption
+		logger := logging.GetGlobalLogger()
+		logger.Debug("Modern SSH parsing failed, trying custom PKCS#8 decryption",
+			slog.String("error", err.Error()))
+
+		// Try custom PKCS#8 decryption for ENCRYPTED PRIVATE KEY format
+		decryptedKey, err := sc.decryptPKCS8Key(keyData, sc.config.Passphrase)
+		if err == nil {
+			// Parse the decrypted key
+			signer, err := ssh.ParsePrivateKey(decryptedKey)
+			if err == nil {
+				return signer, nil
+			}
+			logger.Debug("Failed to parse decrypted PKCS#8 key", slog.String("error", err.Error()))
+		} else {
+			logger.Debug("Custom PKCS#8 decryption failed", slog.String("error", err.Error()))
+		}
+
+		// Fall back to legacy PEM decryption
+		logger.Debug("Falling back to legacy PEM decryption")
 	}
 
 	// Try to parse as PEM
 	block, rest := pem.Decode(keyData)
 	if block == nil {
-		return nil, errors.New("failed to decode PEM block")
+		return nil, errors.New("failed to decode PEM block - private key format is invalid")
 	}
 	if len(rest) > 0 {
 		// Log warning about extra data but continue
@@ -444,30 +501,194 @@ func (sc *SSHClient) loadPrivateKey() (ssh.Signer, error) {
 			slog.Int("extra_bytes", len(rest)))
 	}
 
-	// Handle encrypted private keys
-	if x509.IsEncryptedPEMBlock(block) {
-		if sc.config.Passphrase == "" {
-			return nil, errors.New("private key is encrypted but no passphrase provided")
+	// Handle different PEM block types directly
+	switch block.Type {
+	case "RSA PRIVATE KEY", "DSA PRIVATE KEY", "EC PRIVATE KEY":
+		// Traditional encrypted private keys - try legacy decryption
+		if sc.config.Passphrase != "" {
+			// Try legacy PEM decryption for traditional formats
+			if x509.IsEncryptedPEMBlock(block) {
+				decryptedBlock, err := x509.DecryptPEMBlock(block, []byte(sc.config.Passphrase))
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to decrypt traditional private key - passphrase may be incorrect")
+				}
+				block = &pem.Block{
+					Type:  block.Type,
+					Bytes: decryptedBlock,
+				}
+			}
+		} else if x509.IsEncryptedPEMBlock(block) {
+			return nil, errors.New("private key is encrypted but no passphrase provided - authentication cannot proceed")
 		}
 
-		decryptedBlock, err := x509.DecryptPEMBlock(block, []byte(sc.config.Passphrase))
+		// Parse the decrypted/unencrypted key
+		signer, err := ssh.ParsePrivateKey(pem.EncodeToMemory(block))
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to decrypt private key")
+			return nil, errors.Wrap(err, "failed to parse traditional private key - key format may be corrupted")
 		}
+		return signer, nil
 
-		block = &pem.Block{
-			Type:  block.Type,
-			Bytes: decryptedBlock,
+	case "OPENSSH PRIVATE KEY":
+		// OpenSSH format - try parsing directly
+		signer, err := ssh.ParsePrivateKey(pem.EncodeToMemory(block))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to parse OpenSSH private key - key format may be corrupted")
+		}
+		return signer, nil
+
+	case "PRIVATE KEY":
+		// PKCS#8 format - try parsing directly first
+		signer, err := ssh.ParsePrivateKey(pem.EncodeToMemory(block))
+		if err != nil {
+			// If direct parsing fails, it might be encrypted PKCS#8
+			logger := logging.GetGlobalLogger()
+			logger.Debug("PKCS#8 parsing failed, may be encrypted", slog.String("error", err.Error()))
+			return nil, errors.New("encrypted PKCS#8 keys should be handled by ParsePrivateKeyWithPassphrase")
+		}
+		return signer, nil
+
+	default:
+		logger := logging.GetGlobalLogger()
+		logger.Debug("Unknown PEM block type", slog.String("type", block.Type))
+		return nil, errors.Errorf("unsupported PEM block type: %s - private key format is not supported", block.Type)
+	}
+}
+
+// OID constants for PKCS#8 encryption
+var (
+	oidPBES2     = []int{1, 2, 840, 113549, 1, 5, 13}
+	oidPBKDF2    = []int{1, 2, 840, 113549, 1, 5, 12}
+	oidAES256CBC = []int{2, 16, 840, 1, 101, 3, 4, 1, 42}
+	oidAES128CBC = []int{2, 16, 840, 1, 101, 3, 4, 1, 2}
+)
+
+// AlgorithmIdentifier represents the ASN.1 structure for algorithm identifiers
+type AlgorithmIdentifier struct {
+	Algorithm  []int
+	Parameters asn1.RawValue
+}
+
+// compareOID compares two OIDs for equality
+func compareOID(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
 		}
 	}
+	return true
+}
 
-	// Parse private key
-	signer, err := ssh.ParsePrivateKey(pem.EncodeToMemory(block))
+// decryptPKCS8Key attempts to decrypt a PKCS#8 encrypted private key
+func (sc *SSHClient) decryptPKCS8Key(keyData []byte, passphrase string) ([]byte, error) {
+	// Parse PEM to get the encrypted block
+	block, _ := pem.Decode(keyData)
+	if block == nil {
+		return nil, errors.New("failed to decode PEM block")
+	}
+
+	// Check if this is an ENCRYPTED PRIVATE KEY
+	if block.Type != "ENCRYPTED PRIVATE KEY" {
+		return nil, errors.New("not a PKCS#8 encrypted private key")
+	}
+
+	// Parse the PKCS#8 encrypted structure
+	var encryptedKey struct {
+		Version       int
+		Algorithm     AlgorithmIdentifier
+		EncryptedData []byte `asn1:"tag:0"`
+	}
+
+	_, err := asn1.Unmarshal(block.Bytes, &encryptedKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse private key")
+		return nil, errors.Wrap(err, "failed to parse PKCS#8 encrypted key structure")
 	}
 
-	return signer, nil
+	// Check if it's PBES2 (Password-Based Encryption Scheme 2)
+	if !compareOID(encryptedKey.Algorithm.Algorithm, oidPBES2) {
+		return nil, errors.New("unsupported PKCS#8 encryption algorithm (only PBES2 supported)")
+	}
+
+	// Parse PBES2 parameters
+	var pbes2Params struct {
+		KeyDerivationFunc AlgorithmIdentifier
+		EncryptionScheme  AlgorithmIdentifier
+	}
+
+	_, err = asn1.Unmarshal(encryptedKey.Algorithm.Parameters.FullBytes, &pbes2Params)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse PBES2 parameters")
+	}
+
+	// Check if it's PBKDF2 (Password-Based Key Derivation Function 2)
+	if !compareOID(pbes2Params.KeyDerivationFunc.Algorithm, oidPBKDF2) {
+		return nil, errors.New("unsupported key derivation function (only PBKDF2 supported)")
+	}
+
+	// Parse PBKDF2 parameters
+	var pbkdf2Params struct {
+		Salt           []byte
+		IterationCount int
+		PRF            AlgorithmIdentifier `asn1:"optional"`
+	}
+
+	_, err = asn1.Unmarshal(pbes2Params.KeyDerivationFunc.Parameters.FullBytes, &pbkdf2Params)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse PBKDF2 parameters")
+	}
+
+	// Check if it's AES encryption
+	if !compareOID(pbes2Params.EncryptionScheme.Algorithm, oidAES256CBC) &&
+		!compareOID(pbes2Params.EncryptionScheme.Algorithm, oidAES128CBC) {
+		return nil, errors.New("unsupported encryption algorithm (only AES supported)")
+	}
+
+	// Parse AES parameters (IV)
+	var aesParams []byte
+	_, err = asn1.Unmarshal(pbes2Params.EncryptionScheme.Parameters.FullBytes, &aesParams)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse AES parameters")
+	}
+
+	// Derive key using PBKDF2
+	keyLen := 32 // AES-256
+	if compareOID(pbes2Params.EncryptionScheme.Algorithm, oidAES128CBC) {
+		keyLen = 16 // AES-128
+	}
+
+	derivedKey := pbkdf2.Key([]byte(passphrase), pbkdf2Params.Salt, pbkdf2Params.IterationCount, keyLen, sha256.New)
+
+	// Decrypt using AES
+	cipherBlock, err := aes.NewCipher(derivedKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create AES cipher")
+	}
+
+	if len(encryptedKey.EncryptedData)%aes.BlockSize != 0 {
+		return nil, errors.New("encrypted data is not a multiple of AES block size")
+	}
+
+	// Decrypt in CBC mode
+	mode := cipher.NewCBCDecrypter(cipherBlock, aesParams)
+	decrypted := make([]byte, len(encryptedKey.EncryptedData))
+	mode.CryptBlocks(decrypted, encryptedKey.EncryptedData)
+
+	// Remove PKCS#7 padding
+	paddingLen := int(decrypted[len(decrypted)-1])
+	if paddingLen > aes.BlockSize || paddingLen == 0 {
+		return nil, errors.New("invalid PKCS#7 padding")
+	}
+
+	// Verify padding
+	for i := len(decrypted) - paddingLen; i < len(decrypted); i++ {
+		if decrypted[i] != byte(paddingLen) {
+			return nil, errors.New("invalid PKCS#7 padding")
+		}
+	}
+
+	return decrypted[:len(decrypted)-paddingLen], nil
 }
 
 // connectToAgent connects to the SSH agent

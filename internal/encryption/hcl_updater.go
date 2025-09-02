@@ -15,6 +15,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Resource type constants to avoid repeated string literals
+const (
+	ResourceTypeVariables = "variables"
+	ResourceTypeVariable  = "variable"
+)
+
 // HCLUpdater updates HCL files with encrypted values
 type HCLUpdater struct {
 	ageEncryption *AgeEncryption
@@ -47,7 +53,7 @@ func (hu *HCLUpdater) UpdateFile(filePath string) error {
 
 	// Process variables blocks
 	for _, block := range file.Body.(*hclsyntax.Body).Blocks {
-		if block.Type == "variables" {
+		if block.Type == ResourceTypeVariables {
 			blockModified, err := hu.processVariablesBlock(block, &contentStr)
 			if err != nil {
 				return errors.Wrapf(err, "failed to process variables block in %s", filePath)
@@ -81,7 +87,7 @@ func (hu *HCLUpdater) processVariablesBlock(block *hclsyntax.Block, contentStr *
 
 	// Process each variable block
 	for _, variableBlock := range block.Body.Blocks {
-		if variableBlock.Type == "variable" {
+		if variableBlock.Type == ResourceTypeVariable {
 			blockModified, err := hu.processVariableBlock(variableBlock, contentStr)
 			if err != nil {
 				return false, err

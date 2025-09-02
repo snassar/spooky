@@ -27,31 +27,9 @@ func NewSimpleSSHManager(ageEncryption *encryption.AgeEncryption, config *schema
 	}
 }
 
-// ExecuteCommandOnMachine executes a command on a remote machine via SSH.
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeout control
-//   - machine: Machine configuration with hostname, port, user, and authentication
-//   - command: Command string to execute on the remote machine
-//
-// Returns:
-//   - *CommandResult: Command execution results (stdout, stderr, exit code)
-//   - error: Connection, authentication, or execution errors
-//
-// Dependencies: golang.org/x/crypto/ssh, spooky/internal/encryption for age encryption
-//
-// Example usage:
-//
-//	result, err := sshManager.ExecuteCommandOnMachine(ctx, machine, "ls -la /etc")
-//	if err != nil {
-//	    return fmt.Errorf("failed to execute command: %w", err)
-//	}
-//	fmt.Printf("Exit code: %d\n", result.ExitCode)
-//
-// Performance: 100ms-30s depending on command complexity and network latency
-func (sm *SimpleSSHManager) RunCommandOnMachine(ctx context.Context, machine *schemas.MachinesMachineV1, command string) (*schemas.CommandResult, error) {
-	// Create SSH config
-	sshConfig := &SSHConfig{
+// createSSHConfig creates a new SSH configuration for the given machine
+func (sm *SimpleSSHManager) createSSHConfig(machine *schemas.MachinesMachineV1) *SSHConfig {
+	return &SSHConfig{
 		Host:           machine.Hostname,
 		Port:           machine.Port,
 		User:           machine.User,
@@ -79,6 +57,33 @@ func (sm *SimpleSSHManager) RunCommandOnMachine(ctx context.Context, machine *sc
 		TCPKeepAliveInterval:      sm.config.TCPKeepAliveInterval,
 		TCPKeepAliveProbeInterval: sm.config.TCPKeepAliveProbeInterval,
 	}
+}
+
+// ExecuteCommandOnMachine executes a command on a remote machine via SSH.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control
+//   - machine: Machine configuration with hostname, port, user, and authentication
+//   - command: Command string to execute on the remote machine
+//
+// Returns:
+//   - *CommandResult: Command execution results (stdout, stderr, exit code)
+//   - error: Connection, authentication, or execution errors
+//
+// Dependencies: golang.org/x/crypto/ssh, spooky/internal/encryption for age encryption
+//
+// Example usage:
+//
+//	result, err := sshManager.ExecuteCommandOnMachine(ctx, machine, "ls -la /etc")
+//	if err != nil {
+//	    return fmt.Errorf("failed to execute command: %w", err)
+//	}
+//	fmt.Printf("Exit code: %d\n", result.ExitCode)
+//
+// Performance: 100ms-30s depending on command complexity and network latency
+func (sm *SimpleSSHManager) RunCommandOnMachine(ctx context.Context, machine *schemas.MachinesMachineV1, command string) (*schemas.CommandResult, error) {
+	// Create SSH config
+	sshConfig := sm.createSSHConfig(machine)
 
 	// Set up authentication
 	if err := sm.setupAuthentication(sshConfig, machine); err != nil {
@@ -219,34 +224,7 @@ func (sm *SimpleSSHManager) TestConnection(ctx context.Context, machine *schemas
 // UploadFileToMachine uploads a file to a specific machine
 func (sm *SimpleSSHManager) UploadFileToMachine(ctx context.Context, machine *schemas.MachinesMachineV1, localPath, remotePath string) error {
 	// Create SSH config
-	sshConfig := &SSHConfig{
-		Host:           machine.Hostname,
-		Port:           machine.Port,
-		User:           machine.User,
-		Timeout:        time.Duration(sm.config.Timeout) * time.Second,
-		KeepAlive:      time.Duration(sm.config.KeepaliveInterval) * time.Second,
-		KeepAliveCount: sm.config.KeepaliveCount,
-		KeyScanTimeout: time.Duration(sm.config.KeyScanTimeout) * time.Second,
-		StrictHostKey:  sm.config.KnownHostsStrict,
-		KnownHostsMode: sm.config.KnownHostsMode,
-		PubkeyAuth:     true,
-		PasswordAuth:   true,
-
-		// Proxy configuration
-		ProxyCommand: sm.config.ProxyCommand,
-		ProxyJump:    sm.config.ProxyJump,
-
-		// Compression configuration
-		Compression:      sm.config.Compression,
-		CompressionLevel: sm.config.CompressionLevel,
-
-		// TCP keepalive configuration
-		TCPKeepAlive:              sm.config.TCPKeepAlive,
-		TCPKeepAliveCount:         sm.config.TCPKeepAliveCount,
-		TCPKeepAliveIdle:          sm.config.TCPKeepAliveIdle,
-		TCPKeepAliveInterval:      sm.config.TCPKeepAliveInterval,
-		TCPKeepAliveProbeInterval: sm.config.TCPKeepAliveProbeInterval,
-	}
+	sshConfig := sm.createSSHConfig(machine)
 
 	// Set up authentication
 	if err := sm.setupAuthentication(sshConfig, machine); err != nil {

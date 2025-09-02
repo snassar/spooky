@@ -2,6 +2,7 @@ package sync
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
 
@@ -54,11 +55,14 @@ func Checksum1(buf []byte) uint32 {
 }
 
 // Checksum2 computes the strong checksum (MD4)
-func Checksum2(seed int32, buf []byte) []byte {
+func Checksum2(seed int32, buf []byte) ([]byte, error) {
 	h := md4.New()
 	h.Write(buf)
-	binary.Write(h, binary.LittleEndian, seed)
-	return h.Sum(nil)
+	if err := binary.Write(h, binary.LittleEndian, seed); err != nil {
+		// This should never fail for int32, but handle it gracefully
+		return nil, fmt.Errorf("binary.Write failed for int32: %w", err)
+	}
+	return h.Sum(nil), nil
 }
 
 // FileChecksum computes the MD4 checksum of an entire file

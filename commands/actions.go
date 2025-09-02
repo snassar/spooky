@@ -22,7 +22,7 @@ import (
 
 var (
 	actionsCmd = &cobra.Command{
-		Use:   "actions",
+		Use:   ResourceTypeActions,
 		Short: "Execute actions across machines",
 		Long: `Execute actions across machines defined in your project configuration.
 
@@ -341,7 +341,7 @@ func loadActionsConfig() ([]*schemas.ActionsActionV1, error) {
 
 	// Use the simplified validator to parse and validate the actions configuration
 	validator := schemas.NewSimpleValidator()
-	result, err := validator.ValidateHCLContent("actions", string(content))
+	result, err := validator.ValidateHCLContent(ResourceTypeActions, string(content))
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate actions.hcl: %w", err)
 	}
@@ -356,11 +356,37 @@ func loadActionsConfig() ([]*schemas.ActionsActionV1, error) {
 		return nil, fmt.Errorf("failed to parse actions.hcl: %v", diags)
 	}
 
+	// Extract actions block
+	actionsBlock, err := extractActionsBlock(file)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract action blocks
+	actionContent, err := extractActionBlocks(actionsBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Debug("found action blocks", slog.Int("count", len(actionContent.Blocks)))
+
+	// Process action blocks
+	actions, err := processActionBlocks(actionContent)
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Debug("loadActionsConfig completed", slog.Int("action_count", len(actions)))
+	return actions, nil
+}
+
+// extractActionsBlock extracts the actions block from the parsed HCL file
+func extractActionsBlock(file *hcl.File) (*hcl.Block, error) {
 	// Define the schema for actions block
 	schema := &hcl.BodySchema{
 		Blocks: []hcl.BlockHeaderSchema{
 			{
-				Type:       "actions",
+				Type:       ResourceTypeActions,
 				LabelNames: []string{},
 			},
 		},
@@ -380,8 +406,11 @@ func loadActionsConfig() ([]*schemas.ActionsActionV1, error) {
 		return nil, fmt.Errorf("multiple actions blocks found in actions.hcl")
 	}
 
-	actionsBlock := bodyContent.Blocks[0]
+	return bodyContent.Blocks[0], nil
+}
 
+// extractActionBlocks extracts action blocks from the actions block
+func extractActionBlocks(actionsBlock *hcl.Block) (*hcl.BodyContent, error) {
 	// Define schema for action blocks inside actions
 	actionSchema := &hcl.BodySchema{
 		Blocks: []hcl.BlockHeaderSchema{
@@ -398,132 +427,171 @@ func loadActionsConfig() ([]*schemas.ActionsActionV1, error) {
 		return nil, fmt.Errorf("failed to decode action blocks: %v", diags)
 	}
 
-	logger.Debug("found action blocks", slog.Int("count", len(actionContent.Blocks)))
+	return actionContent, nil
+}
 
-	// Create actions slice
+// processActionBlocks processes all action blocks and returns the parsed actions
+func processActionBlocks(actionContent *hcl.BodyContent) ([]*schemas.ActionsActionV1, error) {
 	var actions []*schemas.ActionsActionV1
 
 	// Process each action block
 	for _, actionBlock := range actionContent.Blocks {
-		actionName := actionBlock.Labels[0]
-		logger.Debug("processing action", slog.String("action_name", actionName))
-
-		// Create a new action struct
-		action := &schemas.ActionsActionV1{
-			Description: "",
-			Type:        "",
-			Tags:        []string{},
-			Targets:     []string{},
-			Timeout:     300, // Default timeout
-			Retries:     0,   // Default retries
-			RetryDelay:  5,   // Default retry delay
+		action, err := parseActionBlock(actionBlock)
+		if err != nil {
+			return nil, err
 		}
-
-		// Define schema for action attributes
-		actionAttrSchema := &hcl.BodySchema{
-			Attributes: []hcl.AttributeSchema{
-				{Name: "description", Required: true},
-				{Name: "type", Required: true},
-				{Name: "command", Required: false},
-
-				{Name: "targets", Required: false},
-				{Name: "timeout", Required: false},
-				{Name: "retries", Required: false},
-				{Name: "retry_delay", Required: false},
-				{Name: "sudo", Required: false},
-			},
-		}
-
-		// Extract action attributes
-		actionAttrContent, diags := actionBlock.Body.Content(actionAttrSchema)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to decode action %s attributes: %v", actionName, diags)
-		}
-
-		// Extract description
-		if descAttr, exists := actionAttrContent.Attributes["description"]; exists {
-			var description string
-			if diags := gohcl.DecodeExpression(descAttr.Expr, nil, &description); diags.HasErrors() {
-				return nil, fmt.Errorf("failed to decode description for action %s: %v", actionName, diags)
-			}
-			action.Description = description
-		}
-
-		// Extract type
-		if typeAttr, exists := actionAttrContent.Attributes["type"]; exists {
-			var actionType string
-			if diags := gohcl.DecodeExpression(typeAttr.Expr, nil, &actionType); diags.HasErrors() {
-				return nil, fmt.Errorf("failed to decode type for action %s: %v", actionName, diags)
-			}
-			action.Type = actionType
-		}
-
-		// Extract command
-		if cmdAttr, exists := actionAttrContent.Attributes["command"]; exists {
-			var command string
-			if diags := gohcl.DecodeExpression(cmdAttr.Expr, nil, &command); diags.HasErrors() {
-				return nil, fmt.Errorf("failed to decode command for action %s: %v", actionName, diags)
-			}
-			action.Command = command
-		}
-
-		// Extract targets
-		if targetsAttr, exists := actionAttrContent.Attributes["targets"]; exists {
-			var targets []string
-			if diags := gohcl.DecodeExpression(targetsAttr.Expr, nil, &targets); diags.HasErrors() {
-				return nil, fmt.Errorf("failed to decode targets for action %s: %v", actionName, diags)
-			}
-			action.Targets = targets
-		}
-
-		// Extract timeout
-		if timeoutAttr, exists := actionAttrContent.Attributes["timeout"]; exists {
-			var timeout int
-			if diags := gohcl.DecodeExpression(timeoutAttr.Expr, nil, &timeout); diags.HasErrors() {
-				return nil, fmt.Errorf("failed to decode timeout for action %s: %v", actionName, diags)
-			}
-			action.Timeout = timeout
-		}
-
-		// Extract retries
-		if retriesAttr, exists := actionAttrContent.Attributes["retries"]; exists {
-			var retries int
-			if diags := gohcl.DecodeExpression(retriesAttr.Expr, nil, &retries); diags.HasErrors() {
-				return nil, fmt.Errorf("failed to decode retries for action %s: %v", actionName, diags)
-			}
-			action.Retries = retries
-		}
-
-		// Extract retry_delay
-		if retryDelayAttr, exists := actionAttrContent.Attributes["retry_delay"]; exists {
-			var retryDelay int
-			if diags := gohcl.DecodeExpression(retryDelayAttr.Expr, nil, &retryDelay); diags.HasErrors() {
-				return nil, fmt.Errorf("failed to decode retry_delay for action %s: %v", actionName, diags)
-			}
-			action.RetryDelay = retryDelay
-		}
-
-		// Extract sudo
-		if sudoAttr, exists := actionAttrContent.Attributes["sudo"]; exists {
-			var sudo bool
-			if diags := gohcl.DecodeExpression(sudoAttr.Expr, nil, &sudo); diags.HasErrors() {
-				return nil, fmt.Errorf("failed to decode sudo for action %s: %v", actionName, diags)
-			}
-			action.Sudo = sudo
-		}
-
-		// Store the action name in the description for now (since the struct doesn't have a name field)
-		// In a full implementation, we'd add a Name field to the struct
-		action.Description = fmt.Sprintf("%s: %s", actionName, action.Description)
-
 		actions = append(actions, action)
-		logger.Debug("successfully parsed action",
-			slog.String("action_name", actionName),
-			slog.String("description", action.Description))
 	}
 
-	logger.Debug("loadActionsConfig completed", slog.Int("action_count", len(actions)))
 	return actions, nil
+}
+
+// parseActionBlock parses a single action block into an ActionsActionV1 struct
+func parseActionBlock(actionBlock *hcl.Block) (*schemas.ActionsActionV1, error) {
+	actionName := actionBlock.Labels[0]
+	logger := logging.GetGlobalLogger()
+	logger.Debug("processing action", slog.String("action_name", actionName))
+
+	// Create a new action struct with defaults
+	action := createDefaultAction()
+
+	// Extract action attributes
+	actionAttrContent, err := extractActionAttributes(actionBlock)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode action %s attributes: %v", actionName, err)
+	}
+
+	// Parse all attributes
+	if err := parseActionAttributes(action, actionAttrContent, actionName); err != nil {
+		return nil, err
+	}
+
+	// Store the action name in the description for now (since the struct doesn't have a name field)
+	// In a full implementation, we'd add a Name field to the struct
+	action.Description = fmt.Sprintf("%s: %s", actionName, action.Description)
+
+	logger.Debug("successfully parsed action",
+		slog.String("action_name", actionName),
+		slog.String("description", action.Description))
+
+	return action, nil
+}
+
+// createDefaultAction creates an action with default values
+func createDefaultAction() *schemas.ActionsActionV1 {
+	return &schemas.ActionsActionV1{
+		Description: "",
+		Type:        "",
+		Tags:        []string{},
+		Targets:     []string{},
+		Timeout:     300, // Default timeout
+		Retries:     0,   // Default retries
+		RetryDelay:  5,   // Default retry delay
+	}
+}
+
+// extractActionAttributes extracts attributes from an action block
+func extractActionAttributes(actionBlock *hcl.Block) (*hcl.BodyContent, error) {
+	// Define schema for action attributes
+	actionAttrSchema := &hcl.BodySchema{
+		Attributes: []hcl.AttributeSchema{
+			{Name: "description", Required: true},
+			{Name: "type", Required: true},
+			{Name: "command", Required: false},
+			{Name: "targets", Required: false},
+			{Name: "timeout", Required: false},
+			{Name: "retries", Required: false},
+			{Name: "retry_delay", Required: false},
+			{Name: "sudo", Required: false},
+		},
+	}
+
+	// Extract action attributes
+	actionAttrContent, diags := actionBlock.Body.Content(actionAttrSchema)
+	if diags.HasErrors() {
+		return nil, fmt.Errorf("failed to decode action attributes: %v", diags)
+	}
+
+	return actionAttrContent, nil
+}
+
+// parseActionAttributes parses all attributes for an action
+func parseActionAttributes(action *schemas.ActionsActionV1, attrContent *hcl.BodyContent, actionName string) error {
+	// Parse each attribute type
+	if err := parseStringAttribute(attrContent, "description", &action.Description, actionName); err != nil {
+		return err
+	}
+	if err := parseStringAttribute(attrContent, "type", &action.Type, actionName); err != nil {
+		return err
+	}
+	if err := parseStringAttribute(attrContent, "command", &action.Command, actionName); err != nil {
+		return err
+	}
+	if err := parseStringSliceAttribute(attrContent, "targets", &action.Targets, actionName); err != nil {
+		return err
+	}
+	if err := parseIntAttribute(attrContent, "timeout", &action.Timeout, actionName); err != nil {
+		return err
+	}
+	if err := parseIntAttribute(attrContent, "retries", &action.Retries, actionName); err != nil {
+		return err
+	}
+	if err := parseIntAttribute(attrContent, "retry_delay", &action.RetryDelay, actionName); err != nil {
+		return err
+	}
+	if err := parseBoolAttribute(attrContent, "sudo", &action.Sudo, actionName); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// parseStringAttribute parses a string attribute
+func parseStringAttribute(attrContent *hcl.BodyContent, attrName string, target *string, actionName string) error {
+	if attr, exists := attrContent.Attributes[attrName]; exists {
+		var value string
+		if diags := gohcl.DecodeExpression(attr.Expr, nil, &value); diags.HasErrors() {
+			return fmt.Errorf("failed to decode %s for action %s: %v", attrName, actionName, diags)
+		}
+		*target = value
+	}
+	return nil
+}
+
+// parseStringSliceAttribute parses a string slice attribute
+func parseStringSliceAttribute(attrContent *hcl.BodyContent, attrName string, target *[]string, actionName string) error {
+	if attr, exists := attrContent.Attributes[attrName]; exists {
+		var value []string
+		if diags := gohcl.DecodeExpression(attr.Expr, nil, &value); diags.HasErrors() {
+			return fmt.Errorf("failed to decode %s for action %s: %v", attrName, actionName, diags)
+		}
+		*target = value
+	}
+	return nil
+}
+
+// parseIntAttribute parses an integer attribute
+func parseIntAttribute(attrContent *hcl.BodyContent, attrName string, target *int, actionName string) error {
+	if attr, exists := attrContent.Attributes[attrName]; exists {
+		var value int
+		if diags := gohcl.DecodeExpression(attr.Expr, nil, &value); diags.HasErrors() {
+			return fmt.Errorf("failed to decode %s for action %s: %v", attrName, actionName, diags)
+		}
+		*target = value
+	}
+	return nil
+}
+
+// parseBoolAttribute parses a boolean attribute
+func parseBoolAttribute(attrContent *hcl.BodyContent, attrName string, target *bool, actionName string) error {
+	if attr, exists := attrContent.Attributes[attrName]; exists {
+		var value bool
+		if diags := gohcl.DecodeExpression(attr.Expr, nil, &value); diags.HasErrors() {
+			return fmt.Errorf("failed to decode %s for action %s: %v", attrName, actionName, diags)
+		}
+		*target = value
+	}
+	return nil
 }
 
 // findAction finds an action by name

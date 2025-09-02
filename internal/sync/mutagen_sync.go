@@ -33,94 +33,179 @@ func (m *MutagenSyncEngine) SyncFile(sourcePath, targetPath string, options *Syn
 		TargetPath: targetPath,
 	}
 
-	// Check if source file exists
+	// Validate source file
+	sourceInfo, err := m.validateSourceFile(sourcePath, result)
+	if err != nil {
+		return result, err
+	}
+
+	// Check target file status
+	targetExists, targetInfo, err := m.checkTargetFile(targetPath, result)
+	if err != nil {
+		return result, err
+	}
+
+	// Handle new file case
+	if !targetExists {
+		return m.handleNewFile(sourcePath, targetPath, options, result, sourceInfo)
+	}
+
+	// Check if files are identical
+	if m.filesAreIdentical(sourcePath, targetPath, result, sourceInfo, targetInfo, options) {
+		return result, nil
+	}
+
+	// Files are different, sync them
+	return m.syncDifferentFiles(sourcePath, targetPath, options, result, sourceInfo)
+}
+
+// validateSourceFile validates that the source file exists and is accessible
+func (m *MutagenSyncEngine) validateSourceFile(sourcePath string, result *FileSyncResult) (os.FileInfo, error) {
 	sourceInfo, err := os.Stat(sourcePath)
 	if err != nil {
 		result.Error = fmt.Errorf("source file not found: %v", err)
-		return result, result.Error
+		return nil, result.Error
 	}
+	return sourceInfo, nil
+}
 
-	// Check if target file exists
+// checkTargetFile checks the status of the target file
+func (m *MutagenSyncEngine) checkTargetFile(targetPath string, result *FileSyncResult) (bool, os.FileInfo, error) {
 	targetInfo, err := os.Stat(targetPath)
 	if err != nil && !os.IsNotExist(err) {
 		result.Error = fmt.Errorf("failed to stat target file: %v", err)
-		return result, result.Error
+		return false, nil, result.Error
 	}
+	return !os.IsNotExist(err), targetInfo, nil
+}
 
-	// If target doesn't exist, just copy the file
-	if os.IsNotExist(err) {
-		if options.DryRun {
-			if options.Verbose {
-				fmt.Printf("Would copy %s to %s (new file)\n", sourcePath, targetPath)
-			}
-			result.BytesTransferred = sourceInfo.Size()
-			result.Operations = 1
-			result.Success = true
-			return result, nil
-		}
-
-		// Create target directory if it doesn't exist
-		targetDir := filepath.Dir(targetPath)
-		if err := os.MkdirAll(targetDir, 0o755); err != nil {
-			result.Error = fmt.Errorf("failed to create target directory: %v", err)
-			return result, result.Error
-		}
-
-		// Simple copy for new files
-		if err := copyFile(sourcePath, targetPath, options); err != nil {
-			result.Error = fmt.Errorf("failed to copy file: %v", err)
-			return result, result.Error
-		}
-
-		result.BytesTransferred = sourceInfo.Size()
-		result.Operations = 1
-		result.Success = true
-		return result, nil
-	}
-
-	// Files exist, check if they're identical
-	if sourceInfo.Size() == targetInfo.Size() {
-		sourceChecksum, err := FileChecksum(sourcePath)
-		if err != nil {
-			result.Error = fmt.Errorf("failed to compute source checksum: %v", err)
-			return result, result.Error
-		}
-
-		targetChecksum, err := FileChecksum(targetPath)
-		if err != nil {
-			result.Error = fmt.Errorf("failed to compute target checksum: %v", err)
-			return result, result.Error
-		}
-
-		if bytes.Equal(sourceChecksum, targetChecksum) {
-			if options.Verbose {
-				fmt.Printf("Files are identical, no sync needed\n")
-			}
-			result.Success = true
-			return result, nil
-		}
-	}
-
-	// Files are different, use Mutagen's rsync algorithm
+// handleNewFile handles the case where the target file doesn't exist
+func (m *MutagenSyncEngine) handleNewFile(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
 	if options.DryRun {
+		return m.handleDryRunNewFile(sourcePath, targetPath, options, result, sourceInfo)
+	}
+
+	// Create target directory if it doesn't exist
+	if err := m.createTargetDirectory(targetPath); err != nil {
+		result.Error = err
+		return result, err
+	}
+
+	// Copy the new file
+	if err := m.copyNewFile(sourcePath, targetPath, options, result, sourceInfo); err != nil {
+		result.Error = err
+		return result, err
+	}
+
+	return result, nil
+}
+
+// handleDryRunNewFile handles dry run for new files
+func (m *MutagenSyncEngine) handleDryRunNewFile(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
+	if options.Verbose {
+		fmt.Printf("Would copy %s to %s (new file)\n", sourcePath, targetPath)
+	}
+	result.BytesTransferred = sourceInfo.Size()
+	result.Operations = 1
+	result.Success = true
+	return result, nil
+}
+
+// createTargetDirectory creates the target directory if it doesn't exist
+func (m *MutagenSyncEngine) createTargetDirectory(targetPath string) error {
+	targetDir := filepath.Dir(targetPath)
+	return os.MkdirAll(targetDir, 0o755)
+}
+
+// copyNewFile copies a new file to the target location
+func (m *MutagenSyncEngine) copyNewFile(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult, sourceInfo os.FileInfo) error {
+	if err := copyFile(sourcePath, targetPath, options); err != nil {
+		return fmt.Errorf("failed to copy file: %v", err)
+	}
+
+	result.BytesTransferred = sourceInfo.Size()
+	result.Operations = 1
+	result.Success = true
+	return nil
+}
+
+// filesAreIdentical checks if source and target files are identical
+func (m *MutagenSyncEngine) filesAreIdentical(sourcePath, targetPath string, result *FileSyncResult, sourceInfo, targetInfo os.FileInfo, options *SyncOptions) bool {
+	// Quick size check first
+	if sourceInfo.Size() != targetInfo.Size() {
+		return false
+	}
+
+	// Compare checksums
+	sourceChecksum, err := FileChecksum(sourcePath)
+	if err != nil {
+		result.Error = fmt.Errorf("failed to compute source checksum: %v", err)
+		return false
+	}
+
+	targetChecksum, err := FileChecksum(targetPath)
+	if err != nil {
+		result.Error = fmt.Errorf("failed to compute target checksum: %v", err)
+		return false
+	}
+
+	if bytes.Equal(sourceChecksum, targetChecksum) {
 		if options.Verbose {
-			fmt.Printf("Would sync %s to %s using Mutagen rsync algorithm\n", sourcePath, targetPath)
+			fmt.Printf("Files are identical, no sync needed\n")
 		}
-		result.BytesTransferred = sourceInfo.Size()
-		result.Operations = 1
 		result.Success = true
-		return result, nil
+		return true
+	}
+
+	return false
+}
+
+// syncDifferentFiles handles syncing files that are different
+func (m *MutagenSyncEngine) syncDifferentFiles(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
+	if options.DryRun {
+		return m.handleDryRunSync(sourcePath, targetPath, options, result, sourceInfo)
 	}
 
 	// Create backup if requested
-	if options.CreateBackup {
-		backupPath := targetPath + ".backup"
-		if err := copyFile(targetPath, backupPath, nil); err != nil {
-			result.Error = fmt.Errorf("failed to create backup: %v", err)
-			return result, result.Error
-		}
+	if err := m.createBackupIfNeeded(targetPath, options, result); err != nil {
+		return result, err
 	}
 
+	// Perform the actual sync using Mutagen's rsync algorithm
+	return m.performMutagenSync(sourcePath, targetPath, options, result, sourceInfo)
+}
+
+// handleDryRunSync handles dry run for file syncing
+func (m *MutagenSyncEngine) handleDryRunSync(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
+	if options.Verbose {
+		fmt.Printf("Would sync %s to %s using Mutagen rsync algorithm\n", sourcePath, targetPath)
+	}
+	result.BytesTransferred = sourceInfo.Size()
+	result.Operations = 1
+	result.Success = true
+	return result, nil
+}
+
+// createBackupIfNeeded creates a backup of the target file if requested
+func (m *MutagenSyncEngine) createBackupIfNeeded(targetPath string, options *SyncOptions, result *FileSyncResult) error {
+	if !options.CreateBackup {
+		return nil
+	}
+
+	backupPath := targetPath + ".backup"
+	if err := copyFile(targetPath, backupPath, nil); err != nil {
+		return fmt.Errorf("failed to create backup: %v", err)
+	}
+
+	if options.Verbose {
+		fmt.Printf("Created backup: %s\n", backupPath)
+	}
+
+	return nil
+}
+
+// performMutagenSync performs the actual file synchronization using Mutagen's rsync algorithm
+func (m *MutagenSyncEngine) performMutagenSync(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
 	if options.Verbose {
 		fmt.Printf("Using Mutagen rsync to sync files...\n")
 	}
@@ -168,10 +253,20 @@ func (m *MutagenSyncEngine) SyncFile(sourcePath, targetPath string, options *Syn
 		if len(op.Data) > 0 {
 			literalBytes += int64(len(op.Data))
 		} else {
-			copyBytes += int64(op.Count) * int64(signature.BlockSize)
+			// Check for potential overflow before conversion
+			if op.Count > 0 && signature.BlockSize > 0 {
+				if uint64(op.Count) <= (1<<63-1)/uint64(signature.BlockSize) {
+					copyBytes += int64(op.Count) * int64(signature.BlockSize)
+				} else {
+					// Handle overflow case
+					copyBytes = 1<<63 - 1
+				}
+			}
 			if op.Start == uint64(len(signature.Hashes)-1) {
 				// Last block might be shorter
-				copyBytes -= int64(signature.BlockSize - signature.LastBlockSize)
+				if signature.BlockSize >= signature.LastBlockSize {
+					copyBytes -= int64(signature.BlockSize - signature.LastBlockSize)
+				}
 			}
 		}
 		return nil

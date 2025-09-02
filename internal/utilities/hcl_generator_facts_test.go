@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"spooky/internal/hcl"
 	"spooky/internal/schemas"
 )
 
@@ -63,7 +64,7 @@ func TestHCLGenerator_FactsV1(t *testing.T) {
 	}
 
 	// Generate HCL
-	hcl, err := GenerateHCL(facts, "facts")
+	hcl, err := hcl.GenerateHCL(facts, "facts")
 	if err != nil {
 		t.Fatalf("Failed to generate HCL: %v", err)
 	}

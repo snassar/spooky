@@ -10,6 +10,16 @@ import (
 	"github.com/pkg/errors"
 )
 
+// OS constants to avoid repeated string literals
+const (
+	OSLinux   = "linux"
+	OSDarwin  = "darwin"
+	OSWindows = "windows"
+	OSFreeBSD = "freebsd"
+	OSOpenBSD = "openbsd"
+	OSNetBSD  = "netbsd"
+)
+
 // OSInfo represents detailed operating system information
 type OSInfo struct {
 	OS          string // "linux", "darwin", "windows", "freebsd", "openbsd", "netbsd"
@@ -51,13 +61,13 @@ func DetectOS() (*OSInfo, error) {
 
 	// OS-specific detection
 	switch info.OS {
-	case "linux":
+	case OSLinux:
 		return detectLinux(info)
-	case "darwin":
+	case OSDarwin:
 		return detectDarwin(info)
-	case "windows":
+	case OSWindows:
 		return detectWindows(info)
-	case "freebsd", "openbsd", "netbsd":
+	case OSFreeBSD, OSOpenBSD, OSNetBSD:
 		return detectBSD(info)
 	default:
 		return nil, errors.Errorf("unsupported operating system: %s", info.OS)
@@ -119,17 +129,17 @@ func detectWindows(info *OSInfo) (*OSInfo, error) {
 func detectBSD(info *OSInfo) (*OSInfo, error) {
 	// BSD version detection
 	switch info.OS {
-	case "freebsd":
+	case OSFreeBSD:
 		version, err := runCommand("freebsd-version")
 		if err == nil {
 			info.Version = strings.TrimSpace(version)
 		}
-	case "openbsd":
+	case OSOpenBSD:
 		version, err := runCommand("uname", "-r")
 		if err == nil {
 			info.Version = strings.TrimSpace(version)
 		}
-	case "netbsd":
+	case OSNetBSD:
 		version, err := runCommand("uname", "-r")
 		if err == nil {
 			info.Version = strings.TrimSpace(version)
@@ -237,7 +247,7 @@ func detectWSL() bool {
 // isRunningAsRoot detects if the process is running as root/administrator
 func isRunningAsRoot() bool {
 	switch runtime.GOOS {
-	case "windows":
+	case OSWindows:
 		// On Windows, check if running as administrator
 		// This is a simplified check - in production you'd use Windows API
 		return false // Placeholder
@@ -273,9 +283,9 @@ func GetPathConfig(appName string) (*PathConfig, error) {
 
 	// Set OS-specific paths
 	switch osInfo.OS {
-	case "linux", "darwin", "freebsd", "openbsd", "netbsd":
+	case OSLinux, OSDarwin, OSFreeBSD, OSOpenBSD, OSNetBSD:
 		setXDGPaths(config, osInfo)
-	case "windows":
+	case OSWindows:
 		setWindowsPaths(config, osInfo)
 	default:
 		return nil, errors.Errorf("unsupported OS for path configuration: %s", osInfo.OS)
@@ -371,9 +381,9 @@ func (info *OSInfo) String() string {
 // IsSupported returns true if the OS is supported
 func (info *OSInfo) IsSupported() bool {
 	switch info.OS {
-	case "linux", "darwin", "freebsd", "openbsd", "netbsd":
+	case OSLinux, OSDarwin, OSFreeBSD, OSOpenBSD, OSNetBSD:
 		return true
-	case "windows":
+	case OSWindows:
 		// Only Windows 11+ is supported
 		return strings.Contains(info.Version, "11") || strings.Contains(info.Version, "12")
 	default:

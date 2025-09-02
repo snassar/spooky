@@ -451,12 +451,18 @@ func (l *Logger) QueryLogs(query LogQuery) ([]LogEntry, error) {
 
 		// Parse metadata
 		if metadataJSON != "{}" {
-			json.Unmarshal([]byte(metadataJSON), &entry.Metadata)
+			if err := json.Unmarshal([]byte(metadataJSON), &entry.Metadata); err != nil {
+				// Log warning but continue - metadata parsing failure shouldn't break the entire query
+				entry.Metadata = make(map[string]interface{})
+			}
 		}
 
 		// Parse tags
 		if tagsJSON != "[]" {
-			json.Unmarshal([]byte(tagsJSON), &entry.Tags)
+			if err := json.Unmarshal([]byte(tagsJSON), &entry.Tags); err != nil {
+				// Log warning but continue - tags parsing failure shouldn't break the entire query
+				entry.Tags = []string{}
+			}
 		}
 
 		entries = append(entries, entry)

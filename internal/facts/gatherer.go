@@ -140,9 +140,9 @@ func (g *Gatherer) GatherFactsFromMachines(ctx context.Context, machines []*sche
 	return results, nil
 }
 
-// gatherBasicFacts collects basic system facts via SSH commands
-func (g *Gatherer) gatherBasicFacts(ctx context.Context, machine *schemas.MachinesMachineV1) (*schemas.BasicFactsV1, error) {
-	basicFacts := &schemas.BasicFactsV1{
+// createEmptyBasicFacts creates an empty BasicFactsV1 structure with initialized fact maps
+func createEmptyBasicFacts() *schemas.BasicFactsV1 {
+	return &schemas.BasicFactsV1{
 		SystemFacts:   &schemas.SystemFactsV1{Facts: make(map[string]*schemas.FactV1)},
 		HardwareFacts: &schemas.HardwareFactsV1{Facts: make(map[string]*schemas.FactV1)},
 		NetworkFacts:  &schemas.NetworkFactsV1{Facts: make(map[string]*schemas.FactV1)},
@@ -150,8 +150,37 @@ func (g *Gatherer) gatherBasicFacts(ctx context.Context, machine *schemas.Machin
 		UserFacts:     &schemas.UserFactsV1{Facts: make(map[string]*schemas.FactV1)},
 		RuntimeFacts:  &schemas.RuntimeFactsV1{Facts: make(map[string]*schemas.FactV1)},
 	}
+}
 
-	// Define fact commands organized by category
+// gatherBasicFacts collects basic system facts via SSH commands
+func (g *Gatherer) gatherBasicFacts(ctx context.Context, machine *schemas.MachinesMachineV1) (*schemas.BasicFactsV1, error) {
+	basicFacts := createEmptyBasicFacts()
+
+	// Execute all fact categories
+	if err := g.executeSystemFacts(ctx, machine, basicFacts); err != nil {
+		return nil, err
+	}
+	if err := g.executeHardwareFacts(ctx, machine, basicFacts); err != nil {
+		return nil, err
+	}
+	if err := g.executeNetworkFacts(ctx, machine, basicFacts); err != nil {
+		return nil, err
+	}
+	if err := g.executeOSFacts(ctx, machine, basicFacts); err != nil {
+		return nil, err
+	}
+	if err := g.executeUserFacts(ctx, machine, basicFacts); err != nil {
+		return nil, err
+	}
+	if err := g.executeRuntimeFacts(ctx, machine, basicFacts); err != nil {
+		return nil, err
+	}
+
+	return basicFacts, nil
+}
+
+// executeSystemFacts executes system-related fact commands
+func (g *Gatherer) executeSystemFacts(ctx context.Context, machine *schemas.MachinesMachineV1, basicFacts *schemas.BasicFactsV1) error {
 	systemCommands := map[string]string{
 		"hostname":               "hostname",
 		"os":                     "uname -s",
@@ -165,6 +194,11 @@ func (g *Gatherer) gatherBasicFacts(ctx context.Context, machine *schemas.Machin
 		"userspace_bits":         "getconf LONG_BIT",
 	}
 
+	return g.executeFactCommands(ctx, machine, systemCommands, basicFacts.SystemFacts.Facts)
+}
+
+// executeHardwareFacts executes hardware-related fact commands
+func (g *Gatherer) executeHardwareFacts(ctx context.Context, machine *schemas.MachinesMachineV1, basicFacts *schemas.BasicFactsV1) error {
 	hardwareCommands := map[string]string{
 		"cpu_count":                  "nproc",
 		"memory_total":               "free -b | grep '^Mem:' | awk '{print $2}'",
@@ -182,6 +216,11 @@ func (g *Gatherer) gatherBasicFacts(ctx context.Context, machine *schemas.Machin
 		"processor_threads_per_core": "grep '^cpu cores' /proc/cpuinfo | head -1 | cut -d: -f2 | tr -d ' '",
 	}
 
+	return g.executeFactCommands(ctx, machine, hardwareCommands, basicFacts.HardwareFacts.Facts)
+}
+
+// executeNetworkFacts executes network-related fact commands
+func (g *Gatherer) executeNetworkFacts(ctx context.Context, machine *schemas.MachinesMachineV1, basicFacts *schemas.BasicFactsV1) error {
 	networkCommands := map[string]string{
 		"interfaces":         "ip -o link show | awk '{print $2}' | sed 's/://' | tr '\n' ','",
 		"default_ip":         "ip route get 8.8.8.8 | awk '{print $7}'",
@@ -191,6 +230,11 @@ func (g *Gatherer) gatherBasicFacts(ctx context.Context, machine *schemas.Machin
 		"all_ipv6_addresses": "ip -6 addr show | grep 'inet6 ' | awk '{print $2}' | cut -d'/' -f1 | tr '\n' ','",
 	}
 
+	return g.executeFactCommands(ctx, machine, networkCommands, basicFacts.NetworkFacts.Facts)
+}
+
+// executeOSFacts executes operating system-related fact commands
+func (g *Gatherer) executeOSFacts(ctx context.Context, machine *schemas.MachinesMachineV1, basicFacts *schemas.BasicFactsV1) error {
 	osCommands := map[string]string{
 		"os_version":                 "uname -r",
 		"os_family":                  "cat /etc/os-release | grep '^ID=' | cut -d'=' -f2 | tr -d '\"'",
@@ -203,6 +247,11 @@ func (g *Gatherer) gatherBasicFacts(ctx context.Context, machine *schemas.Machin
 		"lsb":                        "lsb_release -a 2>/dev/null || echo 'lsb_release not available'",
 	}
 
+	return g.executeFactCommands(ctx, machine, osCommands, basicFacts.OSFacts.Facts)
+}
+
+// executeUserFacts executes user-related fact commands
+func (g *Gatherer) executeUserFacts(ctx context.Context, machine *schemas.MachinesMachineV1, basicFacts *schemas.BasicFactsV1) error {
 	userCommands := map[string]string{
 		"user":          "whoami",
 		"home":          "echo $HOME",
@@ -218,6 +267,11 @@ func (g *Gatherer) gatherBasicFacts(ctx context.Context, machine *schemas.Machin
 		"user_gecos":    "id -P | cut -d: -f5",
 	}
 
+	return g.executeFactCommands(ctx, machine, userCommands, basicFacts.UserFacts.Facts)
+}
+
+// executeRuntimeFacts executes runtime-related fact commands
+func (g *Gatherer) executeRuntimeFacts(ctx context.Context, machine *schemas.MachinesMachineV1, basicFacts *schemas.BasicFactsV1) error {
 	runtimeCommands := map[string]string{
 		"uptime":         "cat /proc/uptime | awk '{print $1}'",
 		"date":           "date -Iseconds",
@@ -226,62 +280,34 @@ func (g *Gatherer) gatherBasicFacts(ctx context.Context, machine *schemas.Machin
 		"date_time":      "date -Iseconds",
 	}
 
-	// Execute system commands
-	for factName, command := range systemCommands {
-		if fact := g.runCommand(ctx, machine, command, factName, "string"); fact != nil {
-			basicFacts.SystemFacts.Facts[factName] = fact
-		}
-	}
+	return g.executeFactCommands(ctx, machine, runtimeCommands, basicFacts.RuntimeFacts.Facts)
+}
 
-	// Execute hardware commands
-	for factName, command := range hardwareCommands {
-		factType := "string"
-		if factName == "cpu_count" || factName == "memory_total" || factName == "memory_used" ||
-			factName == "memory_free" || factName == "swap_total" || factName == "swap_free" ||
-			factName == "load_1" || factName == "load_5" || factName == "load_15" ||
-			factName == "processor_cores" || factName == "processor_vcpus" ||
-			factName == "processor_count" || factName == "processor_nproc" ||
-			factName == "processor_threads_per_core" {
-			factType = "number"
-		}
+// executeFactCommands executes a set of fact commands and stores results
+func (g *Gatherer) executeFactCommands(ctx context.Context, machine *schemas.MachinesMachineV1, commands map[string]string, facts map[string]*schemas.FactV1) error {
+	for factName, command := range commands {
+		factType := g.determineFactType(factName)
 		if fact := g.runCommand(ctx, machine, command, factName, factType); fact != nil {
-			basicFacts.HardwareFacts.Facts[factName] = fact
+			facts[factName] = fact
 		}
 	}
+	return nil
+}
 
-	// Execute network commands
-	for factName, command := range networkCommands {
-		if fact := g.runCommand(ctx, machine, command, factName, "string"); fact != nil {
-			basicFacts.NetworkFacts.Facts[factName] = fact
-		}
+// determineFactType determines the appropriate fact type based on the fact name
+func (g *Gatherer) determineFactType(factName string) string {
+	// Define numeric fact types
+	numericFacts := map[string]bool{
+		"cpu_count": true, "memory_total": true, "memory_used": true, "memory_free": true,
+		"swap_total": true, "swap_free": true, "load_1": true, "load_5": true, "load_15": true,
+		"processor_cores": true, "processor_vcpus": true, "processor_count": true,
+		"processor_nproc": true, "processor_threads_per_core": true,
 	}
 
-	// Execute OS commands
-	for factName, command := range osCommands {
-		if fact := g.runCommand(ctx, machine, command, factName, "string"); fact != nil {
-			basicFacts.OSFacts.Facts[factName] = fact
-		}
+	if numericFacts[factName] {
+		return "number"
 	}
-
-	// Execute user commands
-	for factName, command := range userCommands {
-		if fact := g.runCommand(ctx, machine, command, factName, "string"); fact != nil {
-			basicFacts.UserFacts.Facts[factName] = fact
-		}
-	}
-
-	// Execute runtime commands
-	for factName, command := range runtimeCommands {
-		factType := "string"
-		if factName == "uptime" || factName == "uptime_seconds" {
-			factType = "number"
-		}
-		if fact := g.runCommand(ctx, machine, command, factName, factType); fact != nil {
-			basicFacts.RuntimeFacts.Facts[factName] = fact
-		}
-	}
-
-	return basicFacts, nil
+	return "string"
 }
 
 // runCommand executes a command on a machine and returns a FactV1 if successful
@@ -480,14 +506,7 @@ func (g *Gatherer) ExportFacts(machineFacts []*MachineFacts) (*schemas.FactsV1, 
 	// Combine all machine facts into a single facts structure
 	// This is a simplified version - in practice, you might want to organize by machine
 	combinedFacts := &schemas.FactsV1{
-		BasicFacts: &schemas.BasicFactsV1{
-			SystemFacts:   &schemas.SystemFactsV1{Facts: make(map[string]*schemas.FactV1)},
-			HardwareFacts: &schemas.HardwareFactsV1{Facts: make(map[string]*schemas.FactV1)},
-			NetworkFacts:  &schemas.NetworkFactsV1{Facts: make(map[string]*schemas.FactV1)},
-			OSFacts:       &schemas.OSFactsV1{Facts: make(map[string]*schemas.FactV1)},
-			UserFacts:     &schemas.UserFactsV1{Facts: make(map[string]*schemas.FactV1)},
-			RuntimeFacts:  &schemas.RuntimeFactsV1{Facts: make(map[string]*schemas.FactV1)},
-		},
+		BasicFacts:    createEmptyBasicFacts(),
 		EnhancedFacts: &schemas.EnhancedFactsV1{Facts: make(map[string]*schemas.FactV1)},
 		CustomFacts:   &schemas.CustomFactsV1{Facts: make(map[string]*schemas.FactV1)},
 	}

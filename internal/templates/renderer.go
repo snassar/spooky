@@ -13,6 +13,15 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Resource type constants to avoid repeated string literals
+const (
+	ResourceTypeVariables   = "Variables"
+	ResourceTypeMachines    = "Machines"
+	ResourceTypeFacts       = "Facts"
+	ResourceTypeEnvironment = "Environment"
+	ResourceTypeProject     = "Project"
+)
+
 // TemplateRenderer handles template rendering with transparent decryption
 type TemplateRenderer struct {
 	transparentDecryptor *encryption.TransparentDecryptor
@@ -82,9 +91,9 @@ func (tr *TemplateRenderer) prepareContext(context *TemplateContext) (map[string
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to decrypt variables")
 		}
-		prepared["Variables"] = decryptedVariables
+		prepared[ResourceTypeVariables] = decryptedVariables
 	} else {
-		prepared["Variables"] = make(map[string]interface{})
+		prepared[ResourceTypeVariables] = make(map[string]interface{})
 	}
 
 	// Prepare machines with transparent decryption
@@ -93,35 +102,35 @@ func (tr *TemplateRenderer) prepareContext(context *TemplateContext) (map[string
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to decrypt machines")
 		}
-		prepared["Machines"] = decryptedMachines
+		prepared[ResourceTypeMachines] = decryptedMachines
 	} else {
-		prepared["Machines"] = make(map[string]interface{})
+		prepared[ResourceTypeMachines] = make(map[string]interface{})
 	}
 
 	// Facts don't need decryption (they're collected from machines)
 	if context.Facts != nil {
-		prepared["Facts"] = context.Facts
+		prepared[ResourceTypeFacts] = context.Facts
 	} else {
-		prepared["Facts"] = make(map[string]interface{})
+		prepared[ResourceTypeFacts] = make(map[string]interface{})
 	}
 
 	// Environment variables
 	if context.Environment != nil {
-		prepared["Environment"] = context.Environment
+		prepared[ResourceTypeEnvironment] = context.Environment
 	} else {
-		prepared["Environment"] = make(map[string]string)
+		prepared[ResourceTypeEnvironment] = make(map[string]string)
 	}
 
 	// Project metadata
 	if context.Project != nil {
-		prepared["Project"] = context.Project
+		prepared[ResourceTypeProject] = context.Project
 	} else {
-		prepared["Project"] = make(map[string]interface{})
+		prepared[ResourceTypeProject] = make(map[string]interface{})
 	}
 
 	// Add flattened variables for easy access
 	// This allows templates to use {{ .database_password }} instead of {{ .Variables.database_password }}
-	if variables, ok := prepared["Variables"].(map[string]interface{}); ok {
+	if variables, ok := prepared[ResourceTypeVariables].(map[string]interface{}); ok {
 		for key, value := range variables {
 			prepared[key] = value
 		}

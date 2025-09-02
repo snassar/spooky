@@ -16,6 +16,8 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 var (
@@ -111,7 +113,10 @@ func init() {
 	projectInitCmd.Flags().StringVar(&projectDescription, "description", "", "Project description")
 
 	// Mark name as required
-	projectInitCmd.MarkFlagRequired("name")
+	if err := projectInitCmd.MarkFlagRequired("name"); err != nil {
+		// Log error but continue - this is a configuration issue that shouldn't prevent the program from running
+		slog.Warn("Failed to mark name flag as required", "error", err)
+	}
 }
 
 func runProjectInit(cmd *cobra.Command, args []string) error {
@@ -200,7 +205,10 @@ func createProjectConfigFile(targetDir, filename, content string) error {
 
 func createProjectHCL(targetDir, name, description string) error {
 	// Generate project configuration directly from Go structs
-	content := schemas.GenerateProjectConfigFromStructs(name, description)
+	content, err := schemas.GenerateProjectConfigFromStructs(name, description)
+	if err != nil {
+		return fmt.Errorf("failed to generate project config: %w", err)
+	}
 	return createProjectConfigFile(targetDir, "project.hcl", content)
 }
 
@@ -352,12 +360,12 @@ func validateMergedContent(contents []string, fileNames []string, contentType st
 	// Now validate the merged content against the schema
 	var mergedContent string
 	switch contentType {
-	case "machines":
-		mergedContent = mergeHCLContent(contents, "machine", "machines")
-	case "variables":
-		mergedContent = mergeHCLContent(contents, "variable", "variables")
-	case "actions":
-		mergedContent = mergeHCLContent(contents, "action", "actions")
+	case ResourceTypeMachines:
+		mergedContent = mergeHCLContent(contents, "machine", ResourceTypeMachines)
+	case ResourceTypeVariables:
+		mergedContent = mergeHCLContent(contents, "variable", ResourceTypeVariables)
+	case ResourceTypeActions:
+		mergedContent = mergeHCLContent(contents, "action", ResourceTypeActions)
 	}
 
 	if err := validateAgainstSchema(contentType, mergedContent); err != nil {
@@ -391,7 +399,7 @@ metadata {
 }
 
 %s {
-`, strings.Title(blockType), blockType, blockName)
+`, cases.Title(language.English).String(blockType), blockType, blockName)
 
 	for _, content := range contents {
 		blocks := extractHCLBlocks(content, blockType)
@@ -444,11 +452,11 @@ func getKeys(m map[string]interface{}) []string {
 // getResourceType returns the resource type name for a given content type
 func getResourceType(contentType string) string {
 	switch contentType {
-	case "machines":
+	case ResourceTypeMachines:
 		return "machine"
-	case "variables":
+	case ResourceTypeVariables:
 		return "variable"
-	case "actions":
+	case ResourceTypeActions:
 		return "action"
 	default:
 		return contentType
@@ -458,7 +466,7 @@ func getResourceType(contentType string) string {
 // mergeAndValidateMachines merges multiple machines HCL files and validates for collisions
 func mergeAndValidateMachines(targetDir string) error {
 	machinesHCLPath := filepath.Join(targetDir, "machines.hcl")
-	machinesDirPath := filepath.Join(targetDir, "machines")
+	machinesDirPath := filepath.Join(targetDir, ResourceTypeMachines)
 
 	var allContents []string
 	var fileNames []string
@@ -502,7 +510,7 @@ func mergeAndValidateMachines(targetDir string) error {
 	}
 
 	// Merge all contents and validate
-	return validateMergedContent(allContents, fileNames, "machines")
+	return validateMergedContent(allContents, fileNames, ResourceTypeMachines)
 }
 
 type machineInfo struct {
@@ -532,7 +540,7 @@ func extractMachinesFromParsedData(data map[string]interface{}, fileName string)
 	var machines []machineInfo
 
 	// Look for machines block
-	machinesBlock, exists := data["machines"]
+	machinesBlock, exists := data[ResourceTypeMachines]
 	if !exists {
 		return nil, fmt.Errorf("missing machines block in %s", fileName)
 	}
@@ -619,11 +627,11 @@ func extractResourceNamesFromParsedData(data map[string]interface{}, fileName, b
 
 	// Handle different resource structures based on type
 	switch blockType {
-	case "machines":
+	case ResourceTypeMachines:
 		return extractMachineResources(mainMap, fileName, resourceType)
-	case "variables":
+	case ResourceTypeVariables:
 		return extractVariableResources(mainMap, fileName, resourceType)
-	case "actions":
+	case ResourceTypeActions:
 		return extractActionResources(mainMap, fileName, resourceType)
 	default:
 		return nil, fmt.Errorf("unsupported block type: %s", blockType)
@@ -647,7 +655,7 @@ func extractMachineResources(mainMap map[string]interface{}, fileName, resourceT
 			if name, exists := machineBlock["name"]; exists {
 				nameStr := convertToString(name)
 				// Filter out placeholder values that indicate parsing errors
-				if nameStr != "" && nameStr != "complex_expression" && !strings.HasPrefix(nameStr, "complex_") {
+				if nameStr != "" && nameStr != ComplexExpressionPlaceholder && !strings.HasPrefix(nameStr, ComplexPrefix) {
 					resources = append(resources, machineInfo{
 						name:     nameStr,
 						fileName: fileName,
@@ -662,7 +670,7 @@ func extractMachineResources(mainMap map[string]interface{}, fileName, resourceT
 				if name, exists := machineBlock["name"]; exists {
 					nameStr := convertToString(name)
 					// Filter out placeholder values that indicate parsing errors
-					if nameStr != "" && nameStr != "complex_expression" && !strings.HasPrefix(nameStr, "complex_") {
+					if nameStr != "" && nameStr != ComplexExpressionPlaceholder && !strings.HasPrefix(nameStr, ComplexPrefix) {
 						resources = append(resources, machineInfo{
 							name:     nameStr,
 							fileName: fileName,
@@ -676,7 +684,7 @@ func extractMachineResources(mainMap map[string]interface{}, fileName, resourceT
 		if name, exists := machineBlock["name"]; exists {
 			nameStr := convertToString(name)
 			// Filter out placeholder values that indicate parsing errors
-			if nameStr != "" && nameStr != "complex_expression" && !strings.HasPrefix(nameStr, "complex_") {
+			if nameStr != "" && nameStr != ComplexExpressionPlaceholder && !strings.HasPrefix(nameStr, ComplexPrefix) {
 				resources = append(resources, machineInfo{
 					name:     nameStr,
 					fileName: fileName,
@@ -769,6 +777,26 @@ func extractVariableResources(mainMap map[string]interface{}, fileName, resource
 	return resources, nil
 }
 
+// extractActionMetadata extracts metadata from an action block
+func extractActionMetadata(actionBlock map[string]interface{}, actionName, fileName string) actionInfo {
+	action := actionInfo{
+		name:     actionName,
+		fileName: fileName,
+	}
+
+	// Extract description
+	if desc, exists := actionBlock["description"]; exists {
+		action.description = convertToString(desc)
+	}
+
+	// Extract action type
+	if actionType, exists := actionBlock["type"]; exists {
+		action.actionType = convertToString(actionType)
+	}
+
+	return action
+}
+
 // extractActionResources extracts action resources from the main block
 func extractActionResources(mainMap map[string]interface{}, fileName, resourceType string) ([]interface{}, error) {
 	var resources []interface{}
@@ -782,21 +810,7 @@ func extractActionResources(mainMap map[string]interface{}, fileName, resourceTy
 
 		// Check if it's an action block (map with metadata)
 		if actionBlock, ok := actionValue.(map[string]interface{}); ok {
-			action := actionInfo{
-				name:     actionName,
-				fileName: fileName,
-			}
-
-			// Extract description
-			if desc, exists := actionBlock["description"]; exists {
-				action.description = convertToString(desc)
-			}
-
-			// Extract action type
-			if actionType, exists := actionBlock["type"]; exists {
-				action.actionType = convertToString(actionType)
-			}
-
+			action := extractActionMetadata(actionBlock, actionName, fileName)
 			resources = append(resources, action)
 		} else {
 			// Simple action block without metadata
@@ -817,7 +831,7 @@ func extractActionNamesFromParsedData(data map[string]interface{}, fileName stri
 	logger := logging.GetGlobalLogger()
 
 	// Look for actions block
-	actionsBlock, exists := data["actions"]
+	actionsBlock, exists := data[ResourceTypeActions]
 	if !exists {
 		logger.Debug("no actions block found",
 			slog.String("file", fileName))
@@ -848,21 +862,7 @@ func extractActionNamesFromParsedData(data map[string]interface{}, fileName stri
 
 		// Check if it's an action block (map with metadata)
 		if actionBlock, ok := actionValue.(map[string]interface{}); ok {
-			action := actionInfo{
-				name:     actionName,
-				fileName: fileName,
-			}
-
-			// Extract description
-			if desc, exists := actionBlock["description"]; exists {
-				action.description = convertToString(desc)
-			}
-
-			// Extract action type
-			if actionType, exists := actionBlock["type"]; exists {
-				action.actionType = convertToString(actionType)
-			}
-
+			action := extractActionMetadata(actionBlock, actionName, fileName)
 			actions = append(actions, action)
 		} else {
 			// Simple action block without metadata
@@ -1024,3 +1024,16 @@ func runProjectConfig(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
+
+// Constants to avoid repeated string literals
+const (
+	ComplexExpressionPlaceholder = "complex_expression"
+	ComplexPrefix                = "complex_"
+)
+
+// Resource type constants to avoid repeated string literals
+const (
+	ResourceTypeMachines  = "machines"
+	ResourceTypeVariables = "variables"
+	ResourceTypeActions   = "actions"
+)

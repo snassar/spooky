@@ -73,6 +73,9 @@ func (ae *AgeEncryption) loadIdentitiesFromDirectory() error {
 		return errors.Wrapf(err, "failed to read identities directory: %s", ae.identitiesPath)
 	}
 
+	var loadErrors []error
+	successfullyLoaded := false
+
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -85,12 +88,31 @@ func (ae *AgeEncryption) loadIdentitiesFromDirectory() error {
 
 		identityPath := filepath.Join(ae.identitiesPath, entry.Name())
 		if err := ae.loadIdentityFromFile(identityPath); err != nil {
-			// Log error but continue loading other identities
-			logger := logging.GetGlobalLogger()
-			logger.Warn("failed to load identity file, continuing with other identities",
-				slog.String("identity_path", identityPath),
-				slog.String("error", err.Error()))
+			// Collect errors but continue loading other identities
+			loadErrors = append(loadErrors, errors.Wrapf(err, "failed to load identity file: %s", identityPath))
+		} else {
+			successfullyLoaded = true
 		}
+	}
+
+	// Security-critical: If no identities were loaded successfully, fail fast
+	if !successfullyLoaded {
+		if len(loadErrors) > 0 {
+			// Return the first error with context about all failures
+			return errors.Wrapf(loadErrors[0], "failed to load any identities from directory %s (attempted %d files, all failed)",
+				ae.identitiesPath, len(entries))
+		}
+		return errors.Errorf("no valid identity files found in directory: %s", ae.identitiesPath)
+	}
+
+	// If some identities failed to load, log warnings but don't fail
+	if len(loadErrors) > 0 {
+		logger := logging.GetGlobalLogger()
+		logger.Warn("some identity files failed to load, but continuing with successfully loaded identities",
+			slog.String("identities_path", ae.identitiesPath),
+			slog.Int("total_files", len(entries)),
+			slog.Int("successful_loads", len(ae.identities)),
+			slog.Int("failed_loads", len(loadErrors)))
 	}
 
 	return nil
@@ -149,6 +171,9 @@ func (ae *AgeEncryption) loadRecipientsFromDirectory() error {
 		return errors.Wrapf(err, "failed to read recipients directory: %s", ae.recipientsPath)
 	}
 
+	var loadErrors []error
+	successfullyLoaded := false
+
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -166,12 +191,31 @@ func (ae *AgeEncryption) loadRecipientsFromDirectory() error {
 
 		recipientPath := filepath.Join(ae.recipientsPath, entry.Name())
 		if err := ae.loadRecipientsFromFile(recipientPath); err != nil {
-			// Log error but continue loading other recipients
-			logger := logging.GetGlobalLogger()
-			logger.Warn("failed to load recipient file, continuing with other recipients",
-				slog.String("recipient_path", recipientPath),
-				slog.String("error", err.Error()))
+			// Collect errors but continue loading other recipients
+			loadErrors = append(loadErrors, errors.Wrapf(err, "failed to load recipient file: %s", recipientPath))
+		} else {
+			successfullyLoaded = true
 		}
+	}
+
+	// Security-critical: If no recipients were loaded successfully, fail fast
+	if !successfullyLoaded {
+		if len(loadErrors) > 0 {
+			// Return the first error with context about all failures
+			return errors.Wrapf(loadErrors[0], "failed to load any recipients from directory %s (attempted %d files, all failed)",
+				ae.recipientsPath, len(entries))
+		}
+		return errors.Errorf("no valid recipient files found in directory: %s", ae.recipientsPath)
+	}
+
+	// If some recipients failed to load, log warnings but don't fail
+	if len(loadErrors) > 0 {
+		logger := logging.GetGlobalLogger()
+		logger.Warn("some recipient files failed to load, but continuing with successfully loaded recipients",
+			slog.String("recipients_path", ae.recipientsPath),
+			slog.Int("total_files", len(entries)),
+			slog.Int("successful_loads", len(ae.recipients)),
+			slog.Int("failed_loads", len(loadErrors)))
 	}
 
 	return nil
@@ -228,7 +272,12 @@ func isTextFile(filename string) bool {
 // Encrypt encrypts a plaintext value using age encryption
 func (ae *AgeEncryption) Encrypt(plaintext string) (string, error) {
 	if len(ae.recipients) == 0 {
-		return "", errors.New("no recipients available for encryption")
+		return "", errors.New("no recipients available for encryption - encryption configuration is incomplete")
+	}
+
+	// Security-critical: Validate input
+	if plaintext == "" {
+		return "", errors.New("cannot encrypt empty plaintext - this could lead to data loss")
 	}
 
 	// Create encrypted output
@@ -243,23 +292,23 @@ func (ae *AgeEncryption) Encrypt(plaintext string) (string, error) {
 	// Create encrypted writer
 	encryptedWriter, err := age.Encrypt(output, recipients...)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to create encrypted writer")
+		return "", errors.Wrap(err, "failed to create encrypted writer - encryption initialization failed")
 	}
 	defer encryptedWriter.Close()
 
 	// Write the plaintext
 	if _, err := encryptedWriter.Write([]byte(plaintext)); err != nil {
-		return "", errors.Wrap(err, "failed to write plaintext to encrypted writer")
+		return "", errors.Wrap(err, "failed to write plaintext to encrypted writer - data corruption possible")
 	}
 
 	// Close the encrypted writer to finalize encryption
 	if err := encryptedWriter.Close(); err != nil {
-		return "", errors.Wrap(err, "failed to finalize encryption")
+		return "", errors.Wrap(err, "failed to finalize encryption - encrypted data may be corrupted")
 	}
 
 	// Close the armor writer
 	if err := output.Close(); err != nil {
-		return "", errors.Wrap(err, "failed to close armor writer")
+		return "", errors.Wrap(err, "failed to close armor writer - encrypted data may be corrupted")
 	}
 
 	return encrypted.String(), nil
@@ -268,7 +317,17 @@ func (ae *AgeEncryption) Encrypt(plaintext string) (string, error) {
 // Decrypt decrypts an age-encrypted value
 func (ae *AgeEncryption) Decrypt(encrypted string) (string, error) {
 	if len(ae.identities) == 0 {
-		return "", errors.New("no identities available for decryption")
+		return "", errors.New("no identities available for decryption - decryption configuration is incomplete")
+	}
+
+	// Security-critical: Validate input
+	if encrypted == "" {
+		return "", errors.New("cannot decrypt empty encrypted value - this could lead to data loss")
+	}
+
+	// Security-critical: Validate encrypted format
+	if !ae.IsEncrypted(encrypted) {
+		return "", errors.New("value does not appear to be age-encrypted - decryption may fail or produce corrupted data")
 	}
 
 	// Create armored reader
@@ -277,13 +336,18 @@ func (ae *AgeEncryption) Decrypt(encrypted string) (string, error) {
 	// Create decrypted reader
 	decryptedReader, err := age.Decrypt(armoredReader, ae.identities...)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to create decrypted reader")
+		return "", errors.Wrap(err, "failed to create decrypted reader - decryption initialization failed")
 	}
 
 	// Read the decrypted content
 	decryptedBytes, err := io.ReadAll(decryptedReader)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to read decrypted content")
+		return "", errors.Wrap(err, "failed to read decrypted content - decryption may have produced corrupted data")
+	}
+
+	// Security-critical: Validate decrypted result
+	if len(decryptedBytes) == 0 {
+		return "", errors.New("decryption produced empty result - this may indicate a security issue or corrupted data")
 	}
 
 	return string(decryptedBytes), nil

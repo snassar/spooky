@@ -11,6 +11,15 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
+// Resource type constants to avoid repeated string literals
+const (
+	ResourceTypeProject          = "project"
+	ResourceTypeMachines         = "machines"
+	ResourceTypeActions          = "actions"
+	ResourceTypeVariables        = "variables"
+	ResourceTypeProjectDirectory = "project-directory"
+)
+
 // SimpleValidator provides focused, essential validation without over-engineering
 type SimpleValidator struct {
 	logger *slog.Logger
@@ -70,15 +79,15 @@ func (v *SimpleValidator) ValidateData(schemaName string, data map[string]interf
 // validateEssential performs essential validation without over-engineering
 func (v *SimpleValidator) validateEssential(schemaName string, data map[string]interface{}, result *ValidationResult) {
 	switch schemaName {
-	case "project":
+	case ResourceTypeProject:
 		v.validateProjectEssential(data, result)
-	case "machines":
+	case ResourceTypeMachines:
 		v.validateMachinesEssential(data, result)
-	case "actions":
+	case ResourceTypeActions:
 		v.validateActionsEssential(data, result)
-	case "variables":
+	case ResourceTypeVariables:
 		v.validateVariablesEssential(data, result)
-	case "project-directory":
+	case ResourceTypeProjectDirectory:
 		v.validateProjectDirectoryEssential(data, result)
 	}
 }
@@ -162,10 +171,10 @@ func (v *SimpleValidator) validateProjectBlockEssential(project map[string]inter
 // validateMachinesEssential validates machines with essential rules only
 func (v *SimpleValidator) validateMachinesEssential(data map[string]interface{}, result *ValidationResult) {
 	// Check for required machines block
-	machinesBlock, exists := data["machines"]
+	machinesBlock, exists := data[ResourceTypeMachines]
 	if !exists {
 		result.Errors = append(result.Errors, ValidationError{
-			Field:    "machines",
+			Field:    ResourceTypeMachines,
 			Message:  "missing required machines block",
 			Severity: "error",
 		})
@@ -177,7 +186,7 @@ func (v *SimpleValidator) validateMachinesEssential(data map[string]interface{},
 		v.validateMachinesBlockEssential(machinesMap, result)
 	} else {
 		result.Errors = append(result.Errors, ValidationError{
-			Field:    "machines",
+			Field:    ResourceTypeMachines,
 			Message:  "machines block must be a configuration block",
 			Severity: "error",
 		})
@@ -264,10 +273,10 @@ func (v *SimpleValidator) validateAuthenticationEssential(auth map[string]interf
 // validateActionsEssential validates actions with essential rules only
 func (v *SimpleValidator) validateActionsEssential(data map[string]interface{}, result *ValidationResult) {
 	// Check for required actions block
-	actionsBlock, exists := data["actions"]
+	actionsBlock, exists := data[ResourceTypeActions]
 	if !exists {
 		result.Errors = append(result.Errors, ValidationError{
-			Field:    "actions",
+			Field:    ResourceTypeActions,
 			Message:  "missing required actions block",
 			Severity: "error",
 		})
@@ -279,7 +288,7 @@ func (v *SimpleValidator) validateActionsEssential(data map[string]interface{}, 
 		v.validateActionsBlockEssential(actionsMap, result)
 	} else {
 		result.Errors = append(result.Errors, ValidationError{
-			Field:    "actions",
+			Field:    ResourceTypeActions,
 			Message:  "actions block must be a configuration block",
 			Severity: "error",
 		})
@@ -310,7 +319,7 @@ func (v *SimpleValidator) validateActionsBlockEssential(actions map[string]inter
 
 	if !hasAction {
 		result.Errors = append(result.Errors, ValidationError{
-			Field:    "actions",
+			Field:    ResourceTypeActions,
 			Message:  "at least one action must be defined",
 			Severity: "error",
 		})
@@ -384,10 +393,10 @@ func (v *SimpleValidator) validateActionEssential(action map[string]interface{},
 // validateVariablesEssential validates variables with essential rules only
 func (v *SimpleValidator) validateVariablesEssential(data map[string]interface{}, result *ValidationResult) {
 	// Check for required variables block
-	variablesBlock, exists := data["variables"]
+	variablesBlock, exists := data[ResourceTypeVariables]
 	if !exists {
 		result.Errors = append(result.Errors, ValidationError{
-			Field:    "variables",
+			Field:    ResourceTypeVariables,
 			Message:  "missing required variables block",
 			Severity: "error",
 		})
@@ -399,7 +408,7 @@ func (v *SimpleValidator) validateVariablesEssential(data map[string]interface{}
 		v.validateVariablesBlockEssential(variablesMap, result)
 	} else {
 		result.Errors = append(result.Errors, ValidationError{
-			Field:    "variables",
+			Field:    ResourceTypeVariables,
 			Message:  "variables block must be a configuration block",
 			Severity: "error",
 		})
@@ -428,7 +437,7 @@ func (v *SimpleValidator) validateVariablesBlockEssential(variables map[string]i
 
 	if !hasVariable {
 		result.Errors = append(result.Errors, ValidationError{
-			Field:    "variables",
+			Field:    ResourceTypeVariables,
 			Message:  "at least one variable must be defined",
 			Severity: "error",
 		})

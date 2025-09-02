@@ -25,7 +25,8 @@ func ExampleUsage() {
 
 	logger, err := NewLogger(config)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to create logger: %v", err))
+		fmt.Fprintf(os.Stderr, "Failed to create logger: %v\n", err)
+		return
 	}
 	defer logger.Close()
 
@@ -46,7 +47,8 @@ func ExampleUsage() {
 		Limit: 100,
 	})
 	if err != nil {
-		panic(fmt.Sprintf("Failed to query logs: %v", err))
+		fmt.Fprintf(os.Stderr, "Failed to query logs: %v\n", err)
+		return
 	}
 
 	fmt.Printf("Found %d log entries for run %s\n", len(entries), runID1)
@@ -61,7 +63,8 @@ func ExampleUsage() {
 		Limit:     50,
 	})
 	if err != nil {
-		panic(fmt.Sprintf("Failed to query error logs: %v", err))
+		fmt.Fprintf(os.Stderr, "Failed to query error logs: %v\n", err)
+		return
 	}
 
 	fmt.Printf("Found %d error entries in the last hour\n", len(errorEntries))
@@ -71,7 +74,7 @@ func ExampleUsage() {
 func simulateActionRun(logger *Logger, runID, actionName, projectName string) {
 	// Log action start
 	startTime := time.Now()
-	logger.LogToDatabase(LogEntry{
+	if err := logger.LogToDatabase(LogEntry{
 		Timestamp:   startTime,
 		Level:       "info",
 		Message:     "Starting action execution",
@@ -80,7 +83,9 @@ func simulateActionRun(logger *Logger, runID, actionName, projectName string) {
 		ProjectName: projectName,
 		Host:        "localhost",
 		Tags:        []string{"action_start", "automation"},
-	})
+	}); err != nil {
+		fmt.Printf("Warning: failed to log action start: %v\n", err)
+	}
 
 	// Simulate some tasks
 	tasks := []string{"validate_config", "deploy_packages", "start_services", "verify_deployment"}
@@ -91,7 +96,7 @@ func simulateActionRun(logger *Logger, runID, actionName, projectName string) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Log task completion
-		logger.LogToDatabase(LogEntry{
+		if err := logger.LogToDatabase(LogEntry{
 			Timestamp:   time.Now(),
 			Level:       "info",
 			Message:     fmt.Sprintf("Task %d completed successfully", i+1),
@@ -102,12 +107,14 @@ func simulateActionRun(logger *Logger, runID, actionName, projectName string) {
 			Host:        "localhost",
 			Duration:    time.Since(taskStart),
 			Tags:        []string{"task_complete", task},
-		})
+		}); err != nil {
+			fmt.Printf("Warning: failed to log task completion: %v\n", err)
+		}
 	}
 
 	// Log action completion
 	duration := time.Since(startTime)
-	logger.LogToDatabase(LogEntry{
+	if err := logger.LogToDatabase(LogEntry{
 		Timestamp:   time.Now(),
 		Level:       "info",
 		Message:     "Action completed successfully",
@@ -117,7 +124,9 @@ func simulateActionRun(logger *Logger, runID, actionName, projectName string) {
 		Host:        "localhost",
 		Duration:    duration,
 		Tags:        []string{"action_complete", "success"},
-	})
+	}); err != nil {
+		fmt.Printf("Warning: failed to log action completion: %v\n", err)
+	}
 }
 
 // ExampleXDGPaths demonstrates the XDG state directory structure
@@ -163,14 +172,16 @@ func ExampleMultiProcess() {
 		defer logger.Close()
 
 		runID := uuid.New().String()
-		logger.LogToDatabase(LogEntry{
+		if err := logger.LogToDatabase(LogEntry{
 			Timestamp:   time.Now(),
 			Level:       "info",
 			Message:     "Deploying webserver",
 			RunID:       runID,
 			ActionName:  "deploy_webserver",
 			ProjectName: "webserver-project",
-		})
+		}); err != nil {
+			fmt.Printf("Warning: failed to log webserver deployment: %v\n", err)
+		}
 	}()
 
 	// Process 2: Backup database
@@ -179,14 +190,16 @@ func ExampleMultiProcess() {
 		defer logger.Close()
 
 		runID := uuid.New().String()
-		logger.LogToDatabase(LogEntry{
+		if err := logger.LogToDatabase(LogEntry{
 			Timestamp:   time.Now(),
 			Level:       "info",
 			Message:     "Backing up database",
 			RunID:       runID,
 			ActionName:  "backup_database",
 			ProjectName: "database-project",
-		})
+		}); err != nil {
+			fmt.Printf("Warning: failed to log database backup: %v\n", err)
+		}
 	}()
 
 	// Process 3: Update monitoring
@@ -195,14 +208,16 @@ func ExampleMultiProcess() {
 		defer logger.Close()
 
 		runID := uuid.New().String()
-		logger.LogToDatabase(LogEntry{
+		if err := logger.LogToDatabase(LogEntry{
 			Timestamp:   time.Now(),
 			Level:       "info",
 			Message:     "Updating monitoring",
 			RunID:       runID,
 			ActionName:  "update_monitoring",
 			ProjectName: "monitoring-project",
-		})
+		}); err != nil {
+			fmt.Printf("Warning: failed to log monitoring update: %v\n", err)
+		}
 	}()
 
 	// All three processes can write to the same SQLite database simultaneously
