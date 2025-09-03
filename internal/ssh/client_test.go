@@ -50,8 +50,8 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 		assert.Equal(t, "ssh-rsa", signer.PublicKey().Type())
 	})
 
-	// Test case 2: Encrypted RSA private key (legacy format)
-	t.Run("Encrypted RSA Key (Legacy)", func(t *testing.T) {
+	// Test case 2: Encrypted RSA private key (legacy format) - no longer supported
+	t.Run("Encrypted RSA Key (Legacy) - No Longer Supported", func(t *testing.T) {
 		// Create encrypted PEM block using deprecated function
 		block := &pem.Block{
 			Type:  "RSA PRIVATE KEY",
@@ -68,7 +68,7 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 		err = os.WriteFile(keyPath, pemData, 0600)
 		require.NoError(t, err)
 
-		// Test loading with passphrase
+		// Test loading with passphrase - should fail as legacy DES encryption is no longer supported
 		client := &SSHClient{
 			config: &SSHConfig{
 				PrivateKeyPath: keyPath,
@@ -77,9 +77,9 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 		}
 
 		signer, err := client.loadPrivateKey()
-		assert.NoError(t, err)
-		assert.NotNil(t, signer)
-		assert.Equal(t, "ssh-rsa", signer.PublicKey().Type())
+		assert.Error(t, err)
+		assert.Nil(t, signer)
+		assert.Contains(t, err.Error(), "legacy DES-encrypted traditional keys are no longer supported")
 	})
 
 	// Test case 3: PKCS#8 format (unencrypted)
@@ -141,8 +141,8 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to parse")
 	})
 
-	// Test case 5: Key with passphrase but wrong passphrase
-	t.Run("Wrong Passphrase", func(t *testing.T) {
+	// Test case 5: Key with passphrase but wrong passphrase - legacy DES no longer supported
+	t.Run("Wrong Passphrase - Legacy DES No Longer Supported", func(t *testing.T) {
 		// Create encrypted PEM block
 		block := &pem.Block{
 			Type:  "RSA PRIVATE KEY",
@@ -159,7 +159,7 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 		err = os.WriteFile(keyPath, pemData, 0600)
 		require.NoError(t, err)
 
-		// Test loading with wrong passphrase
+		// Test loading with wrong passphrase - should fail as legacy DES encryption is no longer supported
 		client := &SSHClient{
 			config: &SSHConfig{
 				PrivateKeyPath: keyPath,
@@ -170,11 +170,11 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 		signer, err := client.loadPrivateKey()
 		assert.Error(t, err)
 		assert.Nil(t, signer)
-		assert.Contains(t, err.Error(), "failed to decrypt traditional private key")
+		assert.Contains(t, err.Error(), "legacy DES-encrypted traditional keys are no longer supported")
 	})
 
-	// Test case 6: Encrypted key without passphrase
-	t.Run("Encrypted Key Without Passphrase", func(t *testing.T) {
+	// Test case 6: Encrypted key without passphrase - legacy DES no longer supported
+	t.Run("Encrypted Key Without Passphrase - Legacy DES No Longer Supported", func(t *testing.T) {
 		// Create encrypted PEM block
 		block := &pem.Block{
 			Type:  "RSA PRIVATE KEY",
@@ -191,7 +191,7 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 		err = os.WriteFile(keyPath, pemData, 0600)
 		require.NoError(t, err)
 
-		// Test loading without passphrase
+		// Test loading without passphrase - should fail as legacy DES encryption is no longer supported
 		client := &SSHClient{
 			config: &SSHConfig{
 				PrivateKeyPath: keyPath,
@@ -202,7 +202,7 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 		signer, err := client.loadPrivateKey()
 		assert.Error(t, err)
 		assert.Nil(t, signer)
-		assert.Contains(t, err.Error(), "private key is encrypted but no passphrase provided")
+		assert.Contains(t, err.Error(), "legacy DES-encrypted traditional keys are no longer supported")
 	})
 }
 

@@ -609,6 +609,16 @@ func (sc *SSHClient) loadPrivateKey() (ssh.Signer, error) {
 		return nil, errors.New("private key data is empty - authentication cannot proceed")
 	}
 
+	// Check for legacy DES-encrypted traditional keys first and reject them
+	block, _ := pem.Decode(keyData)
+	if block != nil {
+		if block.Type == "RSA PRIVATE KEY" || block.Type == "DSA PRIVATE KEY" || block.Type == "EC PRIVATE KEY" {
+			if x509.IsEncryptedPEMBlock(block) {
+				return nil, errors.New("legacy DES-encrypted traditional keys are no longer supported - please convert to PKCS#8 or OpenSSH format")
+			}
+		}
+	}
+
 	// Try modern SSH parsing first (supports PKCS#8 and other encrypted formats)
 	if sc.config.Passphrase != "" {
 		// Try parsing with passphrase first - this handles PKCS#8 and other modern formats
@@ -635,11 +645,11 @@ func (sc *SSHClient) loadPrivateKey() (ssh.Signer, error) {
 			logger.Debug("Custom PKCS#8 decryption failed", slog.String("error", err.Error()))
 		}
 
-		// Fall back to legacy PEM decryption
-		logger.Debug("Falling back to legacy PEM decryption")
+		// Modern parsing failed, will try unencrypted formats below
+		logger.Debug("Modern parsing failed, will try unencrypted formats")
 	}
 
-	// Try to parse as PEM
+	// Parse PEM to get block and handle rest data
 	block, rest := pem.Decode(keyData)
 	if block == nil {
 		return nil, errors.New("failed to decode PEM block - private key format is invalid")
@@ -654,24 +664,10 @@ func (sc *SSHClient) loadPrivateKey() (ssh.Signer, error) {
 	// Handle different PEM block types directly
 	switch block.Type {
 	case "RSA PRIVATE KEY", "DSA PRIVATE KEY", "EC PRIVATE KEY":
-		// Traditional encrypted private keys - try legacy decryption
-		if sc.config.Passphrase != "" {
-			// Try legacy PEM decryption for traditional formats
-			if x509.IsEncryptedPEMBlock(block) {
-				decryptedBlock, err := x509.DecryptPEMBlock(block, []byte(sc.config.Passphrase))
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to decrypt traditional private key - passphrase may be incorrect")
-				}
-				block = &pem.Block{
-					Type:  block.Type,
-					Bytes: decryptedBlock,
-				}
-			}
-		} else if x509.IsEncryptedPEMBlock(block) {
-			return nil, errors.New("private key is encrypted but no passphrase provided - authentication cannot proceed")
-		}
+		// Traditional private keys - only support unencrypted format
+		// Legacy DES-encrypted keys are already rejected earlier in the function
 
-		// Parse the decrypted/unencrypted key
+		// Parse the unencrypted key
 		signer, err := ssh.ParsePrivateKey(pem.EncodeToMemory(block))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to parse traditional private key - key format may be corrupted")
