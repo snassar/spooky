@@ -141,15 +141,9 @@ func (pv *ProjectValidator) convertToSchema(items []string, expectedItems map[st
 	return schemaItems
 }
 
-// convertToSchemaGeneric converts file or directory names to schema format
-func (pv *ProjectValidator) convertToSchemaGeneric(items []string, expectedItems map[string]map[string]interface{}) []map[string]interface{} {
-	return pv.convertToSchema(items, expectedItems)
-}
-
-// convertFilesToSchema converts file names to schema format
-func (pv *ProjectValidator) convertFilesToSchema(files []string) []map[string]interface{} {
-	// Define expected files based on schema
-	expectedFiles := map[string]map[string]interface{}{
+// getExpectedFiles returns the expected files configuration
+func (pv *ProjectValidator) getExpectedFiles() map[string]map[string]interface{} {
+	return map[string]map[string]interface{}{
 		"project.hcl": {
 			"name":        "project.hcl",
 			"type":        "file",
@@ -186,14 +180,11 @@ func (pv *ProjectValidator) convertFilesToSchema(files []string) []map[string]in
 			"pattern":     "# .*",
 		},
 	}
-
-	return pv.convertToSchemaGeneric(files, expectedFiles)
 }
 
-// convertDirectoriesToSchema converts directory names to schema format
-func (pv *ProjectValidator) convertDirectoriesToSchema(directories []string) []map[string]interface{} {
-	// Define expected directories based on schema
-	expectedDirs := map[string]map[string]interface{}{
+// getExpectedDirectories returns the expected directories configuration
+func (pv *ProjectValidator) getExpectedDirectories() map[string]map[string]interface{} {
+	return map[string]map[string]interface{}{
 		"machines": {
 			"name":        "machines",
 			"type":        "directory",
@@ -230,8 +221,16 @@ func (pv *ProjectValidator) convertDirectoriesToSchema(directories []string) []m
 			"pattern":     "",
 		},
 	}
+}
 
-	return pv.convertToSchemaGeneric(directories, expectedDirs)
+// convertFilesToSchema converts file names to schema format
+func (pv *ProjectValidator) convertFilesToSchema(files []string) []map[string]interface{} {
+	return pv.convertToSchema(files, pv.getExpectedFiles())
+}
+
+// convertDirectoriesToSchema converts directory names to schema format
+func (pv *ProjectValidator) convertDirectoriesToSchema(directories []string) []map[string]interface{} {
+	return pv.convertToSchema(directories, pv.getExpectedDirectories())
 }
 
 // validateAlternativeConfigurations validates that at least one configuration option exists for each type
