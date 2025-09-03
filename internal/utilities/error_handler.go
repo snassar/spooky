@@ -186,7 +186,7 @@ func (eh *ErrorHandler) FormatError(err error, context map[string]interface{}) s
 	var parts []string
 	parts = append(parts, err.Error())
 
-	if context != nil && len(context) > 0 {
+	if len(context) > 0 {
 		var contextParts []string
 		for key, value := range context {
 			contextParts = append(contextParts, fmt.Sprintf("%s=%v", key, value))
