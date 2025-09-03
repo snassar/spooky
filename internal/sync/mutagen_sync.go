@@ -269,17 +269,25 @@ func (m *MutagenSyncEngine) performMutagenSync(sourcePath, targetPath string, op
 		} else {
 			// Check for potential overflow before conversion
 			if op.Count > 0 && signature.BlockSize > 0 {
-				if uint64(op.Count) <= (1<<63-1)/uint64(signature.BlockSize) {
+				// Safe multiplication with overflow checking
+				if op.Count <= (1<<31-1)/signature.BlockSize {
+					// Safe to multiply without overflow
 					copyBytes += int64(op.Count) * int64(signature.BlockSize)
 				} else {
-					// Handle overflow case
+					// Handle overflow case - cap at maximum safe value
 					copyBytes = 1<<63 - 1
 				}
 			}
 			if op.Start == uint64(len(signature.Hashes)-1) {
 				// Last block might be shorter
 				if signature.BlockSize >= signature.LastBlockSize {
-					copyBytes -= int64(signature.BlockSize - signature.LastBlockSize)
+					// Safe subtraction since we're dealing with positive values
+					adjustment := int64(signature.BlockSize - signature.LastBlockSize)
+					if copyBytes >= adjustment {
+						copyBytes -= adjustment
+					} else {
+						copyBytes = 0
+					}
 				}
 			}
 		}

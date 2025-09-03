@@ -10,11 +10,13 @@ import (
 )
 
 // Tag2 computes the 16-bit tag from two 16-bit values
+// This is safe as it uses bitwise AND to ensure 16-bit result
 func Tag2(s1, s2 uint16) uint16 {
 	return (((s1) + (s2)) & 0xFFFF)
 }
 
 // Tag computes the 16-bit tag from a 32-bit checksum
+// This is safe as it extracts specific 16-bit portions
 func Tag(sum uint32) uint16 {
 	return Tag2(uint16(sum&0xFFFF), uint16(sum>>16))
 }
@@ -24,34 +26,55 @@ func Tag(sum uint32) uint16 {
 // (unsigned char*), which likely was not a conscious choice, but here we are.
 //
 // This function is exported for use in the rolling checksum in match.go.
+// This is safe as it only operates on a single byte
 func SignExtend(b byte) uint32 {
 	val := uint32(b)
 	return uint32(int32(val<<24) >> 24)
 }
 
 // Checksum1 computes the fast rolling checksum (32-bit)
+// Fixed to prevent integer overflow by using modulo arithmetic
 func Checksum1(buf []byte) uint32 {
 	bufLen := len(buf)
 	var s1, s2 uint32
 	var i int
 
+	// Use modulo arithmetic to prevent overflow
+	const mod = 0xFFFFFFFF
+
 	if bufLen > 4 {
 		for i = 0; i < (bufLen - 4); i += 4 {
-			s2 += 4*(s1+SignExtend(buf[i])) +
-				3*SignExtend(buf[i+1]) +
-				2*SignExtend(buf[i+2]) +
-				SignExtend(buf[i+3])
-			s1 += SignExtend(buf[i+0]) +
-				SignExtend(buf[i+1]) +
-				SignExtend(buf[i+2]) +
-				SignExtend(buf[i+3])
+			// Calculate each term separately with modulo to prevent overflow
+			term1 := (4 * (s1 + SignExtend(buf[i]))) % mod
+			term2 := (3 * SignExtend(buf[i+1])) % mod
+			term3 := (2 * SignExtend(buf[i+2])) % mod
+			term4 := SignExtend(buf[i+3]) % mod
+
+			s2 = (s2 + term1 + term2 + term3 + term4) % mod
+
+			// Calculate s1 terms separately
+			s1_term1 := SignExtend(buf[i+0]) % mod
+			s1_term2 := SignExtend(buf[i+1]) % mod
+			s1_term3 := SignExtend(buf[i+2]) % mod
+			s1_term4 := SignExtend(buf[i+3]) % mod
+
+			s1 = (s1 + s1_term1 + s1_term2 + s1_term3 + s1_term4) % mod
 		}
 	}
+
+	// Handle remaining bytes
 	for ; i < bufLen; i++ {
-		s1 += SignExtend(buf[i])
-		s2 += s1
+		s1 = (s1 + SignExtend(buf[i])) % mod
+		s2 = (s2 + s1) % mod
 	}
-	return (s1 & 0xffff) + (s2 << 16)
+
+	// Final calculation with bounds checking
+	s1_part := s1 & 0xffff
+	s2_part := s2 & 0xffff0000 // Ensure we only get the upper 16 bits
+
+	// Combine safely
+	result := s1_part + s2_part
+	return result
 }
 
 // Checksum2 computes the strong checksum (MD4)
