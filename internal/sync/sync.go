@@ -8,6 +8,8 @@ import (
 	"spooky/internal/logging"
 	"syscall"
 
+	"spooky/internal/utilities"
+
 	"github.com/pkg/errors"
 )
 
@@ -437,7 +439,16 @@ func preserveAttributes(sourcePath, targetPath string, options *SyncOptions) err
 		}
 
 		if options.PreserveOwner && options.PreserveGroup {
-			if err := os.Chown(targetPath, int(stat.Uid), int(stat.Gid)); err != nil {
+			// Safe conversion from uint32 to int
+			uid, err := utilities.SafeInt(int64(stat.Uid))
+			if err != nil {
+				return errors.Wrap(err, "UID value out of bounds")
+			}
+			gid, err := utilities.SafeInt(int64(stat.Gid))
+			if err != nil {
+				return errors.Wrap(err, "GID value out of bounds")
+			}
+			if err := os.Chown(targetPath, uid, gid); err != nil {
 				return errors.Wrapf(err, "failed to preserve owner and group for %s", targetPath)
 			}
 		} else if options.PreserveOwner {
@@ -450,7 +461,16 @@ func preserveAttributes(sourcePath, targetPath string, options *SyncOptions) err
 			if !ok {
 				return errors.New("failed to get target system-specific file info")
 			}
-			if err := os.Chown(targetPath, int(stat.Uid), int(targetStat.Gid)); err != nil {
+			// Safe conversion from uint32 to int
+			uid, err := utilities.SafeInt(int64(stat.Uid))
+			if err != nil {
+				return errors.Wrap(err, "UID value out of bounds")
+			}
+			targetGid, err := utilities.SafeInt(int64(targetStat.Gid))
+			if err != nil {
+				return errors.Wrap(err, "target GID value out of bounds")
+			}
+			if err := os.Chown(targetPath, uid, targetGid); err != nil {
 				return errors.Wrapf(err, "failed to preserve owner for %s", targetPath)
 			}
 		} else if options.PreserveGroup {
@@ -461,9 +481,18 @@ func preserveAttributes(sourcePath, targetPath string, options *SyncOptions) err
 			}
 			targetStat, ok := targetInfo.Sys().(*syscall.Stat_t)
 			if !ok {
-				return errors.New("failed to get target system-specific file info")
+				return errors.New("error getting target system-specific file info")
 			}
-			if err := os.Chown(targetPath, int(targetStat.Uid), int(stat.Gid)); err != nil {
+			// Safe conversion from uint32 to int
+			targetUid, err := utilities.SafeInt(int64(targetStat.Uid))
+			if err != nil {
+				return errors.Wrap(err, "target UID value out of bounds")
+			}
+			gid, err := utilities.SafeInt(int64(stat.Gid))
+			if err != nil {
+				return errors.Wrap(err, "GID value out of bounds")
+			}
+			if err := os.Chown(targetPath, targetUid, gid); err != nil {
 				return errors.Wrapf(err, "failed to preserve group for %s", targetPath)
 			}
 		}

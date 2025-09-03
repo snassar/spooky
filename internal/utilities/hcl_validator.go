@@ -130,7 +130,7 @@ func (v *HCLValidator) ValidateContent(content, fileName string) (*ValidationRes
 		IsValid:    true,
 		Errors:     []ValidationError{},
 		Warnings:   []ValidationWarning{},
-		FileSize:   int64(len(content)),
+		FileSize:   int64(len(content)), // Safe: len() returns int, int64 can handle all valid int values
 		BlockCount: 0,
 	}
 

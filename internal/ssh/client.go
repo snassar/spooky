@@ -822,10 +822,11 @@ func (sc *SSHClient) decryptPKCS8Key(keyData []byte, passphrase string) ([]byte,
 	mode.CryptBlocks(decrypted, encryptedKey.EncryptedData)
 
 	// Remove PKCS#7 padding
-	paddingLen := int(decrypted[len(decrypted)-1])
-	if paddingLen > aes.BlockSize || paddingLen == 0 {
+	paddingByte := decrypted[len(decrypted)-1]
+	if paddingByte > aes.BlockSize || paddingByte == 0 {
 		return nil, errors.New("invalid PKCS#7 padding")
 	}
+	paddingLen := int(paddingByte)
 
 	// Verify padding
 	for i := len(decrypted) - paddingLen; i < len(decrypted); i++ {

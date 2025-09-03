@@ -148,7 +148,7 @@ func (cm *ConfigManager) GetEffectiveConfigInfo(customConfigFile string) (*Effec
 		// Using struct-based default (lowest priority)
 		info.Source = "struct-based"
 		defaultConfig := cm.GetStructBasedDefaultConfig()
-		info.Size = int64(len(defaultConfig))
+		info.Size = int64(len(defaultConfig)) // Safe: len() returns int, int64 can handle all valid int values
 	}
 
 	return info, nil
