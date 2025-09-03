@@ -78,7 +78,11 @@ func Checksum1(buf []byte) uint32 {
 	s1_part := s1 & 0xffff
 	s2_part := s2 & 0xffff0000 // Ensure we only get the upper 16 bits
 
-	// Combine safely
+	// Combine safely using safe addition to prevent overflow
+	if s1_part > 0xFFFF-s2_part {
+		// Handle overflow by capping at maximum safe value
+		return 0xFFFF
+	}
 	result := s1_part + s2_part
 	return result
 }

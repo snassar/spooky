@@ -279,21 +279,30 @@ func (m *MutagenSyncEngine) performMutagenSync(sourcePath, targetPath string, op
 		} else {
 			// Safe multiplication with overflow checking
 			if op.Count > 0 && signature.BlockSize > 0 {
-				// Convert uint32 to int64 safely
-				count64 := int64(op.Count)
-				blockSize64 := int64(signature.BlockSize)
-
-				// Use safe multiplication
-				if multiplied, err := utilities.SafeMultiplyInt64(count64, blockSize64); err == nil {
-					if newCopyBytes, err := utilities.SafeAddInt64(copyBytes, multiplied); err == nil {
-						copyBytes = newCopyBytes
-					} else {
+				// Convert uint32 to int64 safely using safe conversion utilities
+				count64, err := utilities.SafeInt64(int(op.Count))
+				if err != nil {
+					// Handle overflow by capping at maximum safe value
+					copyBytes = math.MaxInt64
+				} else {
+					blockSize64, err := utilities.SafeInt64(int(signature.BlockSize))
+					if err != nil {
 						// Handle overflow by capping at maximum safe value
 						copyBytes = math.MaxInt64
+					} else {
+						// Use safe multiplication
+						if multiplied, err := utilities.SafeMultiplyInt64(count64, blockSize64); err == nil {
+							if newCopyBytes, err := utilities.SafeAddInt64(copyBytes, multiplied); err == nil {
+								copyBytes = newCopyBytes
+							} else {
+								// Handle overflow by capping at maximum safe value
+								copyBytes = math.MaxInt64
+							}
+						} else {
+							// Handle multiplication overflow by capping at maximum safe value
+							copyBytes = math.MaxInt64
+						}
 					}
-				} else {
-					// Handle multiplication overflow by capping at maximum safe value
-					copyBytes = math.MaxInt64
 				}
 			}
 
