@@ -24,7 +24,7 @@ import (
 
 var (
 	actionsCmd = &cobra.Command{
-		Use:   ResourceTypeActions,
+		Use:   schemas.ResourceTypeActions,
 		Short: "Execute actions across machines",
 		Long: `Execute actions across machines defined in your project configuration.
 
@@ -343,7 +343,7 @@ func loadActionsConfig() ([]*schemas.ActionsActionV1, error) {
 
 	// Use the simplified validator to parse and validate the actions configuration
 	validator := schemas.NewSimpleValidator()
-	result, err := validator.ValidateHCLContent(ResourceTypeActions, string(content))
+	result, err := validator.ValidateHCLContent(schemas.ResourceTypeActions, string(content))
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate actions.hcl: %w", err)
 	}
@@ -388,7 +388,7 @@ func extractActionsBlock(file *hcl.File) (*hcl.Block, error) {
 	schema := &hcl.BodySchema{
 		Blocks: []hcl.BlockHeaderSchema{
 			{
-				Type:       ResourceTypeActions,
+				Type:       schemas.ResourceTypeActions,
 				LabelNames: []string{},
 			},
 		},

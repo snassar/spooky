@@ -141,6 +141,11 @@ func (pv *ProjectValidator) convertToSchema(items []string, expectedItems map[st
 	return schemaItems
 }
 
+// convertToSchemaGeneric converts file or directory names to schema format
+func (pv *ProjectValidator) convertToSchemaGeneric(items []string, expectedItems map[string]map[string]interface{}) []map[string]interface{} {
+	return pv.convertToSchema(items, expectedItems)
+}
+
 // convertFilesToSchema converts file names to schema format
 func (pv *ProjectValidator) convertFilesToSchema(files []string) []map[string]interface{} {
 	// Define expected files based on schema
@@ -182,7 +187,7 @@ func (pv *ProjectValidator) convertFilesToSchema(files []string) []map[string]in
 		},
 	}
 
-	return pv.convertToSchema(files, expectedFiles)
+	return pv.convertToSchemaGeneric(files, expectedFiles)
 }
 
 // convertDirectoriesToSchema converts directory names to schema format
@@ -226,7 +231,7 @@ func (pv *ProjectValidator) convertDirectoriesToSchema(directories []string) []m
 		},
 	}
 
-	return pv.convertToSchema(directories, expectedDirs)
+	return pv.convertToSchemaGeneric(directories, expectedDirs)
 }
 
 // validateAlternativeConfigurations validates that at least one configuration option exists for each type

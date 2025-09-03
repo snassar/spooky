@@ -332,18 +332,12 @@ func applyCombinedResults(result *FileSyncResult, combined *FileSyncResult) {
 	result.Success = combined.Success
 }
 
-// syncTwoWaySafe performs bidirectional sync with conflict detection
-// Both endpoints can modify, conflicts are detected and preserved
-func syncTwoWaySafe(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
-	if options.Verbose {
-		logger := logging.GetGlobalLogger()
-		logger.Info("performing two-way safe sync",
-			slog.String("source", sourcePath),
-			slog.String("target", targetPath))
-	}
+// syncTwoWayGeneric performs bidirectional sync with configurable conflict resolution
+func syncTwoWayGeneric(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult,
+	sourceToTargetFn, targetToSourceFn func(string, string, *SyncOptions, *FileSyncResult) (*FileSyncResult, error)) (*FileSyncResult, error) {
 
-	// First, sync source → target (one-way safe)
-	sourceToTarget, err := syncOneWaySafe(sourcePath, targetPath, options, &FileSyncResult{
+	// First, sync source → target
+	sourceToTarget, err := sourceToTargetFn(sourcePath, targetPath, options, &FileSyncResult{
 		SourcePath: sourcePath,
 		TargetPath: targetPath,
 	})
@@ -352,8 +346,8 @@ func syncTwoWaySafe(sourcePath, targetPath string, options *SyncOptions, result 
 		return result, err
 	}
 
-	// Then, sync target → source (one-way safe)
-	targetToSource, err := syncOneWaySafe(targetPath, sourcePath, options, &FileSyncResult{
+	// Then, sync target → source
+	targetToSource, err := targetToSourceFn(targetPath, sourcePath, options, &FileSyncResult{
 		SourcePath: targetPath,
 		TargetPath: sourcePath,
 	})
@@ -369,6 +363,19 @@ func syncTwoWaySafe(sourcePath, targetPath string, options *SyncOptions, result 
 	return result, nil
 }
 
+// syncTwoWaySafe performs bidirectional sync with conflict detection
+// Both endpoints can modify, conflicts are detected and preserved
+func syncTwoWaySafe(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
+	if options.Verbose {
+		logger := logging.GetGlobalLogger()
+		logger.Info("performing two-way safe sync",
+			slog.String("source", sourcePath),
+			slog.String("target", targetPath))
+	}
+
+	return syncTwoWayGeneric(sourcePath, targetPath, options, result, syncOneWaySafe, syncOneWaySafe)
+}
+
 // syncTwoWayResolved performs bidirectional sync with source winning conflicts
 // Both endpoints can modify, source always wins conflicts
 func syncTwoWayResolved(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
@@ -379,31 +386,7 @@ func syncTwoWayResolved(sourcePath, targetPath string, options *SyncOptions, res
 			slog.String("target", targetPath))
 	}
 
-	// Use one-way replica for source → target (source always wins)
-	sourceToTarget, err := syncOneWayReplica(sourcePath, targetPath, options, &FileSyncResult{
-		SourcePath: sourcePath,
-		TargetPath: targetPath,
-	})
-	if err != nil {
-		result.Error = err
-		return result, err
-	}
-
-	// Use one-way safe for target → source (preserve source changes)
-	targetToSource, err := syncOneWaySafe(targetPath, sourcePath, options, &FileSyncResult{
-		SourcePath: targetPath,
-		TargetPath: sourcePath,
-	})
-	if err != nil {
-		result.Error = err
-		return result, err
-	}
-
-	// Combine results using helper function
-	combined := combineSyncResults(sourceToTarget, targetToSource)
-	applyCombinedResults(result, combined)
-
-	return result, nil
+	return syncTwoWayGeneric(sourcePath, targetPath, options, result, syncOneWayReplica, syncOneWaySafe)
 }
 
 // copyFile performs a simple file copy

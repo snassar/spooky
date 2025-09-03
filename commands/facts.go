@@ -267,7 +267,7 @@ func getMachinesFromConfig() ([]*schemas.MachinesMachineV1, error) {
 	schema := &hcl.BodySchema{
 		Blocks: []hcl.BlockHeaderSchema{
 			{
-				Type:       ResourceTypeMachines,
+				Type:       schemas.ResourceTypeMachines,
 				LabelNames: []string{},
 			},
 		},
