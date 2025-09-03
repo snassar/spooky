@@ -110,19 +110,13 @@ func getErrorType(err error) string {
 		return "nil"
 	}
 
-	// Try to get the concrete type
-	errorType := "unknown"
-
 	// Check for common error types
-	switch {
-	case err.Error() == "":
-		errorType = "empty"
-	default:
-		// Use reflection to get type name
-		errorType = "error"
+	if err.Error() == "" {
+		return "empty"
 	}
 
-	return errorType
+	// Use reflection to get type name
+	return "error"
 }
 
 // Standardized attribute builders for common contexts
