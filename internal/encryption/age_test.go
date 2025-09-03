@@ -10,10 +10,73 @@ import (
 	"spooky/internal/schemas"
 )
 
+// Test constants to avoid repeated string literals
+const (
+	// File extensions
+	txtExt = ".txt"
+
+	// Directory prefixes for temporary directories
+	ageTestDirPrefix           = "age-test-*"
+	ageDirTestDirPrefix        = "age-dir-test-*"
+	ageFormatTestDirPrefix     = "age-format-test-*"
+	ageRecipientsTestDirPrefix = "age-recipients-test-*"
+	emptyAgeDirPrefix          = "empty-age-dir-*"
+	invalidIdentityPrefix      = "invalid-identity-*"
+
+	// File names
+	identityFileName        = "identity.txt"
+	recipientsFileName      = "recipients.txt"
+	identityArmoredFileName = "identity-armored.txt"
+	identityRawFileName     = "identity-raw.txt"
+
+	// Test recipient keys
+	testRecipientKey = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
+
+	// Test file names for directory-based tests
+	aliceFileName   = "alice.txt"
+	bobFileName     = "bob.txt"
+	charlieFileName = "charlie.txt"
+	hiddenFileName  = ".hidden.txt"
+	readmeFileName  = "README.md"
+
+	// Test content
+	testPlaintext     = "my-secret-password-123"
+	invalidAgeContent = "invalid-age-identity-content"
+	hiddenKeyContent  = "age1hiddenkeythatshouldbeskipped"
+	readmeKeyContent  = "# This should be skipped\nage1readmekeythatshouldbeskipped"
+
+	// Error message parts
+	errNoRecipients          = "no recipients available"
+	errNoIdentities          = "no identities available"
+	errEmptyPlaintext        = "cannot encrypt empty plaintext"
+	errEmptyEncrypted        = "cannot decrypt empty encrypted value"
+	errNotAgeEncrypted       = "does not appear to be age-encrypted"
+	errNoValidIdentityFiles  = "no valid identity files found"
+	errNoValidRecipientFiles = "no valid recipient files found"
+
+	// Path components for validation
+	spookyComponent     = "spooky"
+	ageComponent        = "age"
+	identitiesComponent = "identities"
+	recipientsComponent = "recipients"
+
+	// Custom paths for testing
+	customIdentitiesPath = "/custom/identities/path"
+	customRecipientsPath = "/custom/recipients/path"
+
+	// Age CLI commands
+	ageKeygenCmd         = "age-keygen"
+	ageKeygenYFlag       = "-y"
+	ageKeygenNoArmorFlag = "--armor=false"
+
+	// File permissions
+	testFileMode = 0o644
+)
+
 // TestAgeKeyGenerationAndLoading tests the complete workflow of generating and loading age keys
 func TestAgeKeyGenerationAndLoading(t *testing.T) {
 	// Create temporary directory for test keys
-	tempDir, err := os.MkdirTemp("", "age-test-*")
+	tempDir, err := os.MkdirTemp("", ageTestDirPrefix)
 	if err != nil {
 		t.Fatal("Failed to create temp directory:", err)
 	}
@@ -26,7 +89,7 @@ func TestAgeKeyGenerationAndLoading(t *testing.T) {
 
 	// Test loading identities
 	t.Run("Load Identities", func(t *testing.T) {
-		ae, err := NewAgeEncryption(filepath.Join(tempDir, "identity.txt"), "")
+		ae, err := NewAgeEncryption(filepath.Join(tempDir, identityFileName), "")
 		if err != nil {
 			t.Fatal("Failed to create age encryption with identity:", err)
 		}
@@ -40,7 +103,7 @@ func TestAgeKeyGenerationAndLoading(t *testing.T) {
 
 	// Test loading recipients
 	t.Run("Load Recipients", func(t *testing.T) {
-		ae, err := NewAgeEncryption("", filepath.Join(tempDir, "recipients.txt"))
+		ae, err := NewAgeEncryption("", filepath.Join(tempDir, recipientsFileName))
 		if err != nil {
 			t.Fatal("Failed to create age encryption with recipients:", err)
 		}
@@ -55,15 +118,15 @@ func TestAgeKeyGenerationAndLoading(t *testing.T) {
 	// Test full encryption/decryption cycle
 	t.Run("Encrypt and Decrypt", func(t *testing.T) {
 		ae, err := NewAgeEncryption(
-			filepath.Join(tempDir, "identity.txt"),
-			filepath.Join(tempDir, "recipients.txt"),
+			filepath.Join(tempDir, identityFileName),
+			filepath.Join(tempDir, recipientsFileName),
 		)
 		if err != nil {
 			t.Fatal("Failed to create age encryption:", err)
 		}
 
 		// Test data
-		plaintext := "my-secret-password-123"
+		plaintext := testPlaintext
 
 		// Encrypt
 		encrypted, err := ae.Encrypt(plaintext)
@@ -100,8 +163,8 @@ func TestAgeKeyGenerationAndLoading(t *testing.T) {
 	// Test validation
 	t.Run("Configuration Validation", func(t *testing.T) {
 		ae, err := NewAgeEncryption(
-			filepath.Join(tempDir, "identity.txt"),
-			filepath.Join(tempDir, "recipients.txt"),
+			filepath.Join(tempDir, identityFileName),
+			filepath.Join(tempDir, recipientsFileName),
 		)
 		if err != nil {
 			t.Fatal("Failed to create age encryption:", err)
@@ -116,7 +179,7 @@ func TestAgeKeyGenerationAndLoading(t *testing.T) {
 // TestAgeKeyLoadingFromDirectory tests loading multiple identities from a directory
 func TestAgeKeyLoadingFromDirectory(t *testing.T) {
 	// Create temporary directory for test keys
-	tempDir, err := os.MkdirTemp("", "age-dir-test-*")
+	tempDir, err := os.MkdirTemp("", ageDirTestDirPrefix)
 	if err != nil {
 		t.Fatal("Failed to create temp directory:", err)
 	}
@@ -146,7 +209,7 @@ func TestAgeKeyLoadingFromDirectory(t *testing.T) {
 // TestAgeKeyFormats tests different age key formats (armored vs raw)
 func TestAgeKeyFormats(t *testing.T) {
 	// Create temporary directory for test keys
-	tempDir, err := os.MkdirTemp("", "age-format-test-*")
+	tempDir, err := os.MkdirTemp("", ageFormatTestDirPrefix)
 	if err != nil {
 		t.Fatal("Failed to create temp directory:", err)
 	}
@@ -159,7 +222,7 @@ func TestAgeKeyFormats(t *testing.T) {
 
 	// Test armored identity
 	t.Run("Armored Identity", func(t *testing.T) {
-		ae, err := NewAgeEncryption(filepath.Join(tempDir, "identity-armored.txt"), "")
+		ae, err := NewAgeEncryption(filepath.Join(tempDir, identityArmoredFileName), "")
 		if err != nil {
 			t.Fatal("Failed to load armored identity:", err)
 		}
@@ -171,7 +234,7 @@ func TestAgeKeyFormats(t *testing.T) {
 
 	// Test raw identity
 	t.Run("Raw Identity", func(t *testing.T) {
-		ae, err := NewAgeEncryption(filepath.Join(tempDir, "identity-raw.txt"), "")
+		ae, err := NewAgeEncryption(filepath.Join(tempDir, identityRawFileName), "")
 		if err != nil {
 			t.Fatal("Failed to load raw identity:", err)
 		}
@@ -210,14 +273,14 @@ func TestAgeEncryptionErrors(t *testing.T) {
 
 	t.Run("Invalid Identity File", func(t *testing.T) {
 		// Create a temporary invalid identity file
-		tempFile, err := os.CreateTemp("", "invalid-identity-*")
+		tempFile, err := os.CreateTemp("", invalidIdentityPrefix)
 		if err != nil {
 			t.Fatal("Failed to create temp file:", err)
 		}
 		defer os.Remove(tempFile.Name())
 
 		// Write invalid content
-		if _, err := tempFile.WriteString("invalid-age-identity-content"); err != nil {
+		if _, err := tempFile.WriteString(invalidAgeContent); err != nil {
 			t.Fatal("Failed to write to temp file:", err)
 		}
 
@@ -242,23 +305,23 @@ func TestAgePathFunctions(t *testing.T) {
 		}
 
 		// Verify paths contain expected components
-		if !strings.Contains(identitiesPath, "spooky") {
+		if !strings.Contains(identitiesPath, spookyComponent) {
 			t.Error("Default identities path should contain 'spooky'")
 		}
-		if !strings.Contains(identitiesPath, "age") {
+		if !strings.Contains(identitiesPath, ageComponent) {
 			t.Error("Default identities path should contain 'age'")
 		}
-		if !strings.Contains(identitiesPath, "identities") {
+		if !strings.Contains(identitiesPath, identitiesComponent) {
 			t.Error("Default identities path should contain 'identities'")
 		}
 
-		if !strings.Contains(recipientsPath, "spooky") {
+		if !strings.Contains(recipientsPath, spookyComponent) {
 			t.Error("Default recipients path should contain 'spooky'")
 		}
-		if !strings.Contains(recipientsPath, "age") {
+		if !strings.Contains(recipientsPath, ageComponent) {
 			t.Error("Default recipients path should contain 'age'")
 		}
-		if !strings.Contains(recipientsPath, "recipients") {
+		if !strings.Contains(recipientsPath, recipientsComponent) {
 			t.Error("Default recipients path should contain 'recipients'")
 		}
 
@@ -282,23 +345,23 @@ func TestAgePathFunctions(t *testing.T) {
 
 	t.Run("GetProjectAgePaths with custom config", func(t *testing.T) {
 		projectAge := &schemas.ProjectAgeV1{
-			DefaultRecipientsPath: "/custom/recipients/path",
-			DefaultIdentitiesPath: "/custom/identities/path",
+			DefaultRecipientsPath: customRecipientsPath,
+			DefaultIdentitiesPath: customIdentitiesPath,
 		}
 
 		identitiesPath, recipientsPath := GetProjectAgePaths(projectAge)
 
-		if identitiesPath != "/custom/identities/path" {
+		if identitiesPath != customIdentitiesPath {
 			t.Errorf("Expected custom identities path, got: %s", identitiesPath)
 		}
-		if recipientsPath != "/custom/recipients/path" {
+		if recipientsPath != customRecipientsPath {
 			t.Errorf("Expected custom recipients path, got: %s", recipientsPath)
 		}
 	})
 
 	t.Run("GetProjectAgePaths with partial config", func(t *testing.T) {
 		projectAge := &schemas.ProjectAgeV1{
-			DefaultRecipientsPath: "/custom/recipients/path",
+			DefaultRecipientsPath: customRecipientsPath,
 			// DefaultIdentitiesPath not set
 		}
 
@@ -310,7 +373,7 @@ func TestAgePathFunctions(t *testing.T) {
 		if identitiesPath != defaultIdentities {
 			t.Errorf("Expected default identities path, got: %s", identitiesPath)
 		}
-		if recipientsPath != "/custom/recipients/path" {
+		if recipientsPath != customRecipientsPath {
 			t.Errorf("Expected custom recipients path, got: %s", recipientsPath)
 		}
 	})
@@ -319,7 +382,7 @@ func TestAgePathFunctions(t *testing.T) {
 // TestDirectoryBasedRecipients tests loading recipients from a directory
 func TestDirectoryBasedRecipients(t *testing.T) {
 	// Create temporary directory for test recipients
-	tempDir, err := os.MkdirTemp("", "age-recipients-test-*")
+	tempDir, err := os.MkdirTemp("", ageRecipientsTestDirPrefix)
 	if err != nil {
 		t.Fatal("Failed to create temp directory:", err)
 	}
@@ -327,11 +390,11 @@ func TestDirectoryBasedRecipients(t *testing.T) {
 
 	// Create test recipient files
 	recipientFiles := []string{
-		"alice.txt",
-		"bob.txt",
-		"charlie.txt",
-		".hidden.txt", // Should be skipped
-		"README.md",   // Should be skipped (not .txt)
+		aliceFileName,
+		bobFileName,
+		charlieFileName,
+		hiddenFileName, // Should be skipped
+		readmeFileName, // Should be skipped (not .txt)
 	}
 
 	for _, filename := range recipientFiles {
@@ -339,19 +402,19 @@ func TestDirectoryBasedRecipients(t *testing.T) {
 		var content string
 
 		switch filename {
-		case "alice.txt":
-			content = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
-		case "bob.txt":
-			content = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
-		case "charlie.txt":
-			content = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
-		case ".hidden.txt":
-			content = "age1hiddenkeythatshouldbeskipped"
-		case "README.md":
-			content = "# This should be skipped\nage1readmekeythatshouldbeskipped"
+		case aliceFileName:
+			content = testRecipientKey
+		case bobFileName:
+			content = testRecipientKey
+		case charlieFileName:
+			content = testRecipientKey
+		case hiddenFileName:
+			content = hiddenKeyContent
+		case readmeFileName:
+			content = readmeKeyContent
 		}
 
-		if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
+		if err := os.WriteFile(filePath, []byte(content), testFileMode); err != nil {
 			t.Fatalf("Failed to create test file %s: %v", filename, err)
 		}
 	}
@@ -391,7 +454,7 @@ func TestAgeSecurityImprovements(t *testing.T) {
 			t.Error("Expected error when encrypting empty plaintext")
 		}
 		// Should fail on configuration first, then on empty plaintext
-		if !strings.Contains(err.Error(), "no recipients available") && !strings.Contains(err.Error(), "cannot encrypt empty plaintext") {
+		if !strings.Contains(err.Error(), errNoRecipients) && !strings.Contains(err.Error(), errEmptyPlaintext) {
 			t.Errorf("Expected error about recipients or empty plaintext, got: %v", err)
 		}
 
@@ -401,7 +464,7 @@ func TestAgeSecurityImprovements(t *testing.T) {
 			t.Error("Expected error when decrypting empty value")
 		}
 		// Should fail on configuration first, then on empty encrypted value
-		if !strings.Contains(err.Error(), "no identities available") && !strings.Contains(err.Error(), "cannot decrypt empty encrypted value") {
+		if !strings.Contains(err.Error(), errNoIdentities) && !strings.Contains(err.Error(), errEmptyEncrypted) {
 			t.Errorf("Expected error about identities or empty encrypted value, got: %v", err)
 		}
 
@@ -411,14 +474,14 @@ func TestAgeSecurityImprovements(t *testing.T) {
 			t.Error("Expected error when decrypting non-encrypted value")
 		}
 		// Should fail on configuration first, then on non-age encrypted value
-		if !strings.Contains(err.Error(), "no identities available") && !strings.Contains(err.Error(), "does not appear to be age-encrypted") {
+		if !strings.Contains(err.Error(), errNoIdentities) && !strings.Contains(err.Error(), errNotAgeEncrypted) {
 			t.Errorf("Expected error about identities or non-age encrypted value, got: %v", err)
 		}
 	})
 
 	t.Run("Security: Fail Fast When No Valid Files", func(t *testing.T) {
 		// Create empty directory
-		tempDir, err := os.MkdirTemp("", "empty-age-dir-*")
+		tempDir, err := os.MkdirTemp("", emptyAgeDirPrefix)
 		if err != nil {
 			t.Fatal("Failed to create temp directory:", err)
 		}
@@ -429,7 +492,7 @@ func TestAgeSecurityImprovements(t *testing.T) {
 		if err == nil {
 			t.Error("Expected error when loading from empty identity directory")
 		}
-		if !strings.Contains(err.Error(), "no valid identity files found") {
+		if !strings.Contains(err.Error(), errNoValidIdentityFiles) {
 			t.Errorf("Expected error about no valid files, got: %v", err)
 		}
 
@@ -438,7 +501,7 @@ func TestAgeSecurityImprovements(t *testing.T) {
 		if err == nil {
 			t.Error("Expected error when loading from empty recipients directory")
 		}
-		if !strings.Contains(err.Error(), "no valid recipient files found") {
+		if !strings.Contains(err.Error(), errNoValidRecipientFiles) {
 			t.Errorf("Expected error about no valid files, got: %v", err)
 		}
 	})
@@ -449,15 +512,13 @@ func TestAgeSecurityImprovements(t *testing.T) {
 // generateTestKeys generates test age keys using the age CLI
 func generateTestKeys(tempDir string) error {
 	// Generate identity
-	identityCmd := fmt.Sprintf("age-keygen -o %s", filepath.Join(tempDir, "identity.txt"))
+	identityCmd := fmt.Sprintf("%s -o %s", ageKeygenCmd, filepath.Join(tempDir, identityFileName))
 	if err := runCommand(identityCmd); err != nil {
 		return fmt.Errorf("failed to generate identity: %w", err)
 	}
 
 	// Extract recipient from identity
-	recipientCmd := fmt.Sprintf("age-keygen -y %s > %s",
-		filepath.Join(tempDir, "identity.txt"),
-		filepath.Join(tempDir, "recipients.txt"))
+	recipientCmd := fmt.Sprintf("%s %s > %s", ageKeygenYFlag, filepath.Join(tempDir, identityFileName), filepath.Join(tempDir, recipientsFileName))
 	if err := runCommand(recipientCmd); err != nil {
 		return fmt.Errorf("failed to extract recipient: %w", err)
 	}
@@ -469,8 +530,8 @@ func generateTestKeys(tempDir string) error {
 func generateMultipleTestKeys(tempDir string) error {
 	// Generate multiple identities
 	for i := 1; i <= 3; i++ {
-		identityCmd := fmt.Sprintf("age-keygen -o %s",
-			filepath.Join(tempDir, fmt.Sprintf("identity-%d.txt", i)))
+		identityCmd := fmt.Sprintf("%s -o %s", ageKeygenCmd,
+			filepath.Join(tempDir, fmt.Sprintf("identity-%d%s", i, txtExt)))
 		if err := runCommand(identityCmd); err != nil {
 			return fmt.Errorf("failed to generate identity %d: %w", i, err)
 		}
@@ -482,13 +543,13 @@ func generateMultipleTestKeys(tempDir string) error {
 // generateFormattedTestKeys generates keys in different formats
 func generateFormattedTestKeys(tempDir string) error {
 	// Generate armored identity (default)
-	identityCmd := fmt.Sprintf("age-keygen -o %s", filepath.Join(tempDir, "identity-armored.txt"))
+	identityCmd := fmt.Sprintf("%s -o %s", ageKeygenCmd, filepath.Join(tempDir, identityArmoredFileName))
 	if err := runCommand(identityCmd); err != nil {
 		return fmt.Errorf("failed to generate armored identity: %w", err)
 	}
 
 	// Generate raw identity
-	rawIdentityCmd := fmt.Sprintf("age-keygen --armor=false -o %s", filepath.Join(tempDir, "identity-raw.txt"))
+	rawIdentityCmd := fmt.Sprintf("%s %s -o %s", ageKeygenCmd, ageKeygenNoArmorFlag, filepath.Join(tempDir, identityRawFileName))
 	if err := runCommand(rawIdentityCmd); err != nil {
 		return fmt.Errorf("failed to generate raw identity: %w", err)
 	}
@@ -500,7 +561,7 @@ func generateFormattedTestKeys(tempDir string) error {
 func runCommand(cmd string) error {
 	// This is a simplified version - in a real implementation you'd use exec.Command
 	// For now, we'll just check if age-keygen is available
-	if !commandExists("age-keygen") {
+	if !commandExists(ageKeygenCmd) {
 		return fmt.Errorf("age-keygen command not found")
 	}
 
