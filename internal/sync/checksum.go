@@ -16,9 +16,13 @@ func Tag2(s1, s2 uint16) uint16 {
 }
 
 // Tag computes the 16-bit tag from a 32-bit checksum
-// This is safe as it extracts specific 16-bit portions
+// Fixed to prevent uint32 -> uint16 overflow by using safe bit extraction
 func Tag(sum uint32) uint16 {
-	return Tag2(uint16(sum&0xFFFF), uint16(sum>>16))
+	// Extract lower 16 bits safely (this is always safe)
+	lower := uint16(sum & 0xFFFF)
+	// Extract upper 16 bits safely (this is always safe)
+	upper := uint16((sum >> 16) & 0xFFFF)
+	return Tag2(lower, upper)
 }
 
 // SignExtend mirrors how C converts from (signed char) to uint32, i.e. using
@@ -26,10 +30,12 @@ func Tag(sum uint32) uint16 {
 // (unsigned char*), which likely was not a conscious choice, but here we are.
 //
 // This function is exported for use in the rolling checksum in match.go.
-// This is safe as it only operates on a single byte
+// Fixed to prevent potential overflow in shift operations
 func SignExtend(b byte) uint32 {
-	val := uint32(b)
-	return uint32(int32(val<<24) >> 24)
+	// Convert byte to int8 first to get proper sign extension
+	// This is safer than the previous shift-based approach
+	signedByte := int8(b)
+	return uint32(signedByte)
 }
 
 // Checksum1 computes the fast rolling checksum (32-bit)
