@@ -7,7 +7,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/sha256"
-	"crypto/x509"
 	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
@@ -613,8 +612,12 @@ func (sc *SSHClient) loadPrivateKey() (ssh.Signer, error) {
 	block, _ := pem.Decode(keyData)
 	if block != nil {
 		if block.Type == "RSA PRIVATE KEY" || block.Type == "DSA PRIVATE KEY" || block.Type == "EC PRIVATE KEY" {
-			if x509.IsEncryptedPEMBlock(block) {
-				return nil, errors.New("legacy DES-encrypted traditional keys are no longer supported - please convert to PKCS#8 or OpenSSH format")
+			// Check for legacy DES encryption by looking for the Proc-Type header
+			// Legacy encrypted keys have "Proc-Type: 4,ENCRYPTED" in their headers
+			if block.Headers != nil {
+				if procType, exists := block.Headers["Proc-Type"]; exists && procType == "4,ENCRYPTED" {
+					return nil, errors.New("legacy DES-encrypted traditional keys are no longer supported - please convert to PKCS#8 or OpenSSH format")
+				}
 			}
 		}
 	}

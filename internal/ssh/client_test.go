@@ -13,6 +13,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// createLegacyEncryptedPEMBlock creates a PEM block with legacy encryption headers
+// This simulates the format that would be created by the deprecated x509.EncryptPEMBlock
+func createLegacyEncryptedPEMBlock(blockType string, data []byte) *pem.Block {
+	return &pem.Block{
+		Type: blockType,
+		Headers: map[string]string{
+			"Proc-Type": "4,ENCRYPTED",
+			"DEK-Info":  "DES-CBC,0123456789ABCDEF", // Dummy DEK-Info for testing
+		},
+		Bytes: data, // In real legacy encryption, this would be encrypted data
+	}
+}
+
 func TestSSHClient_LoadPrivateKey(t *testing.T) {
 	// Create a temporary directory for test keys
 	tempDir, err := os.MkdirTemp("", "ssh-test-keys")
@@ -52,15 +65,8 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 
 	// Test case 2: Encrypted RSA private key (legacy format) - no longer supported
 	t.Run("Encrypted RSA Key (Legacy) - No Longer Supported", func(t *testing.T) {
-		// Create encrypted PEM block using deprecated function
-		block := &pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
-		}
-
-		passphrase := "test-passphrase"
-		encryptedBlock, err := x509.EncryptPEMBlock(rand.Reader, block.Type, block.Bytes, []byte(passphrase), x509.PEMCipherDES)
-		require.NoError(t, err)
+		// Create encrypted PEM block with legacy encryption headers
+		encryptedBlock := createLegacyEncryptedPEMBlock("RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(privateKey))
 
 		// Write to temporary file
 		keyPath := filepath.Join(tempDir, "encrypted_rsa.pem")
@@ -72,7 +78,7 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 		client := &SSHClient{
 			config: &SSHConfig{
 				PrivateKeyPath: keyPath,
-				Passphrase:     passphrase,
+				Passphrase:     "test-passphrase",
 			},
 		}
 
@@ -143,15 +149,8 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 
 	// Test case 5: Key with passphrase but wrong passphrase - legacy DES no longer supported
 	t.Run("Wrong Passphrase - Legacy DES No Longer Supported", func(t *testing.T) {
-		// Create encrypted PEM block
-		block := &pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
-		}
-
-		correctPassphrase := "correct-passphrase"
-		encryptedBlock, err := x509.EncryptPEMBlock(rand.Reader, block.Type, block.Bytes, []byte(correctPassphrase), x509.PEMCipherDES)
-		require.NoError(t, err)
+		// Create encrypted PEM block with legacy encryption headers
+		encryptedBlock := createLegacyEncryptedPEMBlock("RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(privateKey))
 
 		// Write to temporary file
 		keyPath := filepath.Join(tempDir, "wrong_passphrase.pem")
@@ -175,15 +174,8 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 
 	// Test case 6: Encrypted key without passphrase - legacy DES no longer supported
 	t.Run("Encrypted Key Without Passphrase - Legacy DES No Longer Supported", func(t *testing.T) {
-		// Create encrypted PEM block
-		block := &pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
-		}
-
-		passphrase := "test-passphrase"
-		encryptedBlock, err := x509.EncryptPEMBlock(rand.Reader, block.Type, block.Bytes, []byte(passphrase), x509.PEMCipherDES)
-		require.NoError(t, err)
+		// Create encrypted PEM block with legacy encryption headers
+		encryptedBlock := createLegacyEncryptedPEMBlock("RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(privateKey))
 
 		// Write to temporary file
 		keyPath := filepath.Join(tempDir, "no_passphrase.pem")
