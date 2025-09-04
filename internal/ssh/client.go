@@ -583,7 +583,12 @@ func (sc *SSHClient) SetFileAttributes(remotePath, permissions, owner, group str
 	if err != nil {
 		return errors.Wrap(err, "failed to create session")
 	}
-	defer session.Close()
+	defer func() {
+		if closeErr := session.Close(); closeErr != nil {
+			// Log the error but don't return it since we're in a defer
+			// This is a cleanup operation and shouldn't mask the main error
+		}
+	}()
 
 	// Set permissions if specified
 	if permissions != "" {
