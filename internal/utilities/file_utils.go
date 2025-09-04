@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"spooky/internal/logging"
 	"strings"
 )
 
@@ -69,8 +70,65 @@ func SanitizePathForError(path string) string {
 }
 
 // LogSensitiveInfo logs sensitive information at debug level only
+// This function ensures sensitive data is only logged when debug logging is enabled
 func LogSensitiveInfo(logger interface{}, message string, sensitiveData map[string]interface{}) {
-	// This function would be used to log sensitive information at debug level
-	// Implementation depends on the logging framework being used
-	// For now, this is a placeholder that ensures sensitive data is only logged at debug level
+	// Get the global logger if no specific logger is provided
+	var log *logging.Logger
+	if logger == nil {
+		log = logging.GetGlobalLogger()
+	} else if l, ok := logger.(*logging.Logger); ok {
+		log = l
+	} else {
+		// If logger is not the expected type, use global logger
+		log = logging.GetGlobalLogger()
+	}
+
+	// Only log sensitive information at debug level
+	// Convert sensitive data to slog attributes
+	attrs := make([]any, 0, len(sensitiveData)*2)
+	for key, value := range sensitiveData {
+		// Sanitize sensitive keys to avoid accidental exposure
+		sanitizedKey := sanitizeSensitiveKey(key)
+		attrs = append(attrs, sanitizedKey, value)
+	}
+
+	// Log at debug level only
+	log.Debug(message, attrs...)
+}
+
+// sanitizeSensitiveKey sanitizes sensitive key names to prevent accidental exposure
+func sanitizeSensitiveKey(key string) string {
+	// Replace common sensitive key patterns with generic names
+	sensitivePatterns := map[string]string{
+		"password":       "auth_data",
+		"passwd":         "auth_data",
+		"secret":         "auth_data",
+		"token":          "auth_data",
+		"key":            "auth_data",
+		"private_key":    "auth_data",
+		"privatekey":     "auth_data",
+		"private-key":    "auth_data",
+		"api_key":        "auth_data",
+		"apikey":         "auth_data",
+		"api-key":        "auth_data",
+		"access_key":     "auth_data",
+		"accesskey":      "auth_data",
+		"access-key":     "auth_data",
+		"secret_key":     "auth_data",
+		"secretkey":      "auth_data",
+		"secret-key":     "auth_data",
+		"credential":     "auth_data",
+		"credentials":    "auth_data",
+		"auth":           "auth_data",
+		"authentication": "auth_data",
+	}
+
+	keyLower := strings.ToLower(key)
+	for pattern, replacement := range sensitivePatterns {
+		if strings.Contains(keyLower, pattern) {
+			return replacement
+		}
+	}
+
+	return key
 }
