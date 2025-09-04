@@ -338,6 +338,24 @@ func (hg *Generator) shouldIncludeField(field reflect.Value, fieldType reflect.S
 		return true
 	}
 
+	// Check if field has a non-zero value (for primitive types)
+	switch field.Kind() {
+	case reflect.String:
+		return field.String() != ""
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return field.Int() != 0
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return field.Uint() != 0
+	case reflect.Float32, reflect.Float64:
+		return field.Float() != 0
+	case reflect.Bool:
+		return field.Bool()
+	case reflect.Slice, reflect.Map:
+		return field.Len() > 0
+	case reflect.Ptr, reflect.Interface:
+		return !field.IsNil()
+	}
+
 	return false
 }
 
