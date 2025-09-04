@@ -45,8 +45,6 @@ func (cm *ConfigManager) GetConfigDir() string {
 
 // GetStructBasedDefaultConfig returns the default configuration using struct-based defaults
 func (cm *ConfigManager) GetStructBasedDefaultConfig() string {
-	// Import the schemas package to use the default config generator
-	// Note: We need to import "spooky/internal/schemas" at the top of this file
 	defaultGen := schemas.NewDefaultConfigGenerator()
 	defaultConfig := defaultGen.GetDefaultSpookyConfig()
 
