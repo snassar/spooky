@@ -424,6 +424,8 @@ func (l *Logger) QueryLogs(query LogQuery) ([]LogEntry, error) {
 		if closeErr := rows.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already processed the data
 			// This is a best-effort cleanup
+			// Note: Using fmt.Printf for logging since we're in the logging package itself
+			fmt.Printf("warning: failed to close database rows during cleanup: %v\n", closeErr)
 		}
 	}()
 

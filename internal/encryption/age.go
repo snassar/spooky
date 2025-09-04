@@ -128,6 +128,8 @@ func (ae *AgeEncryption) loadIdentityFromFile(path string) error {
 		if closeErr := file.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already read the data
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close identity file during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 
@@ -236,6 +238,8 @@ func (ae *AgeEncryption) loadRecipientsFromFile(path string) error {
 		if closeErr := file.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already read the data
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close recipients file during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 
@@ -297,6 +301,8 @@ func (ae *AgeEncryption) Encrypt(plaintext string) (string, error) {
 		if closeErr := output.Close(); closeErr != nil {
 			// Log the error but don't fail the function since encryption may have succeeded
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close armor writer during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 
@@ -313,6 +319,8 @@ func (ae *AgeEncryption) Encrypt(plaintext string) (string, error) {
 		if closeErr := encryptedWriter.Close(); closeErr != nil {
 			// Log the error but don't fail the function since encryption may have succeeded
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close encrypted writer during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 

@@ -133,6 +133,8 @@ func (m *MutagenSyncEngine) validateSourceFile(sourcePath string, result *FileSy
 	if closeErr := file.Close(); closeErr != nil {
 		// Log the error but don't fail the function since we've already read the data
 		// This is a best-effort cleanup
+		logger := logging.GetGlobalLogger()
+		logger.Warn("failed to close file during cleanup", slog.String("error", closeErr.Error()))
 	}
 
 	return sourceInfo, nil
@@ -175,6 +177,8 @@ func (m *MutagenSyncEngine) checkTargetFile(targetPath string, result *FileSyncR
 		if closeErr := file.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already read the data
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close file during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}
 
@@ -358,12 +362,16 @@ func (m *MutagenSyncEngine) performMutagenSync(sourcePath, targetPath string, op
 		if closeErr := sourceFile.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already processed the data
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close source file during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 	defer func() {
 		if closeErr := targetFile.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already processed the data
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close target file during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 
@@ -409,6 +417,8 @@ func (m *MutagenSyncEngine) openSyncFiles(sourcePath, targetPath string, result 
 		if closeErr := sourceFile.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we're already in an error state
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close source file during error cleanup", slog.String("error", closeErr.Error()))
 		}
 		result.Error = fmt.Errorf("failed to open target file: %v", err)
 		return nil, nil, result.Error
@@ -586,6 +596,8 @@ func (m *MutagenSyncEngine) applyDeltaOperations(targetFile *os.File, operations
 		if closeErr := outputFile.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already written the data
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close output file during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 
@@ -606,6 +618,8 @@ func (m *MutagenSyncEngine) applyDeltaOperations(targetFile *os.File, operations
 	if closeErr := outputFile.Close(); closeErr != nil {
 		// Log the error but don't fail the function since we've already written the data
 		// This is a best-effort cleanup
+		logger := logging.GetGlobalLogger()
+		logger.Warn("failed to close output file during cleanup", slog.String("error", closeErr.Error()))
 	}
 
 	// Replace target file with new version

@@ -254,6 +254,8 @@ func (r *RemoteSyncEngine) syncFileToRemote(ctx context.Context, localPath, remo
 		if removeErr := os.Remove(tempRemotePath); removeErr != nil {
 			// Log the error but don't fail the function since this is cleanup
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to remove temporary file during cleanup", slog.String("error", removeErr.Error()))
 		}
 	}() // Clean up temp file
 

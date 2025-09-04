@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -17,6 +18,8 @@ func FileChecksum(fn string) ([]byte, error) {
 		if closeErr := f.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already read the data
 			// This is a best-effort cleanup
+			// Note: Using fmt.Printf for logging since this package doesn't import logging
+			fmt.Printf("warning: failed to close file during cleanup: %v\n", closeErr)
 		}
 	}()
 	h := md4.New()

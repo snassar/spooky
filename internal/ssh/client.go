@@ -174,6 +174,8 @@ func (sc *SSHClient) Connect(ctx context.Context) error {
 		if closeErr := conn.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we're already in an error state
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close connection during error cleanup", slog.String("error", closeErr.Error()))
 		}
 		return errors.Wrapf(err, "failed to establish SSH connection to %s - authentication or protocol negotiation failed", addr)
 	}
@@ -198,6 +200,8 @@ func (sc *SSHClient) Disconnect() error {
 		if closeErr := sc.session.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we're disconnecting
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close session during disconnect", slog.String("error", closeErr.Error()))
 		}
 		sc.session = nil
 	}
@@ -237,6 +241,8 @@ func (sc *SSHClient) RunCommand(ctx context.Context, command string) (*schemas.C
 		if closeErr := session.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already processed the data
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close session during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 
@@ -294,6 +300,8 @@ func (sc *SSHClient) UploadFile(ctx context.Context, localPath, remotePath strin
 		if closeErr := localFile.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already read the data
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close local file during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 
@@ -312,6 +320,8 @@ func (sc *SSHClient) UploadFile(ctx context.Context, localPath, remotePath strin
 		if closeErr := session.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already processed the data
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close session during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 
@@ -363,6 +373,8 @@ func (sc *SSHClient) DownloadFile(ctx context.Context, remotePath, localPath str
 		if closeErr := session.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already processed the data
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close session during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 
@@ -386,6 +398,8 @@ func (sc *SSHClient) DownloadFile(ctx context.Context, remotePath, localPath str
 		if closeErr := localFile.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already written the data
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close local file during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 
@@ -453,6 +467,8 @@ func (sc *SSHClient) CopyFile(localPath, remotePath string) error {
 		if closeErr := localFile.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already read the data
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close local file during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 
@@ -471,6 +487,8 @@ func (sc *SSHClient) CopyFile(localPath, remotePath string) error {
 		if closeErr := session.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already processed the data
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close session during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 
@@ -529,6 +547,8 @@ func (sc *SSHClient) CopyFileContent(content, remotePath string, permissions os.
 		if closeErr := session.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already processed the data
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close session during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 
@@ -587,6 +607,8 @@ func (sc *SSHClient) SetFileAttributes(remotePath, permissions, owner, group str
 		if closeErr := session.Close(); closeErr != nil {
 			// Log the error but don't return it since we're in a defer
 			// This is a cleanup operation and shouldn't mask the main error
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close session during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 

@@ -515,6 +515,8 @@ func copyFile(src, dst string, options *SyncOptions) error {
 		if closeErr := source.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already read the data
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close source file during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 
@@ -532,6 +534,8 @@ func copyFile(src, dst string, options *SyncOptions) error {
 		if closeErr := destination.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already written the data
 			// This is a best-effort cleanup
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close destination file during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 

@@ -411,6 +411,8 @@ func testSSHConnection(ip string, port int, timeout int) string {
 		if closeErr := conn.Close(); closeErr != nil {
 			// Log the error but don't fail the test since we're just checking connectivity
 			// This is a best-effort cleanup in a test function
+			logger := logging.GetGlobalLogger()
+			logger.Warn("failed to close connection during cleanup", slog.String("error", closeErr.Error()))
 		}
 	}()
 	return "available"
