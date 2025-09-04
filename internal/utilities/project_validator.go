@@ -141,86 +141,114 @@ func (pv *ProjectValidator) convertToSchema(items []string, expectedItems map[st
 	return schemaItems
 }
 
+// ExpectedItem represents a configuration item (file or directory)
+type ExpectedItem struct {
+	Name        string
+	Type        string
+	Required    bool
+	Description string
+	Pattern     string
+}
+
 // getExpectedFiles returns the expected files configuration
 func (pv *ProjectValidator) getExpectedFiles() map[string]map[string]interface{} {
-	return map[string]map[string]interface{}{
-		"project.hcl": {
-			"name":        "project.hcl",
-			"type":        "file",
-			"required":    true,
-			"description": "Main project configuration file",
-			"pattern":     "project \"[a-zA-Z0-9_-]+\" {",
+	expectedFiles := []ExpectedItem{
+		{
+			Name:        "project.hcl",
+			Type:        "file",
+			Required:    true,
+			Description: "Main project configuration file",
+			Pattern:     "project \"[a-zA-Z0-9_-]+\" {",
 		},
-		"machines.hcl": {
-			"name":        "machines.hcl",
-			"type":        "file",
-			"required":    false,
-			"description": "Machine inventory definitions",
-			"pattern":     "machines {",
+		{
+			Name:        "machines.hcl",
+			Type:        "file",
+			Required:    false,
+			Description: "Machine inventory definitions",
+			Pattern:     "machines {",
 		},
-		"actions.hcl": {
-			"name":        "actions.hcl",
-			"type":        "file",
-			"required":    false,
-			"description": "Main actions file",
-			"pattern":     "actions {",
+		{
+			Name:        "actions.hcl",
+			Type:        "file",
+			Required:    false,
+			Description: "Main actions file",
+			Pattern:     "actions {",
 		},
-		"variables.hcl": {
-			"name":        "variables.hcl",
-			"type":        "file",
-			"required":    false,
-			"description": "Main variables file",
-			"pattern":     "variables {",
+		{
+			Name:        "variables.hcl",
+			Type:        "file",
+			Required:    false,
+			Description: "Main variables file",
+			Pattern:     "variables {",
 		},
-		"README.md": {
-			"name":        "README.md",
-			"type":        "file",
-			"required":    false,
-			"description": "Project documentation",
-			"pattern":     "# .*",
+		{
+			Name:        "README.md",
+			Type:        "file",
+			Required:    false,
+			Description: "Project documentation",
+			Pattern:     "# .*",
 		},
 	}
+
+	return pv.convertExpectedItemsToMap(expectedFiles)
 }
 
 // getExpectedDirectories returns the expected directories configuration
 func (pv *ProjectValidator) getExpectedDirectories() map[string]map[string]interface{} {
-	return map[string]map[string]interface{}{
-		"machines": {
-			"name":        "machines",
-			"type":        "directory",
-			"required":    false,
-			"description": "Machine inventory files directory",
-			"pattern":     ".*\\.hcl$",
+	expectedDirs := []ExpectedItem{
+		{
+			Name:        "machines",
+			Type:        "directory",
+			Required:    false,
+			Description: "Machine inventory files directory",
+			Pattern:     ".*\\.hcl$",
 		},
-		"actions": {
-			"name":        "actions",
-			"type":        "directory",
-			"required":    false,
-			"description": "Organized action files",
-			"pattern":     ".*\\.hcl$",
+		{
+			Name:        "actions",
+			Type:        "directory",
+			Required:    false,
+			Description: "Organized action files",
+			Pattern:     ".*\\.hcl$",
 		},
-		"variables": {
-			"name":        "variables",
-			"type":        "directory",
-			"required":    false,
-			"description": "Variables files directory",
-			"pattern":     ".*\\.hcl$",
+		{
+			Name:        "variables",
+			Type:        "directory",
+			Required:    false,
+			Description: "Variables files directory",
+			Pattern:     ".*\\.hcl$",
 		},
-		"templates": {
-			"name":        "templates",
-			"type":        "directory",
-			"required":    false,
-			"description": "Template files for dynamic content",
-			"pattern":     "",
+		{
+			Name:        "templates",
+			Type:        "directory",
+			Required:    false,
+			Description: "Template files for dynamic content",
+			Pattern:     "",
 		},
-		"files": {
-			"name":        "files",
-			"type":        "directory",
-			"required":    false,
-			"description": "Static files to be deployed",
-			"pattern":     "",
+		{
+			Name:        "files",
+			Type:        "directory",
+			Required:    false,
+			Description: "Static files to be deployed",
+			Pattern:     "",
 		},
 	}
+
+	return pv.convertExpectedItemsToMap(expectedDirs)
+}
+
+// convertExpectedItemsToMap converts a slice of ExpectedItem to the expected map format
+func (pv *ProjectValidator) convertExpectedItemsToMap(items []ExpectedItem) map[string]map[string]interface{} {
+	result := make(map[string]map[string]interface{})
+	for _, item := range items {
+		result[item.Name] = map[string]interface{}{
+			"name":        item.Name,
+			"type":        item.Type,
+			"required":    item.Required,
+			"description": item.Description,
+			"pattern":     item.Pattern,
+		}
+	}
+	return result
 }
 
 // convertFilesToSchema converts file names to schema format
@@ -395,19 +423,24 @@ func (pv *ProjectValidator) validateHCLFile(filePath, schemaType, context string
 	}
 }
 
-// validateMachinesFile validates a single machines.hcl file
-func (pv *ProjectValidator) validateMachinesFile(filePath string) {
-	pv.validateHCLFile(filePath, ResourceTypeMachines, ValidationContextMachines)
+// validateResourceFile validates a single resource file with the specified schema type and context
+func (pv *ProjectValidator) validateResourceFile(filePath, resourceType, context string) {
+	pv.validateHCLFile(filePath, resourceType, context)
 }
 
-// validateMachinesDirectory validates all .hcl files in the machines directory
-func (pv *ProjectValidator) validateMachinesDirectory(dirPath string) {
+// validateMachinesFile validates a single machines.hcl file
+func (pv *ProjectValidator) validateMachinesFile(filePath string) {
+	pv.validateResourceFile(filePath, ResourceTypeMachines, ValidationContextMachines)
+}
+
+// validateResourceDirectory validates all .hcl files in a resource directory
+func (pv *ProjectValidator) validateResourceDirectory(dirPath, resourceType, context string) {
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
 		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
-			Message: fmt.Sprintf("failed to read machines directory: %v", err),
+			Message: fmt.Sprintf("failed to read %s directory: %v", resourceType, err),
 			File:    dirPath,
-			Context: ValidationContextMachines,
+			Context: context,
 		})
 		return
 	}
@@ -415,9 +448,14 @@ func (pv *ProjectValidator) validateMachinesDirectory(dirPath string) {
 	for _, entry := range entries {
 		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".hcl") {
 			filePath := filepath.Join(dirPath, entry.Name())
-			pv.validateMachinesFile(filePath)
+			pv.validateResourceFile(filePath, resourceType, context)
 		}
 	}
+}
+
+// validateMachinesDirectory validates all .hcl files in the machines directory
+func (pv *ProjectValidator) validateMachinesDirectory(dirPath string) {
+	pv.validateResourceDirectory(dirPath, ResourceTypeMachines, ValidationContextMachines)
 }
 
 // validateActions validates action configurations
@@ -438,27 +476,12 @@ func (pv *ProjectValidator) validateActions(projectPath string) {
 
 // validateActionsFile validates a single actions.hcl file
 func (pv *ProjectValidator) validateActionsFile(filePath string) {
-	pv.validateHCLFile(filePath, ResourceTypeActions, ValidationContextActions)
+	pv.validateResourceFile(filePath, ResourceTypeActions, ValidationContextActions)
 }
 
 // validateActionsDirectory validates all .hcl files in the actions directory
 func (pv *ProjectValidator) validateActionsDirectory(dirPath string) {
-	entries, err := os.ReadDir(dirPath)
-	if err != nil {
-		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
-			Message: fmt.Sprintf("failed to read actions directory: %v", err),
-			File:    dirPath,
-			Context: ValidationContextActions,
-		})
-		return
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".hcl") {
-			filePath := filepath.Join(dirPath, entry.Name())
-			pv.validateActionsFile(filePath)
-		}
-	}
+	pv.validateResourceDirectory(dirPath, ResourceTypeActions, ValidationContextActions)
 }
 
 // validateVariablesConfig validates variable configurations
@@ -479,25 +502,10 @@ func (pv *ProjectValidator) validateVariablesConfig(projectPath string) {
 
 // validateVariablesFile validates a single variables.hcl file
 func (pv *ProjectValidator) validateVariablesFile(filePath string) {
-	pv.validateHCLFile(filePath, ResourceTypeVariables, ValidationContextVariables)
+	pv.validateResourceFile(filePath, ResourceTypeVariables, ValidationContextVariables)
 }
 
 // validateVariablesDirectory validates all .hcl files in the variables directory
 func (pv *ProjectValidator) validateVariablesDirectory(dirPath string) {
-	entries, err := os.ReadDir(dirPath)
-	if err != nil {
-		pv.result.Errors = append(pv.result.Errors, schemas.ValidationError{
-			Message: fmt.Sprintf("failed to read variables directory: %v", err),
-			File:    dirPath,
-			Context: ValidationContextVariables,
-		})
-		return
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".hcl") {
-			filePath := filepath.Join(dirPath, entry.Name())
-			pv.validateVariablesFile(filePath)
-		}
-	}
+	pv.validateResourceDirectory(dirPath, ResourceTypeVariables, ValidationContextVariables)
 }
