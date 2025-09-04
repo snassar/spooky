@@ -55,7 +55,7 @@ var gatherFactsCmd = &cobra.Command{
 		}
 
 		// Create SSH manager
-		sshManager := ssh.NewSimpleSSHManager(nil, sshConfig) // Note: Age encryption not yet implemented for facts gathering
+		sshManager := ssh.NewSimpleSSHManager(nil, sshConfig)
 
 		// Create facts gatherer
 		gatherer := facts.NewGatherer(sshManager, projectConfig)
