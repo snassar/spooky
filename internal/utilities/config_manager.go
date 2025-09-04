@@ -76,7 +76,6 @@ ssh {
   keepalive_interval = 60
   keepalive_count = 3
   key_scan_timeout = 10
-  known_hosts_strict = true
   connection_pool_size = 10
 }
 

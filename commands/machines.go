@@ -426,7 +426,6 @@ func testAuthentication(machine *schemas.MachinesMachineV1, timeout int) string 
 		KeepaliveInterval:  60,
 		KeepaliveCount:     3,
 		KeyScanTimeout:     10,
-		KnownHostsStrict:   false, // For testing, be more permissive
 		KnownHostsMode:     "accept-new",
 		ConnectionPoolSize: 1,
 	}

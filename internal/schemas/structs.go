@@ -356,7 +356,6 @@ type SpookySSHV1 struct {
 	KeepaliveInterval  int    `json:"keepalive_interval" min:"1" max:"300" default:"60" description:"SSH keepalive interval in seconds"`
 	KeepaliveCount     int    `json:"keepalive_count" min:"1" max:"10" default:"3" description:"SSH keepalive count before considering connection dead"`
 	KeyScanTimeout     int    `json:"key_scan_timeout" min:"1" max:"60" default:"10" description:"SSH key scanning timeout in seconds"`
-	KnownHostsStrict   bool   `json:"known_hosts_strict" default:"true" description:"Strict known_hosts checking (deprecated, use known_hosts_mode instead)"`
 	KnownHostsMode     string `json:"known_hosts_mode" default:"accept-new" description:"Known hosts handling mode: strict, accept-new, or ignore"`
 	ConnectionPoolSize int    `json:"connection_pool_size" min:"1" max:"100" default:"10" description:"SSH connection pool size"`
 

@@ -35,18 +35,17 @@ func (dcg *DefaultConfigGenerator) GetDefaultSpookySSH() *SpookySSHV1 {
 		KeepaliveInterval:         dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(1), 60),
 		KeepaliveCount:            dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(2), 3),
 		KeyScanTimeout:            dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(3), 10),
-		KnownHostsStrict:          dcg.extractBoolDefault(reflect.TypeOf(SpookySSHV1{}).Field(4), false), // Deprecated
-		KnownHostsMode:            dcg.extractStringDefault(reflect.TypeOf(SpookySSHV1{}).Field(5), "accept-new"),
-		ConnectionPoolSize:        dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(6), 10),
+		KnownHostsMode:            dcg.extractStringDefault(reflect.TypeOf(SpookySSHV1{}).Field(4), "accept-new"),
+		ConnectionPoolSize:        dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(5), 10),
 		ProxyCommand:              "", // No default
 		ProxyJump:                 "", // No default
-		Compression:               dcg.extractBoolDefault(reflect.TypeOf(SpookySSHV1{}).Field(9), false),
-		CompressionLevel:          dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(10), 6),
-		TCPKeepAlive:              dcg.extractBoolDefault(reflect.TypeOf(SpookySSHV1{}).Field(11), true),
-		TCPKeepAliveCount:         dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(12), 3),
-		TCPKeepAliveIdle:          dcg.extractDurationDefault(reflect.TypeOf(SpookySSHV1{}).Field(13), 60*time.Second),
-		TCPKeepAliveInterval:      dcg.extractDurationDefault(reflect.TypeOf(SpookySSHV1{}).Field(14), 10*time.Second),
-		TCPKeepAliveProbeInterval: dcg.extractDurationDefault(reflect.TypeOf(SpookySSHV1{}).Field(15), 5*time.Second),
+		Compression:               dcg.extractBoolDefault(reflect.TypeOf(SpookySSHV1{}).Field(8), false),
+		CompressionLevel:          dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(9), 6),
+		TCPKeepAlive:              dcg.extractBoolDefault(reflect.TypeOf(SpookySSHV1{}).Field(10), true),
+		TCPKeepAliveCount:         dcg.extractIntDefault(reflect.TypeOf(SpookySSHV1{}).Field(11), 3),
+		TCPKeepAliveIdle:          dcg.extractDurationDefault(reflect.TypeOf(SpookySSHV1{}).Field(12), 60*time.Second),
+		TCPKeepAliveInterval:      dcg.extractDurationDefault(reflect.TypeOf(SpookySSHV1{}).Field(13), 10*time.Second),
+		TCPKeepAliveProbeInterval: dcg.extractDurationDefault(reflect.TypeOf(SpookySSHV1{}).Field(14), 5*time.Second),
 	}
 }
 

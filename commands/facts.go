@@ -240,7 +240,6 @@ func loadSSHConfig() (*schemas.SpookySSHV1, error) {
 		KeepaliveInterval:         60,
 		KeepaliveCount:            3,
 		KeyScanTimeout:            10,
-		KnownHostsStrict:          false,        // Deprecated, use KnownHostsMode instead
 		KnownHostsMode:            "accept-new", // Accept new hosts silently, warn on changed keys
 		Compression:               false,
 		CompressionLevel:          6,

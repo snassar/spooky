@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -469,27 +470,333 @@ func (r *RemoteSyncEngine) syncOneWaySafeRemote(ctx context.Context, localPath, 
 
 // syncTwoWaySafeRemote performs bidirectional sync with conflict detection
 func (r *RemoteSyncEngine) syncTwoWaySafeRemote(ctx context.Context, localPath, remotePath string, options *RemoteOptions, result *RemoteSyncResult, progress *Progress) error {
-	// This would involve:
-	// 1. Sync local → remote (one-way safe)
-	// 2. Sync remote → local (one-way safe)
-	// 3. Detect and report conflicts
-
-	// For now, this is a placeholder implementation
 	logger := logging.GetGlobalLogger()
-	logger.Info("two-way safe sync not yet implemented")
+	logger.Info("performing two-way safe sync",
+		slog.String("local", localPath),
+		slog.String("remote", remotePath),
+		slog.String("machine", options.Machine.Hostname))
+
+	// Step 1: Sync local → remote (one-way safe)
+	logger.Info("syncing local to remote (safe mode)")
+	localToRemoteResult := &RemoteSyncResult{
+		FileSyncResult: &FileSyncResult{
+			SourcePath: localPath,
+			TargetPath: remotePath,
+		},
+		RemoteMachine: options.Machine.Hostname,
+		Progress:      progress,
+	}
+
+	if err := r.syncOneWaySafeRemote(ctx, localPath, remotePath, options, localToRemoteResult, progress); err != nil {
+		return fmt.Errorf("failed to sync local to remote: %v", err)
+	}
+
+	// Step 2: Sync remote → local (one-way safe)
+	logger.Info("syncing remote to local (safe mode)")
+	remoteToLocalResult := &RemoteSyncResult{
+		FileSyncResult: &FileSyncResult{
+			SourcePath: remotePath,
+			TargetPath: localPath,
+		},
+		RemoteMachine: options.Machine.Hostname,
+		Progress:      progress,
+	}
+
+	if err := r.syncRemoteToLocalSafe(ctx, remotePath, localPath, options, remoteToLocalResult, progress); err != nil {
+		return fmt.Errorf("failed to sync remote to local: %v", err)
+	}
+
+	// Step 3: Combine results and detect conflicts
+	result.BytesTransferred = localToRemoteResult.BytesTransferred + remoteToLocalResult.BytesTransferred
+	result.BytesSaved = localToRemoteResult.BytesSaved + remoteToLocalResult.BytesSaved
+	result.Operations = localToRemoteResult.Operations + remoteToLocalResult.Operations
+	result.Conflicts = append(localToRemoteResult.Conflicts, remoteToLocalResult.Conflicts...)
+	result.Success = localToRemoteResult.Success && remoteToLocalResult.Success
+
+	if len(result.Conflicts) > 0 {
+		logger.Warn("conflicts detected during two-way safe sync",
+			slog.Int("conflict_count", len(result.Conflicts)),
+			slog.String("conflicts", fmt.Sprintf("%v", result.Conflicts)))
+	}
 
 	return nil
 }
 
 // syncTwoWayResolvedRemote performs bidirectional sync with local winning conflicts
 func (r *RemoteSyncEngine) syncTwoWayResolvedRemote(ctx context.Context, localPath, remotePath string, options *RemoteOptions, result *RemoteSyncResult, progress *Progress) error {
-	// This would involve:
-	// 1. Sync local → remote (one-way replica - local always wins)
-	// 2. Sync remote → local (one-way safe - preserve local changes)
-
-	// For now, this is a placeholder implementation
 	logger := logging.GetGlobalLogger()
-	logger.Info("two-way resolved sync not yet implemented")
+	logger.Info("performing two-way resolved sync (local wins conflicts)",
+		slog.String("local", localPath),
+		slog.String("remote", remotePath),
+		slog.String("machine", options.Machine.Hostname))
+
+	// Step 1: Sync local → remote (one-way replica - local always wins)
+	logger.Info("syncing local to remote (replica mode - local wins)")
+	localToRemoteResult := &RemoteSyncResult{
+		FileSyncResult: &FileSyncResult{
+			SourcePath: localPath,
+			TargetPath: remotePath,
+		},
+		RemoteMachine: options.Machine.Hostname,
+		Progress:      progress,
+	}
+
+	if err := r.syncOneWayReplicaRemote(ctx, localPath, remotePath, options, localToRemoteResult, progress); err != nil {
+		return fmt.Errorf("failed to sync local to remote: %v", err)
+	}
+
+	// Step 2: Sync remote → local (one-way safe - preserve local changes)
+	logger.Info("syncing remote to local (safe mode - preserve local changes)")
+	remoteToLocalResult := &RemoteSyncResult{
+		FileSyncResult: &FileSyncResult{
+			SourcePath: remotePath,
+			TargetPath: localPath,
+		},
+		RemoteMachine: options.Machine.Hostname,
+		Progress:      progress,
+	}
+
+	if err := r.syncRemoteToLocalSafe(ctx, remotePath, localPath, options, remoteToLocalResult, progress); err != nil {
+		return fmt.Errorf("failed to sync remote to local: %v", err)
+	}
+
+	// Step 3: Combine results (conflicts are resolved by local winning)
+	result.BytesTransferred = localToRemoteResult.BytesTransferred + remoteToLocalResult.BytesTransferred
+	result.BytesSaved = localToRemoteResult.BytesSaved + remoteToLocalResult.BytesSaved
+	result.Operations = localToRemoteResult.Operations + remoteToLocalResult.Operations
+	result.Conflicts = append(localToRemoteResult.Conflicts, remoteToLocalResult.Conflicts...)
+	result.Success = localToRemoteResult.Success && remoteToLocalResult.Success
+
+	// Log resolved conflicts
+	if len(result.Conflicts) > 0 {
+		logger.Info("conflicts resolved during two-way sync (local wins)",
+			slog.Int("resolved_count", len(result.Conflicts)),
+			slog.String("resolved_conflicts", fmt.Sprintf("%v", result.Conflicts)))
+		result.ResolvedConflicts = result.Conflicts
+		result.Conflicts = nil // Clear conflicts since they're resolved
+	}
 
 	return nil
+}
+
+// syncRemoteToLocalSafe performs safe one-way sync from remote to local
+func (r *RemoteSyncEngine) syncRemoteToLocalSafe(ctx context.Context, remotePath, localPath string, options *RemoteOptions, result *RemoteSyncResult, progress *Progress) error {
+	logger := logging.GetGlobalLogger()
+	logger.Info("performing one-way safe sync from remote to local",
+		slog.String("source", remotePath),
+		slog.String("target", localPath),
+		slog.String("machine", options.Machine.Hostname))
+
+	// Create local directory if it doesn't exist
+	if err := os.MkdirAll(localPath, 0755); err != nil {
+		return fmt.Errorf("failed to create local directory: %v", err)
+	}
+
+	// Get list of remote files
+	remoteFiles, err := r.listRemoteFiles(ctx, options.Machine, remotePath)
+	if err != nil {
+		return fmt.Errorf("failed to list remote files: %v", err)
+	}
+
+	// Sync each remote file to local
+	for _, remoteFile := range remoteFiles {
+		relPath, err := filepath.Rel(remotePath, remoteFile)
+		if err != nil {
+			return fmt.Errorf("failed to calculate relative path: %v", err)
+		}
+
+		localFile := filepath.Join(localPath, relPath)
+
+		// Create local directory if needed
+		localDir := filepath.Dir(localFile)
+		if err := os.MkdirAll(localDir, 0755); err != nil {
+			return fmt.Errorf("failed to create local directory %s: %v", localDir, err)
+		}
+
+		// Sync file from remote to local
+		fileResult, err := r.syncFileFromRemote(ctx, remoteFile, localFile, options, progress)
+		if err != nil {
+			return fmt.Errorf("failed to sync file %s: %v", remoteFile, err)
+		}
+
+		result.BytesTransferred += fileResult.BytesTransferred
+		result.BytesSaved += fileResult.BytesSaved
+		result.Operations += fileResult.Operations
+		result.Conflicts = append(result.Conflicts, fileResult.Conflicts...)
+	}
+
+	// Clean up local files that don't exist on remote if delete is enabled
+	if options.SyncDelete {
+		if err := r.cleanupLocalFiles(ctx, remotePath, localPath, options, progress); err != nil {
+			return fmt.Errorf("failed to cleanup local files: %v", err)
+		}
+	}
+
+	result.Success = true
+	return nil
+}
+
+// listRemoteFiles lists all files in a remote directory
+func (r *RemoteSyncEngine) listRemoteFiles(ctx context.Context, machine *schemas.MachinesMachineV1, remotePath string) ([]string, error) {
+	// Use find command to list all files recursively
+	command := fmt.Sprintf("find %s -type f 2>/dev/null || true", remotePath)
+	result, err := r.sshManager.RunCommandOnMachine(ctx, machine, command)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list remote files: %v", err)
+	}
+
+	if result.ExitCode != 0 {
+		return nil, fmt.Errorf("failed to list remote files, exit code: %d", result.ExitCode)
+	}
+
+	// Parse the output and filter out empty lines
+	lines := strings.Split(strings.TrimSpace(result.Stdout), "\n")
+	var files []string
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			files = append(files, strings.TrimSpace(line))
+		}
+	}
+
+	return files, nil
+}
+
+// syncFileFromRemote synchronizes a single file from remote to local
+func (r *RemoteSyncEngine) syncFileFromRemote(ctx context.Context, remotePath, localPath string, options *RemoteOptions, progress *Progress) (*FileSyncResult, error) {
+	result := &FileSyncResult{
+		SourcePath: remotePath,
+		TargetPath: localPath,
+	}
+
+	// Update progress
+	progress.CurrentFile = filepath.Base(remotePath)
+	progress.CurrentOperation = "downloading"
+
+	// Check if local file exists
+	localExists := false
+	if localInfo, err := os.Stat(localPath); err == nil {
+		localExists = true
+		if !localInfo.IsDir() {
+			// Handle conflict detection in safe mode
+			if options.Mode == ModeOneWaySafe || options.Mode == ModeTwoWaySafe {
+				if conflict, err := r.checkForConflictsRemoteToLocal(ctx, remotePath, localPath, options); err != nil {
+					result.Error = err
+					return result, result.Error
+				} else if conflict {
+					result.Conflicts = append(result.Conflicts, localPath)
+					return result, nil
+				}
+			}
+		}
+	}
+
+	// Download the remote file
+	content, err := r.downloadRemoteFileContent(ctx, options.Machine, remotePath)
+	if err != nil {
+		result.Error = fmt.Errorf("failed to download remote file: %v", err)
+		return result, result.Error
+	}
+
+	// Write to local file
+	if err := os.WriteFile(localPath, content, 0644); err != nil {
+		result.Error = fmt.Errorf("failed to write local file: %v", err)
+		return result, result.Error
+	}
+
+	// Update statistics
+	result.BytesTransferred = int64(len(content))
+	result.Operations = 1
+	if localExists {
+		result.BytesSaved = 0 // No compression for simple download
+	}
+
+	// Update progress
+	progress.CurrentOperation = "completed"
+	result.Success = true
+	return result, nil
+}
+
+// downloadRemoteFileContent downloads the content of a remote file
+func (r *RemoteSyncEngine) downloadRemoteFileContent(ctx context.Context, machine *schemas.MachinesMachineV1, remotePath string) ([]byte, error) {
+	command := fmt.Sprintf("cat %s", remotePath)
+	result, err := r.sshManager.RunCommandOnMachine(ctx, machine, command)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download remote file: %v", err)
+	}
+
+	if result.ExitCode != 0 {
+		return nil, fmt.Errorf("download command failed with exit code %d", result.ExitCode)
+	}
+
+	return []byte(result.Stdout), nil
+}
+
+// checkForConflictsRemoteToLocal checks for conflicts when syncing from remote to local
+func (r *RemoteSyncEngine) checkForConflictsRemoteToLocal(ctx context.Context, remotePath, localPath string, options *RemoteOptions) (bool, error) {
+	// Download remote file content
+	remoteContent, err := r.downloadRemoteFileContent(ctx, options.Machine, remotePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to download remote file for conflict check: %v", err)
+	}
+
+	// Read local file content
+	localContent, err := os.ReadFile(localPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to read local file for conflict check: %v", err)
+	}
+
+	// Compare content
+	return !bytes.Equal(remoteContent, localContent), nil
+}
+
+// cleanupLocalFiles removes local files that don't exist on remote
+func (r *RemoteSyncEngine) cleanupLocalFiles(ctx context.Context, remotePath, localPath string, options *RemoteOptions, progress *Progress) error {
+	// Get list of remote files
+	remoteFiles, err := r.listRemoteFiles(ctx, options.Machine, remotePath)
+	if err != nil {
+		return fmt.Errorf("failed to list remote files for cleanup: %v", err)
+	}
+
+	// Create a set of remote files for quick lookup
+	remoteFileSet := make(map[string]bool)
+	for _, remoteFile := range remoteFiles {
+		relPath, err := filepath.Rel(remotePath, remoteFile)
+		if err != nil {
+			continue
+		}
+		remoteFileSet[relPath] = true
+	}
+
+	// Walk local directory and remove files not in remote
+	return filepath.Walk(localPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(localPath, path)
+		if err != nil {
+			return err
+		}
+
+		// Skip if file exists on remote
+		if remoteFileSet[relPath] {
+			return nil
+		}
+
+		// Remove local file that doesn't exist on remote
+		if err := os.Remove(path); err != nil {
+			return fmt.Errorf("failed to remove local file %s: %v", path, err)
+		}
+
+		if options.Verbose {
+			logger := logging.GetGlobalLogger()
+			logger.Info("removed local file not present on remote", slog.String("path", path))
+		}
+
+		return nil
+	})
 }

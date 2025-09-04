@@ -36,7 +36,6 @@ func (sm *SimpleSSHManager) createSSHConfig(machine *schemas.MachinesMachineV1) 
 		KeepAlive:      time.Duration(sm.config.KeepaliveInterval) * time.Second,
 		KeepAliveCount: sm.config.KeepaliveCount,
 		KeyScanTimeout: time.Duration(sm.config.KeyScanTimeout) * time.Second,
-		StrictHostKey:  sm.config.KnownHostsStrict,
 		KnownHostsMode: sm.config.KnownHostsMode,
 		PubkeyAuth:     true,
 		PasswordAuth:   true,
