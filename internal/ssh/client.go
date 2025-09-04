@@ -396,7 +396,7 @@ func (sc *SSHClient) createDownloadSession(remotePath string) (*ssh.Session, err
 	}
 
 	if err := session.Start(fmt.Sprintf("scp -f %s", remotePath)); err != nil {
-		session.Close()
+		sc.closeSession(session)
 		return nil, errors.Wrap(err, "failed to start scp command")
 	}
 
