@@ -6,9 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"spooky/internal/logging"
-	"syscall"
-
 	"spooky/internal/utilities"
+	"syscall"
 
 	"github.com/pkg/errors"
 )
@@ -550,14 +549,8 @@ func preservePermissions(targetPath string, sourceMode os.FileMode) error {
 
 // preserveBothOwnerAndGroup preserves both owner and group from source to target
 func preserveBothOwnerAndGroup(targetPath string, sourceStat *syscall.Stat_t) error {
-	uid, err := utilities.SafeInt(int64(sourceStat.Uid))
-	if err != nil {
-		return errors.Wrap(err, "UID value out of bounds")
-	}
-	gid, err := utilities.SafeInt(int64(sourceStat.Gid))
-	if err != nil {
-		return errors.Wrap(err, "GID value out of bounds")
-	}
+	uid := int(sourceStat.Uid)
+	gid := int(sourceStat.Gid)
 	return errors.Wrapf(os.Chown(targetPath, uid, gid), "failed to preserve owner and group for %s", targetPath)
 }
 
@@ -581,14 +574,8 @@ func preserveOwnerOnly(targetPath string, sourceStat *syscall.Stat_t) error {
 		return err
 	}
 
-	uid, err := utilities.SafeInt(int64(sourceStat.Uid))
-	if err != nil {
-		return errors.Wrap(err, "UID value out of bounds")
-	}
-	targetGid, err := utilities.SafeInt(int64(targetStat.Gid))
-	if err != nil {
-		return errors.Wrap(err, "target GID value out of bounds")
-	}
+	uid := int(sourceStat.Uid)
+	targetGid := int(targetStat.Gid)
 	return errors.Wrapf(os.Chown(targetPath, uid, targetGid), "failed to preserve owner for %s", targetPath)
 }
 
@@ -599,14 +586,8 @@ func preserveGroupOnly(targetPath string, sourceStat *syscall.Stat_t) error {
 		return err
 	}
 
-	targetUID, err := utilities.SafeInt(int64(targetStat.Uid))
-	if err != nil {
-		return errors.Wrap(err, "target UID value out of bounds")
-	}
-	gid, err := utilities.SafeInt(int64(sourceStat.Gid))
-	if err != nil {
-		return errors.Wrap(err, "GID value out of bounds")
-	}
+	targetUID := int(targetStat.Uid)
+	gid := int(sourceStat.Gid)
 	return errors.Wrapf(os.Chown(targetPath, targetUID, gid), "failed to preserve group for %s", targetPath)
 }
 

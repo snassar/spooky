@@ -7,9 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
-	testhelpers "spooky/internal/testing"
 	"spooky/internal/utilities"
 
 	"github.com/stretchr/testify/assert"
@@ -67,7 +65,7 @@ func testFactsGatheringEndToEnd(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test facts gathering
-	ctx := testhelpers.TestContext(t, 30*time.Second)
+	// ctx := testhelpers.TestContext(t, 30*time.Second)
 
 	// This would test the actual facts gathering command
 	// For now, we'll test the project structure validation
@@ -91,7 +89,7 @@ func testActionExecutionEndToEnd(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test action execution
-	ctx := testhelpers.TestContext(t, 30*time.Second)
+	// ctx := testhelpers.TestContext(t, 30*time.Second)
 
 	// This would test the actual action execution
 	// For now, we'll validate the project structure
@@ -115,7 +113,7 @@ func testMachineConnectionEndToEnd(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test machine connection
-	ctx := testhelpers.TestContext(t, 30*time.Second)
+	// ctx := testhelpers.TestContext(t, 30*time.Second)
 
 	// This would test the actual machine connection
 	// For now, we'll validate the project structure

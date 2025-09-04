@@ -1,157 +1,120 @@
 package utilities
 
-import "github.com/pkg/errors"
-
-// HCL-specific error types
-var (
-	ErrHCLSyntaxError      = errors.New("HCL syntax error")
-	ErrHCLFileNotFound     = errors.New("HCL file not found")
-	ErrHCLInvalidBlock     = errors.New("invalid HCL block")
-	ErrHCLValidationFailed = errors.New("HCL validation failed")
-	ErrHCLParseFailed      = errors.New("failed to parse HCL")
-	ErrHCLReadFailed       = errors.New("failed to read HCL file")
-	ErrHCLDirectoryError   = errors.New("HCL directory error")
+import (
+	"fmt"
+	"log/slog"
 )
 
-// HCLSyntaxError provides detailed syntax error information
-type HCLSyntaxError struct {
-	File    string
-	Line    int
-	Column  int
-	Message string
-	Token   string
-}
+// Common error types for the application
+var (
+	ErrHCLValidationFailed = fmt.Errorf("HCL validation failed")
+	ErrHCLSyntaxError      = fmt.Errorf("HCL syntax error")
+	ErrHCLFileNotFound     = fmt.Errorf("HCL file not found")
+)
 
-func (e *HCLSyntaxError) Error() string {
-	if e.Line > 0 {
-		return errors.Errorf("HCL syntax error at %s:%d:%d: %s",
-			e.File, e.Line, e.Column, e.Message).Error()
+// WrapError wraps an error with a simple context message
+func WrapError(err error, context string) error {
+	if err == nil {
+		return nil
 	}
-	return errors.Errorf("HCL syntax error in %s: %s", e.File, e.Message).Error()
+	return fmt.Errorf("%s: %w", context, err)
 }
 
-func (e *HCLSyntaxError) Unwrap() error {
-	return ErrHCLSyntaxError
+// WrapErrorf wraps an error with a formatted context message
+func WrapErrorf(err error, format string, args ...interface{}) error {
+	if err == nil {
+		return nil
+	}
+	context := fmt.Sprintf(format, args...)
+	return fmt.Errorf("%s: %w", context, err)
 }
 
-// HCLValidationError provides structured validation error information
-type HCLValidationError struct {
-	File      string
-	BlockType string
-	Field     string
-	Value     interface{}
-	Rule      string
-	Message   string
-	Severity  string
+// NewError creates a new error with a simple message
+func NewError(message string) error {
+	return fmt.Errorf("%s", message)
 }
 
-func (e *HCLValidationError) Error() string {
-	return errors.Errorf("HCL validation error in %s: %s", e.File, e.Message).Error()
+// NewErrorf creates a new error with a formatted message
+func NewErrorf(format string, args ...interface{}) error {
+	return fmt.Errorf(format, args...)
 }
 
-func (e *HCLValidationError) Unwrap() error {
-	return ErrHCLValidationFailed
+// LogError logs an error with context using structured logging
+func LogError(err error, context string, logger *slog.Logger) {
+	if err == nil {
+		return
+	}
+
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	logger.Error("operation failed",
+		slog.String("context", context),
+		slog.String("error", err.Error()))
 }
 
-// HCLFileError provides file-related error information
-type HCLFileError struct {
-	FilePath  string
-	Operation string
-	Message   string
+// LogErrorf logs an error with formatted context using structured logging
+func LogErrorf(err error, logger *slog.Logger, format string, args ...interface{}) {
+	if err == nil {
+		return
+	}
+
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	context := fmt.Sprintf(format, args...)
+	logger.Error("operation failed",
+		slog.String("context", context),
+		slog.String("error", err.Error()))
 }
 
-func (e *HCLFileError) Error() string {
-	return errors.Errorf("HCL file error for %s during %s: %s",
-		e.FilePath, e.Operation, e.Message).Error()
+// LogWarning logs a warning with context using structured logging
+func LogWarning(err error, context string, logger *slog.Logger) {
+	if err == nil {
+		return
+	}
+
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	logger.Warn("operation warning",
+		slog.String("context", context),
+		slog.String("error", err.Error()))
 }
 
-func (e *HCLFileError) Unwrap() error {
-	return ErrHCLFileNotFound
+// LogWarningf logs a warning with formatted context using structured logging
+func LogWarningf(err error, logger *slog.Logger, format string, args ...interface{}) {
+	if err == nil {
+		return
+	}
+
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	context := fmt.Sprintf(format, args...)
+	logger.Warn("operation warning",
+		slog.String("context", context),
+		slog.String("error", err.Error()))
 }
 
-// HCLBlockError provides block-related error information
-type HCLBlockError struct {
-	File      string
-	BlockType string
-	BlockName string
-	Message   string
-}
-
-func (e *HCLBlockError) Error() string {
-	return errors.Errorf("HCL block error in %s: %s block '%s': %s",
-		e.File, e.BlockType, e.BlockName, e.Message).Error()
-}
-
-func (e *HCLBlockError) Unwrap() error {
-	return ErrHCLInvalidBlock
-}
-
-// HCLDirectoryError provides directory-related error information
-type HCLDirectoryError struct {
-	Directory string
-	Operation string
-	Message   string
-	FileCount int
-}
-
-func (e *HCLDirectoryError) Error() string {
-	return errors.Errorf("HCL directory error for %s during %s: %s",
-		e.Directory, e.Operation, e.Message).Error()
-}
-
-func (e *HCLDirectoryError) Unwrap() error {
-	return ErrHCLDirectoryError
-}
-
-// NewHCLSyntaxError creates a new HCL syntax error.
-func NewHCLSyntaxError(file, message string, line, column int, token string) error {
-	return errors.WithStack(&HCLSyntaxError{
-		File:    file,
-		Line:    line,
-		Column:  column,
-		Message: message,
-		Token:   token,
-	})
-}
-
-// NewHCLValidationError creates a new HCL validation error.
-func NewHCLValidationError(file, blockType, field string, value interface{}, rule, message, severity string) error {
-	return errors.WithStack(&HCLValidationError{
-		File:      file,
-		BlockType: blockType,
-		Field:     field,
-		Value:     value,
-		Rule:      rule,
-		Message:   message,
-		Severity:  severity,
-	})
-}
-
-// NewHCLFileError creates a new HCL file error.
+// NewHCLFileError creates a new HCL file error with context
 func NewHCLFileError(filePath, operation, message string) error {
-	return errors.WithStack(&HCLFileError{
-		FilePath:  filePath,
-		Operation: operation,
-		Message:   message,
-	})
+	return fmt.Errorf("HCL file error in %s for %s: %s", operation, filePath, message)
 }
 
-// NewHCLBlockError creates a new HCL block error.
-func NewHCLBlockError(file, blockType, blockName, message string) error {
-	return errors.WithStack(&HCLBlockError{
-		File:      file,
-		BlockType: blockType,
-		BlockName: blockName,
-		Message:   message,
-	})
-}
+// HandleCleanupError handles cleanup errors with appropriate logging
+func HandleCleanupError(err error, resource string, operation string) {
+	if err == nil {
+		return
+	}
 
-// NewHCLDirectoryError creates a new HCL directory error.
-func NewHCLDirectoryError(directory, operation, message string, fileCount int) error {
-	return errors.WithStack(&HCLDirectoryError{
-		Directory: directory,
-		Operation: operation,
-		Message:   message,
-		FileCount: fileCount,
-	})
+	logger := slog.Default()
+	logger.Warn("cleanup warning",
+		slog.String("resource", resource),
+		slog.String("operation", operation),
+		slog.String("error", err.Error()))
 }

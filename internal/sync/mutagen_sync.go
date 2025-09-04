@@ -14,6 +14,7 @@ import (
 	"log/slog"
 
 	"github.com/mutagen-io/mutagen/pkg/synchronization/rsync"
+	"modernc.org/mathutil"
 )
 
 // MutagenSyncEngine wraps Mutagen's rsync engine for efficient file synchronization
@@ -496,10 +497,9 @@ func (m *MutagenSyncEngine) trackOperationStats(op *rsync.Operation, signature *
 
 // trackLiteralBytes safely tracks literal bytes with overflow protection
 func (m *MutagenSyncEngine) trackLiteralBytes(op *rsync.Operation, literalBytes int64) int64 {
-	if dataLen, err := utilities.SafeInt64(len(op.Data)); err == nil {
-		if newLiteralBytes, err := utilities.SafeAddInt64(literalBytes, dataLen); err == nil {
-			return newLiteralBytes
-		}
+	dataLen := int64(len(op.Data))
+	if newLiteralBytes, overflow := mathutil.AddOverflowInt64(literalBytes, dataLen); !overflow {
+		return newLiteralBytes
 	}
 	// Handle overflow by capping at maximum safe value
 	return math.MaxInt64
@@ -522,13 +522,13 @@ func (m *MutagenSyncEngine) trackCopyBytes(op *rsync.Operation, signature *rsync
 	blockSize64 := int64(signature.BlockSize)
 
 	// Use safe multiplication
-	multiplied, err := utilities.SafeMultiplyInt64(count64, blockSize64)
-	if err != nil {
+	multiplied, overflow := mathutil.MulOverflowInt64(count64, blockSize64)
+	if overflow {
 		return math.MaxInt64
 	}
 
 	// Add to existing copy bytes
-	if newCopyBytes, err := utilities.SafeAddInt64(copyBytes, multiplied); err == nil {
+	if newCopyBytes, overflow := mathutil.AddOverflowInt64(copyBytes, multiplied); !overflow {
 		return newCopyBytes
 	}
 
@@ -557,7 +557,7 @@ func (m *MutagenSyncEngine) adjustLastBlockSize(op *rsync.Operation, signature *
 	}
 	adjustment := int64(blockDiff)
 
-	if newCopyBytes, err := utilities.SafeSubtractInt64(copyBytes, adjustment); err == nil {
+	if newCopyBytes, overflow := mathutil.SubOverflowInt64(copyBytes, adjustment); !overflow {
 		return newCopyBytes
 	}
 

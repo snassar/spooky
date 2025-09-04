@@ -97,12 +97,13 @@ func testFileSyncLocalToRemote(t *testing.T) {
 		PreservePerms: true,
 		PreserveOwner: false,
 		PreserveGroup: false,
+		Mode:          ModeOneWayReplica,
 	}
 
 	result, err := File(testFS.RootDir(), targetDir, options)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Equal(t, 2, int(result.FilesProcessed))
+	assert.Equal(t, 2, result.Operations)
 
 	// Verify files were synced
 	targetFile1 := filepath.Join(targetDir, "file1.txt")
@@ -146,6 +147,7 @@ func testFileSyncRemoteToLocal(t *testing.T) {
 		BlockLength:   1024,
 		CreateBackup:  false,
 		PreservePerms: true,
+		Mode:          ModeOneWayReplica,
 	}
 
 	result, err := File(sourceDir, targetDir, options)
@@ -189,6 +191,7 @@ func testFileSyncConflictResolution(t *testing.T) {
 		BlockLength:   1024,
 		CreateBackup:  true, // Enable backup for conflicts
 		PreservePerms: true,
+		Mode:          ModeOneWayReplica,
 	}
 
 	result, err := File(sourceDir, targetDir, options)
@@ -233,6 +236,7 @@ func testFileSyncLargeFiles(t *testing.T) {
 		BlockLength:   4096, // 4KB blocks
 		CreateBackup:  false,
 		PreservePerms: true,
+		Mode:          ModeOneWayReplica,
 	}
 
 	start := time.Now()
@@ -241,7 +245,7 @@ func testFileSyncLargeFiles(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.NotNil(t, result)
-	assert.Equal(t, 1, int(result.FilesProcessed))
+	assert.Equal(t, 1, result.Operations)
 
 	// Verify large file was synced correctly
 	targetFile := filepath.Join(targetDir, "large_file.bin")
@@ -297,9 +301,10 @@ func testFileSyncDirectoryStructure(t *testing.T) {
 		BlockLength:   1024,
 		CreateBackup:  false,
 		PreservePerms: true,
+		Mode:          ModeOneWayReplica,
 	}
 
-	result, err := Directory(testFS.RootDir(), targetDir, ModeOneWayReplica, options)
+	result, err := Directory(testFS.RootDir(), targetDir, options)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 
@@ -357,6 +362,7 @@ func testFileSyncErrorHandling(t *testing.T) {
 				BlockLength:   1024,
 				CreateBackup:  false,
 				PreservePerms: true,
+				Mode:          ModeOneWayReplica,
 			}
 
 			result, err := File(tt.sourcePath, tt.targetPath, options)
@@ -405,6 +411,7 @@ func testFileSyncConcurrentOperations(t *testing.T) {
 				BlockLength:   1024,
 				CreateBackup:  false,
 				PreservePerms: true,
+				Mode:          ModeOneWayReplica,
 			}
 
 			_, err := File(testFS.RootDir(), targetDir, options)
@@ -481,9 +488,10 @@ func TestEndToEndSyncIntegration(t *testing.T) {
 			PreservePerms: true,
 			PreserveOwner: false,
 			PreserveGroup: false,
+			Mode:          ModeOneWayReplica,
 		}
 
-		result, err := Directory(sourceDir, targetDir, ModeOneWayReplica, options)
+		result, err := Directory(sourceDir, targetDir, options)
 		require.NoError(t, err)
 		assert.NotNil(t, result)
 
