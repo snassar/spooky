@@ -1,11 +1,14 @@
 package utilities
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -257,9 +260,30 @@ func isRunningAsRoot() bool {
 
 // runCommand runs a command and returns its output
 func runCommand(name string, args ...string) (string, error) {
-	// This is a simplified implementation
-	// In production, you'd use os/exec to run commands
-	return "", errors.New("command execution not implemented")
+	// Create a context with timeout to prevent hanging commands
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Create the command
+	cmd := exec.CommandContext(ctx, name, args...)
+
+	// Execute the command and capture output
+	output, err := cmd.Output()
+	if err != nil {
+		// Check if it's a timeout error
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", errors.Wrap(err, "command timed out after 10 seconds")
+		}
+		// Check if command was not found
+		if execErr, ok := err.(*exec.Error); ok && execErr.Err == exec.ErrNotFound {
+			return "", errors.Wrap(err, "command not found")
+		}
+		// Other execution errors
+		return "", errors.Wrap(err, "failed to execute command")
+	}
+
+	// Return the output as a string, trimming whitespace
+	return strings.TrimSpace(string(output)), nil
 }
 
 // GetPathConfig returns OS-specific path configuration
