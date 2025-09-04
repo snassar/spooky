@@ -734,6 +734,12 @@ func (sc *Client) createConfig() (*ssh.ClientConfig, error) {
 	if sc.config.AgentForwarding {
 		if agentConn, err := sc.connectToAgent(); err == nil {
 			authMethods = append(authMethods, ssh.PublicKeysCallback(agentConn.Signers))
+		} else {
+			// Log SSH agent connection failure but don't fail the entire authentication
+			// This is expected behavior when SSH agent is not available
+			logger := logging.GetGlobalLogger()
+			logger.Debug("SSH agent connection failed, skipping agent authentication",
+				slog.String("error", err.Error()))
 		}
 	}
 

@@ -119,22 +119,43 @@ func (sm *SimpleSSHManager) RunCommandOnMachine(ctx context.Context, machine *sc
 // setupAuthentication configures authentication methods for the SSH client
 func (sm *SimpleSSHManager) setupAuthentication(config *Config, machine *schemas.MachinesMachineV1) error {
 	auth := machine.Authentication
+	logger := logging.GetGlobalLogger()
 
 	// Try public key authentication first
 	if err := sm.setupPublicKeyAuth(config, &auth); err == nil {
+		logger.Debug("SSH public key authentication configured successfully",
+			slog.String("machine", machine.Hostname))
 		return nil
+	} else {
+		logger.Debug("SSH public key authentication failed",
+			slog.String("machine", machine.Hostname),
+			slog.String("error", err.Error()))
 	}
 
 	// Try password authentication
 	if err := sm.setupPasswordAuth(config, &auth); err == nil {
+		logger.Debug("SSH password authentication configured successfully",
+			slog.String("machine", machine.Hostname))
 		return nil
+	} else {
+		logger.Debug("SSH password authentication failed",
+			slog.String("machine", machine.Hostname),
+			slog.String("error", err.Error()))
 	}
 
 	// Try certificate authentication
 	if err := sm.setupCertificateAuth(config, &auth); err == nil {
+		logger.Debug("SSH certificate authentication configured successfully",
+			slog.String("machine", machine.Hostname))
 		return nil
+	} else {
+		logger.Debug("SSH certificate authentication failed",
+			slog.String("machine", machine.Hostname),
+			slog.String("error", err.Error()))
 	}
 
+	logger.Error("All SSH authentication methods failed",
+		slog.String("machine", machine.Hostname))
 	return errors.New("no valid authentication method found")
 }
 
