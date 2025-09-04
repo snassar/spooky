@@ -21,71 +21,173 @@ type MutagenSyncEngine struct {
 	engine *rsync.Engine
 }
 
-// NewMutagenSyncEngine creates a new sync engine using Mutagen's rsync implementation
+// NewMutagenSyncEngine creates a new sync engine using Mutagen's rsync implementation.
+// Returns a properly initialized MutagenSyncEngine ready for file synchronization operations.
 func NewMutagenSyncEngine() *MutagenSyncEngine {
 	return &MutagenSyncEngine{
 		engine: rsync.NewEngine(),
 	}
 }
 
-// SyncFile efficiently synchronizes a source file to a target location using Mutagen's rsync
+// SyncFile efficiently synchronizes a source file to a target location using Mutagen's rsync algorithm.
+// It performs intelligent delta synchronization to minimize data transfer.
+//
+// Parameters:
+//   - sourcePath: Path to the source file to synchronize
+//   - targetPath: Path where the file should be synchronized to
+//   - options: Synchronization options (nil will use defaults)
+//
+// Returns:
+//   - *FileSyncResult: Detailed result of the synchronization operation
+//   - error: Any error that occurred during synchronization
+//
+// The function handles various scenarios:
+//   - New files (target doesn't exist)
+//   - Identical files (no sync needed)
+//   - Different files (delta sync using rsync algorithm)
 func (m *MutagenSyncEngine) SyncFile(sourcePath, targetPath string, options *SyncOptions) (*FileSyncResult, error) {
+	// Input validation
+	if sourcePath == "" {
+		return nil, fmt.Errorf("source path cannot be empty")
+	}
+	if targetPath == "" {
+		return nil, fmt.Errorf("target path cannot be empty")
+	}
+	if sourcePath == targetPath {
+		return nil, fmt.Errorf("source and target paths cannot be identical")
+	}
+
+	// Use default options if none provided
 	if options == nil {
 		options = DefaultSyncOptions()
 	}
 
+	// Initialize result structure
 	result := &FileSyncResult{
 		SourcePath: sourcePath,
 		TargetPath: targetPath,
 	}
 
-	// Validate source file
+	// Validate source file exists and is accessible
 	sourceInfo, err := m.validateSourceFile(sourcePath, result)
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("source file validation failed: %w", err)
 	}
 
 	// Check target file status
 	targetExists, targetInfo, err := m.checkTargetFile(targetPath, result)
 	if err != nil {
-		return result, err
+		return result, fmt.Errorf("target file check failed: %w", err)
 	}
 
-	// Handle new file case
+	// Handle new file case (target doesn't exist)
 	if !targetExists {
 		return m.handleNewFile(sourcePath, targetPath, options, result, sourceInfo)
 	}
 
-	// Check if files are identical
+	// Check if files are identical (no sync needed)
 	if m.filesAreIdentical(sourcePath, targetPath, result, sourceInfo, targetInfo, options) {
 		return result, nil
 	}
 
-	// Files are different, sync them
+	// Files are different, perform delta synchronization
 	return m.syncDifferentFiles(sourcePath, targetPath, options, result, sourceInfo)
 }
 
-// validateSourceFile validates that the source file exists and is accessible
+// validateSourceFile validates that the source file exists and is accessible.
+// It performs comprehensive checks to ensure the source file is ready for synchronization.
+//
+// Parameters:
+//   - sourcePath: Path to the source file to validate
+//   - result: FileSyncResult to update with any errors
+//
+// Returns:
+//   - os.FileInfo: File information if validation succeeds
+//   - error: Validation error if the file cannot be accessed
 func (m *MutagenSyncEngine) validateSourceFile(sourcePath string, result *FileSyncResult) (os.FileInfo, error) {
+	// Check if source path is a directory
 	sourceInfo, err := os.Stat(sourcePath)
 	if err != nil {
-		result.Error = fmt.Errorf("source file not found: %v", err)
+		if os.IsNotExist(err) {
+			result.Error = fmt.Errorf("source file does not exist: %s", sourcePath)
+		} else if os.IsPermission(err) {
+			result.Error = fmt.Errorf("permission denied accessing source file: %s", sourcePath)
+		} else {
+			result.Error = fmt.Errorf("failed to access source file %s: %w", sourcePath, err)
+		}
 		return nil, result.Error
 	}
+
+	// Ensure it's a regular file, not a directory
+	if sourceInfo.IsDir() {
+		result.Error = fmt.Errorf("source path is a directory, not a file: %s", sourcePath)
+		return nil, result.Error
+	}
+
+	// Check if file is readable
+	file, err := os.Open(sourcePath)
+	if err != nil {
+		result.Error = fmt.Errorf("source file is not readable: %s: %w", sourcePath, err)
+		return nil, result.Error
+	}
+	file.Close()
+
 	return sourceInfo, nil
 }
 
-// checkTargetFile checks the status of the target file
+// checkTargetFile checks the status of the target file and determines if it exists.
+// It handles various error conditions gracefully and provides detailed error information.
+//
+// Parameters:
+//   - targetPath: Path to the target file to check
+//   - result: FileSyncResult to update with any errors
+//
+// Returns:
+//   - bool: true if target file exists, false otherwise
+//   - os.FileInfo: File information if target exists, nil otherwise
+//   - error: Any error that occurred during the check
 func (m *MutagenSyncEngine) checkTargetFile(targetPath string, result *FileSyncResult) (bool, os.FileInfo, error) {
 	targetInfo, err := os.Stat(targetPath)
-	if err != nil && !os.IsNotExist(err) {
-		result.Error = fmt.Errorf("failed to stat target file: %v", err)
-		return false, nil, result.Error
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Target doesn't exist - this is normal for new files
+			return false, nil, nil
+		} else if os.IsPermission(err) {
+			result.Error = fmt.Errorf("permission denied accessing target path: %s", targetPath)
+			return false, nil, result.Error
+		} else {
+			result.Error = fmt.Errorf("failed to check target file status: %s: %w", targetPath, err)
+			return false, nil, result.Error
+		}
 	}
-	return !os.IsNotExist(err), targetInfo, nil
+
+	// Target exists - ensure it's a regular file if it's not a directory
+	if !targetInfo.IsDir() {
+		// Check if target file is writable
+		file, err := os.OpenFile(targetPath, os.O_WRONLY, 0)
+		if err != nil {
+			result.Error = fmt.Errorf("target file is not writable: %s: %w", targetPath, err)
+			return true, targetInfo, result.Error
+		}
+		file.Close()
+	}
+
+	return true, targetInfo, nil
 }
 
-// handleNewFile handles the case where the target file doesn't exist
+// handleNewFile handles the case where the target file doesn't exist.
+// It creates the target directory if needed and copies the source file to the target location.
+//
+// Parameters:
+//   - sourcePath: Path to the source file
+//   - targetPath: Path where the file should be copied
+//   - options: Synchronization options
+//   - result: FileSyncResult to update with operation results
+//   - sourceInfo: File information for the source file
+//
+// Returns:
+//   - *FileSyncResult: Updated result with operation details
+//   - error: Any error that occurred during the operation
 func (m *MutagenSyncEngine) handleNewFile(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
 	if options.DryRun {
 		return m.handleDryRunNewFile(sourcePath, targetPath, options, result, sourceInfo)
@@ -93,14 +195,14 @@ func (m *MutagenSyncEngine) handleNewFile(sourcePath, targetPath string, options
 
 	// Create target directory if it doesn't exist
 	if err := m.createTargetDirectory(targetPath); err != nil {
-		result.Error = err
-		return result, err
+		result.Error = fmt.Errorf("failed to create target directory: %w", err)
+		return result, result.Error
 	}
 
 	// Copy the new file
 	if err := m.copyNewFile(sourcePath, targetPath, options, result, sourceInfo); err != nil {
-		result.Error = err
-		return result, err
+		result.Error = fmt.Errorf("failed to copy new file: %w", err)
+		return result, result.Error
 	}
 
 	return result, nil
@@ -120,10 +222,26 @@ func (m *MutagenSyncEngine) handleDryRunNewFile(sourcePath, targetPath string, o
 	return result, nil
 }
 
-// createTargetDirectory creates the target directory if it doesn't exist
+// createTargetDirectory creates the target directory if it doesn't exist.
+// It ensures the parent directory structure is created with appropriate permissions.
+//
+// Parameters:
+//   - targetPath: Path to the target file (directory will be created for its parent)
+//
+// Returns:
+//   - error: Any error that occurred during directory creation
 func (m *MutagenSyncEngine) createTargetDirectory(targetPath string) error {
 	targetDir := filepath.Dir(targetPath)
-	return os.MkdirAll(targetDir, 0o755)
+	if targetDir == "." || targetDir == "" {
+		// No directory creation needed for current directory
+		return nil
+	}
+
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create target directory %s: %w", targetDir, err)
+	}
+
+	return nil
 }
 
 // copyNewFile copies a new file to the target location

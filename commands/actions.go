@@ -102,9 +102,34 @@ func init() {
 	RootCmd.AddCommand(actionsCmd)
 }
 
-// runAction executes a specific action
+// runAction executes a specific action across target machines.
+// It performs comprehensive action execution with proper error handling and logging.
+//
+// Parameters:
+//   - cmd: Cobra command instance
+//   - args: Command arguments (first argument should be action name)
+//
+// Returns:
+//   - error: Any error that occurred during action execution
+//
+// The function:
+//  1. Validates input parameters
+//  2. Loads all required configurations
+//  3. Determines target machines
+//  4. Creates necessary managers and executors
+//  5. Executes the action with proper error handling
+//  6. Displays comprehensive results
 func runAction(cmd *cobra.Command, args []string) error {
+	// Input validation
+	if len(args) == 0 {
+		return fmt.Errorf("action name is required")
+	}
+
 	actionName := args[0]
+	if actionName == "" {
+		return fmt.Errorf("action name cannot be empty")
+	}
+
 	logger := logging.GetGlobalLogger()
 	logger.Info("🔧 Running action", slog.String("action_name", actionName))
 
@@ -153,7 +178,6 @@ func runAction(cmd *cobra.Command, args []string) error {
 	// Create SSH manager with encryption
 	ageEncryption, err := encryption.NewAgeEncryption("", "")
 	if err != nil {
-		logger := logging.GetGlobalLogger()
 		logger.Warn("failed to initialize age encryption, continuing without encryption support",
 			slog.String("error", err.Error()))
 		// Continue with nil encryption - SSH manager will handle this gracefully
@@ -224,7 +248,16 @@ func listActions(cmd *cobra.Command, args []string) error {
 
 // showAction shows details of a specific action
 func showAction(cmd *cobra.Command, args []string) error {
+	// Input validation
+	if len(args) == 0 {
+		return fmt.Errorf("action name is required")
+	}
+
 	actionName := args[0]
+	if actionName == "" {
+		return fmt.Errorf("action name cannot be empty")
+	}
+
 	logger := logging.GetGlobalLogger()
 
 	// Load actions configuration
@@ -239,6 +272,17 @@ func showAction(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("action '%s' not found in actions configuration", actionName)
 	}
 
+	// Display action details
+	displayActionBasicInfo(logger, actionName, action)
+	displayActionTypeSpecificInfo(logger, action)
+	displayActionExecutionConfig(logger, action)
+	displayActionConditionalExecution(logger, action)
+
+	return nil
+}
+
+// displayActionBasicInfo displays basic action information
+func displayActionBasicInfo(logger *logging.Logger, actionName string, action *schemas.ActionsActionV1) {
 	logger.Info("🔧 Action details",
 		slog.String("action_name", actionName),
 		slog.String("description", action.Description),
@@ -247,40 +291,60 @@ func showAction(cmd *cobra.Command, args []string) error {
 	if len(action.Tags) > 0 {
 		logger.Info("Action tags", slog.String("tags", strings.Join(action.Tags, ", ")))
 	}
+}
 
-	// Show type-specific fields
+// displayActionTypeSpecificInfo displays type-specific action information
+func displayActionTypeSpecificInfo(logger *logging.Logger, action *schemas.ActionsActionV1) {
 	switch action.Type {
 	case "command":
 		logger.Info("Command action details", slog.String("command", action.Command))
 
 	case "template_deploy":
-		logger.Info("Template deploy action details",
-			slog.String("source", action.Source),
-			slog.String("destination", action.Destination),
-			slog.Bool("validate", action.Validate),
-			slog.Bool("backup", action.Backup))
-		if action.Permissions != "" {
-			logger.Info("Template permissions", slog.String("permissions", action.Permissions))
-		}
-		if action.Owner != "" {
-			logger.Info("Template owner", slog.String("owner", action.Owner))
-		}
-		if action.Group != "" {
-			logger.Info("Template group", slog.String("group", action.Group))
-		}
+		displayTemplateDeployInfo(logger, action)
 	case "file_sync":
-		logger.Info("File sync action details",
-			slog.String("source", action.SyncSource),
-			slog.String("destination", action.SyncDestination),
-			slog.Bool("delete", action.SyncDelete),
-			slog.Bool("preserve", action.SyncPreserve))
+		displayFileSyncInfo(logger, action)
 	case "service_control":
-		logger.Info("Service control action details",
-			slog.String("service", action.ServiceName),
-			slog.String("action", action.ServiceAction))
+		displayServiceControlInfo(logger, action)
 	}
+}
 
-	// Show execution configuration
+// displayTemplateDeployInfo displays template deploy specific information
+func displayTemplateDeployInfo(logger *logging.Logger, action *schemas.ActionsActionV1) {
+	logger.Info("Template deploy action details",
+		slog.String("source", action.Source),
+		slog.String("destination", action.Destination),
+		slog.Bool("validate", action.Validate),
+		slog.Bool("backup", action.Backup))
+
+	if action.Permissions != "" {
+		logger.Info("Template permissions", slog.String("permissions", action.Permissions))
+	}
+	if action.Owner != "" {
+		logger.Info("Template owner", slog.String("owner", action.Owner))
+	}
+	if action.Group != "" {
+		logger.Info("Template group", slog.String("group", action.Group))
+	}
+}
+
+// displayFileSyncInfo displays file sync specific information
+func displayFileSyncInfo(logger *logging.Logger, action *schemas.ActionsActionV1) {
+	logger.Info("File sync action details",
+		slog.String("source", action.SyncSource),
+		slog.String("destination", action.SyncDestination),
+		slog.Bool("delete", action.SyncDelete),
+		slog.Bool("preserve", action.SyncPreserve))
+}
+
+// displayServiceControlInfo displays service control specific information
+func displayServiceControlInfo(logger *logging.Logger, action *schemas.ActionsActionV1) {
+	logger.Info("Service control action details",
+		slog.String("service", action.ServiceName),
+		slog.String("action", action.ServiceAction))
+}
+
+// displayActionExecutionConfig displays action execution configuration
+func displayActionExecutionConfig(logger *logging.Logger, action *schemas.ActionsActionV1) {
 	if len(action.Targets) > 0 {
 		logger.Info("Action targets", slog.String("targets", strings.Join(action.Targets, ", ")))
 	}
@@ -292,8 +356,10 @@ func showAction(cmd *cobra.Command, args []string) error {
 		slog.Int("timeout_seconds", action.Timeout),
 		slog.Int("retries", action.Retries),
 		slog.Int("retry_delay_seconds", action.RetryDelay))
+}
 
-	// Show conditional execution
+// displayActionConditionalExecution displays action conditional execution settings
+func displayActionConditionalExecution(logger *logging.Logger, action *schemas.ActionsActionV1) {
 	if action.When != "" {
 		logger.Info("Action when condition", slog.String("when", action.When))
 	}
@@ -303,8 +369,6 @@ func showAction(cmd *cobra.Command, args []string) error {
 	if action.Unless != "" {
 		logger.Info("Action unless condition", slog.String("unless", action.Unless))
 	}
-
-	return nil
 }
 
 // loadMachinesConfig loads the machines configuration
@@ -384,31 +448,7 @@ func loadActionsConfig() ([]*schemas.ActionsActionV1, error) {
 
 // extractActionsBlock extracts the actions block from the parsed HCL file
 func extractActionsBlock(file *hcl.File) (*hcl.Block, error) {
-	// Define the schema for actions block
-	schema := &hcl.BodySchema{
-		Blocks: []hcl.BlockHeaderSchema{
-			{
-				Type:       schemas.ResourceTypeActions,
-				LabelNames: []string{},
-			},
-		},
-	}
-
-	// Extract the actions block
-	bodyContent, diags := file.Body.Content(schema)
-	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to decode actions block: %v", diags)
-	}
-
-	if len(bodyContent.Blocks) == 0 {
-		return nil, fmt.Errorf("no actions block found in actions.hcl")
-	}
-
-	if len(bodyContent.Blocks) > 1 {
-		return nil, fmt.Errorf("multiple actions blocks found in actions.hcl")
-	}
-
-	return bodyContent.Blocks[0], nil
+	return extractResourceBlock(file, schemas.ResourceTypeActions, "actions.hcl")
 }
 
 // extractActionBlocks extracts action blocks from the actions block
@@ -1359,16 +1399,7 @@ func (ae *ActionExecutor) setFilePermissions(ctx context.Context, action *schema
 		return nil
 	}
 
-	logger := logging.GetGlobalLogger()
-	chmodCmd := fmt.Sprintf("chmod %s %s", action.Permissions, action.Destination)
-	result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, chmodCmd)
-	if err != nil {
-		logger.Warn("failed to set file permissions", slog.String("error", err.Error()))
-	} else if result.ExitCode != 0 {
-		logger.Warn("chmod command returned non-zero exit code", slog.Int("exit_code", result.ExitCode))
-	}
-
-	return nil
+	return ae.executeFileAttributeCommand(ctx, machine, "chmod", action.Permissions, action.Destination, "permissions")
 }
 
 // setFileOwner sets file owner if specified
@@ -1377,16 +1408,7 @@ func (ae *ActionExecutor) setFileOwner(ctx context.Context, action *schemas.Acti
 		return nil
 	}
 
-	logger := logging.GetGlobalLogger()
-	chownCmd := fmt.Sprintf("chown %s %s", action.Owner, action.Destination)
-	result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, chownCmd)
-	if err != nil {
-		logger.Warn("failed to set file owner", slog.String("error", err.Error()))
-	} else if result.ExitCode != 0 {
-		logger.Warn("chown command returned non-zero exit code", slog.Int("exit_code", result.ExitCode))
-	}
-
-	return nil
+	return ae.executeFileAttributeCommand(ctx, machine, "chown", action.Owner, action.Destination, "owner")
 }
 
 // setFileGroup sets file group if specified
@@ -1395,13 +1417,18 @@ func (ae *ActionExecutor) setFileGroup(ctx context.Context, action *schemas.Acti
 		return nil
 	}
 
+	return ae.executeFileAttributeCommand(ctx, machine, "chgrp", action.Group, action.Destination, "group")
+}
+
+// executeFileAttributeCommand is a shared utility for executing file attribute commands
+func (ae *ActionExecutor) executeFileAttributeCommand(ctx context.Context, machine *schemas.MachinesMachineV1, command, value, destination, attributeType string) error {
 	logger := logging.GetGlobalLogger()
-	chgrpCmd := fmt.Sprintf("chgrp %s %s", action.Group, action.Destination)
-	result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, chgrpCmd)
+	cmd := fmt.Sprintf("%s %s %s", command, value, destination)
+	result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, cmd)
 	if err != nil {
-		logger.Warn("failed to set file group", slog.String("error", err.Error()))
+		logger.Warn(fmt.Sprintf("failed to set file %s", attributeType), slog.String("error", err.Error()))
 	} else if result.ExitCode != 0 {
-		logger.Warn("chgrp command returned non-zero exit code", slog.Int("exit_code", result.ExitCode))
+		logger.Warn(fmt.Sprintf("%s command returned non-zero exit code", command), slog.Int("exit_code", result.ExitCode))
 	}
 
 	return nil

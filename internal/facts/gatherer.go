@@ -24,7 +24,15 @@ type Gatherer struct {
 	config     *schemas.ProjectV1
 }
 
-// NewGatherer creates a new facts gatherer
+// NewGatherer creates a new facts gatherer with the specified SSH manager and project configuration.
+// The gatherer is used to collect system facts from remote machines via SSH.
+//
+// Parameters:
+//   - sshManager: SSH manager for connecting to remote machines
+//   - config: Project configuration containing facts collection settings
+//
+// Returns:
+//   - *Gatherer: A properly initialized facts gatherer ready for use
 func NewGatherer(sshManager *ssh.SimpleSSHManager, config *schemas.ProjectV1) *Gatherer {
 	return &Gatherer{
 		sshManager: sshManager,
@@ -42,22 +50,45 @@ type MachineFacts struct {
 	Error         error
 }
 
-// GatherFactsFromMachine collects all facts from a single machine
+// GatherFactsFromMachine collects all facts from a single machine.
+// It performs comprehensive fact collection including basic, enhanced, and custom facts.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control
+//   - machine: Machine configuration to gather facts from
+//
+// Returns:
+//   - *MachineFacts: Complete facts collection result
+//   - error: Any error that occurred during fact collection
+//
+// The function collects three types of facts:
+//  1. Basic facts: System information via SSH commands
+//  2. Enhanced facts: Detailed information from spooky-facts tool (optional)
+//  3. Custom facts: Age-encrypted custom facts (optional)
 func (g *Gatherer) GatherFactsFromMachine(ctx context.Context, machine *schemas.MachinesMachineV1) (*MachineFacts, error) {
+	// Input validation
+	if machine == nil {
+		return nil, fmt.Errorf("machine cannot be nil")
+	}
+	if machine.Hostname == "" {
+		return nil, fmt.Errorf("machine hostname cannot be empty")
+	}
+
+	// Initialize result structure
 	result := &MachineFacts{
 		Machine:     machine,
 		CollectedAt: time.Now(),
 	}
 
-	// Collect basic facts via SSH commands
+	// Collect basic facts via SSH commands (required)
 	basicFacts, err := g.gatherBasicFacts(ctx, machine)
 	if err != nil {
-		result.Error = errors.Wrap(err, "failed to gather basic facts")
+		result.Error = fmt.Errorf("failed to gather basic facts from %s: %w", machine.Hostname, err)
 		return result, result.Error
 	}
 	result.BasicFacts = basicFacts
 
-	// Collect enhanced facts if spooky-facts is available
+	// Collect enhanced facts if spooky-facts is available (optional)
 	enhancedFacts, err := g.gatherEnhancedFacts(ctx, machine)
 	if err != nil {
 		// Enhanced facts are optional, so we don't fail the entire operation
@@ -68,7 +99,7 @@ func (g *Gatherer) GatherFactsFromMachine(ctx context.Context, machine *schemas.
 	}
 	result.EnhancedFacts = enhancedFacts
 
-	// Collect custom facts (age-encrypted)
+	// Collect custom facts (age-encrypted) (optional)
 	customFacts, err := g.gatherCustomFacts(ctx, machine)
 	if err != nil {
 		// Custom facts are optional, so we don't fail the entire operation

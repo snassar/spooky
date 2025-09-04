@@ -26,25 +26,58 @@ type HCLUpdater struct {
 	ageEncryption *AgeEncryption
 }
 
-// NewHCLUpdater creates a new HCL updater
+// NewHCLUpdater creates a new HCL updater with the specified age encryption instance.
+// The updater is used to encrypt variable values in HCL files.
+//
+// Parameters:
+//   - ageEncryption: Age encryption instance for encrypting/decrypting values
+//
+// Returns:
+//   - *HCLUpdater: A properly initialized HCL updater ready for use
 func NewHCLUpdater(ageEncryption *AgeEncryption) *HCLUpdater {
 	return &HCLUpdater{
 		ageEncryption: ageEncryption,
 	}
 }
 
-// UpdateFile updates a single HCL file with encrypted values
+// UpdateFile updates a single HCL file with encrypted values.
+// It processes all variables blocks and encrypts values marked for encryption.
+//
+// Parameters:
+//   - filePath: Path to the HCL file to update
+//
+// Returns:
+//   - error: Any error that occurred during the update process
+//
+// The function:
+//  1. Reads and parses the HCL file
+//  2. Processes all variables blocks
+//  3. Encrypts values marked with encrypted = true
+//  4. Writes the modified content back to the file
 func (hu *HCLUpdater) UpdateFile(filePath string) error {
+	// Input validation
+	if filePath == "" {
+		return fmt.Errorf("file path cannot be empty")
+	}
+
+	// Validate file exists and is readable
+	if _, err := os.Stat(filePath); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("file does not exist: %s", filePath)
+		}
+		return fmt.Errorf("failed to access file %s: %w", filePath, err)
+	}
+
 	// Read the file
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return errors.Wrapf(err, "failed to read file: %s", filePath)
+		return fmt.Errorf("failed to read file %s: %w", filePath, err)
 	}
 
 	// Parse HCL
 	file, diags := hclsyntax.ParseConfig(content, filepath.Base(filePath), hcl.Pos{Line: 1, Column: 1})
 	if diags.HasErrors() {
-		return errors.Wrapf(err, "failed to parse HCL file: %s", filePath)
+		return fmt.Errorf("failed to parse HCL file %s: %v", filePath, diags)
 	}
 
 	// Convert content to string for manipulation
@@ -56,7 +89,7 @@ func (hu *HCLUpdater) UpdateFile(filePath string) error {
 		if block.Type == ResourceTypeVariables {
 			blockModified, err := hu.processVariablesBlock(block, &contentStr)
 			if err != nil {
-				return errors.Wrapf(err, "failed to process variables block in %s", filePath)
+				return fmt.Errorf("failed to process variables block in %s: %w", filePath, err)
 			}
 			modified = modified || blockModified
 		}
@@ -72,7 +105,7 @@ func (hu *HCLUpdater) UpdateFile(filePath string) error {
 
 	// Write the modified content back to the file
 	if err := utilities.WriteFile(filePath, contentStr); err != nil {
-		return errors.Wrapf(err, "failed to write modified file: %s", filePath)
+		return fmt.Errorf("failed to write modified file %s: %w", filePath, err)
 	}
 
 	logger := logging.GetGlobalLogger()

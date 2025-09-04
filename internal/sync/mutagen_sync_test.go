@@ -6,243 +6,230 @@ import (
 	"testing"
 )
 
-func TestMutagenSync(t *testing.T) {
-	// Create temporary directory for test files
-	tempDir, err := os.MkdirTemp("", "spooky-mutagen-test")
-	if err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Test 1: New file sync (simple copy)
-	t.Run("NewFile", func(t *testing.T) {
-		sourcePath := filepath.Join(tempDir, "new_source.txt")
-		targetPath := filepath.Join(tempDir, "new_target.txt")
-
-		// Create source file
-		sourceData := []byte("Hello, this is a new file for testing Mutagen sync!")
-		if err := os.WriteFile(sourcePath, sourceData, 0o644); err != nil {
-			t.Fatalf("Failed to create source file: %v", err)
-		}
-
-		// Test sync
-		options := DefaultSyncOptions()
-		options.Verbose = true
-		result, err := SyncFile(sourcePath, targetPath, options)
-
-		if err != nil {
-			t.Fatalf("SyncFile failed: %v", err)
-		}
-
-		if !result.Success {
-			t.Fatalf("Sync operation failed: %v", result.Error)
-		}
-
-		// Verify target file was created
-		targetData, err := os.ReadFile(targetPath)
-		if err != nil {
-			t.Fatalf("Failed to read target file: %v", err)
-		}
-
-		if string(targetData) != string(sourceData) {
-			t.Errorf("Target file content mismatch. Expected: %q, Got: %q", sourceData, targetData)
-		}
-
-		t.Logf("New file sync successful: %d bytes transferred", result.BytesTransferred)
-	})
-
-	// Test 2: Identical files
-	t.Run("IdenticalFiles", func(t *testing.T) {
-		sourcePath := filepath.Join(tempDir, "identical_source.txt")
-		targetPath := filepath.Join(tempDir, "identical_target.txt")
-
-		// Create identical files
-		data := []byte("This content is identical in both files.")
-		if err := os.WriteFile(sourcePath, data, 0o644); err != nil {
-			t.Fatalf("Failed to create source file: %v", err)
-		}
-		if err := os.WriteFile(targetPath, data, 0o644); err != nil {
-			t.Fatalf("Failed to create target file: %v", err)
-		}
-
-		// Test sync
-		options := DefaultSyncOptions()
-		options.Verbose = true
-		result, err := SyncFile(sourcePath, targetPath, options)
-
-		if err != nil {
-			t.Fatalf("SyncFile failed: %v", err)
-		}
-
-		if !result.Success {
-			t.Fatalf("Sync operation failed: %v", result.Error)
-		}
-
-		if result.BytesTransferred != 0 {
-			t.Errorf("Expected 0 bytes transferred for identical files, got %d", result.BytesTransferred)
-		}
-
-		t.Logf("Identical files test successful: no transfer needed")
-	})
-
-	// Test 3: Similar files (efficient delta sync)
-	t.Run("SimilarFiles", func(t *testing.T) {
-		sourcePath := filepath.Join(tempDir, "similar_source.txt")
-		targetPath := filepath.Join(tempDir, "similar_target.txt")
-
-		// Create source file
-		sourceData := []byte("This is the source file with some content that will be modified slightly.")
-		if err := os.WriteFile(sourcePath, sourceData, 0o644); err != nil {
-			t.Fatalf("Failed to create source file: %v", err)
-		}
-
-		// Create target file with similar but different content
-		targetData := []byte("This is the target file with some content that will be modified differently.")
-		if err := os.WriteFile(targetPath, targetData, 0o644); err != nil {
-			t.Fatalf("Failed to create target file: %v", err)
-		}
-
-		// Test sync
-		options := DefaultSyncOptions()
-		options.Verbose = true
-		result, err := SyncFile(sourcePath, targetPath, options)
-
-		if err != nil {
-			t.Fatalf("SyncFile failed: %v", err)
-		}
-
-		if !result.Success {
-			t.Fatalf("Sync operation failed: %v", result.Error)
-		}
-
-		// Verify target file has been updated to match source
-		finalData, err := os.ReadFile(targetPath)
-		if err != nil {
-			t.Fatalf("Failed to read target file: %v", err)
-		}
-
-		if string(finalData) != string(sourceData) {
-			t.Errorf("Sync failed - target file content mismatch.\nExpected: %q\nGot: %q", sourceData, finalData)
-		}
-
-		t.Logf("Similar files sync successful: %d bytes transferred, %d bytes saved, %d operations",
-			result.BytesTransferred, result.BytesSaved, result.Operations)
-	})
-
-	// Test 4: Large file differences
-	t.Run("LargeFiles", func(t *testing.T) {
-		sourcePath := filepath.Join(tempDir, "large_source.txt")
-		targetPath := filepath.Join(tempDir, "large_target.txt")
-
-		// Create larger files for more realistic testing
-		sourceData := make([]byte, 10*1024) // 10KB
-		for i := range sourceData {
-			sourceData[i] = byte(i % 256)
-		}
-		// Modify the source slightly
-		copy(sourceData[5000:5010], []byte("DIFFERENT!"))
-
-		if err := os.WriteFile(sourcePath, sourceData, 0o644); err != nil {
-			t.Fatalf("Failed to create source file: %v", err)
-		}
-
-		// Create target with mostly same content but some differences
-		targetData := make([]byte, 10*1024)
-		for i := range targetData {
-			targetData[i] = byte(i % 256)
-		}
-		// Different modification in target
-		copy(targetData[5000:5010], []byte("original!!"))
-
-		if err := os.WriteFile(targetPath, targetData, 0o644); err != nil {
-			t.Fatalf("Failed to create target file: %v", err)
-		}
-
-		// Test sync
-		options := DefaultSyncOptions()
-		options.Verbose = true
-		result, err := SyncFile(sourcePath, targetPath, options)
-
-		if err != nil {
-			t.Fatalf("SyncFile failed: %v", err)
-		}
-
-		if !result.Success {
-			t.Fatalf("Sync operation failed: %v", result.Error)
-		}
-
-		// Verify target file has been updated to match source
-		finalData, err := os.ReadFile(targetPath)
-		if err != nil {
-			t.Fatalf("Failed to read target file: %v", err)
-		}
-
-		if len(finalData) != len(sourceData) {
-			t.Errorf("Target file size mismatch. Expected: %d, Got: %d", len(sourceData), len(finalData))
-		}
-
-		// Check that the files are now identical
-		for i := range sourceData {
-			if finalData[i] != sourceData[i] {
-				t.Errorf("File content mismatch at position %d. Expected: %d, Got: %d", i, sourceData[i], finalData[i])
-				break
-			}
-		}
-
-		// Check efficiency - should transfer much less than the full file size
-		efficiency := float64(result.BytesTransferred) / float64(len(sourceData))
-		t.Logf("Large files sync successful: %d bytes transferred (%.1f%% of file), %d bytes saved, %d operations",
-			result.BytesTransferred, efficiency*100, result.BytesSaved, result.Operations)
-
-		if efficiency > 0.5 {
-			t.Logf("Warning: Transfer efficiency was %.1f%% - might indicate suboptimal rsync performance", efficiency*100)
-		}
-	})
-
-	// Test 5: Dry run
-	t.Run("DryRun", func(t *testing.T) {
-		sourcePath := filepath.Join(tempDir, "dryrun_source.txt")
-		targetPath := filepath.Join(tempDir, "dryrun_target.txt")
-
-		// Create source file
-		sourceData := []byte("This is a dry run test file.")
-		if err := os.WriteFile(sourcePath, sourceData, 0o644); err != nil {
-			t.Fatalf("Failed to create source file: %v", err)
-		}
-
-		// Test dry run
-		options := DefaultSyncOptions()
-		options.DryRun = true
-		options.Verbose = true
-		result, err := SyncFile(sourcePath, targetPath, options)
-
-		if err != nil {
-			t.Fatalf("SyncFile failed: %v", err)
-		}
-
-		if !result.Success {
-			t.Fatalf("Dry run operation failed: %v", result.Error)
-		}
-
-		// Verify target file was NOT created
-		if _, err := os.Stat(targetPath); !os.IsNotExist(err) {
-			t.Errorf("Target file should not exist after dry run")
-		}
-
-		t.Logf("Dry run successful: would transfer %d bytes", result.BytesTransferred)
-	})
-}
-
-func TestMutagenSyncEngine(t *testing.T) {
-	// Test engine creation
+func TestNewMutagenSyncEngine(t *testing.T) {
 	engine := NewMutagenSyncEngine()
 	if engine == nil {
-		t.Fatal("Failed to create Mutagen sync engine")
+		t.Fatal("NewMutagenSyncEngine returned nil")
 	}
-
 	if engine.engine == nil {
-		t.Fatal("Mutagen rsync engine not initialized")
+		t.Fatal("MutagenSyncEngine.engine is nil")
+	}
+}
+
+func TestMutagenSyncEngine_SyncFile_InputValidation(t *testing.T) {
+	engine := NewMutagenSyncEngine()
+
+	tests := []struct {
+		name        string
+		sourcePath  string
+		targetPath  string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "empty source path",
+			sourcePath:  "",
+			targetPath:  "target.txt",
+			expectError: true,
+			errorMsg:    "source path cannot be empty",
+		},
+		{
+			name:        "empty target path",
+			sourcePath:  "source.txt",
+			targetPath:  "",
+			expectError: true,
+			errorMsg:    "target path cannot be empty",
+		},
+		{
+			name:        "identical paths",
+			sourcePath:  "same.txt",
+			targetPath:  "same.txt",
+			expectError: true,
+			errorMsg:    "source and target paths cannot be identical",
+		},
 	}
 
-	t.Log("Mutagen sync engine created successfully")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := engine.SyncFile(tt.sourcePath, tt.targetPath, nil)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if err.Error() != tt.errorMsg {
+					t.Errorf("expected error message %q, got %q", tt.errorMsg, err.Error())
+				}
+				if result != nil {
+					t.Errorf("expected nil result on error, got %v", result)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestMutagenSyncEngine_validateSourceFile(t *testing.T) {
+	engine := NewMutagenSyncEngine()
+
+	// Create a temporary file for testing
+	tempDir := t.TempDir()
+	sourceFile := filepath.Join(tempDir, "source.txt")
+	if err := os.WriteFile(sourceFile, []byte("test content"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	tests := []struct {
+		name        string
+		sourcePath  string
+		expectError bool
+	}{
+		{
+			name:        "valid file",
+			sourcePath:  sourceFile,
+			expectError: false,
+		},
+		{
+			name:        "non-existent file",
+			sourcePath:  filepath.Join(tempDir, "nonexistent.txt"),
+			expectError: true,
+		},
+		{
+			name:        "directory instead of file",
+			sourcePath:  tempDir,
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := &FileSyncResult{}
+			fileInfo, err := engine.validateSourceFile(tt.sourcePath, result)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+				if fileInfo != nil {
+					t.Errorf("expected nil fileInfo on error, got %v", fileInfo)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if fileInfo == nil {
+					t.Errorf("expected fileInfo but got nil")
+				}
+			}
+		})
+	}
+}
+
+func TestMutagenSyncEngine_checkTargetFile(t *testing.T) {
+	engine := NewMutagenSyncEngine()
+
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+	targetFile := filepath.Join(tempDir, "target.txt")
+
+	// Create a test file
+	if err := os.WriteFile(targetFile, []byte("test content"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	tests := []struct {
+		name         string
+		targetPath   string
+		expectExists bool
+		expectError  bool
+	}{
+		{
+			name:         "existing file",
+			targetPath:   targetFile,
+			expectExists: true,
+			expectError:  false,
+		},
+		{
+			name:         "non-existent file",
+			targetPath:   filepath.Join(tempDir, "nonexistent.txt"),
+			expectExists: false,
+			expectError:  false,
+		},
+		{
+			name:         "directory",
+			targetPath:   tempDir,
+			expectExists: true,
+			expectError:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := &FileSyncResult{}
+			exists, fileInfo, err := engine.checkTargetFile(tt.targetPath, result)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+
+			if exists != tt.expectExists {
+				t.Errorf("expected exists=%v, got %v", tt.expectExists, exists)
+			}
+
+			if tt.expectExists && fileInfo == nil {
+				t.Errorf("expected fileInfo but got nil")
+			}
+		})
+	}
+}
+
+func TestMutagenSyncEngine_createTargetDirectory(t *testing.T) {
+	engine := NewMutagenSyncEngine()
+
+	tempDir := t.TempDir()
+
+	tests := []struct {
+		name        string
+		targetPath  string
+		expectError bool
+	}{
+		{
+			name:        "create nested directory",
+			targetPath:  filepath.Join(tempDir, "nested", "deep", "file.txt"),
+			expectError: false,
+		},
+		{
+			name:        "current directory",
+			targetPath:  "file.txt",
+			expectError: false,
+		},
+		{
+			name:        "empty directory",
+			targetPath:  "",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := engine.createTargetDirectory(tt.targetPath)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
 }

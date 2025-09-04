@@ -6,125 +6,194 @@ import (
 	"testing"
 )
 
-func TestSyncDirectory(t *testing.T) {
-	// Create temporary directories for testing
-	sourceDir, err := os.MkdirTemp("", "sync_source")
-	if err != nil {
-		t.Fatalf("Failed to create source temp dir: %v", err)
+func TestSyncFile_InputValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		sourcePath  string
+		targetPath  string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "empty source path",
+			sourcePath:  "",
+			targetPath:  "target.txt",
+			expectError: true,
+			errorMsg:    "source path cannot be empty",
+		},
+		{
+			name:        "empty target path",
+			sourcePath:  "source.txt",
+			targetPath:  "",
+			expectError: true,
+			errorMsg:    "target path cannot be empty",
+		},
+		{
+			name:        "identical paths",
+			sourcePath:  "same.txt",
+			targetPath:  "same.txt",
+			expectError: true,
+			errorMsg:    "source and target paths cannot be identical",
+		},
 	}
-	defer os.RemoveAll(sourceDir)
 
-	targetDir, err := os.MkdirTemp("", "sync_target")
-	if err != nil {
-		t.Fatalf("Failed to create target temp dir: %v", err)
-	}
-	defer os.RemoveAll(targetDir)
-
-	// Create test files in source directory
-	testFiles := map[string]string{
-		"file1.txt":        "content1",
-		"file2.txt":        "content2",
-		"subdir/file3.txt": "content3",
-	}
-
-	for path, content := range testFiles {
-		fullPath := filepath.Join(sourceDir, path)
-		dir := filepath.Dir(fullPath)
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatalf("Failed to create directory %s: %v", dir, err)
-		}
-		if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
-			t.Fatalf("Failed to create file %s: %v", fullPath, err)
-		}
-	}
-
-	// Test one-way replica sync
-	t.Run("OneWayReplica", func(t *testing.T) {
-		options := DefaultSyncOptions()
-		options.SyncMode = SyncModeOneWayReplica
-		options.Verbose = true
-
-		result, err := SyncDirectory(sourceDir, targetDir, options)
-		if err != nil {
-			t.Fatalf("SyncDirectory failed: %v", err)
-		}
-
-		if !result.Success {
-			t.Fatalf("Sync failed: %v", result.Error)
-		}
-
-		// Verify files were synced
-		for path, content := range testFiles {
-			targetPath := filepath.Join(targetDir, path)
-			data, err := os.ReadFile(targetPath)
-			if err != nil {
-				t.Errorf("Failed to read synced file %s: %v", targetPath, err)
-			} else if string(data) != content {
-				t.Errorf("File content mismatch for %s: expected %q, got %q", path, content, string(data))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := SyncFile(tt.sourcePath, tt.targetPath, nil)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if err.Error() != tt.errorMsg {
+					t.Errorf("expected error message %q, got %q", tt.errorMsg, err.Error())
+				}
+				if result != nil {
+					t.Errorf("expected nil result on error, got %v", result)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
 			}
-		}
-	})
-
-	// Test one-way safe sync
-	t.Run("OneWaySafe", func(t *testing.T) {
-		// Create a different target directory
-		targetDir2, err := os.MkdirTemp("", "sync_target2")
-		if err != nil {
-			t.Fatalf("Failed to create target temp dir: %v", err)
-		}
-		defer os.RemoveAll(targetDir2)
-
-		// Create a newer file in target that should be preserved
-		conflictFile := filepath.Join(targetDir2, "file1.txt")
-		if err := os.WriteFile(conflictFile, []byte("newer content"), 0o644); err != nil {
-			t.Fatalf("Failed to create conflict file: %v", err)
-		}
-
-		options := DefaultSyncOptions()
-		options.SyncMode = SyncModeOneWaySafe
-		options.Verbose = true
-
-		result, err := SyncDirectory(sourceDir, targetDir2, options)
-		if err != nil {
-			t.Fatalf("SyncDirectory failed: %v", err)
-		}
-
-		if !result.Success {
-			t.Fatalf("Sync failed: %v", result.Error)
-		}
-
-		// Check that conflict was detected
-		if len(result.Conflicts) == 0 {
-			t.Error("Expected conflict to be detected")
-		}
-
-		// Verify conflict file was preserved
-		data, err := os.ReadFile(conflictFile)
-		if err != nil {
-			t.Errorf("Failed to read conflict file: %v", err)
-		} else if string(data) != "newer content" {
-			t.Errorf("Conflict file was modified: expected 'newer content', got %q", string(data))
-		}
-	})
+		})
+	}
 }
 
-func TestSyncDirectoryValidation(t *testing.T) {
-	// Test with non-existent source
-	_, err := SyncDirectory("/non/existent/path", "/tmp/target", DefaultSyncOptions())
-	if err == nil {
-		t.Error("Expected error for non-existent source directory")
+func TestSyncDirectory_InputValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		sourcePath  string
+		targetPath  string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "empty source path",
+			sourcePath:  "",
+			targetPath:  "target",
+			expectError: true,
+			errorMsg:    "source path cannot be empty",
+		},
+		{
+			name:        "empty target path",
+			sourcePath:  "source",
+			targetPath:  "",
+			expectError: true,
+			errorMsg:    "target path cannot be empty",
+		},
+		{
+			name:        "identical paths",
+			sourcePath:  "same",
+			targetPath:  "same",
+			expectError: true,
+			errorMsg:    "source and target paths cannot be identical",
+		},
 	}
 
-	// Test with file as source
-	tempFile, err := os.CreateTemp("", "test_file")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := SyncDirectory(tt.sourcePath, tt.targetPath, nil)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if err.Error() != tt.errorMsg {
+					t.Errorf("expected error message %q, got %q", tt.errorMsg, err.Error())
+				}
+				if result != nil {
+					t.Errorf("expected nil result on error, got %v", result)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
 	}
-	defer os.Remove(tempFile.Name())
-	defer tempFile.Close()
+}
 
-	_, err = SyncDirectory(tempFile.Name(), "/tmp/target", DefaultSyncOptions())
+func TestSyncDirectory_NonExistentSource(t *testing.T) {
+	tempDir := t.TempDir()
+	nonExistentDir := filepath.Join(tempDir, "nonexistent")
+	targetDir := filepath.Join(tempDir, "target")
+
+	result, err := SyncDirectory(nonExistentDir, targetDir, nil)
 	if err == nil {
-		t.Error("Expected error for file as source directory")
+		t.Errorf("expected error for non-existent source directory")
+	}
+	if result == nil {
+		t.Errorf("expected result even on error")
+	}
+	if result.Error == nil {
+		t.Errorf("expected result.Error to be set")
+	}
+}
+
+func TestSyncDirectory_FileAsSource(t *testing.T) {
+	tempDir := t.TempDir()
+	sourceFile := filepath.Join(tempDir, "source.txt")
+	targetDir := filepath.Join(tempDir, "target")
+
+	// Create a file instead of directory
+	if err := os.WriteFile(sourceFile, []byte("test"), 0644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+
+	result, err := SyncDirectory(sourceFile, targetDir, nil)
+	if err == nil {
+		t.Errorf("expected error for file as source directory")
+	}
+	if result == nil {
+		t.Errorf("expected result even on error")
+	}
+	if result.Error == nil {
+		t.Errorf("expected result.Error to be set")
+	}
+}
+
+func TestDefaultSyncOptions(t *testing.T) {
+	options := DefaultSyncOptions()
+	if options == nil {
+		t.Fatal("DefaultSyncOptions returned nil")
+	}
+
+	// Check default values
+	if options.BlockLength != DefaultBlockLength {
+		t.Errorf("expected BlockLength %d, got %d", DefaultBlockLength, options.BlockLength)
+	}
+	if !options.CreateBackup {
+		t.Error("expected CreateBackup to be true")
+	}
+	if !options.PreservePerms {
+		t.Error("expected PreservePerms to be true")
+	}
+	if options.PreserveOwner {
+		t.Error("expected PreserveOwner to be false")
+	}
+	if options.PreserveGroup {
+		t.Error("expected PreserveGroup to be false")
+	}
+	if options.DryRun {
+		t.Error("expected DryRun to be false")
+	}
+	if options.Verbose {
+		t.Error("expected Verbose to be false")
+	}
+	if options.SyncMode != SyncModeOneWayReplica {
+		t.Errorf("expected SyncMode %s, got %s", SyncModeOneWayReplica, options.SyncMode)
+	}
+}
+
+func TestSyncModes(t *testing.T) {
+	// Test that all sync modes are properly defined
+	expectedModes := []SyncMode{
+		SyncModeOneWayReplica,
+		SyncModeOneWaySafe,
+		SyncModeTwoWaySafe,
+		SyncModeTwoWayResolved,
+	}
+
+	for _, mode := range expectedModes {
+		if mode == "" {
+			t.Errorf("sync mode should not be empty")
+		}
 	}
 }

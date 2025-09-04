@@ -148,10 +148,22 @@ func init() {
 	RootCmd.AddCommand(factsCmd)
 }
 
-// loadProjectConfig loads the project configuration
+// loadProjectConfig loads the project configuration from project.hcl file.
+// It performs comprehensive validation and parsing of the project configuration.
+//
+// Returns:
+//   - *schemas.ProjectV1: Parsed project configuration with defaults applied
+//   - error: Any error that occurred during loading or validation
+//
+// The function:
+//  1. Validates that project.hcl exists and is readable
+//  2. Parses and validates the HCL content
+//  3. Extracts project configuration with proper error handling
+//  4. Applies default values for missing configuration fields
 func loadProjectConfig() (*schemas.ProjectV1, error) {
 	logger := logging.GetGlobalLogger()
 	logger.Debug("loading project configuration")
+
 	// Look for project.hcl in current directory
 	projectHCLPath := "project.hcl"
 	if _, err := os.Stat(projectHCLPath); os.IsNotExist(err) {
@@ -262,26 +274,33 @@ func parseMachinesHCL() (*hcl.File, error) {
 
 // validateMachinesBlock validates and extracts the machines block from the HCL file
 func validateMachinesBlock(file *hcl.File) (*hcl.Block, error) {
+	return extractResourceBlock(file, schemas.ResourceTypeMachines, "machines.hcl")
+}
+
+// extractResourceBlock is a shared utility function for extracting resource blocks from HCL files
+func extractResourceBlock(file *hcl.File, resourceType, fileName string) (*hcl.Block, error) {
+	// Define the schema for the resource block
 	schema := &hcl.BodySchema{
 		Blocks: []hcl.BlockHeaderSchema{
 			{
-				Type:       schemas.ResourceTypeMachines,
+				Type:       resourceType,
 				LabelNames: []string{},
 			},
 		},
 	}
 
+	// Extract the resource block
 	bodyContent, diags := file.Body.Content(schema)
 	if diags.HasErrors() {
-		return nil, fmt.Errorf("failed to decode machines block: %v", diags)
+		return nil, fmt.Errorf("failed to decode %s block: %v", resourceType, diags)
 	}
 
 	if len(bodyContent.Blocks) == 0 {
-		return nil, fmt.Errorf("no machines block found in machines.hcl")
+		return nil, fmt.Errorf("no %s block found in %s", resourceType, fileName)
 	}
 
 	if len(bodyContent.Blocks) > 1 {
-		return nil, fmt.Errorf("multiple machines blocks found in machines.hcl")
+		return nil, fmt.Errorf("multiple %s blocks found in %s", resourceType, fileName)
 	}
 
 	return bodyContent.Blocks[0], nil

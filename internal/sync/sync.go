@@ -73,28 +73,86 @@ type FileSyncResult struct {
 }
 
 // SyncFile efficiently synchronizes a source file to a target location
-// using Mutagen's proven rsync algorithm to minimize data transfer
+// using Mutagen's proven rsync algorithm to minimize data transfer.
+// This is the main entry point for file synchronization operations.
+//
+// Parameters:
+//   - sourcePath: Path to the source file to synchronize
+//   - targetPath: Path where the file should be synchronized to
+//   - options: Synchronization options (nil will use defaults)
+//
+// Returns:
+//   - *FileSyncResult: Detailed result of the synchronization operation
+//   - error: Any error that occurred during synchronization
+//
+// The function uses Mutagen's rsync implementation for efficient delta synchronization.
 func SyncFile(sourcePath, targetPath string, options *SyncOptions) (*FileSyncResult, error) {
+	// Input validation
+	if sourcePath == "" {
+		return nil, fmt.Errorf("source path cannot be empty")
+	}
+	if targetPath == "" {
+		return nil, fmt.Errorf("target path cannot be empty")
+	}
+	if sourcePath == targetPath {
+		return nil, fmt.Errorf("source and target paths cannot be identical")
+	}
+
 	// Use Mutagen's rsync implementation directly
 	engine := NewMutagenSyncEngine()
 	return engine.SyncFile(sourcePath, targetPath, options)
 }
 
-// SyncDirectory synchronizes entire directories with support for different modes
+// SyncDirectory synchronizes entire directories with support for different modes.
+// It provides comprehensive directory synchronization with conflict resolution strategies.
+//
+// Parameters:
+//   - sourcePath: Path to the source directory to synchronize
+//   - targetPath: Path where the directory should be synchronized to
+//   - options: Synchronization options (nil will use defaults)
+//
+// Returns:
+//   - *FileSyncResult: Detailed result of the synchronization operation
+//   - error: Any error that occurred during synchronization
+//
+// Supported sync modes:
+//   - SyncModeOneWayReplica: Exact one-way replication (source → target)
+//   - SyncModeOneWaySafe: Safe one-way sync with conflict preservation
+//   - SyncModeTwoWaySafe: Bidirectional sync with conflict detection
+//   - SyncModeTwoWayResolved: Bidirectional sync with source winning conflicts
 func SyncDirectory(sourcePath, targetPath string, options *SyncOptions) (*FileSyncResult, error) {
+	// Input validation
+	if sourcePath == "" {
+		return nil, fmt.Errorf("source path cannot be empty")
+	}
+	if targetPath == "" {
+		return nil, fmt.Errorf("target path cannot be empty")
+	}
+	if sourcePath == targetPath {
+		return nil, fmt.Errorf("source and target paths cannot be identical")
+	}
+
+	// Use default options if none provided
 	if options == nil {
 		options = DefaultSyncOptions()
 	}
 
+	// Initialize result structure
 	result := &FileSyncResult{
 		SourcePath: sourcePath,
 		TargetPath: targetPath,
 	}
 
-	// Validate source directory exists
+	// Validate source directory exists and is accessible
 	sourceInfo, err := os.Stat(sourcePath)
 	if err != nil {
-		result.Error = fmt.Errorf("source directory not found: %v", err)
+		if os.IsNotExist(err) {
+			result.Error = fmt.Errorf("source directory does not exist: %s", sourcePath)
+		} else if os.IsPermission(err) {
+			result.Error = fmt.Errorf("permission denied accessing source directory: %s", sourcePath)
+		} else {
+			result.Error = fmt.Errorf("failed to access source directory %s: %w", sourcePath, err)
+		}
 		return result, result.Error
 	}
 	if !sourceInfo.IsDir() {
@@ -104,14 +162,14 @@ func SyncDirectory(sourcePath, targetPath string, options *SyncOptions) (*FileSy
 
 	// Create target directory if it doesn't exist
 	if err := os.MkdirAll(targetPath, 0o755); err != nil {
-		result.Error = fmt.Errorf("failed to create target directory: %v", err)
+		result.Error = fmt.Errorf("failed to create target directory: %w", err)
 		return result, result.Error
 	}
 
-	// Check target directory exists
+	// Validate target directory exists and is accessible
 	targetInfo, err := os.Stat(targetPath)
 	if err != nil {
-		result.Error = fmt.Errorf("failed to stat target directory: %v", err)
+		result.Error = fmt.Errorf("failed to stat target directory: %w", err)
 		return result, result.Error
 	}
 	if !targetInfo.IsDir() {
