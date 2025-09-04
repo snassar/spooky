@@ -447,16 +447,120 @@ func (r *RemoteSyncEngine) uploadFileToRemote(ctx context.Context, localPath, re
 	return nil
 }
 
+// listLocalFiles returns a list of all files in the local directory
+func (r *RemoteSyncEngine) listLocalFiles(localPath string) ([]string, error) {
+	var files []string
+
+	err := filepath.Walk(localPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			// Convert to relative path from localPath
+			relPath, err := filepath.Rel(localPath, path)
+			if err != nil {
+				return err
+			}
+			files = append(files, relPath)
+		}
+		return nil
+	})
+
+	return files, err
+}
+
+// removeRemoteFile safely removes a file from the remote system
+func (r *RemoteSyncEngine) removeRemoteFile(ctx context.Context, machine *schemas.MachinesMachineV1, remoteFilePath string) error {
+	// Use rm command to remove the file
+	command := fmt.Sprintf("rm -f %s", remoteFilePath)
+	result, err := r.sshManager.RunCommandOnMachine(ctx, machine, command)
+	if err != nil {
+		return fmt.Errorf("failed to remove remote file %s: %v", remoteFilePath, err)
+	}
+
+	if result.ExitCode != 0 {
+		return fmt.Errorf("failed to remove remote file %s, exit code: %d", remoteFilePath, result.ExitCode)
+	}
+
+	return nil
+}
+
 // cleanupRemoteFiles removes files on remote that don't exist locally
 func (r *RemoteSyncEngine) cleanupRemoteFiles(ctx context.Context, localPath, remotePath string, options *RemoteOptions, progress *Progress) error {
-	// This would involve:
-	// 1. Getting a list of files on remote
-	// 2. Comparing with local files
-	// 3. Removing files that don't exist locally
-
-	// For now, this is a placeholder implementation
 	logger := logging.GetGlobalLogger()
-	logger.Info("cleanup not yet implemented")
+
+	// Check if cleanup is enabled
+	if !options.SyncDelete {
+		logger.Debug("cleanup disabled, skipping remote file cleanup")
+		return nil
+	}
+
+	// Update progress
+	if progress != nil {
+		progress.CurrentOperation = "cleanup"
+	}
+
+	// Get list of local files
+	localFiles, err := r.listLocalFiles(localPath)
+	if err != nil {
+		return fmt.Errorf("failed to list local files: %v", err)
+	}
+
+	// Create a map for faster lookup
+	localFileMap := make(map[string]bool)
+	for _, file := range localFiles {
+		localFileMap[file] = true
+	}
+
+	// Get list of remote files
+	remoteFiles, err := r.listRemoteFiles(ctx, options.Machine, remotePath)
+	if err != nil {
+		return fmt.Errorf("failed to list remote files: %v", err)
+	}
+
+	// Find files to remove (exist on remote but not locally)
+	var filesToRemove []string
+	for _, remoteFile := range remoteFiles {
+		// Convert remote file path to relative path from remotePath
+		relPath, err := filepath.Rel(remotePath, remoteFile)
+		if err != nil {
+			logger.Warn("failed to get relative path for remote file", slog.String("file", remoteFile), slog.Any("error", err))
+			continue
+		}
+
+		// Check if this file exists locally
+		if !localFileMap[relPath] {
+			filesToRemove = append(filesToRemove, remoteFile)
+		}
+	}
+
+	// Remove files that don't exist locally
+	removedCount := 0
+	for _, fileToRemove := range filesToRemove {
+		if options.DryRun {
+			logger.Info("would remove remote file", slog.String("file", fileToRemove))
+			removedCount++
+		} else {
+			err := r.removeRemoteFile(ctx, options.Machine, fileToRemove)
+			if err != nil {
+				logger.Error("failed to remove remote file", slog.String("file", fileToRemove), slog.Any("error", err))
+				// Continue with other files even if one fails
+				continue
+			}
+			logger.Debug("removed remote file", slog.String("file", fileToRemove))
+			removedCount++
+		}
+
+		// Update progress
+		if progress != nil {
+			progress.FilesProcessed++
+		}
+	}
+
+	logger.Info("remote file cleanup completed",
+		slog.Int("files_removed", removedCount),
+		slog.Int("total_remote_files", len(remoteFiles)),
+		slog.Int("total_local_files", len(localFiles)))
 
 	return nil
 }
