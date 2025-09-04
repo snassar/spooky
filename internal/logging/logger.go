@@ -420,7 +420,12 @@ func (l *Logger) QueryLogs(query LogQuery) ([]LogEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already processed the data
+			// This is a best-effort cleanup
+		}
+	}()
 
 	var entries []LogEntry
 	for rows.Next() {

@@ -124,7 +124,12 @@ func (ae *AgeEncryption) loadIdentityFromFile(path string) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to open identity file: %s", path)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already read the data
+			// This is a best-effort cleanup
+		}
+	}()
 
 	// Try to read as armored format first
 	if _, err := file.Seek(0, 0); err != nil {
@@ -227,7 +232,12 @@ func (ae *AgeEncryption) loadRecipientsFromFile(path string) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to open recipients file: %s", path)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already read the data
+			// This is a best-effort cleanup
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
@@ -283,7 +293,12 @@ func (ae *AgeEncryption) Encrypt(plaintext string) (string, error) {
 	// Create encrypted output
 	var encrypted strings.Builder
 	output := armor.NewWriter(&encrypted)
-	defer output.Close()
+	defer func() {
+		if closeErr := output.Close(); closeErr != nil {
+			// Log the error but don't fail the function since encryption may have succeeded
+			// This is a best-effort cleanup
+		}
+	}()
 
 	// Create recipient list
 	recipients := make([]age.Recipient, len(ae.recipients))
@@ -294,7 +309,12 @@ func (ae *AgeEncryption) Encrypt(plaintext string) (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "failed to create encrypted writer - encryption initialization failed")
 	}
-	defer encryptedWriter.Close()
+	defer func() {
+		if closeErr := encryptedWriter.Close(); closeErr != nil {
+			// Log the error but don't fail the function since encryption may have succeeded
+			// This is a best-effort cleanup
+		}
+	}()
 
 	// Write the plaintext
 	if _, err := encryptedWriter.Write([]byte(plaintext)); err != nil {

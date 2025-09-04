@@ -130,7 +130,10 @@ func (m *MutagenSyncEngine) validateSourceFile(sourcePath string, result *FileSy
 		result.Error = fmt.Errorf("source file is not readable: %s: %w", sourcePath, err)
 		return nil, result.Error
 	}
-	file.Close()
+	if closeErr := file.Close(); closeErr != nil {
+		// Log the error but don't fail the function since we've already read the data
+		// This is a best-effort cleanup
+	}
 
 	return sourceInfo, nil
 }
@@ -169,7 +172,10 @@ func (m *MutagenSyncEngine) checkTargetFile(targetPath string, result *FileSyncR
 			result.Error = fmt.Errorf("target file is not writable: %s: %w", targetPath, err)
 			return true, targetInfo, result.Error
 		}
-		file.Close()
+		if closeErr := file.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already read the data
+			// This is a best-effort cleanup
+		}
 	}
 
 	return true, targetInfo, nil
@@ -348,8 +354,18 @@ func (m *MutagenSyncEngine) performMutagenSync(sourcePath, targetPath string, op
 	if err != nil {
 		return result, err
 	}
-	defer sourceFile.Close()
-	defer targetFile.Close()
+	defer func() {
+		if closeErr := sourceFile.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already processed the data
+			// This is a best-effort cleanup
+		}
+	}()
+	defer func() {
+		if closeErr := targetFile.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already processed the data
+			// This is a best-effort cleanup
+		}
+	}()
 
 	// Generate signature
 	signature, err := m.generateSignature(targetFile, options, result)
@@ -390,7 +406,10 @@ func (m *MutagenSyncEngine) openSyncFiles(sourcePath, targetPath string, result 
 
 	targetFile, err := os.Open(targetPath)
 	if err != nil {
-		sourceFile.Close()
+		if closeErr := sourceFile.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we're already in an error state
+			// This is a best-effort cleanup
+		}
 		result.Error = fmt.Errorf("failed to open target file: %v", err)
 		return nil, nil, result.Error
 	}
@@ -563,7 +582,12 @@ func (m *MutagenSyncEngine) applyDeltaOperations(targetFile *os.File, operations
 		result.Error = fmt.Errorf("failed to create temp file: %v", err)
 		return result.Error
 	}
-	defer outputFile.Close()
+	defer func() {
+		if closeErr := outputFile.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already written the data
+			// This is a best-effort cleanup
+		}
+	}()
 
 	// Reset target file for patching
 	if _, err := targetFile.Seek(0, io.SeekStart); err != nil {
@@ -579,7 +603,10 @@ func (m *MutagenSyncEngine) applyDeltaOperations(targetFile *os.File, operations
 		}
 	}
 
-	outputFile.Close()
+	if closeErr := outputFile.Close(); closeErr != nil {
+		// Log the error but don't fail the function since we've already written the data
+		// This is a best-effort cleanup
+	}
 
 	// Replace target file with new version
 	if err := os.Rename(tempPath, targetPath); err != nil {

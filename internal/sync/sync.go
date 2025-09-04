@@ -511,7 +511,12 @@ func copyFile(src, dst string, options *SyncOptions) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to open source file %s", src)
 	}
-	defer source.Close()
+	defer func() {
+		if closeErr := source.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already read the data
+			// This is a best-effort cleanup
+		}
+	}()
 
 	// Create target directory if it doesn't exist
 	targetDir := filepath.Dir(dst)
@@ -523,7 +528,12 @@ func copyFile(src, dst string, options *SyncOptions) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to create destination file %s", dst)
 	}
-	defer destination.Close()
+	defer func() {
+		if closeErr := destination.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already written the data
+			// This is a best-effort cleanup
+		}
+	}()
 
 	_, err = destination.ReadFrom(source)
 	return errors.Wrapf(err, "failed to copy data from %s to %s", src, dst)

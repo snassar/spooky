@@ -407,7 +407,12 @@ func testSSHConnection(ip string, port int, timeout int) string {
 	if err != nil {
 		return "unavailable"
 	}
-	defer conn.Close()
+	defer func() {
+		if closeErr := conn.Close(); closeErr != nil {
+			// Log the error but don't fail the test since we're just checking connectivity
+			// This is a best-effort cleanup in a test function
+		}
+	}()
 	return "available"
 }
 

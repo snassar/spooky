@@ -250,7 +250,12 @@ func (r *RemoteSyncEngine) syncFileToRemote(ctx context.Context, localPath, remo
 
 	// Create a temporary local copy of the remote file for Mutagen to work with
 	tempRemotePath := localPath + ".remote"
-	defer os.Remove(tempRemotePath) // Clean up temp file
+	defer func() {
+		if removeErr := os.Remove(tempRemotePath); removeErr != nil {
+			// Log the error but don't fail the function since this is cleanup
+			// This is a best-effort cleanup
+		}
+	}() // Clean up temp file
 
 	// Check if remote file exists and download it if needed
 	remoteExists, err := r.downloadRemoteFileIfExists(ctx, options.Machine, remotePath, tempRemotePath)

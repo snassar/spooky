@@ -28,7 +28,12 @@ func ExampleUsage() {
 		fmt.Fprintf(os.Stderr, "Failed to create logger: %v\n", err)
 		return
 	}
-	defer logger.Close()
+	defer func() {
+		if closeErr := logger.Close(); closeErr != nil {
+			// Log the error but don't fail the example since this is cleanup
+			fmt.Fprintf(os.Stderr, "Warning: failed to close logger: %v\n", closeErr)
+		}
+	}()
 
 	// Example 2: Multiple concurrent action runs
 	runID1 := uuid.New().String()
@@ -149,7 +154,9 @@ func ExampleXDGPaths() {
 	fmt.Printf("Windows SQLite path: %s\n", windowsPath)
 
 	// Custom XDG_STATE_HOME
-	os.Setenv("XDG_STATE_HOME", "/custom/state/path")
+	if err := os.Setenv("XDG_STATE_HOME", "/custom/state/path"); err != nil {
+		fmt.Printf("Warning: failed to set XDG_STATE_HOME environment variable: %v\n", err)
+	}
 	customPath := filepath.Join("/custom/state/path", "spooky", "logs.db")
 	fmt.Printf("Custom XDG_STATE_HOME path: %s\n", customPath)
 }
@@ -169,7 +176,12 @@ func ExampleMultiProcess() {
 	// Process 1: Deploy webserver
 	go func() {
 		logger, _ := NewLogger(config)
-		defer logger.Close()
+		defer func() {
+			if closeErr := logger.Close(); closeErr != nil {
+				// Log the error but don't fail the example since this is cleanup
+				fmt.Printf("Warning: failed to close logger: %v\n", closeErr)
+			}
+		}()
 
 		runID := uuid.New().String()
 		if err := logger.LogToDatabase(LogEntry{
@@ -187,7 +199,12 @@ func ExampleMultiProcess() {
 	// Process 2: Backup database
 	go func() {
 		logger, _ := NewLogger(config)
-		defer logger.Close()
+		defer func() {
+			if closeErr := logger.Close(); closeErr != nil {
+				// Log the error but don't fail the example since this is cleanup
+				fmt.Printf("Warning: failed to close logger: %v\n", closeErr)
+			}
+		}()
 
 		runID := uuid.New().String()
 		if err := logger.LogToDatabase(LogEntry{
@@ -205,7 +222,12 @@ func ExampleMultiProcess() {
 	// Process 3: Update monitoring
 	go func() {
 		logger, _ := NewLogger(config)
-		defer logger.Close()
+		defer func() {
+			if closeErr := logger.Close(); closeErr != nil {
+				// Log the error but don't fail the example since this is cleanup
+				fmt.Printf("Warning: failed to close logger: %v\n", closeErr)
+			}
+		}()
 
 		runID := uuid.New().String()
 		if err := logger.LogToDatabase(LogEntry{

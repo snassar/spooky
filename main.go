@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"spooky/commands"
@@ -40,7 +41,12 @@ func main() {
 		os.Exit(1)
 	}
 	logging.SetGlobalLogger(logger)
-	defer logger.Close()
+	defer func() {
+		if closeErr := logger.Close(); closeErr != nil {
+			// Log the error but don't fail the application since we're shutting down
+			fmt.Fprintf(os.Stderr, "Warning: failed to close logger: %v\n", closeErr)
+		}
+	}()
 
 	if err := commands.Execute(); err != nil {
 		logger.Error("application failed",

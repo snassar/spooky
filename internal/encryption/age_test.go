@@ -80,7 +80,12 @@ func TestAgeKeyGenerationAndLoading(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to create temp directory:", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if removeErr := os.RemoveAll(tempDir); removeErr != nil {
+			// Log the error but don't fail the test since this is cleanup
+			t.Logf("Warning: failed to remove temp directory %s: %v", tempDir, removeErr)
+		}
+	}()
 
 	// Generate test keys using age CLI
 	if err := generateTestKeys(tempDir); err != nil {
@@ -183,7 +188,12 @@ func TestAgeKeyLoadingFromDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to create temp directory:", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if removeErr := os.RemoveAll(tempDir); removeErr != nil {
+			// Log the error but don't fail the test since this is cleanup
+			t.Logf("Warning: failed to remove temp directory %s: %v", tempDir, removeErr)
+		}
+	}()
 
 	// Generate multiple test keys
 	if err := generateMultipleTestKeys(tempDir); err != nil {
@@ -213,7 +223,12 @@ func TestAgeKeyFormats(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to create temp directory:", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if removeErr := os.RemoveAll(tempDir); removeErr != nil {
+			// Log the error but don't fail the test since this is cleanup
+			t.Logf("Warning: failed to remove temp directory %s: %v", tempDir, removeErr)
+		}
+	}()
 
 	// Generate keys in different formats
 	if err := generateFormattedTestKeys(tempDir); err != nil {
@@ -277,7 +292,12 @@ func TestAgeEncryptionErrors(t *testing.T) {
 		if err != nil {
 			t.Fatal("Failed to create temp file:", err)
 		}
-		defer os.Remove(tempFile.Name())
+		defer func() {
+			if removeErr := os.Remove(tempFile.Name()); removeErr != nil {
+				// Log the error but don't fail the test since this is cleanup
+				t.Logf("Warning: failed to remove temp file %s: %v", tempFile.Name(), removeErr)
+			}
+		}()
 
 		// Write invalid content
 		if _, err := tempFile.WriteString(invalidAgeContent); err != nil {
@@ -386,7 +406,12 @@ func TestDirectoryBasedRecipients(t *testing.T) {
 	if err != nil {
 		t.Fatal("Failed to create temp directory:", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if removeErr := os.RemoveAll(tempDir); removeErr != nil {
+			// Log the error but don't fail the test since this is cleanup
+			t.Logf("Warning: failed to remove temp directory %s: %v", tempDir, removeErr)
+		}
+	}()
 
 	// Create test recipient files
 	recipientFiles := []string{
@@ -485,7 +510,12 @@ func TestAgeSecurityImprovements(t *testing.T) {
 		if err != nil {
 			t.Fatal("Failed to create temp directory:", err)
 		}
-		defer os.RemoveAll(tempDir)
+		defer func() {
+			if removeErr := os.RemoveAll(tempDir); removeErr != nil {
+				// Log the error but don't fail the test since this is cleanup
+				t.Logf("Warning: failed to remove temp directory %s: %v", tempDir, removeErr)
+			}
+		}()
 
 		// Test that loading from empty directory fails fast
 		_, err = NewAgeEncryption(tempDir, "")

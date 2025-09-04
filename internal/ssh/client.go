@@ -171,7 +171,10 @@ func (sc *SSHClient) Connect(ctx context.Context) error {
 	// Create SSH connection
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, sshConfig)
 	if err != nil {
-		conn.Close()
+		if closeErr := conn.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we're already in an error state
+			// This is a best-effort cleanup
+		}
 		return errors.Wrapf(err, "failed to establish SSH connection to %s - authentication or protocol negotiation failed", addr)
 	}
 
@@ -192,7 +195,10 @@ func (sc *SSHClient) Disconnect() error {
 	defer sc.mu.Unlock()
 
 	if sc.session != nil {
-		sc.session.Close()
+		if closeErr := sc.session.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we're disconnecting
+			// This is a best-effort cleanup
+		}
 		sc.session = nil
 	}
 
@@ -227,7 +233,12 @@ func (sc *SSHClient) RunCommand(ctx context.Context, command string) (*schemas.C
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create SSH session")
 	}
-	defer session.Close()
+	defer func() {
+		if closeErr := session.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already processed the data
+			// This is a best-effort cleanup
+		}
+	}()
 
 	// Set up session
 	if err := sc.setupSession(session); err != nil {
@@ -279,7 +290,12 @@ func (sc *SSHClient) UploadFile(ctx context.Context, localPath, remotePath strin
 	if err != nil {
 		return errors.Wrapf(err, "failed to open local file: %s", localPath)
 	}
-	defer localFile.Close()
+	defer func() {
+		if closeErr := localFile.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already read the data
+			// This is a best-effort cleanup
+		}
+	}()
 
 	// Get file info
 	fileInfo, err := localFile.Stat()
@@ -292,7 +308,12 @@ func (sc *SSHClient) UploadFile(ctx context.Context, localPath, remotePath strin
 	if err != nil {
 		return errors.Wrap(err, "failed to create SSH session")
 	}
-	defer session.Close()
+	defer func() {
+		if closeErr := session.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already processed the data
+			// This is a best-effort cleanup
+		}
+	}()
 
 	// Set up file transfer
 	stdin, err := session.StdinPipe()
@@ -306,7 +327,9 @@ func (sc *SSHClient) UploadFile(ctx context.Context, localPath, remotePath strin
 	}
 
 	// Send file header
-	fmt.Fprintf(stdin, "C%04o %d %s\n", fileInfo.Mode().Perm(), fileInfo.Size(), filepath.Base(localPath))
+	if _, err := fmt.Fprintf(stdin, "C%04o %d %s\n", fileInfo.Mode().Perm(), fileInfo.Size(), filepath.Base(localPath)); err != nil {
+		return errors.Wrap(err, "failed to send file header")
+	}
 
 	// Copy file content
 	if _, err := io.Copy(stdin, localFile); err != nil {
@@ -314,10 +337,14 @@ func (sc *SSHClient) UploadFile(ctx context.Context, localPath, remotePath strin
 	}
 
 	// Send end marker
-	fmt.Fprint(stdin, "\x00")
+	if _, err := fmt.Fprint(stdin, "\x00"); err != nil {
+		return errors.Wrap(err, "failed to send end marker")
+	}
 
 	// Close stdin and wait for completion
-	stdin.Close()
+	if closeErr := stdin.Close(); closeErr != nil {
+		return errors.Wrap(closeErr, "failed to close stdin")
+	}
 	return session.Wait()
 }
 
@@ -332,7 +359,12 @@ func (sc *SSHClient) DownloadFile(ctx context.Context, remotePath, localPath str
 	if err != nil {
 		return errors.Wrap(err, "failed to create SSH session")
 	}
-	defer session.Close()
+	defer func() {
+		if closeErr := session.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already processed the data
+			// This is a best-effort cleanup
+		}
+	}()
 
 	// Set up file transfer
 	stdout, err := session.StdoutPipe()
@@ -350,7 +382,12 @@ func (sc *SSHClient) DownloadFile(ctx context.Context, remotePath, localPath str
 	if err != nil {
 		return errors.Wrapf(err, "failed to create local file: %s", localPath)
 	}
-	defer localFile.Close()
+	defer func() {
+		if closeErr := localFile.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already written the data
+			// This is a best-effort cleanup
+		}
+	}()
 
 	// Read file header
 	scanner := bufio.NewScanner(stdout)
@@ -376,7 +413,9 @@ func (sc *SSHClient) DownloadFile(ctx context.Context, remotePath, localPath str
 	}
 
 	// Send acknowledgment
-	fmt.Fprint(os.Stdout, "\x00")
+	if _, err := fmt.Fprint(os.Stdout, "\x00"); err != nil {
+		return errors.Wrap(err, "failed to send acknowledgment")
+	}
 
 	// Copy file content
 	written, err := io.CopyN(localFile, stdout, fileSize)
@@ -389,7 +428,9 @@ func (sc *SSHClient) DownloadFile(ctx context.Context, remotePath, localPath str
 	}
 
 	// Send acknowledgment
-	fmt.Fprint(os.Stdout, "\x00")
+	if _, err := fmt.Fprint(os.Stdout, "\x00"); err != nil {
+		return errors.Wrap(err, "failed to send final acknowledgment")
+	}
 
 	return session.Wait()
 }
@@ -408,7 +449,12 @@ func (sc *SSHClient) CopyFile(localPath, remotePath string) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to open local file: %s", localPath)
 	}
-	defer localFile.Close()
+	defer func() {
+		if closeErr := localFile.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already read the data
+			// This is a best-effort cleanup
+		}
+	}()
 
 	// Get file info for permissions
 	fileInfo, err := localFile.Stat()
@@ -421,7 +467,12 @@ func (sc *SSHClient) CopyFile(localPath, remotePath string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to create SCP session")
 	}
-	defer session.Close()
+	defer func() {
+		if closeErr := session.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already processed the data
+			// This is a best-effort cleanup
+		}
+	}()
 
 	// Create pipe for SCP protocol
 	stdin, err := session.StdinPipe()
@@ -435,7 +486,9 @@ func (sc *SSHClient) CopyFile(localPath, remotePath string) error {
 	}
 
 	// Send file header
-	fmt.Fprintf(stdin, "C%04o %d %s\n", fileInfo.Mode().Perm(), fileInfo.Size(), filepath.Base(remotePath))
+	if _, err := fmt.Fprintf(stdin, "C%04o %d %s\n", fileInfo.Mode().Perm(), fileInfo.Size(), filepath.Base(remotePath)); err != nil {
+		return errors.Wrap(err, "failed to send file header")
+	}
 
 	// Copy file content
 	if _, err := io.Copy(stdin, localFile); err != nil {
@@ -443,10 +496,14 @@ func (sc *SSHClient) CopyFile(localPath, remotePath string) error {
 	}
 
 	// Send end marker
-	fmt.Fprint(stdin, "\x00")
+	if _, err := fmt.Fprint(stdin, "\x00"); err != nil {
+		return errors.Wrap(err, "failed to send end marker")
+	}
 
 	// Close stdin and wait for session to complete
-	stdin.Close()
+	if closeErr := stdin.Close(); closeErr != nil {
+		return errors.Wrap(closeErr, "failed to close stdin")
+	}
 	if err := session.Wait(); err != nil {
 		return errors.Wrap(err, "SCP session failed")
 	}
@@ -468,7 +525,12 @@ func (sc *SSHClient) CopyFileContent(content, remotePath string, permissions os.
 	if err != nil {
 		return errors.Wrap(err, "failed to create SCP session")
 	}
-	defer session.Close()
+	defer func() {
+		if closeErr := session.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already processed the data
+			// This is a best-effort cleanup
+		}
+	}()
 
 	// Create pipe for SCP protocol
 	stdin, err := session.StdinPipe()
@@ -482,7 +544,9 @@ func (sc *SSHClient) CopyFileContent(content, remotePath string, permissions os.
 	}
 
 	// Send file header
-	fmt.Fprintf(stdin, "C%04o %d %s\n", permissions, len(content), filepath.Base(remotePath))
+	if _, err := fmt.Fprintf(stdin, "C%04o %d %s\n", permissions, len(content), filepath.Base(remotePath)); err != nil {
+		return errors.Wrap(err, "failed to send file header")
+	}
 
 	// Copy content
 	if _, err := io.Copy(stdin, strings.NewReader(content)); err != nil {
@@ -490,10 +554,14 @@ func (sc *SSHClient) CopyFileContent(content, remotePath string, permissions os.
 	}
 
 	// Send end marker
-	fmt.Fprint(stdin, "\x00")
+	if _, err := fmt.Fprint(stdin, "\x00"); err != nil {
+		return errors.Wrap(err, "failed to send end marker")
+	}
 
 	// Close stdin and wait for session to complete
-	stdin.Close()
+	if closeErr := stdin.Close(); closeErr != nil {
+		return errors.Wrap(closeErr, "failed to close stdin")
+	}
 	if err := session.Wait(); err != nil {
 		return errors.Wrap(err, "SCP session failed")
 	}

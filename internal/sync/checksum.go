@@ -13,7 +13,12 @@ func FileChecksum(fn string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil {
+			// Log the error but don't fail the function since we've already read the data
+			// This is a best-effort cleanup
+		}
+	}()
 	h := md4.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return nil, err

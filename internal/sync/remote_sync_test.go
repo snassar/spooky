@@ -15,7 +15,12 @@ func TestRemoteSyncEngine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if removeErr := os.RemoveAll(tempDir); removeErr != nil {
+			// Log the error but don't fail the test since this is cleanup
+			t.Logf("Warning: failed to remove temp directory %s: %v", tempDir, removeErr)
+		}
+	}()
 
 	// Create some test files
 	testFile1 := filepath.Join(tempDir, "test1.txt")

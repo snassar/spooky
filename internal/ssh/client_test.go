@@ -30,7 +30,12 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 	// Create a temporary directory for test keys
 	tempDir, err := os.MkdirTemp("", "ssh-test-keys")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if removeErr := os.RemoveAll(tempDir); removeErr != nil {
+			// Log the error but don't fail the test since this is cleanup
+			t.Logf("Warning: failed to remove temp directory %s: %v", tempDir, removeErr)
+		}
+	}()
 
 	// Generate a test RSA key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -202,7 +207,12 @@ func TestSSHClient_LoadPrivateKeyWithPassphrase(t *testing.T) {
 	// Create a temporary directory for test keys
 	tempDir, err := os.MkdirTemp("", "ssh-test-keys")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if removeErr := os.RemoveAll(tempDir); removeErr != nil {
+			// Log the error but don't fail the test since this is cleanup
+			t.Logf("Warning: failed to remove temp directory %s: %v", tempDir, removeErr)
+		}
+	}()
 
 	// Generate a test RSA key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -246,7 +256,12 @@ func TestSSHClient_LoadPrivateKeyWithPassphrase(t *testing.T) {
 func TestSSHClient_ExtractKeyData(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "ssh-test-extract")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if removeErr := os.RemoveAll(tempDir); removeErr != nil {
+			// Log the error but don't fail the test since this is cleanup
+			t.Logf("Warning: failed to remove temp directory %s: %v", tempDir, removeErr)
+		}
+	}()
 
 	// Generate a test RSA key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -497,7 +512,12 @@ func BenchmarkSSHClient_LoadPrivateKey(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if removeErr := os.RemoveAll(tempDir); removeErr != nil {
+			// Log the error but don't fail the benchmark since this is cleanup
+			b.Logf("Warning: failed to remove temp directory %s: %v", tempDir, removeErr)
+		}
+	}()
 
 	// Generate a test RSA key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
