@@ -32,27 +32,29 @@ const (
 
 // Options configures file synchronization behavior
 type Options struct {
-	BlockLength   int32 // Block size for rsync algorithm
-	CreateBackup  bool  // Create backup before overwriting
-	PreservePerms bool  // Preserve file permissions
-	PreserveOwner bool  // Preserve file owner
-	PreserveGroup bool  // Preserve file group
-	DryRun        bool  // Show what would be done without doing it
-	Verbose       bool  // Show detailed progress
-	Mode          Mode  // Synchronization mode and directionality
+	BlockLength    int32 // Block size for rsync algorithm
+	CreateBackup   bool  // Create backup before overwriting
+	PreservePerms  bool  // Preserve file permissions
+	PreserveOwner  bool  // Preserve file owner
+	PreserveGroup  bool  // Preserve file group
+	DryRun         bool  // Show what would be done without doing it
+	Verbose        bool  // Show detailed progress
+	Mode           Mode  // Synchronization mode and directionality
+	MaxConcurrency int   // Maximum number of concurrent file operations (0 = auto-detect)
 }
 
 // DefaultOptions returns default synchronization options
 func DefaultOptions() *Options {
 	return &Options{
-		BlockLength:   DefaultBlockLength,
-		CreateBackup:  true,
-		PreservePerms: true,
-		PreserveOwner: false,
-		PreserveGroup: false,
-		DryRun:        false,
-		Verbose:       false,
-		Mode:          ModeOneWayReplica, // Default to exact replication for deployments
+		BlockLength:    DefaultBlockLength,
+		CreateBackup:   true,
+		PreservePerms:  true,
+		PreserveOwner:  false,
+		PreserveGroup:  false,
+		DryRun:         false,
+		Verbose:        false,
+		Mode:           ModeOneWayReplica, // Default to exact replication for deployments
+		MaxConcurrency: 5,                 // Default to 5 concurrent operations
 	}
 }
 

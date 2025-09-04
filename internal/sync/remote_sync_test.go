@@ -2,8 +2,10 @@ package sync
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"spooky/internal/schemas"
@@ -62,7 +64,7 @@ func TestRemoteSyncEngine(t *testing.T) {
 	}
 
 	// Should have 3 files (not counting directories)
-	expectedFiles := 3
+	expectedFiles := int64(3)
 	if progress.TotalFiles != expectedFiles {
 		t.Errorf("Expected %d files, got %d", expectedFiles, progress.TotalFiles)
 	}
@@ -246,4 +248,187 @@ func TestCleanupRemoteFiles(t *testing.T) {
 	// We can't test the full functionality without a real SSH connection,
 	// but we can verify the early return behavior
 	t.Logf("Cleanup tests completed successfully - SyncDelete flag properly checked")
+}
+
+func TestConcurrentSyncResult(t *testing.T) {
+	result := &ConcurrentSyncResult{}
+
+	// Test adding results
+	fileResult1 := &FileSyncResult{
+		BytesTransferred: 1000,
+		BytesSaved:       500,
+		Operations:       1,
+	}
+	fileResult2 := &FileSyncResult{
+		BytesTransferred: 2000,
+		BytesSaved:       1000,
+		Operations:       2,
+	}
+
+	result.AddResult(fileResult1)
+	result.AddResult(fileResult2)
+
+	// Test adding errors
+	err1 := fmt.Errorf("test error 1")
+	err2 := fmt.Errorf("test error 2")
+	result.AddError(err1)
+	result.AddError(err2)
+
+	// Verify results
+	if result.BytesTransferred != 3000 {
+		t.Errorf("Expected BytesTransferred=3000, got %d", result.BytesTransferred)
+	}
+	if result.BytesSaved != 1500 {
+		t.Errorf("Expected BytesSaved=1500, got %d", result.BytesSaved)
+	}
+	if result.Operations != 3 {
+		t.Errorf("Expected Operations=3, got %d", result.Operations)
+	}
+
+	errors := result.GetErrors()
+	if len(errors) != 2 {
+		t.Errorf("Expected 2 errors, got %d", len(errors))
+	}
+
+	t.Logf("ConcurrentSyncResult test passed: %d bytes transferred, %d operations, %d errors",
+		result.BytesTransferred, result.Operations, len(errors))
+}
+
+func TestProgressThreadSafety(t *testing.T) {
+	progress := &Progress{
+		TotalFiles: 100,
+	}
+
+	// Test concurrent access to progress
+	var wg sync.WaitGroup
+	numGoroutines := 10
+	filesPerGoroutine := 10
+
+	// Start multiple goroutines that increment files processed
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < filesPerGoroutine; j++ {
+				progress.IncrementFilesProcessed()
+				progress.SetCurrentFile(fmt.Sprintf("file_%d_%d", i, j))
+				progress.SetCurrentOperation("syncing")
+				progress.UpdatePercentage()
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	// Verify final count
+	expectedFiles := int64(numGoroutines * filesPerGoroutine)
+	if progress.FilesProcessed != expectedFiles {
+		t.Errorf("Expected %d files processed, got %d", expectedFiles, progress.FilesProcessed)
+	}
+
+	// Verify percentage calculation
+	expectedPercentage := 100.0
+	if progress.Percentage != expectedPercentage {
+		t.Errorf("Expected percentage %.1f, got %.1f", expectedPercentage, progress.Percentage)
+	}
+
+	t.Logf("Thread safety test passed: %d files processed (%.1f%%)",
+		progress.FilesProcessed, progress.Percentage)
+}
+
+func TestGetOptimalConcurrency(t *testing.T) {
+	// Create a mock SSH manager
+	sshManager := &ssh.SimpleSSHManager{}
+	engine := NewRemoteSyncEngine(sshManager)
+
+	// Test with explicit concurrency setting
+	options := &RemoteOptions{
+		Options: &Options{
+			MaxConcurrency: 3,
+		},
+	}
+
+	concurrency := engine.getOptimalConcurrency(options)
+	if concurrency != 3 {
+		t.Errorf("Expected concurrency=3, got %d", concurrency)
+	}
+
+	// Test with auto-detection (0)
+	options.MaxConcurrency = 0
+	concurrency = engine.getOptimalConcurrency(options)
+	if concurrency < 1 || concurrency > 10 {
+		t.Errorf("Expected concurrency between 1-10, got %d", concurrency)
+	}
+
+	t.Logf("Concurrency test passed: explicit=3, auto-detected=%d", concurrency)
+}
+
+func TestFileProcessingJob(t *testing.T) {
+	job := FileProcessingJob{
+		LocalPath:  "/local/path/file.txt",
+		RemotePath: "/remote/path/file.txt",
+		IsDir:      false,
+	}
+
+	if job.LocalPath != "/local/path/file.txt" {
+		t.Errorf("Expected LocalPath='/local/path/file.txt', got '%s'", job.LocalPath)
+	}
+	if job.RemotePath != "/remote/path/file.txt" {
+		t.Errorf("Expected RemotePath='/remote/path/file.txt', got '%s'", job.RemotePath)
+	}
+	if job.IsDir {
+		t.Error("Expected IsDir=false, got true")
+	}
+
+	// Test directory job
+	dirJob := FileProcessingJob{
+		LocalPath:  "/local/path/dir",
+		RemotePath: "/remote/path/dir",
+		IsDir:      true,
+	}
+
+	if !dirJob.IsDir {
+		t.Error("Expected IsDir=true, got false")
+	}
+
+	t.Logf("FileProcessingJob test passed: file job and directory job created successfully")
+}
+
+func TestProgressSnapshot(t *testing.T) {
+	progress := &Progress{
+		CurrentFile:      "test.txt",
+		FilesProcessed:   5,
+		TotalFiles:       10,
+		BytesTransferred: 1024,
+		BytesSaved:       512,
+		CurrentOperation: "syncing",
+		Percentage:       50.0,
+	}
+
+	snapshot := progress.GetProgressSnapshot()
+
+	// Verify snapshot contains correct values
+	if snapshot.CurrentFile != "test.txt" {
+		t.Errorf("Expected CurrentFile='test.txt', got '%s'", snapshot.CurrentFile)
+	}
+	if snapshot.FilesProcessed != 5 {
+		t.Errorf("Expected FilesProcessed=5, got %d", snapshot.FilesProcessed)
+	}
+	if snapshot.TotalFiles != 10 {
+		t.Errorf("Expected TotalFiles=10, got %d", snapshot.TotalFiles)
+	}
+	if snapshot.BytesTransferred != 1024 {
+		t.Errorf("Expected BytesTransferred=1024, got %d", snapshot.BytesTransferred)
+	}
+	if snapshot.BytesSaved != 512 {
+		t.Errorf("Expected BytesSaved=512, got %d", snapshot.BytesSaved)
+	}
+	if snapshot.CurrentOperation != "syncing" {
+		t.Errorf("Expected CurrentOperation='syncing', got '%s'", snapshot.CurrentOperation)
+	}
+	if snapshot.Percentage != 50.0 {
+		t.Errorf("Expected Percentage=50.0, got %.1f", snapshot.Percentage)
+	}
+
+	t.Logf("Progress snapshot test passed: all fields correctly copied")
 }

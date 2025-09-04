@@ -7,11 +7,14 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"spooky/internal/logging"
 	"spooky/internal/schemas"
 	"spooky/internal/ssh"
 	"spooky/internal/utilities"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/pkg/errors"
 )
@@ -39,11 +42,12 @@ type RemoteOptions struct {
 	SyncDelete      bool // Delete files in destination that don't exist in source
 }
 
-// Progress represents synchronization progress
+// Progress represents synchronization progress with thread-safe operations
 type Progress struct {
+	mu               sync.RWMutex
 	CurrentFile      string
-	FilesProcessed   int
-	TotalFiles       int
+	FilesProcessed   int64
+	TotalFiles       int64
 	BytesTransferred int64
 	BytesSaved       int64
 	CurrentOperation string
@@ -63,6 +67,93 @@ const (
 	// ConflictResolutionPrompt prompts user for conflict resolution.
 	ConflictResolutionPrompt ConflictResolution = "prompt"
 )
+
+// FileProcessingJob represents a file to be processed by a worker goroutine
+type FileProcessingJob struct {
+	LocalPath  string
+	RemotePath string
+	IsDir      bool
+}
+
+// ConcurrentSyncResult holds thread-safe results from concurrent operations
+type ConcurrentSyncResult struct {
+	mu               sync.Mutex
+	BytesTransferred int64
+	BytesSaved       int64
+	Operations       int
+	Errors           []error
+}
+
+// AddResult safely adds a file sync result to the concurrent result
+func (c *ConcurrentSyncResult) AddResult(result *FileSyncResult) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.BytesTransferred += result.BytesTransferred
+	c.BytesSaved += result.BytesSaved
+	c.Operations += result.Operations
+}
+
+// AddError safely adds an error to the concurrent result
+func (c *ConcurrentSyncResult) AddError(err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.Errors = append(c.Errors, err)
+}
+
+// GetErrors returns a copy of all errors
+func (c *ConcurrentSyncResult) GetErrors() []error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	errors := make([]error, len(c.Errors))
+	copy(errors, c.Errors)
+	return errors
+}
+
+// IncrementFilesProcessed atomically increments the files processed counter
+func (p *Progress) IncrementFilesProcessed() {
+	atomic.AddInt64(&p.FilesProcessed, 1)
+}
+
+// SetCurrentFile safely sets the current file being processed
+func (p *Progress) SetCurrentFile(filename string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.CurrentFile = filename
+}
+
+// SetCurrentOperation safely sets the current operation
+func (p *Progress) SetCurrentOperation(operation string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.CurrentOperation = operation
+}
+
+// UpdatePercentage safely updates the percentage
+func (p *Progress) UpdatePercentage() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.TotalFiles > 0 {
+		p.Percentage = float64(p.FilesProcessed) / float64(p.TotalFiles) * 100
+	}
+}
+
+// GetProgressSnapshot returns a thread-safe snapshot of current progress
+func (p *Progress) GetProgressSnapshot() Progress {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return Progress{
+		CurrentFile:      p.CurrentFile,
+		FilesProcessed:   atomic.LoadInt64(&p.FilesProcessed),
+		TotalFiles:       p.TotalFiles,
+		BytesTransferred: atomic.LoadInt64(&p.BytesTransferred),
+		BytesSaved:       atomic.LoadInt64(&p.BytesSaved),
+		CurrentOperation: p.CurrentOperation,
+		Percentage:       p.Percentage,
+	}
+}
 
 // RemoteSyncResult contains the result of remote synchronization
 type RemoteSyncResult struct {
@@ -173,60 +264,152 @@ func (r *RemoteSyncEngine) createRemoteDirectory(ctx context.Context, machine *s
 	return nil
 }
 
-// syncOneWayReplicaRemote performs exact one-way replication (local → remote)
+// getOptimalConcurrency determines the optimal number of concurrent workers
+func (r *RemoteSyncEngine) getOptimalConcurrency(options *RemoteOptions) int {
+	if options.MaxConcurrency > 0 {
+		return options.MaxConcurrency
+	}
+
+	// Auto-detect based on CPU cores and system resources
+	// For I/O bound operations like file sync, we can use more workers than CPU cores
+	cpuCores := runtime.NumCPU()
+	optimal := cpuCores * 2 // Start with 2x CPU cores for I/O bound work
+
+	// Cap at reasonable maximum to avoid overwhelming the system
+	if optimal > 10 {
+		optimal = 10
+	}
+
+	// Minimum of 1 worker
+	if optimal < 1 {
+		optimal = 1
+	}
+
+	return optimal
+}
+
+// processFileConcurrently handles individual file processing in a worker goroutine
+func (r *RemoteSyncEngine) processFileConcurrently(ctx context.Context, job FileProcessingJob, options *RemoteOptions, progress *Progress, concurrentResult *ConcurrentSyncResult) {
+	if job.IsDir {
+		// Handle directory creation
+		if err := r.createRemoteDirectory(ctx, options.Machine, job.RemotePath); err != nil {
+			concurrentResult.AddError(fmt.Errorf("failed to create remote directory %s: %v", job.RemotePath, err))
+			return
+		}
+
+		if options.Verbose {
+			logger := logging.GetGlobalLogger()
+			logger.Info("created remote directory", slog.String("path", job.RemotePath))
+		}
+		return
+	}
+
+	// Update progress for file processing
+	progress.SetCurrentFile(filepath.Base(job.LocalPath))
+	progress.SetCurrentOperation("syncing")
+
+	// Handle file synchronization
+	fileResult, err := r.syncFileToRemote(ctx, job.LocalPath, job.RemotePath, options, progress)
+	if err != nil {
+		concurrentResult.AddError(fmt.Errorf("failed to sync file %s: %v", job.LocalPath, err))
+		return
+	}
+
+	// Update progress atomically
+	progress.IncrementFilesProcessed()
+	progress.UpdatePercentage()
+
+	concurrentResult.AddResult(fileResult)
+}
+
+// syncOneWayReplicaRemote performs exact one-way replication (local → remote) with parallel processing
 func (r *RemoteSyncEngine) syncOneWayReplicaRemote(ctx context.Context, localPath, remotePath string, options *RemoteOptions, result *RemoteSyncResult, progress *Progress) error {
 	logger := logging.GetGlobalLogger()
-	logger.Info("performing one-way replica sync to remote",
+	logger.Info("performing one-way replica sync to remote with parallel processing",
 		slog.String("source", localPath),
 		slog.String("target", remotePath),
 		slog.String("machine", options.Machine.Hostname))
 
-	// Walk local directory and sync all files
-	err := filepath.Walk(localPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return errors.Wrapf(err, "failed to walk local path %s", path)
-		}
+	// Determine optimal concurrency level
+	maxWorkers := r.getOptimalConcurrency(options)
+	logger.Info("using parallel processing", slog.Int("workers", maxWorkers))
 
-		// Calculate relative path from local source
-		relPath, err := filepath.Rel(localPath, path)
-		if err != nil {
-			return fmt.Errorf("failed to calculate relative path: %v", err)
-		}
+	// Create channels for job distribution and results
+	jobChan := make(chan FileProcessingJob, maxWorkers*2) // Buffered channel
+	concurrentResult := &ConcurrentSyncResult{}
+	var wg sync.WaitGroup
 
-		// Skip root directory
-		if relPath == "." {
-			return nil
-		}
-
-		remoteFile := filepath.Join(remotePath, relPath)
-
-		if info.IsDir() {
-			// Create directory on remote
-			if err := r.createRemoteDirectory(ctx, options.Machine, remoteFile); err != nil {
-				return fmt.Errorf("failed to create remote directory %s: %v", remoteFile, err)
+	// Start worker goroutines
+	for i := 0; i < maxWorkers; i++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			for job := range jobChan {
+				// Process each file/directory concurrently
+				r.processFileConcurrently(ctx, job, options, progress, concurrentResult)
 			}
-			if options.Verbose {
-				logger.Info("created remote directory", slog.String("path", remoteFile))
-			}
-		} else {
-			// Sync file to remote
-			fileResult, err := r.syncFileToRemote(ctx, path, remoteFile, options, progress)
+		}(i)
+	}
+
+	// Walk directory and send jobs to workers
+	walkErr := make(chan error, 1)
+	go func() {
+		defer close(jobChan)
+		walkErr <- filepath.Walk(localPath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				return fmt.Errorf("failed to sync file %s: %v", path, err)
+				return errors.Wrapf(err, "failed to walk local path %s", path)
 			}
 
-			result.BytesTransferred += fileResult.BytesTransferred
-			result.BytesSaved += fileResult.BytesSaved
-			result.Operations += fileResult.Operations
-		}
+			// Calculate relative path from local source
+			relPath, err := filepath.Rel(localPath, path)
+			if err != nil {
+				return fmt.Errorf("failed to calculate relative path: %v", err)
+			}
 
-		return nil
-	})
+			// Skip root directory
+			if relPath == "." {
+				return nil
+			}
 
-	if err != nil {
-		result.Error = errors.Wrap(err, "failed to sync directory")
+			remoteFile := filepath.Join(remotePath, relPath)
+
+			// Send job to worker
+			job := FileProcessingJob{
+				LocalPath:  path,
+				RemotePath: remoteFile,
+				IsDir:      info.IsDir(),
+			}
+			jobChan <- job
+
+			return nil
+		})
+	}()
+
+	// Wait for directory walk to complete
+	if err := <-walkErr; err != nil {
+		// Close job channel to stop workers
+		close(jobChan)
+		wg.Wait()
+		result.Error = errors.Wrap(err, "failed to walk directory")
 		return result.Error
 	}
+
+	// Wait for all workers to complete
+	wg.Wait()
+
+	// Check for errors from concurrent operations
+	if errors := concurrentResult.GetErrors(); len(errors) > 0 {
+		// Log all errors but continue with cleanup
+		for _, err := range errors {
+			logger.Error("concurrent sync error", slog.String("error", err.Error()))
+		}
+		result.Error = fmt.Errorf("encountered %d errors during parallel sync", len(errors))
+	}
+
+	// Update result with aggregated data
+	result.BytesTransferred += concurrentResult.BytesTransferred
+	result.BytesSaved += concurrentResult.BytesSaved
+	result.Operations += concurrentResult.Operations
 
 	// Clean up files on remote that don't exist locally if delete is enabled
 	if options.SyncDelete {
