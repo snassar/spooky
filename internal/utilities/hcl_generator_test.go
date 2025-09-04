@@ -24,7 +24,7 @@ type TestNestedStruct struct {
 }
 
 func TestHCLGenerator_Basic(t *testing.T) {
-	generator := hcl.NewHCLGenerator()
+	generator := hcl.NewGenerator()
 
 	testData := TestStruct{
 		Name:        "example",
@@ -61,7 +61,7 @@ func TestHCLGenerator_Basic(t *testing.T) {
 }
 
 func TestHCLGenerator_WithDefaults(t *testing.T) {
-	generator := hcl.NewHCLGenerator()
+	generator := hcl.NewGenerator()
 	generator.UseDefaults = true
 
 	// Test with empty struct (should use defaults)
@@ -94,7 +94,7 @@ func TestHCLGenerator_WithDefaults(t *testing.T) {
 }
 
 func TestHCLGenerator_WithoutDefaults(t *testing.T) {
-	generator := hcl.NewHCLGenerator()
+	generator := hcl.NewGenerator()
 	generator.UseDefaults = false
 
 	// Test with empty struct (should not use defaults)

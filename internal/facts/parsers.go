@@ -22,13 +22,11 @@ const (
 	// VirtualizationRoleHost represents a host VM role
 	VirtualizationRoleHost = "host"
 
-	// Common file paths
 	// ProcScsiScsiPath is the path to the SCSI information file.
 	ProcScsiScsiPath = "/proc/scsi/scsi"
 	// ProcCPUInfoPath is the path to the CPU information file.
 	ProcCPUInfoPath = "/proc/cpuinfo"
 
-	// System types
 	// SystemTypeDesktop indicates a desktop system type.
 	SystemTypeDesktop = "desktop"
 	// SystemTypeLaptop indicates a laptop system type.
@@ -36,7 +34,6 @@ const (
 	// SystemTypeServer indicates a server system type.
 	SystemTypeServer = "server"
 
-	// SELinux related
 	// SELinuxConfigPath is the path to the SELinux configuration file.
 	SELinuxConfigPath = "/etc/selinux/config"
 	// SELinuxPrefix is the prefix for SELinux configuration lines.
@@ -44,14 +41,13 @@ const (
 	// SELinuxTypePrefix is the prefix for SELinux type configuration lines.
 	SELinuxTypePrefix = "SELINUXTYPE="
 
-	// Hardware detection
 	// HardwareLaptopIndicator is the indicator for laptop hardware.
 	HardwareLaptopIndicator = "laptop"
 	// HardwareDesktopIndicator is the indicator for desktop hardware.
 	HardwareDesktopIndicator = "desktop"
-	HardwareServerIndicator  = "server"
+	// HardwareServerIndicator is the indicator for server hardware.
+	HardwareServerIndicator = "server"
 
-	// Network routing
 	// DefaultRouteDestination is the default route destination.
 	DefaultRouteDestination = "00000000"
 )

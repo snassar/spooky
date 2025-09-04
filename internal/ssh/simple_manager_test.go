@@ -14,7 +14,7 @@ import (
 func TestSimpleSSHManager_SetupAuthentication(t *testing.T) {
 	t.Run("Public Key Authentication", func(t *testing.T) {
 		manager := &SimpleSSHManager{}
-		config := &SSHConfig{}
+		config := &Config{}
 		machine := &schemas.MachinesMachineV1{
 			Authentication: schemas.MachinesMachineAuthenticationV1{
 				PublicKeyPath: "/path/to/private/key",
@@ -33,7 +33,7 @@ func TestSimpleSSHManager_SetupAuthentication(t *testing.T) {
 
 	t.Run("Password Authentication", func(t *testing.T) {
 		manager := &SimpleSSHManager{}
-		config := &SSHConfig{}
+		config := &Config{}
 		machine := &schemas.MachinesMachineV1{
 			Authentication: schemas.MachinesMachineAuthenticationV1{
 				Password: schemas.MachinesMachineAuthenticationPasswordV1{
@@ -50,7 +50,7 @@ func TestSimpleSSHManager_SetupAuthentication(t *testing.T) {
 
 	t.Run("Certificate Authentication", func(t *testing.T) {
 		manager := &SimpleSSHManager{}
-		config := &SSHConfig{}
+		config := &Config{}
 		machine := &schemas.MachinesMachineV1{
 			Authentication: schemas.MachinesMachineAuthenticationV1{
 				PrivateKeyPath:  "/path/to/private/key",
@@ -70,7 +70,7 @@ func TestSimpleSSHManager_SetupAuthentication(t *testing.T) {
 
 	t.Run("No Authentication Method", func(t *testing.T) {
 		manager := &SimpleSSHManager{}
-		config := &SSHConfig{}
+		config := &Config{}
 		machine := &schemas.MachinesMachineV1{
 			Authentication: schemas.MachinesMachineAuthenticationV1{},
 		}
@@ -83,7 +83,7 @@ func TestSimpleSSHManager_SetupAuthentication(t *testing.T) {
 
 func TestSimpleSSHManager_SetupPublicKeyAuth(t *testing.T) {
 	manager := &SimpleSSHManager{}
-	config := &SSHConfig{}
+	config := &Config{}
 
 	t.Run("Valid Public Key", func(t *testing.T) {
 		auth := &schemas.MachinesMachineAuthenticationV1{
@@ -111,7 +111,7 @@ func TestSimpleSSHManager_SetupPublicKeyAuth(t *testing.T) {
 
 func TestSimpleSSHManager_SetupPasswordAuth(t *testing.T) {
 	manager := &SimpleSSHManager{}
-	config := &SSHConfig{}
+	config := &Config{}
 
 	t.Run("Valid Password", func(t *testing.T) {
 		auth := &schemas.MachinesMachineAuthenticationV1{
@@ -137,7 +137,7 @@ func TestSimpleSSHManager_SetupPasswordAuth(t *testing.T) {
 
 func TestSimpleSSHManager_SetupCertificateAuth(t *testing.T) {
 	manager := &SimpleSSHManager{}
-	config := &SSHConfig{}
+	config := &Config{}
 
 	t.Run("Valid Certificate", func(t *testing.T) {
 		auth := &schemas.MachinesMachineAuthenticationV1{

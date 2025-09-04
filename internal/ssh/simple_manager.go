@@ -27,8 +27,8 @@ func NewSimpleSSHManager(ageEncryption *encryption.AgeEncryption, config *schema
 }
 
 // createSSHConfig creates a new SSH configuration for the given machine
-func (sm *SimpleSSHManager) createSSHConfig(machine *schemas.MachinesMachineV1) *SSHConfig {
-	return &SSHConfig{
+func (sm *SimpleSSHManager) createSSHConfig(machine *schemas.MachinesMachineV1) *Config {
+	return &Config{
 		Host:           machine.Hostname,
 		Port:           machine.Port,
 		User:           machine.User,
@@ -90,7 +90,7 @@ func (sm *SimpleSSHManager) RunCommandOnMachine(ctx context.Context, machine *sc
 	}
 
 	// Create SSH client
-	client, err := NewSSHClient(sshConfig)
+	client, err := NewClient(sshConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create SSH client")
 	}
@@ -117,7 +117,7 @@ func (sm *SimpleSSHManager) RunCommandOnMachine(ctx context.Context, machine *sc
 }
 
 // setupAuthentication configures authentication methods for the SSH client
-func (sm *SimpleSSHManager) setupAuthentication(config *SSHConfig, machine *schemas.MachinesMachineV1) error {
+func (sm *SimpleSSHManager) setupAuthentication(config *Config, machine *schemas.MachinesMachineV1) error {
 	auth := machine.Authentication
 
 	// Try public key authentication first
@@ -139,7 +139,7 @@ func (sm *SimpleSSHManager) setupAuthentication(config *SSHConfig, machine *sche
 }
 
 // setupPublicKeyAuth configures public key authentication
-func (sm *SimpleSSHManager) setupPublicKeyAuth(config *SSHConfig, auth *schemas.MachinesMachineAuthenticationV1) error {
+func (sm *SimpleSSHManager) setupPublicKeyAuth(config *Config, auth *schemas.MachinesMachineAuthenticationV1) error {
 	if auth.PublicKeyPath == "" {
 		return errors.New("no public key path provided")
 	}
@@ -159,7 +159,7 @@ func (sm *SimpleSSHManager) setupPublicKeyAuth(config *SSHConfig, auth *schemas.
 }
 
 // setupPasswordAuth configures password authentication
-func (sm *SimpleSSHManager) setupPasswordAuth(config *SSHConfig, auth *schemas.MachinesMachineAuthenticationV1) error {
+func (sm *SimpleSSHManager) setupPasswordAuth(config *Config, auth *schemas.MachinesMachineAuthenticationV1) error {
 	if auth.Password.Value == "" {
 		return errors.New("no password provided")
 	}
@@ -174,7 +174,7 @@ func (sm *SimpleSSHManager) setupPasswordAuth(config *SSHConfig, auth *schemas.M
 }
 
 // setupCertificateAuth configures certificate authentication
-func (sm *SimpleSSHManager) setupCertificateAuth(config *SSHConfig, auth *schemas.MachinesMachineAuthenticationV1) error {
+func (sm *SimpleSSHManager) setupCertificateAuth(config *Config, auth *schemas.MachinesMachineAuthenticationV1) error {
 	if auth.PrivateKeyPath == "" || auth.CertificatePath == "" {
 		return errors.New("certificate authentication requires both private key and certificate paths")
 	}
@@ -242,7 +242,7 @@ func (sm *SimpleSSHManager) UploadFileToMachine(ctx context.Context, machine *sc
 	}
 
 	// Create SSH client
-	client, err := NewSSHClient(sshConfig)
+	client, err := NewClient(sshConfig)
 	if err != nil {
 		return errors.Wrap(err, "failed to create SSH client")
 	}
@@ -268,7 +268,7 @@ func (sm *SimpleSSHManager) UploadFileToMachine(ctx context.Context, machine *sc
 }
 
 // GetSSHClient gets an SSH client for a specific machine
-func (sm *SimpleSSHManager) GetSSHClient(hostname string, machine *schemas.MachinesMachineV1) (*SSHClient, error) {
+func (sm *SimpleSSHManager) GetSSHClient(hostname string, machine *schemas.MachinesMachineV1) (*Client, error) {
 	// Create SSH config
 	sshConfig := sm.createSSHConfig(machine)
 
@@ -278,7 +278,7 @@ func (sm *SimpleSSHManager) GetSSHClient(hostname string, machine *schemas.Machi
 	}
 
 	// Create and return SSH client
-	client, err := NewSSHClient(sshConfig)
+	client, err := NewClient(sshConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create SSH client")
 	}

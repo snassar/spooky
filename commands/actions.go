@@ -1035,14 +1035,14 @@ func (ae *ActionExecutor) runFileSyncAction(ctx context.Context, action *schemas
 	remoteSyncEngine := sync.NewRemoteSyncEngine(ae.sshManager)
 
 	// Determine sync mode based on action configuration
-	syncMode := sync.SyncModeOneWayReplica // Default mode
+	syncMode := sync.ModeOneWayReplica // Default mode
 	if action.SyncPreserve {
-		syncMode = sync.SyncModeOneWaySafe
+		syncMode = sync.ModeOneWaySafe
 	}
 
 	// Create sync options
-	syncOptions := &sync.RemoteSyncOptions{
-		SyncOptions: &sync.SyncOptions{
+	syncOptions := &sync.RemoteOptions{
+		Options: &sync.Options{
 			BlockLength:   sync.DefaultBlockLength,
 			CreateBackup:  true,
 			PreservePerms: action.SyncPreserve,
@@ -1050,7 +1050,7 @@ func (ae *ActionExecutor) runFileSyncAction(ctx context.Context, action *schemas
 			PreserveGroup: false, // Could be configurable
 			DryRun:        false,
 			Verbose:       true,
-			SyncMode:      syncMode,
+			Mode:          syncMode,
 		},
 		Machine:         machine,
 		ProgressReport:  ae.createProgressReporter(action),
@@ -1508,8 +1508,8 @@ func (ae *ActionExecutor) executeFileAttributeCommand(ctx context.Context, machi
 }
 
 // createProgressReporter creates a progress reporting function for file synchronization
-func (ae *ActionExecutor) createProgressReporter(action *schemas.ActionsActionV1) func(progress *sync.SyncProgress) {
-	return func(progress *sync.SyncProgress) {
+func (ae *ActionExecutor) createProgressReporter(action *schemas.ActionsActionV1) func(progress *sync.Progress) {
+	return func(progress *sync.Progress) {
 		logger := logging.GetGlobalLogger()
 
 		// Calculate percentage

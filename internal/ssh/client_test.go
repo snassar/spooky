@@ -26,7 +26,7 @@ func createLegacyEncryptedPEMBlock(blockType string, data []byte) *pem.Block {
 	}
 }
 
-func TestSSHClient_LoadPrivateKey(t *testing.T) {
+func TestClient_LoadPrivateKey(t *testing.T) {
 	// Create a temporary directory for test keys
 	tempDir, err := os.MkdirTemp("", "ssh-test-keys")
 	require.NoError(t, err)
@@ -56,8 +56,8 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test loading
-		client := &SSHClient{
-			config: &SSHConfig{
+		client := &Client{
+			config: &Config{
 				PrivateKeyPath: keyPath,
 			},
 		}
@@ -80,8 +80,8 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test loading with passphrase - should fail as legacy DES encryption is no longer supported
-		client := &SSHClient{
-			config: &SSHConfig{
+		client := &Client{
+			config: &Config{
 				PrivateKeyPath: keyPath,
 				Passphrase:     "test-passphrase",
 			},
@@ -111,8 +111,8 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test loading
-		client := &SSHClient{
-			config: &SSHConfig{
+		client := &Client{
+			config: &Config{
 				PrivateKeyPath: keyPath,
 			},
 		}
@@ -139,8 +139,8 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test loading - this should fail parsing but succeed in format detection
-		client := &SSHClient{
-			config: &SSHConfig{
+		client := &Client{
+			config: &Config{
 				PrivateKeyPath: keyPath,
 			},
 		}
@@ -164,8 +164,8 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test loading with wrong passphrase - should fail as legacy DES encryption is no longer supported
-		client := &SSHClient{
-			config: &SSHConfig{
+		client := &Client{
+			config: &Config{
 				PrivateKeyPath: keyPath,
 				Passphrase:     "wrong-passphrase",
 			},
@@ -189,8 +189,8 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test loading without passphrase - should fail as legacy DES encryption is no longer supported
-		client := &SSHClient{
-			config: &SSHConfig{
+		client := &Client{
+			config: &Config{
 				PrivateKeyPath: keyPath,
 				// No passphrase
 			},
@@ -203,7 +203,7 @@ func TestSSHClient_LoadPrivateKey(t *testing.T) {
 	})
 }
 
-func TestSSHClient_LoadPrivateKeyWithPassphrase(t *testing.T) {
+func TestClient_LoadPrivateKeyWithPassphrase(t *testing.T) {
 	// Create a temporary directory for test keys
 	tempDir, err := os.MkdirTemp("", "ssh-test-keys")
 	require.NoError(t, err)
@@ -238,8 +238,8 @@ func TestSSHClient_LoadPrivateKeyWithPassphrase(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test loading with passphrase (should work for unencrypted PKCS#8)
-		client := &SSHClient{
-			config: &SSHConfig{
+		client := &Client{
+			config: &Config{
 				PrivateKeyPath: keyPath,
 				Passphrase:     "test-passphrase", // Should be ignored for unencrypted
 			},
@@ -253,7 +253,7 @@ func TestSSHClient_LoadPrivateKeyWithPassphrase(t *testing.T) {
 }
 
 // Test helper functions for loadPrivateKey refactoring
-func TestSSHClient_ExtractKeyData(t *testing.T) {
+func TestClient_ExtractKeyData(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "ssh-test-extract")
 	require.NoError(t, err)
 	defer func() {
@@ -280,8 +280,8 @@ func TestSSHClient_ExtractKeyData(t *testing.T) {
 		err := os.WriteFile(keyPath, pemData, 0600)
 		require.NoError(t, err)
 
-		client := &SSHClient{
-			config: &SSHConfig{
+		client := &Client{
+			config: &Config{
 				PrivateKeyPath: keyPath,
 			},
 		}
@@ -292,8 +292,8 @@ func TestSSHClient_ExtractKeyData(t *testing.T) {
 	})
 
 	t.Run("From Direct Data", func(t *testing.T) {
-		client := &SSHClient{
-			config: &SSHConfig{
+		client := &Client{
+			config: &Config{
 				PrivateKeyData: pemData,
 			},
 		}
@@ -304,8 +304,8 @@ func TestSSHClient_ExtractKeyData(t *testing.T) {
 	})
 
 	t.Run("No Key Provided", func(t *testing.T) {
-		client := &SSHClient{
-			config: &SSHConfig{},
+		client := &Client{
+			config: &Config{},
 		}
 
 		_, err := client.extractKeyData()
@@ -314,8 +314,8 @@ func TestSSHClient_ExtractKeyData(t *testing.T) {
 	})
 
 	t.Run("File Not Found", func(t *testing.T) {
-		client := &SSHClient{
-			config: &SSHConfig{
+		client := &Client{
+			config: &Config{
 				PrivateKeyPath: "/nonexistent/path/key.pem",
 			},
 		}
@@ -326,12 +326,12 @@ func TestSSHClient_ExtractKeyData(t *testing.T) {
 	})
 }
 
-func TestSSHClient_ValidateKeyData(t *testing.T) {
+func TestClient_ValidateKeyData(t *testing.T) {
 	// Generate a test RSA key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	client := &SSHClient{}
+	client := &Client{}
 
 	t.Run("Valid Key Data", func(t *testing.T) {
 		block := &pem.Block{
@@ -376,12 +376,12 @@ func TestSSHClient_ValidateKeyData(t *testing.T) {
 	})
 }
 
-func TestSSHClient_ParsePEMBlock(t *testing.T) {
+func TestClient_ParsePEMBlock(t *testing.T) {
 	// Generate a test RSA key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	client := &SSHClient{}
+	client := &Client{}
 
 	t.Run("Valid RSA Key", func(t *testing.T) {
 		block := &pem.Block{
@@ -419,12 +419,12 @@ func TestSSHClient_ParsePEMBlock(t *testing.T) {
 	})
 }
 
-func TestSSHClient_HandlePEMBlockType(t *testing.T) {
+func TestClient_HandlePEMBlockType(t *testing.T) {
 	// Generate a test RSA key
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	client := &SSHClient{}
+	client := &Client{}
 
 	t.Run("RSA Private Key", func(t *testing.T) {
 		block := &pem.Block{
@@ -506,7 +506,7 @@ func TestSSHClient_HandlePEMBlockType(t *testing.T) {
 }
 
 // Benchmark tests for performance
-func BenchmarkSSHClient_LoadPrivateKey(b *testing.B) {
+func BenchmarkClient_LoadPrivateKey(b *testing.B) {
 	// Create a temporary directory for test keys
 	tempDir, err := os.MkdirTemp("", "ssh-benchmark-keys")
 	if err != nil {
@@ -539,8 +539,8 @@ func BenchmarkSSHClient_LoadPrivateKey(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	client := &SSHClient{
-		config: &SSHConfig{
+	client := &Client{
+		config: &Config{
 			PrivateKeyPath: keyPath,
 		},
 	}
