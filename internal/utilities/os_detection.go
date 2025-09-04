@@ -248,9 +248,7 @@ func detectWSL() bool {
 func isRunningAsRoot() bool {
 	switch runtime.GOOS {
 	case OSWindows:
-		// On Windows, check if running as administrator
-		// This is a simplified check - in production you'd use Windows API
-		return false // Placeholder
+		return isRunningAsAdministrator()
 	default:
 		// On Unix-like systems, check if UID is 0
 		return os.Geteuid() == 0

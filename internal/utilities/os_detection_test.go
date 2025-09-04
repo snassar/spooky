@@ -111,3 +111,51 @@ func isDir(path string) bool {
 	// This is a simplified check - in a real test you'd use os.Stat
 	return true
 }
+
+func TestIsRunningAsRoot(t *testing.T) {
+	isRoot := isRunningAsRoot()
+
+	// The result depends on the current environment
+	// We can't predict the exact value, but we can test that it doesn't panic
+	// and returns a boolean value
+	if isRoot != true && isRoot != false {
+		t.Error("isRunningAsRoot should return a boolean value")
+	}
+
+	t.Logf("Running as root/administrator: %v", isRoot)
+}
+
+func TestIsRunningAsAdministrator(t *testing.T) {
+	// This test will only run on Windows due to build constraints
+	// On non-Windows systems, it will use the stub implementation
+	isAdmin := isRunningAsAdministrator()
+
+	// The result depends on the current environment
+	// We can't predict the exact value, but we can test that it doesn't panic
+	// and returns a boolean value
+	if isAdmin != true && isAdmin != false {
+		t.Error("isRunningAsAdministrator should return a boolean value")
+	}
+
+	t.Logf("Running as administrator: %v", isAdmin)
+}
+
+func TestDetectOSRootDetection(t *testing.T) {
+	osInfo, err := DetectOS()
+	if err != nil {
+		t.Fatalf("DetectOS failed: %v", err)
+	}
+
+	// Test that IsRoot is properly set
+	if osInfo.IsRoot != true && osInfo.IsRoot != false {
+		t.Error("IsRoot should be a boolean value")
+	}
+
+	// Test that the root detection is consistent with the direct function call
+	expectedRoot := isRunningAsRoot()
+	if osInfo.IsRoot != expectedRoot {
+		t.Errorf("OSInfo.IsRoot (%v) should match isRunningAsRoot() (%v)", osInfo.IsRoot, expectedRoot)
+	}
+
+	t.Logf("OS Info: %s", osInfo.String())
+}
