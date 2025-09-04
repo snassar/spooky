@@ -99,35 +99,89 @@ func (hu *HCLUpdater) processVariablesBlock(block *hclsyntax.Block, contentStr *
 	return modified, nil
 }
 
-// processVariableBlock processes a single variable block and updates the content string
-func (hu *HCLUpdater) processVariableBlock(block *hclsyntax.Block, contentStr *string) (bool, error) {
-	// Check if this variable is marked for encryption
-	encrypted := false
+// isVariableEncrypted checks if a variable block is marked for encryption
+func (hu *HCLUpdater) isVariableEncrypted(block *hclsyntax.Block) bool {
 	for _, attr := range block.Body.Attributes {
 		if attr.Name == "encrypted" {
 			if val, ok := attr.Expr.(*hclsyntax.LiteralValueExpr); ok {
 				if val.Val.Type().IsPrimitiveType() && val.Val.True() {
-					encrypted = true
+					return true
 				}
 			}
 		}
 	}
+	return false
+}
 
-	if !encrypted {
+// findValueAttribute finds the value attribute in a variable block
+func (hu *HCLUpdater) findValueAttribute(block *hclsyntax.Block) (*hclsyntax.Attribute, error) {
+	for _, attr := range block.Body.Attributes {
+		if attr.Name == "value" {
+			return attr, nil
+		}
+	}
+	return nil, errors.Errorf("variable %s is marked as encrypted but has no value attribute", block.Labels[0])
+}
+
+// findValueStart finds the start position of the actual value in the content string
+func (hu *HCLUpdater) findValueStart(contentStr string, start int) int {
+	for i := start; i < len(contentStr); i++ {
+		if contentStr[i] == '=' {
+			// Skip equals sign and whitespace
+			for j := i + 1; j < len(contentStr); j++ {
+				if contentStr[j] != ' ' && contentStr[j] != '\t' {
+					return j
+				}
+			}
+			break
+		}
+	}
+	return start
+}
+
+// findValueEnd finds the end position of the value in the content string
+func (hu *HCLUpdater) findValueEnd(contentStr string, valueStart int) int {
+	for i := valueStart; i < len(contentStr); i++ {
+		if contentStr[i] == '\n' || contentStr[i] == '}' {
+			return i
+		}
+	}
+	return len(contentStr)
+}
+
+// replaceContentValue replaces the value in the content string with the encrypted value
+func (hu *HCLUpdater) replaceContentValue(contentStr *string, valueAttr *hclsyntax.Attribute, encryptedValue string) {
+	valueRange := valueAttr.Range()
+	start := valueRange.Start.Byte
+
+	// Extract the part before the value
+	before := (*contentStr)[:start]
+
+	// Find the actual value positions
+	valueStart := hu.findValueStart(*contentStr, start)
+	valueEnd := hu.findValueEnd(*contentStr, valueStart)
+
+	// Extract the part after the value
+	after := (*contentStr)[valueEnd:]
+
+	// Create the new value with proper quoting
+	newValue := fmt.Sprintf(`"%s"`, strings.ReplaceAll(encryptedValue, `"`, `\"`))
+
+	// Reconstruct the content
+	*contentStr = before + newValue + after
+}
+
+// processVariableBlock processes a single variable block and updates the content string
+func (hu *HCLUpdater) processVariableBlock(block *hclsyntax.Block, contentStr *string) (bool, error) {
+	// Check if this variable is marked for encryption
+	if !hu.isVariableEncrypted(block) {
 		return false, nil
 	}
 
 	// Find the value attribute
-	var valueAttr *hclsyntax.Attribute
-	for _, attr := range block.Body.Attributes {
-		if attr.Name == "value" {
-			valueAttr = attr
-			break
-		}
-	}
-
-	if valueAttr == nil {
-		return false, errors.Errorf("variable %s is marked as encrypted but has no value attribute", block.Labels[0])
+	valueAttr, err := hu.findValueAttribute(block)
+	if err != nil {
+		return false, err
 	}
 
 	// Get the current value
@@ -150,46 +204,7 @@ func (hu *HCLUpdater) processVariableBlock(block *hclsyntax.Block, contentStr *s
 	}
 
 	// Update the value in the content string
-	// Find the range of the value attribute and replace it
-	valueRange := valueAttr.Range()
-	start := valueRange.Start.Byte
-	end := valueRange.End.Byte
-
-	// Extract the part before the value
-	before := (*contentStr)[:start]
-
-	// Find the actual value part (after the equals sign and whitespace)
-	valueStart := start
-	for i := start; i < len(*contentStr); i++ {
-		if (*contentStr)[i] == '=' {
-			// Skip equals sign and whitespace
-			for j := i + 1; j < len(*contentStr); j++ {
-				if (*contentStr)[j] != ' ' && (*contentStr)[j] != '\t' {
-					valueStart = j
-					break
-				}
-			}
-			break
-		}
-	}
-
-	// Find the end of the value (before the next newline or closing brace)
-	valueEnd := end
-	for i := valueStart; i < len(*contentStr); i++ {
-		if (*contentStr)[i] == '\n' || (*contentStr)[i] == '}' {
-			valueEnd = i
-			break
-		}
-	}
-
-	// Extract the part after the value
-	after := (*contentStr)[valueEnd:]
-
-	// Create the new value with proper quoting
-	newValue := fmt.Sprintf(`"%s"`, strings.ReplaceAll(encryptedValue, `"`, `\"`))
-
-	// Reconstruct the content
-	*contentStr = before + newValue + after
+	hu.replaceContentValue(contentStr, valueAttr, encryptedValue)
 
 	logger := logging.GetGlobalLogger()
 	logger.Info("encrypted variable",
