@@ -503,8 +503,6 @@ func (g *Gatherer) parseFactsHCL(hclContent string) (*schemas.EnhancedFactsV1, e
 
 // ExportFacts exports collected facts to HCL format
 func (g *Gatherer) ExportFacts(machineFacts []*MachineFacts) (*schemas.FactsV1, error) {
-	// Combine all machine facts into a single facts structure
-	// This is a simplified version - in practice, you might want to organize by machine
 	combinedFacts := &schemas.FactsV1{
 		BasicFacts:    createEmptyBasicFacts(),
 		EnhancedFacts: &schemas.EnhancedFactsV1{Facts: make(map[string]*schemas.FactV1)},
@@ -516,73 +514,63 @@ func (g *Gatherer) ExportFacts(machineFacts []*MachineFacts) (*schemas.FactsV1, 
 			continue // Skip machines with errors
 		}
 
-		// Add basic facts with machine prefix, organized by category
-		if machineFact.BasicFacts != nil {
-			// System facts
-			if machineFact.BasicFacts.SystemFacts != nil {
-				for factName, fact := range machineFact.BasicFacts.SystemFacts.Facts {
-					prefixedName := fmt.Sprintf("%s_%s", machineFact.Machine.Hostname, factName)
-					combinedFacts.BasicFacts.SystemFacts.Facts[prefixedName] = fact
-				}
-			}
-
-			// Hardware facts
-			if machineFact.BasicFacts.HardwareFacts != nil {
-				for factName, fact := range machineFact.BasicFacts.HardwareFacts.Facts {
-					prefixedName := fmt.Sprintf("%s_%s", machineFact.Machine.Hostname, factName)
-					combinedFacts.BasicFacts.HardwareFacts.Facts[prefixedName] = fact
-				}
-			}
-
-			// Network facts
-			if machineFact.BasicFacts.NetworkFacts != nil {
-				for factName, fact := range machineFact.BasicFacts.NetworkFacts.Facts {
-					prefixedName := fmt.Sprintf("%s_%s", machineFact.Machine.Hostname, factName)
-					combinedFacts.BasicFacts.NetworkFacts.Facts[prefixedName] = fact
-				}
-			}
-
-			// OS facts
-			if machineFact.BasicFacts.OSFacts != nil {
-				for factName, fact := range machineFact.BasicFacts.OSFacts.Facts {
-					prefixedName := fmt.Sprintf("%s_%s", machineFact.Machine.Hostname, factName)
-					combinedFacts.BasicFacts.OSFacts.Facts[prefixedName] = fact
-				}
-			}
-
-			// User facts
-			if machineFact.BasicFacts.UserFacts != nil {
-				for factName, fact := range machineFact.BasicFacts.UserFacts.Facts {
-					prefixedName := fmt.Sprintf("%s_%s", machineFact.Machine.Hostname, factName)
-					combinedFacts.BasicFacts.UserFacts.Facts[prefixedName] = fact
-				}
-			}
-
-			// Runtime facts
-			if machineFact.BasicFacts.RuntimeFacts != nil {
-				for factName, fact := range machineFact.BasicFacts.RuntimeFacts.Facts {
-					prefixedName := fmt.Sprintf("%s_%s", machineFact.Machine.Hostname, factName)
-					combinedFacts.BasicFacts.RuntimeFacts.Facts[prefixedName] = fact
-				}
-			}
-		}
-
-		// Add enhanced facts with machine prefix
-		if machineFact.EnhancedFacts != nil {
-			for factName, fact := range machineFact.EnhancedFacts.Facts {
-				prefixedName := fmt.Sprintf("%s_%s", machineFact.Machine.Hostname, factName)
-				combinedFacts.EnhancedFacts.Facts[prefixedName] = fact
-			}
-		}
-
-		// Add custom facts with machine prefix
-		if machineFact.CustomFacts != nil {
-			for factName, fact := range machineFact.CustomFacts.Facts {
-				prefixedName := fmt.Sprintf("%s_%s", machineFact.Machine.Hostname, factName)
-				combinedFacts.CustomFacts.Facts[prefixedName] = fact
-			}
-		}
+		g.processMachineFacts(machineFact, combinedFacts)
 	}
 
 	return combinedFacts, nil
+}
+
+// processMachineFacts processes all facts from a single machine
+func (g *Gatherer) processMachineFacts(machineFact *MachineFacts, combinedFacts *schemas.FactsV1) {
+	if machineFact.BasicFacts != nil {
+		g.processBasicFacts(machineFact.Machine.Hostname, machineFact.BasicFacts, combinedFacts.BasicFacts)
+	}
+
+	if machineFact.EnhancedFacts != nil {
+		g.processFactCategory(machineFact.Machine.Hostname, machineFact.EnhancedFacts.Facts, combinedFacts.EnhancedFacts.Facts)
+	}
+
+	if machineFact.CustomFacts != nil {
+		g.processFactCategory(machineFact.Machine.Hostname, machineFact.CustomFacts.Facts, combinedFacts.CustomFacts.Facts)
+	}
+}
+
+// processBasicFacts processes all basic fact categories for a machine
+func (g *Gatherer) processBasicFacts(hostname string, basicFacts *schemas.BasicFactsV1, combinedBasicFacts *schemas.BasicFactsV1) {
+	factCategories := map[string]map[string]*schemas.FactV1{
+		"system":   basicFacts.SystemFacts.Facts,
+		"hardware": basicFacts.HardwareFacts.Facts,
+		"network":  basicFacts.NetworkFacts.Facts,
+		"os":       basicFacts.OSFacts.Facts,
+		"user":     basicFacts.UserFacts.Facts,
+		"runtime":  basicFacts.RuntimeFacts.Facts,
+	}
+
+	targetCategories := map[string]map[string]*schemas.FactV1{
+		"system":   combinedBasicFacts.SystemFacts.Facts,
+		"hardware": combinedBasicFacts.HardwareFacts.Facts,
+		"network":  combinedBasicFacts.NetworkFacts.Facts,
+		"os":       combinedBasicFacts.OSFacts.Facts,
+		"user":     combinedBasicFacts.UserFacts.Facts,
+		"runtime":  combinedBasicFacts.RuntimeFacts.Facts,
+	}
+
+	for category, facts := range factCategories {
+		if facts != nil {
+			g.processFactCategory(hostname, facts, targetCategories[category])
+		}
+	}
+}
+
+// processFactCategory processes a category of facts with machine prefixing
+func (g *Gatherer) processFactCategory(hostname string, sourceFacts map[string]*schemas.FactV1, targetFacts map[string]*schemas.FactV1) {
+	for factName, fact := range sourceFacts {
+		prefixedName := g.createMachinePrefixedName(hostname, factName)
+		targetFacts[prefixedName] = fact
+	}
+}
+
+// createMachinePrefixedName creates a machine-prefixed fact name
+func (g *Gatherer) createMachinePrefixedName(hostname, factName string) string {
+	return fmt.Sprintf("%s_%s", hostname, factName)
 }
