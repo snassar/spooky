@@ -2,10 +2,12 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"spooky/internal/facts"
@@ -20,6 +22,220 @@ import (
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/spf13/cobra"
 )
+
+// ErrorType categorizes different types of errors for appropriate handling
+type ErrorType int
+
+const (
+	ErrorTypeTemporary ErrorType = iota
+	ErrorTypePermanent
+	ErrorTypeConfiguration
+)
+
+// categorizeError determines the type of error for appropriate handling strategy
+func categorizeError(err error) ErrorType {
+	errStr := strings.ToLower(err.Error())
+
+	// Temporary errors (network, timeouts, etc.) - should be retried
+	temporaryPatterns := []string{
+		"timeout", "connection refused", "connection reset",
+		"network unreachable", "temporary failure", "try again",
+		"connection timed out", "no route to host", "host is down",
+		"connection lost", "broken pipe", "i/o timeout",
+	}
+
+	// Configuration errors - need user intervention
+	configPatterns := []string{
+		"authentication failed", "permission denied", "invalid configuration",
+		"missing key", "invalid key", "unknown host", "host key verification failed",
+		"no such file or directory", "access denied", "invalid credentials",
+		"ssh: handshake failed", "ssh: no common algorithms",
+	}
+
+	for _, pattern := range temporaryPatterns {
+		if strings.Contains(errStr, pattern) {
+			return ErrorTypeTemporary
+		}
+	}
+
+	for _, pattern := range configPatterns {
+		if strings.Contains(errStr, pattern) {
+			return ErrorTypeConfiguration
+		}
+	}
+
+	return ErrorTypePermanent
+}
+
+// processFactsWithEnhancedErrorHandling implements comprehensive error handling with retry logic
+func processFactsWithEnhancedErrorHandling(ctx context.Context, gatherer *facts.Gatherer, machines []*schemas.MachinesMachineV1, logger *logging.Logger) error {
+	// Add timeout to context for the entire operation
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	defer cancel()
+
+	var (
+		successCount        = 0
+		temporaryErrorCount = 0
+		permanentErrorCount = 0
+		configErrorCount    = 0
+		retryableMachines   []*schemas.MachinesMachineV1
+		allMachineFacts     []*facts.MachineFacts
+	)
+
+	logger.Info("starting facts gathering with enhanced error handling",
+		slog.Int("total_machines", len(machines)))
+
+	// First attempt - gather facts from all machines
+	machineFacts, err := gatherer.GatherFactsFromMachines(ctx, machines)
+	if err != nil {
+		return fmt.Errorf("critical failure during facts gathering: %w", err)
+	}
+
+	allMachineFacts = machineFacts
+
+	// Categorize errors and identify retryable machines
+	for _, machineFact := range machineFacts {
+		if machineFact.Error != nil {
+			errorType := categorizeError(machineFact.Error)
+			switch errorType {
+			case ErrorTypeTemporary:
+				logger.Warn("temporary error gathering facts",
+					slog.String("hostname", machineFact.Machine.Hostname),
+					slog.String("error", machineFact.Error.Error()),
+					slog.String("action", "will_retry"))
+				temporaryErrorCount++
+				retryableMachines = append(retryableMachines, machineFact.Machine)
+
+			case ErrorTypePermanent:
+				logger.Error("permanent error gathering facts",
+					slog.String("hostname", machineFact.Machine.Hostname),
+					slog.String("error", machineFact.Error.Error()),
+					slog.String("action", "skip"))
+				permanentErrorCount++
+
+			case ErrorTypeConfiguration:
+				logger.Error("configuration error - check machine settings",
+					slog.String("hostname", machineFact.Machine.Hostname),
+					slog.String("error", machineFact.Error.Error()),
+					slog.String("suggestion", "verify SSH configuration, keys, and network connectivity"))
+				configErrorCount++
+			}
+		} else {
+			successCount++
+			logger.Info("✅ successfully gathered facts from machine",
+				slog.String("hostname", machineFact.Machine.Hostname))
+		}
+	}
+
+	// Retry logic for temporary failures
+	if len(retryableMachines) > 0 {
+		logger.Info("retrying machines with temporary failures",
+			slog.Int("retry_count", len(retryableMachines)),
+			slog.String("retry_delay", "5s"))
+
+		// Brief delay before retry to allow network conditions to improve
+		time.Sleep(5 * time.Second)
+
+		// Check if context is still valid
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("context cancelled during retry: %w", ctx.Err())
+		default:
+		}
+
+		retryFacts, err := gatherer.GatherFactsFromMachines(ctx, retryableMachines)
+		if err != nil {
+			logger.Warn("retry attempt failed",
+				slog.String("error", err.Error()),
+				slog.Int("machines_affected", len(retryableMachines)))
+		} else {
+			// Process retry results and update counts
+			for _, retryFact := range retryFacts {
+				if retryFact.Error == nil {
+					successCount++
+					temporaryErrorCount--
+					logger.Info("✅ retry successful",
+						slog.String("hostname", retryFact.Machine.Hostname))
+
+					// Update the original machine facts with successful retry
+					for j, originalFact := range allMachineFacts {
+						if originalFact.Machine.Hostname == retryFact.Machine.Hostname {
+							allMachineFacts[j] = retryFact
+							break
+						}
+					}
+				} else {
+					// Categorize retry failure
+					errorType := categorizeError(retryFact.Error)
+					switch errorType {
+					case ErrorTypeTemporary:
+						logger.Warn("retry failed - still temporary error",
+							slog.String("hostname", retryFact.Machine.Hostname),
+							slog.String("error", retryFact.Error.Error()))
+					case ErrorTypeConfiguration:
+						logger.Error("retry revealed configuration error",
+							slog.String("hostname", retryFact.Machine.Hostname),
+							slog.String("error", retryFact.Error.Error()))
+						configErrorCount++
+						temporaryErrorCount--
+					default:
+						logger.Error("retry failed - permanent error",
+							slog.String("hostname", retryFact.Machine.Hostname),
+							slog.String("error", retryFact.Error.Error()))
+						permanentErrorCount++
+						temporaryErrorCount--
+					}
+				}
+			}
+		}
+	}
+
+	// Final summary with actionable information
+	totalFailures := temporaryErrorCount + permanentErrorCount + configErrorCount
+	logger.Info("facts gathering completed",
+		slog.Int("successful", successCount),
+		slog.Int("temporary_failures", temporaryErrorCount),
+		slog.Int("permanent_failures", permanentErrorCount),
+		slog.Int("configuration_errors", configErrorCount),
+		slog.Int("total_machines", len(machines)),
+		slog.Float64("success_rate", float64(successCount)/float64(len(machines))*100))
+
+	// Provide actionable recommendations based on error types
+	if configErrorCount > 0 {
+		logger.Warn("configuration errors detected",
+			slog.Int("count", configErrorCount),
+			slog.String("recommendation", "check SSH keys, authentication, and network connectivity"))
+	}
+
+	if temporaryErrorCount > 0 {
+		logger.Warn("temporary failures detected",
+			slog.Int("count", temporaryErrorCount),
+			slog.String("recommendation", "check network stability and machine availability"))
+	}
+
+	// Fail if all machines failed
+	if successCount == 0 {
+		return errors.New("failed to gather facts from any machine - check configurations and network connectivity")
+	}
+
+	// Warn if significant failure rate
+	failureRate := float64(totalFailures) / float64(len(machines))
+	if failureRate > 0.5 {
+		logger.Warn("high failure rate detected",
+			slog.Float64("failure_rate", failureRate*100),
+			slog.String("recommendation", "investigate network connectivity and machine configurations"))
+	}
+
+	// Success with warnings if some machines failed
+	if totalFailures > 0 {
+		logger.Warn("facts gathering completed with some failures",
+			slog.Int("successful", successCount),
+			slog.Int("failed", totalFailures),
+			slog.String("note", "proceeding with successful machines only"))
+	}
+
+	return nil
+}
 
 var factsCmd = &cobra.Command{
 	Use:   "facts",
@@ -78,33 +294,20 @@ var gatherFactsCmd = &cobra.Command{
 
 		logger.Info("Gathering facts from machines", slog.Int("machine_count", len(machines)))
 
-		// Gather facts from all machines
+		// Gather facts from all machines with enhanced error handling
 		ctx := context.Background()
-		machineFacts, err := gatherer.GatherFactsFromMachines(ctx, machines)
+		err = processFactsWithEnhancedErrorHandling(ctx, gatherer, machines, logger)
 		if err != nil {
-			logger.Error("failed to gather facts from machines", slog.String("error", err.Error()))
+			logger.Error("facts gathering failed", slog.String("error", err.Error()))
 			os.Exit(1)
 		}
 
-		// Process results
-		successCount := 0
-		errorCount := 0
-		for _, machineFact := range machineFacts {
-			if machineFact.Error != nil {
-				logger.Error("❌ Failed to gather facts from machine",
-					slog.String("hostname", machineFact.Machine.Hostname),
-					slog.String("error", machineFact.Error.Error()))
-				errorCount++
-			} else {
-				logger.Info("✅ Successfully gathered facts from machine",
-					slog.String("hostname", machineFact.Machine.Hostname))
-				successCount++
-			}
+		// Re-gather facts for successful machines only (for export)
+		machineFacts, err := gatherer.GatherFactsFromMachines(ctx, machines)
+		if err != nil {
+			logger.Error("failed to gather facts for export", slog.String("error", err.Error()))
+			os.Exit(1)
 		}
-
-		logger.Info("Facts gathering completed",
-			slog.Int("successful", successCount),
-			slog.Int("failed", errorCount))
 
 		// Export facts to HCL
 		combinedFacts, err := gatherer.ExportFacts(machineFacts)
@@ -193,33 +396,20 @@ If no output file is specified, the facts will be exported to 'exported-facts.hc
 
 		logger.Info("Gathering facts from machines for export", slog.Int("machine_count", len(machines)))
 
-		// Gather facts from all machines
+		// Gather facts from all machines with enhanced error handling
 		ctx := context.Background()
-		machineFacts, err := gatherer.GatherFactsFromMachines(ctx, machines)
+		err = processFactsWithEnhancedErrorHandling(ctx, gatherer, machines, logger)
 		if err != nil {
-			logger.Error("failed to gather facts from machines", slog.String("error", err.Error()))
+			logger.Error("facts gathering failed", slog.String("error", err.Error()))
 			os.Exit(1)
 		}
 
-		// Process results
-		successCount := 0
-		errorCount := 0
-		for _, machineFact := range machineFacts {
-			if machineFact.Error != nil {
-				logger.Error("❌ Failed to gather facts from machine",
-					slog.String("hostname", machineFact.Machine.Hostname),
-					slog.String("error", machineFact.Error.Error()))
-				errorCount++
-			} else {
-				logger.Info("✅ Successfully gathered facts from machine",
-					slog.String("hostname", machineFact.Machine.Hostname))
-				successCount++
-			}
+		// Re-gather facts for successful machines only (for export)
+		machineFacts, err := gatherer.GatherFactsFromMachines(ctx, machines)
+		if err != nil {
+			logger.Error("failed to gather facts for export", slog.String("error", err.Error()))
+			os.Exit(1)
 		}
-
-		logger.Info("Facts gathering completed",
-			slog.Int("successful", successCount),
-			slog.Int("failed", errorCount))
 
 		// Export facts to HCL
 		combinedFacts, err := gatherer.ExportFacts(machineFacts)
@@ -238,14 +428,8 @@ If no output file is specified, the facts will be exported to 'exported-facts.hc
 		}
 
 		logger.Info("Facts exported successfully",
-			slog.String("output_file", outputFile),
-			slog.Int("successful_machines", successCount),
-			slog.Int("failed_machines", errorCount))
+			slog.String("output_file", outputFile))
 		fmt.Printf("✅ Facts exported successfully to %s\n", outputFile)
-		fmt.Printf("   Successfully gathered from %d machines\n", successCount)
-		if errorCount > 0 {
-			fmt.Printf("   Failed to gather from %d machines\n", errorCount)
-		}
 	},
 }
 
