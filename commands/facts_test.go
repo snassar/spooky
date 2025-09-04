@@ -1,7 +1,11 @@
 package commands
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
+
+	"spooky/internal/schemas"
 )
 
 func TestExtractResourceBlock_Facts(t *testing.T) {
@@ -51,7 +55,7 @@ func TestGetMachinesFromConfig(t *testing.T) {
 	})
 }
 
-func TestWriteFactsToFile(t *testing.T) {
+func TestWriteFactsToFileExists(t *testing.T) {
 	// This test would require creating actual facts structures
 	// For now, we'll test that the function exists
 	t.Run("function exists", func(t *testing.T) {
@@ -127,4 +131,151 @@ func TestCreateMachinePrefixedName(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestWriteFactsToFile tests the writeFactsToFile function with minimal facts data
+func TestWriteFactsToFile(t *testing.T) {
+	// Create a temporary directory for test files
+	tempDir := t.TempDir()
+	outputPath := filepath.Join(tempDir, "test-facts.hcl")
+
+	// Create minimal test facts data - just test that the function can be called
+	// The actual HCL generation is tested by the real facts gathering process
+	facts := &schemas.FactsV1{
+		BasicFacts: &schemas.BasicFactsV1{
+			SystemFacts: &schemas.SystemFactsV1{
+				Facts: make(map[string]*schemas.FactV1),
+			},
+		},
+		EnhancedFacts: &schemas.EnhancedFactsV1{
+			Facts: make(map[string]*schemas.FactV1),
+		},
+		CustomFacts: &schemas.CustomFactsV1{
+			Facts: make(map[string]*schemas.FactV1),
+		},
+	}
+
+	// Test writing facts to file
+	err := writeFactsToFile(facts, outputPath)
+	if err != nil {
+		t.Fatalf("writeFactsToFile failed: %v", err)
+	}
+
+	// Verify file was created
+	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
+		t.Fatalf("Output file was not created: %s", outputPath)
+	}
+
+	// Read and verify file content
+	content, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("Failed to read output file: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Verify file contains expected content
+	if !containsString(contentStr, "# Facts gathered by spooky") {
+		t.Error("File should contain header comment")
+	}
+
+	if !containsString(contentStr, "facts") {
+		t.Error("File should contain facts block")
+	}
+}
+
+// TestWriteFactsToFileWithDirectory tests writing facts to a file in a non-existent directory
+func TestWriteFactsToFileWithDirectory(t *testing.T) {
+	// Create a temporary directory for test files
+	tempDir := t.TempDir()
+	outputDir := filepath.Join(tempDir, "subdir")
+	outputPath := filepath.Join(outputDir, "test-facts.hcl")
+
+	// Create minimal test facts data
+	facts := &schemas.FactsV1{
+		BasicFacts: &schemas.BasicFactsV1{
+			SystemFacts: &schemas.SystemFactsV1{
+				Facts: make(map[string]*schemas.FactV1),
+			},
+		},
+	}
+
+	// Test writing facts to file in non-existent directory
+	err := writeFactsToFile(facts, outputPath)
+	if err != nil {
+		t.Fatalf("writeFactsToFile failed: %v", err)
+	}
+
+	// Verify directory was created
+	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
+		t.Fatalf("Output directory was not created: %s", outputDir)
+	}
+
+	// Verify file was created
+	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
+		t.Fatalf("Output file was not created: %s", outputPath)
+	}
+}
+
+// TestExportFactsCmdStructure tests that the exportFactsCmd is properly structured
+func TestExportFactsCmdStructure(t *testing.T) {
+	// Test that the command exists and has the correct structure
+	if exportFactsCmd == nil {
+		t.Fatal("exportFactsCmd should not be nil")
+	}
+
+	// Test command properties
+	if exportFactsCmd.Use != "export [output-file]" {
+		t.Errorf("Expected Use to be 'export [output-file]', got %q", exportFactsCmd.Use)
+	}
+
+	if exportFactsCmd.Short == "" {
+		t.Error("Short description should not be empty")
+	}
+
+	if exportFactsCmd.Long == "" {
+		t.Error("Long description should not be empty")
+	}
+
+	if exportFactsCmd.Run == nil {
+		t.Error("Run function should not be nil")
+	}
+}
+
+// TestExportFactsCmdHelp tests that the command help text is informative
+func TestExportFactsCmdHelp(t *testing.T) {
+	// Test that help text contains expected information
+	helpText := exportFactsCmd.Long
+
+	expectedKeywords := []string{
+		"gather",
+		"machines",
+		"HCL",
+		"export",
+		"exported-facts.hcl",
+	}
+
+	for _, keyword := range expectedKeywords {
+		if !containsString(helpText, keyword) {
+			t.Errorf("Help text should contain %q", keyword)
+		}
+	}
+}
+
+// containsString is a helper function to check if a string contains a substring
+func containsString(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		(len(s) > len(substr) && (s[:len(substr)] == substr ||
+			s[len(s)-len(substr):] == substr ||
+			containsSubstringHelper(s, substr))))
+}
+
+// containsSubstringHelper is a helper function to check substring containment
+func containsSubstringHelper(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

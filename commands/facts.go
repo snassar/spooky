@@ -133,12 +133,119 @@ var gatherFactsCmd = &cobra.Command{
 
 var exportFactsCmd = &cobra.Command{
 	Use:   "export [output-file]",
-	Short: "Export gathered facts to HCL format",
+	Short: "Gather facts from machines and export to HCL format",
+	Long: `Gather facts from all configured machines and export them to HCL format.
+
+This command performs the same fact gathering as 'spooky facts gather' but exports
+the collected facts to a specified HCL file instead of the default facts.hcl.
+This is useful for:
+- Creating multiple fact exports with different names
+- Exporting facts to specific locations
+- Creating backups of gathered facts
+
+If no output file is specified, the facts will be exported to 'exported-facts.hcl'.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := logging.GetGlobalLogger()
-		// This would be used to export facts that were previously gathered
-		// For now, it's a placeholder
-		logger.Info("Export command not yet implemented")
+		logger.Debug("exportFactsCmd started")
+
+		// Determine output file
+		outputFile := "exported-facts.hcl"
+		if len(args) > 0 {
+			outputFile = args[0]
+		}
+
+		// Load project configuration
+		projectConfig, err := loadProjectConfig()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error loading project config: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Load SSH configuration
+		sshConfig, err := loadSSHConfig()
+		if err != nil {
+			logger.Error("failed to load SSH configuration", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+
+		// Create SSH manager
+		sshManager := ssh.NewSimpleSSHManager(nil, sshConfig)
+
+		// Create facts gatherer
+		gatherer := facts.NewGatherer(sshManager, projectConfig)
+
+		// Get machines from configuration
+		logger.Debug("about to call getMachinesFromConfig")
+		machines, err := getMachinesFromConfig()
+		logger.Debug("getMachinesFromConfig completed",
+			slog.Int("machine_count", len(machines)),
+			slog.String("error", fmt.Sprintf("%v", err)))
+		if err != nil {
+			logger.Error("failed to get machines from configuration", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+
+		if len(machines) == 0 {
+			logger.Info("No machines configured for facts gathering")
+			fmt.Fprintf(os.Stderr, "Error: No machines configured for facts gathering\n")
+			os.Exit(1)
+		}
+
+		logger.Info("Gathering facts from machines for export", slog.Int("machine_count", len(machines)))
+
+		// Gather facts from all machines
+		ctx := context.Background()
+		machineFacts, err := gatherer.GatherFactsFromMachines(ctx, machines)
+		if err != nil {
+			logger.Error("failed to gather facts from machines", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+
+		// Process results
+		successCount := 0
+		errorCount := 0
+		for _, machineFact := range machineFacts {
+			if machineFact.Error != nil {
+				logger.Error("❌ Failed to gather facts from machine",
+					slog.String("hostname", machineFact.Machine.Hostname),
+					slog.String("error", machineFact.Error.Error()))
+				errorCount++
+			} else {
+				logger.Info("✅ Successfully gathered facts from machine",
+					slog.String("hostname", machineFact.Machine.Hostname))
+				successCount++
+			}
+		}
+
+		logger.Info("Facts gathering completed",
+			slog.Int("successful", successCount),
+			slog.Int("failed", errorCount))
+
+		// Export facts to HCL
+		combinedFacts, err := gatherer.ExportFacts(machineFacts)
+		if err != nil {
+			logger.Error("failed to export facts", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+
+		// Write facts to specified output file
+		err = writeFactsToFile(combinedFacts, outputFile)
+		if err != nil {
+			logger.Error("failed to write facts to file",
+				slog.String("file", outputFile),
+				slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+
+		logger.Info("Facts exported successfully",
+			slog.String("output_file", outputFile),
+			slog.Int("successful_machines", successCount),
+			slog.Int("failed_machines", errorCount))
+		fmt.Printf("✅ Facts exported successfully to %s\n", outputFile)
+		fmt.Printf("   Successfully gathered from %d machines\n", successCount)
+		if errorCount > 0 {
+			fmt.Printf("   Failed to gather from %d machines\n", errorCount)
+		}
 	},
 }
 
