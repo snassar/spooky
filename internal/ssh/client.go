@@ -589,23 +589,52 @@ func (sc *SSHClient) createSSHConfig() (*ssh.ClientConfig, error) {
 
 // loadPrivateKey loads and decrypts the private key
 func (sc *SSHClient) loadPrivateKey() (ssh.Signer, error) {
-	var keyData []byte
-	var err error
+	// Extract key data from configuration
+	keyData, err := sc.extractKeyData()
+	if err != nil {
+		return nil, err
+	}
 
+	// Validate key data and reject legacy formats
+	if err := sc.validateKeyData(keyData); err != nil {
+		return nil, err
+	}
+
+	// Try modern SSH parsing first (supports PKCS#8 and other encrypted formats)
+	if sc.config.Passphrase != "" {
+		signer, err := sc.tryModernParsing(keyData)
+		if err == nil {
+			return signer, nil
+		}
+		// Modern parsing failed, will try unencrypted formats below
+	}
+
+	// Parse PEM block and handle different types
+	return sc.parsePEMBlock(keyData)
+}
+
+// extractKeyData extracts key data from configuration (file path or direct data)
+func (sc *SSHClient) extractKeyData() ([]byte, error) {
 	if sc.config.PrivateKeyPath != "" {
-		keyData, err = os.ReadFile(sc.config.PrivateKeyPath)
+		keyData, err := os.ReadFile(sc.config.PrivateKeyPath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to read private key file: %s - authentication cannot proceed", sc.config.PrivateKeyPath)
 		}
-	} else if len(sc.config.PrivateKeyData) > 0 {
-		keyData = sc.config.PrivateKeyData
-	} else {
-		return nil, errors.New("no private key provided - authentication configuration is incomplete")
+		return keyData, nil
 	}
 
+	if len(sc.config.PrivateKeyData) > 0 {
+		return sc.config.PrivateKeyData, nil
+	}
+
+	return nil, errors.New("no private key provided - authentication configuration is incomplete")
+}
+
+// validateKeyData validates key data and rejects legacy DES-encrypted formats
+func (sc *SSHClient) validateKeyData(keyData []byte) error {
 	// Security-critical: Validate key data
 	if len(keyData) == 0 {
-		return nil, errors.New("private key data is empty - authentication cannot proceed")
+		return errors.New("private key data is empty - authentication cannot proceed")
 	}
 
 	// Check for legacy DES-encrypted traditional keys first and reject them
@@ -616,47 +645,54 @@ func (sc *SSHClient) loadPrivateKey() (ssh.Signer, error) {
 			// Legacy encrypted keys have "Proc-Type: 4,ENCRYPTED" in their headers
 			if block.Headers != nil {
 				if procType, exists := block.Headers["Proc-Type"]; exists && procType == "4,ENCRYPTED" {
-					return nil, errors.New("legacy DES-encrypted traditional keys are no longer supported - please convert to PKCS#8 or OpenSSH format")
+					return errors.New("legacy DES-encrypted traditional keys are no longer supported - please convert to PKCS#8 or OpenSSH format")
 				}
 			}
 		}
 	}
 
-	// Try modern SSH parsing first (supports PKCS#8 and other encrypted formats)
-	if sc.config.Passphrase != "" {
-		// Try parsing with passphrase first - this handles PKCS#8 and other modern formats
-		signer, err := ssh.ParsePrivateKeyWithPassphrase(keyData, []byte(sc.config.Passphrase))
+	return nil
+}
+
+// tryModernParsing attempts modern SSH parsing with passphrase and custom PKCS#8 decryption
+func (sc *SSHClient) tryModernParsing(keyData []byte) (ssh.Signer, error) {
+	// Try parsing with passphrase first - this handles PKCS#8 and other modern formats
+	signer, err := ssh.ParsePrivateKeyWithPassphrase(keyData, []byte(sc.config.Passphrase))
+	if err == nil {
+		return signer, nil
+	}
+
+	// If that fails, try our custom PKCS#8 decryption
+	logger := logging.GetGlobalLogger()
+	logger.Debug("Modern SSH parsing failed, trying custom PKCS#8 decryption",
+		slog.String("error", err.Error()))
+
+	// Try custom PKCS#8 decryption for ENCRYPTED PRIVATE KEY format
+	decryptedKey, err := sc.decryptPKCS8Key(keyData, sc.config.Passphrase)
+	if err == nil {
+		// Parse the decrypted key
+		signer, err := ssh.ParsePrivateKey(decryptedKey)
 		if err == nil {
 			return signer, nil
 		}
-
-		// If that fails, try our custom PKCS#8 decryption
-		logger := logging.GetGlobalLogger()
-		logger.Debug("Modern SSH parsing failed, trying custom PKCS#8 decryption",
-			slog.String("error", err.Error()))
-
-		// Try custom PKCS#8 decryption for ENCRYPTED PRIVATE KEY format
-		decryptedKey, err := sc.decryptPKCS8Key(keyData, sc.config.Passphrase)
-		if err == nil {
-			// Parse the decrypted key
-			signer, err := ssh.ParsePrivateKey(decryptedKey)
-			if err == nil {
-				return signer, nil
-			}
-			logger.Debug("Failed to parse decrypted PKCS#8 key", slog.String("error", err.Error()))
-		} else {
-			logger.Debug("Custom PKCS#8 decryption failed", slog.String("error", err.Error()))
-		}
-
-		// Modern parsing failed, will try unencrypted formats below
-		logger.Debug("Modern parsing failed, will try unencrypted formats")
+		logger.Debug("Failed to parse decrypted PKCS#8 key", slog.String("error", err.Error()))
+	} else {
+		logger.Debug("Custom PKCS#8 decryption failed", slog.String("error", err.Error()))
 	}
 
+	// Modern parsing failed, will try unencrypted formats below
+	logger.Debug("Modern parsing failed, will try unencrypted formats")
+	return nil, err
+}
+
+// parsePEMBlock parses PEM block and handles different key types
+func (sc *SSHClient) parsePEMBlock(keyData []byte) (ssh.Signer, error) {
 	// Parse PEM to get block and handle rest data
 	block, rest := pem.Decode(keyData)
 	if block == nil {
 		return nil, errors.New("failed to decode PEM block - private key format is invalid")
 	}
+
 	if len(rest) > 0 {
 		// Log warning about extra data but continue
 		logger := logging.GetGlobalLogger()
@@ -664,43 +700,61 @@ func (sc *SSHClient) loadPrivateKey() (ssh.Signer, error) {
 			slog.Int("extra_bytes", len(rest)))
 	}
 
-	// Handle different PEM block types directly
+	// Handle different PEM block types
+	return sc.handlePEMBlockType(block)
+}
+
+// handlePEMBlockType handles specific PEM block types
+func (sc *SSHClient) handlePEMBlockType(block *pem.Block) (ssh.Signer, error) {
 	switch block.Type {
 	case "RSA PRIVATE KEY", "DSA PRIVATE KEY", "EC PRIVATE KEY":
 		// Traditional private keys - only support unencrypted format
 		// Legacy DES-encrypted keys are already rejected earlier in the function
-
-		// Parse the unencrypted key
-		signer, err := ssh.ParsePrivateKey(pem.EncodeToMemory(block))
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to parse traditional private key - key format may be corrupted")
-		}
-		return signer, nil
+		return sc.parseTraditionalKey(block)
 
 	case "OPENSSH PRIVATE KEY":
 		// OpenSSH format - try parsing directly
-		signer, err := ssh.ParsePrivateKey(pem.EncodeToMemory(block))
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to parse OpenSSH private key - key format may be corrupted")
-		}
-		return signer, nil
+		return sc.parseOpenSSHKey(block)
 
 	case "PRIVATE KEY":
 		// PKCS#8 format - try parsing directly first
-		signer, err := ssh.ParsePrivateKey(pem.EncodeToMemory(block))
-		if err != nil {
-			// If direct parsing fails, it might be encrypted PKCS#8
-			logger := logging.GetGlobalLogger()
-			logger.Debug("PKCS#8 parsing failed, may be encrypted", slog.String("error", err.Error()))
-			return nil, errors.New("encrypted PKCS#8 keys should be handled by ParsePrivateKeyWithPassphrase")
-		}
-		return signer, nil
+		return sc.parsePKCS8Key(block)
 
 	default:
 		logger := logging.GetGlobalLogger()
 		logger.Debug("Unknown PEM block type", slog.String("type", block.Type))
 		return nil, errors.Errorf("unsupported PEM block type: %s - private key format is not supported", block.Type)
 	}
+}
+
+// parseTraditionalKey parses traditional private key formats (RSA, DSA, EC)
+func (sc *SSHClient) parseTraditionalKey(block *pem.Block) (ssh.Signer, error) {
+	signer, err := ssh.ParsePrivateKey(pem.EncodeToMemory(block))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse traditional private key - key format may be corrupted")
+	}
+	return signer, nil
+}
+
+// parseOpenSSHKey parses OpenSSH private key format
+func (sc *SSHClient) parseOpenSSHKey(block *pem.Block) (ssh.Signer, error) {
+	signer, err := ssh.ParsePrivateKey(pem.EncodeToMemory(block))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse OpenSSH private key - key format may be corrupted")
+	}
+	return signer, nil
+}
+
+// parsePKCS8Key parses PKCS#8 private key format
+func (sc *SSHClient) parsePKCS8Key(block *pem.Block) (ssh.Signer, error) {
+	signer, err := ssh.ParsePrivateKey(pem.EncodeToMemory(block))
+	if err != nil {
+		// If direct parsing fails, it might be encrypted PKCS#8
+		logger := logging.GetGlobalLogger()
+		logger.Debug("PKCS#8 parsing failed, may be encrypted", slog.String("error", err.Error()))
+		return nil, errors.New("encrypted PKCS#8 keys should be handled by ParsePrivateKeyWithPassphrase")
+	}
+	return signer, nil
 }
 
 // OID constants for PKCS#8 encryption

@@ -120,89 +120,99 @@ func (sm *SimpleSSHManager) RunCommandOnMachine(ctx context.Context, machine *sc
 func (sm *SimpleSSHManager) setupAuthentication(config *SSHConfig, machine *schemas.MachinesMachineV1) error {
 	auth := machine.Authentication
 
-	// Check if we have public key authentication
-	if auth.PublicKeyPath != "" {
-		config.PrivateKeyPath = auth.PublicKeyPath
-
-		// Handle passphrase if present
-		if auth.Passphrase.Value != "" {
-			passphrase := auth.Passphrase.Value
-
-			// Decrypt passphrase if it's encrypted
-			if auth.Passphrase.Encrypted {
-				if sm.ageEncryption == nil {
-					return errors.New("encrypted passphrase requires age encryption, but encryption is not available")
-				}
-				if sm.ageEncryption.IsEncrypted(passphrase) {
-					decrypted, err := sm.ageEncryption.Decrypt(passphrase)
-					if err != nil {
-						return errors.Wrap(err, "failed to decrypt SSH key passphrase")
-					}
-					passphrase = decrypted
-				} else {
-					return errors.New("passphrase marked as encrypted but does not appear to be age-encrypted")
-				}
-			}
-
-			config.Passphrase = passphrase
-		}
+	// Try public key authentication first
+	if err := sm.setupPublicKeyAuth(config, &auth); err == nil {
 		return nil
 	}
 
-	// Check if we have password authentication
-	if auth.Password.Value != "" {
-		passphrase := auth.Password.Value
-
-		// Decrypt password if it's encrypted
-		if auth.Password.Encrypted {
-			if sm.ageEncryption == nil {
-				return errors.New("encrypted password requires age encryption, but encryption is not available")
-			}
-			if sm.ageEncryption.IsEncrypted(passphrase) {
-				decrypted, err := sm.ageEncryption.Decrypt(passphrase)
-				if err != nil {
-					return errors.Wrap(err, "failed to decrypt SSH password")
-				}
-				passphrase = decrypted
-			} else {
-				return errors.New("password marked as encrypted but does not appear to be age-encrypted")
-			}
-		}
-
-		config.Password = passphrase
+	// Try password authentication
+	if err := sm.setupPasswordAuth(config, &auth); err == nil {
 		return nil
 	}
 
-	// Check if we have certificate authentication
-	if auth.PrivateKeyPath != "" && auth.CertificatePath != "" {
-		config.PrivateKeyPath = auth.PrivateKeyPath
-
-		// Handle certificate passphrase if present
-		if auth.CertificatePassphrase.Value != "" {
-			passphrase := auth.CertificatePassphrase.Value
-
-			// Decrypt passphrase if it's encrypted
-			if auth.CertificatePassphrase.Encrypted {
-				if sm.ageEncryption == nil {
-					return errors.New("encrypted certificate passphrase requires age encryption, but encryption is not available")
-				}
-				if sm.ageEncryption.IsEncrypted(passphrase) {
-					decrypted, err := sm.ageEncryption.Decrypt(passphrase)
-					if err != nil {
-						return errors.Wrap(err, "failed to decrypt certificate passphrase")
-					}
-					passphrase = decrypted
-				} else {
-					return errors.New("certificate passphrase marked as encrypted but does not appear to be age-encrypted")
-				}
-			}
-
-			config.Passphrase = passphrase
-		}
+	// Try certificate authentication
+	if err := sm.setupCertificateAuth(config, &auth); err == nil {
 		return nil
 	}
 
 	return errors.New("no valid authentication method found")
+}
+
+// setupPublicKeyAuth configures public key authentication
+func (sm *SimpleSSHManager) setupPublicKeyAuth(config *SSHConfig, auth *schemas.MachinesMachineAuthenticationV1) error {
+	if auth.PublicKeyPath == "" {
+		return errors.New("no public key path provided")
+	}
+
+	config.PrivateKeyPath = auth.PublicKeyPath
+
+	// Handle passphrase if present
+	if auth.Passphrase.Value != "" {
+		passphrase, err := sm.decryptCredential(auth.Passphrase.Value, auth.Passphrase.Encrypted, "SSH key passphrase")
+		if err != nil {
+			return err
+		}
+		config.Passphrase = passphrase
+	}
+
+	return nil
+}
+
+// setupPasswordAuth configures password authentication
+func (sm *SimpleSSHManager) setupPasswordAuth(config *SSHConfig, auth *schemas.MachinesMachineAuthenticationV1) error {
+	if auth.Password.Value == "" {
+		return errors.New("no password provided")
+	}
+
+	password, err := sm.decryptCredential(auth.Password.Value, auth.Password.Encrypted, "SSH password")
+	if err != nil {
+		return err
+	}
+
+	config.Password = password
+	return nil
+}
+
+// setupCertificateAuth configures certificate authentication
+func (sm *SimpleSSHManager) setupCertificateAuth(config *SSHConfig, auth *schemas.MachinesMachineAuthenticationV1) error {
+	if auth.PrivateKeyPath == "" || auth.CertificatePath == "" {
+		return errors.New("certificate authentication requires both private key and certificate paths")
+	}
+
+	config.PrivateKeyPath = auth.PrivateKeyPath
+
+	// Handle certificate passphrase if present
+	if auth.CertificatePassphrase.Value != "" {
+		passphrase, err := sm.decryptCredential(auth.CertificatePassphrase.Value, auth.CertificatePassphrase.Encrypted, "certificate passphrase")
+		if err != nil {
+			return err
+		}
+		config.Passphrase = passphrase
+	}
+
+	return nil
+}
+
+// decryptCredential handles decryption of credentials if they are encrypted
+func (sm *SimpleSSHManager) decryptCredential(value string, encrypted bool, credentialType string) (string, error) {
+	if !encrypted {
+		return value, nil
+	}
+
+	if sm.ageEncryption == nil {
+		return "", errors.Errorf("encrypted %s requires age encryption, but encryption is not available", credentialType)
+	}
+
+	if !sm.ageEncryption.IsEncrypted(value) {
+		return "", errors.Errorf("%s marked as encrypted but does not appear to be age-encrypted", credentialType)
+	}
+
+	decrypted, err := sm.ageEncryption.Decrypt(value)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to decrypt %s", credentialType)
+	}
+
+	return decrypted, nil
 }
 
 // TestConnection tests the SSH connection to a machine

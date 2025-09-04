@@ -242,6 +242,254 @@ func TestSSHClient_LoadPrivateKeyWithPassphrase(t *testing.T) {
 	})
 }
 
+// Test helper functions for loadPrivateKey refactoring
+func TestSSHClient_ExtractKeyData(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "ssh-test-extract")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	// Generate a test RSA key
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	// Create test key data
+	block := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	}
+	pemData := pem.EncodeToMemory(block)
+
+	t.Run("From File Path", func(t *testing.T) {
+		// Write to temporary file
+		keyPath := filepath.Join(tempDir, "test_key.pem")
+		err := os.WriteFile(keyPath, pemData, 0600)
+		require.NoError(t, err)
+
+		client := &SSHClient{
+			config: &SSHConfig{
+				PrivateKeyPath: keyPath,
+			},
+		}
+
+		keyData, err := client.extractKeyData()
+		assert.NoError(t, err)
+		assert.Equal(t, pemData, keyData)
+	})
+
+	t.Run("From Direct Data", func(t *testing.T) {
+		client := &SSHClient{
+			config: &SSHConfig{
+				PrivateKeyData: pemData,
+			},
+		}
+
+		keyData, err := client.extractKeyData()
+		assert.NoError(t, err)
+		assert.Equal(t, pemData, keyData)
+	})
+
+	t.Run("No Key Provided", func(t *testing.T) {
+		client := &SSHClient{
+			config: &SSHConfig{},
+		}
+
+		_, err := client.extractKeyData()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no private key provided")
+	})
+
+	t.Run("File Not Found", func(t *testing.T) {
+		client := &SSHClient{
+			config: &SSHConfig{
+				PrivateKeyPath: "/nonexistent/path/key.pem",
+			},
+		}
+
+		_, err := client.extractKeyData()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to read private key file")
+	})
+}
+
+func TestSSHClient_ValidateKeyData(t *testing.T) {
+	// Generate a test RSA key
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	client := &SSHClient{}
+
+	t.Run("Valid Key Data", func(t *testing.T) {
+		block := &pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+		}
+		pemData := pem.EncodeToMemory(block)
+
+		err := client.validateKeyData(pemData)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Empty Key Data", func(t *testing.T) {
+		err := client.validateKeyData([]byte{})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "private key data is empty")
+	})
+
+	t.Run("Legacy DES Encrypted Key", func(t *testing.T) {
+		// Create legacy encrypted PEM block
+		encryptedBlock := createLegacyEncryptedPEMBlock("RSA PRIVATE KEY", x509.MarshalPKCS1PrivateKey(privateKey))
+		pemData := pem.EncodeToMemory(encryptedBlock)
+
+		err := client.validateKeyData(pemData)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "legacy DES-encrypted traditional keys are no longer supported")
+	})
+
+	t.Run("Non-Legacy Encrypted Key", func(t *testing.T) {
+		// Create encrypted PEM block without legacy headers
+		block := &pem.Block{
+			Type: "RSA PRIVATE KEY",
+			Headers: map[string]string{
+				"DEK-Info": "AES-256-CBC,0123456789ABCDEF", // Modern encryption
+			},
+			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+		}
+		pemData := pem.EncodeToMemory(block)
+
+		err := client.validateKeyData(pemData)
+		assert.NoError(t, err) // Should pass validation
+	})
+}
+
+func TestSSHClient_ParsePEMBlock(t *testing.T) {
+	// Generate a test RSA key
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	client := &SSHClient{}
+
+	t.Run("Valid RSA Key", func(t *testing.T) {
+		block := &pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+		}
+		pemData := pem.EncodeToMemory(block)
+
+		signer, err := client.parsePEMBlock(pemData)
+		assert.NoError(t, err)
+		assert.NotNil(t, signer)
+		assert.Equal(t, "ssh-rsa", signer.PublicKey().Type())
+	})
+
+	t.Run("Invalid PEM Data", func(t *testing.T) {
+		invalidData := []byte("not a valid PEM block")
+
+		_, err := client.parsePEMBlock(invalidData)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to decode PEM block")
+	})
+
+	t.Run("PEM with Extra Data", func(t *testing.T) {
+		block := &pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+		}
+		pemData := pem.EncodeToMemory(block)
+		// Add extra data
+		pemData = append(pemData, []byte("extra data")...)
+
+		signer, err := client.parsePEMBlock(pemData)
+		assert.NoError(t, err) // Should still work but log warning
+		assert.NotNil(t, signer)
+	})
+}
+
+func TestSSHClient_HandlePEMBlockType(t *testing.T) {
+	// Generate a test RSA key
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	client := &SSHClient{}
+
+	t.Run("RSA Private Key", func(t *testing.T) {
+		block := &pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+		}
+
+		signer, err := client.handlePEMBlockType(block)
+		assert.NoError(t, err)
+		assert.NotNil(t, signer)
+		assert.Equal(t, "ssh-rsa", signer.PublicKey().Type())
+	})
+
+	t.Run("DSA Private Key", func(t *testing.T) {
+		// Create a dummy DSA key block (we won't actually parse it)
+		block := &pem.Block{
+			Type:  "DSA PRIVATE KEY",
+			Bytes: []byte("dummy dsa key data"),
+		}
+
+		_, err := client.handlePEMBlockType(block)
+		// Should fail because it's dummy data, but the type should be recognized
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse traditional private key")
+	})
+
+	t.Run("EC Private Key", func(t *testing.T) {
+		// Create a dummy EC key block
+		block := &pem.Block{
+			Type:  "EC PRIVATE KEY",
+			Bytes: []byte("dummy ec key data"),
+		}
+
+		_, err := client.handlePEMBlockType(block)
+		// Should fail because it's dummy data, but the type should be recognized
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse traditional private key")
+	})
+
+	t.Run("OpenSSH Private Key", func(t *testing.T) {
+		// Create a dummy OpenSSH key block
+		block := &pem.Block{
+			Type:  "OPENSSH PRIVATE KEY",
+			Bytes: []byte("dummy openssh key data"),
+		}
+
+		_, err := client.handlePEMBlockType(block)
+		// Should fail because it's dummy data, but the type should be recognized
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse OpenSSH private key")
+	})
+
+	t.Run("PKCS#8 Private Key", func(t *testing.T) {
+		// Create PKCS#8 format
+		pkcs8Bytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+		require.NoError(t, err)
+
+		block := &pem.Block{
+			Type:  "PRIVATE KEY",
+			Bytes: pkcs8Bytes,
+		}
+
+		signer, err := client.handlePEMBlockType(block)
+		assert.NoError(t, err)
+		assert.NotNil(t, signer)
+		assert.Equal(t, "ssh-rsa", signer.PublicKey().Type())
+	})
+
+	t.Run("Unknown Block Type", func(t *testing.T) {
+		block := &pem.Block{
+			Type:  "UNKNOWN TYPE",
+			Bytes: []byte("dummy data"),
+		}
+
+		_, err := client.handlePEMBlockType(block)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported PEM block type")
+	})
+}
+
 // Benchmark tests for performance
 func BenchmarkSSHClient_LoadPrivateKey(b *testing.B) {
 	// Create a temporary directory for test keys

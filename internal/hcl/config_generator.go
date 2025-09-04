@@ -108,61 +108,117 @@ func (cg *ConfigGenerator) structToCty(config interface{}) (cty.Value, error) {
 func (cg *ConfigGenerator) fieldToCty(field reflect.Value) (cty.Value, error) {
 	switch field.Kind() {
 	case reflect.Ptr:
-		// Handle pointers
-		if field.IsNil() {
-			return cty.NilVal, nil
-		}
-		return cg.fieldToCty(field.Elem())
+		return cg.convertPointer(field)
 	case reflect.String:
-		return cty.StringVal(field.String()), nil
+		return cg.convertString(field)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return cty.NumberIntVal(field.Int()), nil
+		return cg.convertInt(field)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return cty.NumberUIntVal(field.Uint()), nil
+		return cg.convertUint(field)
 	case reflect.Float32, reflect.Float64:
-		return cty.NumberFloatVal(field.Float()), nil
+		return cg.convertFloat(field)
 	case reflect.Bool:
-		return cty.BoolVal(field.Bool()), nil
+		return cg.convertBool(field)
 	case reflect.Slice:
-		// Handle slices
-		if field.Len() == 0 {
-			return cty.ListValEmpty(cty.String), nil
-		}
-		elements := make([]cty.Value, field.Len())
-		for i := 0; i < field.Len(); i++ {
-			element, err := cg.fieldToCty(field.Index(i))
-			if err != nil {
-				return cty.NilVal, fmt.Errorf("failed to convert slice element %d: %v", i, err)
-			}
-			elements[i] = element
-		}
-		return cty.ListVal(elements), nil
+		return cg.convertSlice(field)
 	case reflect.Struct:
-		// Handle nested structs
-		if field.Type() == reflect.TypeOf(time.Time{}) {
-			// Special handling for time.Time
-			return cty.StringVal(field.Interface().(time.Time).Format(time.RFC3339)), nil
-		}
-		return cg.structToCty(field.Interface())
+		return cg.convertStruct(field)
 	case reflect.Map:
-		// Handle maps
-		if field.Len() == 0 {
-			return cty.MapValEmpty(cty.String), nil
-		}
-		keys := field.MapKeys()
-		valueMap := make(map[string]cty.Value)
-		for _, key := range keys {
-			keyStr := fmt.Sprintf("%v", key.Interface())
-			val, err := cg.fieldToCty(field.MapIndex(key))
-			if err != nil {
-				return cty.NilVal, fmt.Errorf("failed to convert map value for key %s: %v", keyStr, err)
-			}
-			valueMap[keyStr] = val
-		}
-		return cty.MapVal(valueMap), nil
+		return cg.convertMap(field)
+	case reflect.Interface:
+		return cg.convertInterface(field)
 	default:
 		return cty.NilVal, fmt.Errorf("unsupported field type: %s", field.Kind())
 	}
+}
+
+// convertPointer handles pointer type conversion
+func (cg *ConfigGenerator) convertPointer(field reflect.Value) (cty.Value, error) {
+	if field.IsNil() {
+		return cty.NilVal, nil
+	}
+	return cg.fieldToCty(field.Elem())
+}
+
+// convertString handles string type conversion
+func (cg *ConfigGenerator) convertString(field reflect.Value) (cty.Value, error) {
+	return cty.StringVal(field.String()), nil
+}
+
+// convertInt handles integer type conversion
+func (cg *ConfigGenerator) convertInt(field reflect.Value) (cty.Value, error) {
+	return cty.NumberIntVal(field.Int()), nil
+}
+
+// convertUint handles unsigned integer type conversion
+func (cg *ConfigGenerator) convertUint(field reflect.Value) (cty.Value, error) {
+	return cty.NumberUIntVal(field.Uint()), nil
+}
+
+// convertFloat handles float type conversion
+func (cg *ConfigGenerator) convertFloat(field reflect.Value) (cty.Value, error) {
+	return cty.NumberFloatVal(field.Float()), nil
+}
+
+// convertBool handles boolean type conversion
+func (cg *ConfigGenerator) convertBool(field reflect.Value) (cty.Value, error) {
+	return cty.BoolVal(field.Bool()), nil
+}
+
+// convertSlice handles slice type conversion
+func (cg *ConfigGenerator) convertSlice(field reflect.Value) (cty.Value, error) {
+	if field.Len() == 0 {
+		return cty.ListValEmpty(cty.String), nil
+	}
+
+	elements := make([]cty.Value, field.Len())
+	for i := 0; i < field.Len(); i++ {
+		element, err := cg.fieldToCty(field.Index(i))
+		if err != nil {
+			return cty.NilVal, fmt.Errorf("failed to convert slice element %d: %v", i, err)
+		}
+		elements[i] = element
+	}
+	return cty.ListVal(elements), nil
+}
+
+// convertStruct handles struct type conversion
+func (cg *ConfigGenerator) convertStruct(field reflect.Value) (cty.Value, error) {
+	// Special handling for time.Time
+	if field.Type() == reflect.TypeOf(time.Time{}) {
+		return cty.StringVal(field.Interface().(time.Time).Format(time.RFC3339)), nil
+	}
+	return cg.structToCty(field.Interface())
+}
+
+// convertMap handles map type conversion
+func (cg *ConfigGenerator) convertMap(field reflect.Value) (cty.Value, error) {
+	if field.Len() == 0 {
+		return cty.MapValEmpty(cty.String), nil
+	}
+
+	keys := field.MapKeys()
+	valueMap := make(map[string]cty.Value)
+	for _, key := range keys {
+		keyStr := fmt.Sprintf("%v", key.Interface())
+		val, err := cg.fieldToCty(field.MapIndex(key))
+		if err != nil {
+			return cty.NilVal, fmt.Errorf("failed to convert map value for key %s: %v", keyStr, err)
+		}
+		valueMap[keyStr] = val
+	}
+	return cty.MapVal(valueMap), nil
+}
+
+// convertInterface handles interface type conversion
+func (cg *ConfigGenerator) convertInterface(field reflect.Value) (cty.Value, error) {
+	if field.IsNil() {
+		return cty.NilVal, nil
+	}
+
+	// Get the underlying value and recursively convert it
+	underlyingValue := reflect.ValueOf(field.Interface())
+	return cg.fieldToCty(underlyingValue)
 }
 
 // ctyValueToHCL converts a cty.Value to HCL and writes it to the body
