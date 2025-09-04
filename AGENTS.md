@@ -17,9 +17,8 @@ go mod tidy
 # Run main spooky application
 go run main.go
 
-# Run development tools
-go run tools/spooky-schemas-tool/main.go schemas
-go run tools/spooky-hcl-tool/main.go validate project.hcl
+# Run tests
+go test ./...
 
 # Run tests
 go test ./...
@@ -34,7 +33,7 @@ go build -o spooky main.go
 spooky/
 ├── commands/                 # Main spooky commands
 ├── internal/                 # Core packages and business logic
-├── tools/                    # Development utilities
+├── tools/                    # Development utilities (currently empty)
 ├── documentation/            # Project documentation
 └── main.go                   # Entry point
 ```
@@ -91,38 +90,25 @@ func TestFunctionality(t *testing.T) {
 
 ## Tool Architecture
 
-### Main Application vs. Development Tools
+### Main Application
 
-The project uses a two-tier architecture:
+The project focuses on a single main application:
 
 **Main Application (`spooky`):**
 - Focus: Automation and configuration management
 - Commands: `commands/` directory
 - Purpose: Core automation functionality (like Ansible)
+- Structure: Self-contained binary with embedded configuration schemas
 
-**Development Tools (`./tools/`):**
-- Focus: Development utilities and schema management
-- Structure: Each tool has its own `main.go` in `tools/` directory
-- Purpose: Help developers work with schemas, validate HCL, etc.
+### Development Tools
 
-### Current Tools
+**Note**: The `tools/` directory is currently empty. Development tools mentioned in previous documentation (`spooky-schemas-tool`, `spooky-hcl-tool`) are not currently implemented.
 
-**`spooky-schemas-tool`:**
-- Purpose: Schema management and inspection
-- Commands: `schemas`, `list`, `show`
-- Usage: `go run tools/spooky-schemas-tool/main.go`
-
-**`spooky-hcl-tool`:**
-- Purpose: HCL validation and manipulation
-- Commands: `validate [path]`, `validate --quick`
-- Usage: `go run tools/spooky-hcl-tool/main.go`
-
-### Shared Dependencies
-
-- All tools share the same `go.mod` file
-- Tools import from `internal/` packages
-- Consistent use of `spf13/cobra` across all components
-- Guaranteed version consistency across all tools
+If development tools are needed in the future, they should:
+- Be placed in the `tools/` directory with their own `main.go` files
+- Share the same `go.mod` file for dependency consistency
+- Import from `internal/` packages for shared functionality
+- Use `spf13/cobra` for consistent CLI experience
 
 ## Development Workflow
 
@@ -198,8 +184,9 @@ Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`
 4. Include help text and usage examples
 5. Add tests for command functionality
 
-### Development Tool Development
+### Development Tool Development (Future)
 
+If development tools are needed:
 1. Create tool in `tools/` directory with its own `main.go`
 2. Import shared functionality from `internal/` packages
 3. Use `spf13/cobra` for consistent CLI experience
@@ -334,9 +321,8 @@ func TestFunctionName(t *testing.T) {
 # Run main application
 go run main.go
 
-# Run development tools
-go run tools/spooky-schemas-tool/main.go schemas
-go run tools/spooky-hcl-tool/main.go validate project.hcl
+# Run tests
+go test ./...
 
 # Run specific tests
 go test -v ./internal/package/ -run TestSpecificFunction

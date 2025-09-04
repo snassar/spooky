@@ -199,8 +199,8 @@ func TestLogError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp log file: %v", err)
 	}
-	defer os.Remove(logFile.Name())
-	defer logFile.Close()
+	defer func() { _ = os.Remove(logFile.Name()) }()
+	defer func() { _ = logFile.Close() }()
 
 	logger := slog.New(slog.NewTextHandler(logFile, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -246,8 +246,8 @@ func TestLogErrorf(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp log file: %v", err)
 	}
-	defer os.Remove(logFile.Name())
-	defer logFile.Close()
+	defer func() { _ = os.Remove(logFile.Name()) }()
+	defer func() { _ = logFile.Close() }()
 
 	logger := slog.New(slog.NewTextHandler(logFile, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -297,8 +297,8 @@ func TestLogWarning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp log file: %v", err)
 	}
-	defer os.Remove(logFile.Name())
-	defer logFile.Close()
+	defer func() { _ = os.Remove(logFile.Name()) }()
+	defer func() { _ = logFile.Close() }()
 
 	logger := slog.New(slog.NewTextHandler(logFile, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -344,8 +344,8 @@ func TestLogWarningf(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp log file: %v", err)
 	}
-	defer os.Remove(logFile.Name())
-	defer logFile.Close()
+	defer func() { _ = os.Remove(logFile.Name()) }()
+	defer func() { _ = logFile.Close() }()
 
 	logger := slog.New(slog.NewTextHandler(logFile, &slog.HandlerOptions{
 		Level: slog.LevelDebug,

@@ -1,0 +1,192 @@
+{
+  "name": "Sync Package Context",
+  "description": "Context about the internal/sync package complexity and architecture for informed editing decisions",
+  "version": "1.0.0",
+  "context": {
+    "role": "You are editing the internal/sync package with full understanding of its complexity and architecture decisions.",
+    "package": "internal/sync",
+    "complexity_assessment": "ACCEPTED_AS_JUSTIFIED",
+    "analysis_date": "2024-12-19",
+    "analysis_conclusion": "The sync package complexity is justified for a production automation tool and represents appropriate engineering for its use case."
+  },
+  "package_overview": {
+    "total_size": "3,807 lines across 8 files",
+    "functions": "118 functions (47 production, 71 test)",
+    "complexity_level": "High - Justified",
+    "architecture": "Multi-engine sync system with comprehensive conflict resolution"
+  },
+  "architecture_components": {
+    "sync_engines": {
+      "count": 3,
+      "engines": [
+        {
+          "name": "MutagenSyncEngine",
+          "file": "mutagen_sync.go",
+          "lines": 642,
+          "functions": 23,
+          "purpose": "Wraps Mutagen's rsync engine for efficient delta synchronization",
+          "features": [
+            "Delta sync using rsync algorithm",
+            "File signature generation",
+            "Operation tracking and statistics",
+            "Backup creation",
+            "Permission preservation"
+          ]
+        },
+        {
+          "name": "RemoteSyncEngine", 
+          "file": "remote_sync.go",
+          "lines": 1089,
+          "functions": 37,
+          "purpose": "Handles remote file synchronization via SSH",
+          "features": [
+            "SSH-based remote file operations",
+            "Progress tracking with thread-safe operations",
+            "Concurrent file processing with worker pools",
+            "Remote directory management",
+            "Integration with MutagenSyncEngine"
+          ]
+        },
+        {
+          "name": "Local Sync Functions",
+          "file": "sync.go", 
+          "lines": 644,
+          "functions": 27,
+          "purpose": "Local file synchronization with multiple modes",
+          "features": [
+            "Multiple sync modes (4 different strategies)",
+            "Conflict resolution",
+            "Directory synchronization",
+            "File attribute preservation"
+          ]
+        }
+      ]
+    },
+    "sync_modes": {
+      "count": 4,
+      "modes": [
+        "ModeOneWayReplica: Exact one-way replication (source → target)",
+        "ModeOneWaySafe: Safe one-way sync with conflict detection", 
+        "ModeTwoWaySafe: Bidirectional sync with conflict detection",
+        "ModeTwoWayResolved: Bidirectional sync with source winning conflicts"
+      ]
+    },
+    "conflict_resolution": {
+      "count": 4,
+      "strategies": [
+        "ConflictResolutionSkip: Skip conflicted files",
+        "ConflictResolutionBackup: Create backups of conflicted files",
+        "ConflictResolutionOverwrite: Overwrite conflicted files", 
+        "ConflictResolutionPrompt: Prompt user for resolution"
+      ]
+    },
+    "additional_components": {
+      "checksum_system": {
+        "file": "checksum.go",
+        "lines": 57,
+        "functions": 1,
+        "purpose": "MD4 checksum computation and file integrity verification"
+      },
+      "test_coverage": {
+        "files": 4,
+        "lines": 1381,
+        "coverage": "Comprehensive integration and unit tests"
+      }
+    }
+  },
+  "complexity_justification": {
+    "why_complex": [
+      "Multiple sync engines for different use cases (local vs remote)",
+      "Multiple sync modes for different deployment scenarios",
+      "Multiple conflict resolution strategies for different workflows",
+      "Concurrent processing with thread-safe operations",
+      "SSH integration for remote file operations",
+      "Delta synchronization using sophisticated rsync algorithm",
+      "Progress tracking with real-time reporting",
+      "Comprehensive error handling across multiple layers"
+    ],
+    "value_provided": [
+      "Production-ready file synchronization",
+      "Flexible sync strategies for different use cases",
+      "Robust conflict resolution for team workflows",
+      "Efficient delta sync minimizing data transfer",
+      "Remote synchronization via SSH",
+      "Thread-safe concurrent operations",
+      "Comprehensive progress reporting",
+      "Enterprise-grade error handling"
+    ],
+    "use_cases_served": [
+      "Infrastructure automation and deployment",
+      "Configuration management across multiple machines",
+      "File synchronization in team environments",
+      "Backup and restore operations",
+      "Development environment synchronization",
+      "Production deployment workflows"
+    ]
+  },
+  "refactoring_history": {
+    "complexity_reduction_completed": true,
+    "refactoring_summary": {
+      "functions_refactored": 8,
+      "complexity_reduction": "145 → 24 (83.4% reduction)",
+      "average_complexity_before": 18.1,
+      "average_complexity_after": 3.0,
+      "status": "fully_resolved"
+    },
+    "key_refactorings": [
+      "SyncDirectory function: 16 → 2 complexity",
+      "All high-complexity functions have been refactored",
+      "Helper functions extracted for better maintainability",
+      "Error handling consolidated and improved"
+    ]
+  },
+  "editing_guidelines": {
+    "do_not_suggest": [
+      "Reducing the number of sync engines",
+      "Simplifying sync modes to fewer options",
+      "Removing conflict resolution strategies",
+      "Eliminating concurrent processing",
+      "Removing progress tracking",
+      "Simplifying the rsync algorithm integration",
+      "Reducing SSH integration features"
+    ],
+    "acceptable_changes": [
+      "Bug fixes and error handling improvements",
+      "Performance optimizations that maintain functionality",
+      "Code organization and readability improvements",
+      "Test coverage enhancements",
+      "Documentation improvements",
+      "Security enhancements",
+      "New features that extend existing capabilities"
+    ],
+    "complexity_acceptance": "The current complexity level is appropriate for a production automation tool. Focus on maintaining functionality while improving code quality, not reducing features."
+  },
+  "technical_context": {
+    "dependencies": [
+      "github.com/mutagen-io/mutagen - Core rsync engine (integral)",
+      "golang.org/x/crypto/ssh - SSH functionality",
+      "spooky/internal/ssh - SSH manager integration",
+      "spooky/internal/schemas - Configuration schemas",
+      "spooky/internal/utilities - Utility functions"
+    ],
+    "integration_points": [
+      "SSH Manager for remote connections",
+      "Project configuration schemas",
+      "Logging system for progress and errors",
+      "Utility functions for file operations"
+    ],
+    "performance_characteristics": [
+      "Delta sync minimizes data transfer",
+      "Concurrent processing improves throughput",
+      "Thread-safe operations ensure reliability",
+      "Progress tracking provides user feedback"
+    ]
+  },
+  "constraints": {
+    "maintain_functionality": "All existing sync capabilities must be preserved",
+    "preserve_architecture": "Don't suggest architectural changes that reduce functionality",
+    "focus_on_quality": "Improve code quality without reducing features",
+    "consider_use_cases": "Remember this serves production automation workflows",
+    "respect_complexity": "The complexity is justified and should be maintained"
+  }
+}
