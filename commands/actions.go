@@ -137,13 +137,13 @@ func runAction(cmd *cobra.Command, args []string) error {
 	// Load project configuration
 	projectConfig, err := loadProjectConfig()
 	if err != nil {
-		return fmt.Errorf("failed to load project configuration: %w", err)
+		return utilities.WrapErrorf(err, "failed to load project configuration")
 	}
 
 	// Load actions configuration
 	actions, err := loadActionsConfig()
 	if err != nil {
-		return fmt.Errorf("failed to load actions configuration: %w", err)
+		return utilities.WrapErrorf(err, "failed to load actions configuration")
 	}
 
 	// Find the action
@@ -155,13 +155,13 @@ func runAction(cmd *cobra.Command, args []string) error {
 	// Load machines configuration
 	machines, err := loadMachinesConfig()
 	if err != nil {
-		return fmt.Errorf("failed to load machines configuration: %w", err)
+		return utilities.WrapErrorf(err, "failed to load machines configuration")
 	}
 
 	// Determine target machines
 	targetMachines, err := determineTargetMachines(action, machines, actionTargets)
 	if err != nil {
-		return fmt.Errorf("failed to determine target machines: %w", err)
+		return utilities.WrapErrorf(err, "failed to determine target machines")
 	}
 
 	if len(targetMachines) == 0 {
@@ -173,7 +173,7 @@ func runAction(cmd *cobra.Command, args []string) error {
 	// Load SSH configuration
 	sshConfig, err := loadSSHConfig()
 	if err != nil {
-		return fmt.Errorf("failed to load SSH configuration: %w", err)
+		return utilities.WrapErrorf(err, "failed to load SSH configuration")
 	}
 
 	// Create SSH manager with encryption
@@ -220,7 +220,7 @@ func listActions(cmd *cobra.Command, args []string) error {
 	// Load actions configuration
 	actions, err := loadActionsConfig()
 	if err != nil {
-		return fmt.Errorf("failed to load actions configuration: %w", err)
+		return utilities.WrapErrorf(err, "failed to load actions configuration")
 	}
 
 	if len(actions) == 0 {
@@ -264,7 +264,7 @@ func showAction(cmd *cobra.Command, args []string) error {
 	// Load actions configuration
 	actions, err := loadActionsConfig()
 	if err != nil {
-		return fmt.Errorf("failed to load actions configuration: %w", err)
+		return utilities.WrapErrorf(err, "failed to load actions configuration")
 	}
 
 	// Find the action

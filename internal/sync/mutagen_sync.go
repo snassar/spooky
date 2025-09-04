@@ -177,8 +177,7 @@ func (m *MutagenSyncEngine) checkTargetFile(targetPath string, result *FileSyncR
 		if closeErr := file.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already read the data
 			// This is a best-effort cleanup
-			logger := logging.GetGlobalLogger()
-			logger.Warn("failed to close file during cleanup", slog.String("error", closeErr.Error()))
+			utilities.HandleCleanupError(closeErr, "file", "close")
 		}
 	}
 
@@ -362,16 +361,14 @@ func (m *MutagenSyncEngine) performMutagenSync(sourcePath, targetPath string, op
 		if closeErr := sourceFile.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already processed the data
 			// This is a best-effort cleanup
-			logger := logging.GetGlobalLogger()
-			logger.Warn("failed to close source file during cleanup", slog.String("error", closeErr.Error()))
+			utilities.HandleCleanupError(closeErr, "source_file", "close")
 		}
 	}()
 	defer func() {
 		if closeErr := targetFile.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already processed the data
 			// This is a best-effort cleanup
-			logger := logging.GetGlobalLogger()
-			logger.Warn("failed to close target file during cleanup", slog.String("error", closeErr.Error()))
+			utilities.HandleCleanupError(closeErr, "target_file", "close")
 		}
 	}()
 
@@ -596,8 +593,7 @@ func (m *MutagenSyncEngine) applyDeltaOperations(targetFile *os.File, operations
 		if closeErr := outputFile.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already written the data
 			// This is a best-effort cleanup
-			logger := logging.GetGlobalLogger()
-			logger.Warn("failed to close output file during cleanup", slog.String("error", closeErr.Error()))
+			utilities.HandleCleanupError(closeErr, "output_file", "close")
 		}
 	}()
 

@@ -9,6 +9,7 @@ import (
 	"spooky/internal/logging"
 	"spooky/internal/schemas"
 	"spooky/internal/ssh"
+	"spooky/internal/utilities"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -300,8 +301,7 @@ func (r *RemoteSyncEngine) cleanupTempFile(tempRemotePath string) {
 	if removeErr := os.Remove(tempRemotePath); removeErr != nil {
 		// Log the error but don't fail the function since this is cleanup
 		// This is a best-effort cleanup
-		logger := logging.GetGlobalLogger()
-		logger.Warn("failed to remove temporary file during cleanup", slog.String("error", removeErr.Error()))
+		utilities.HandleCleanupError(removeErr, "temporary_file", "remove")
 	}
 }
 
