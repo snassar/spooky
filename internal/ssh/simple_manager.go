@@ -121,37 +121,37 @@ func (sm *SimpleSSHManager) setupAuthentication(config *Config, machine *schemas
 	logger := logging.GetGlobalLogger()
 
 	// Try public key authentication first
-	if err := sm.setupPublicKeyAuth(config, &auth); err == nil {
+	err := sm.setupPublicKeyAuth(config, &auth)
+	if err == nil {
 		logger.Debug("SSH public key authentication configured successfully",
 			slog.String("machine", machine.Hostname))
 		return nil
-	} else {
-		logger.Debug("SSH public key authentication failed",
-			slog.String("machine", machine.Hostname),
-			slog.String("error", err.Error()))
 	}
+	logger.Debug("SSH public key authentication failed",
+		slog.String("machine", machine.Hostname),
+		slog.String("error", err.Error()))
 
 	// Try password authentication
-	if err := sm.setupPasswordAuth(config, &auth); err == nil {
+	err = sm.setupPasswordAuth(config, &auth)
+	if err == nil {
 		logger.Debug("SSH password authentication configured successfully",
 			slog.String("machine", machine.Hostname))
 		return nil
-	} else {
-		logger.Debug("SSH password authentication failed",
-			slog.String("machine", machine.Hostname),
-			slog.String("error", err.Error()))
 	}
+	logger.Debug("SSH password authentication failed",
+		slog.String("machine", machine.Hostname),
+		slog.String("error", err.Error()))
 
 	// Try certificate authentication
-	if err := sm.setupCertificateAuth(config, &auth); err == nil {
+	err = sm.setupCertificateAuth(config, &auth)
+	if err == nil {
 		logger.Debug("SSH certificate authentication configured successfully",
 			slog.String("machine", machine.Hostname))
 		return nil
-	} else {
-		logger.Debug("SSH certificate authentication failed",
-			slog.String("machine", machine.Hostname),
-			slog.String("error", err.Error()))
 	}
+	logger.Debug("SSH certificate authentication failed",
+		slog.String("machine", machine.Hostname),
+		slog.String("error", err.Error()))
 
 	logger.Error("All SSH authentication methods failed",
 		slog.String("machine", machine.Hostname))

@@ -4,7 +4,6 @@ go 1.24
 
 require (
 	filippo.io/age v1.2.1
-	github.com/google/uuid v1.6.0
 	github.com/hashicorp/hcl/v2 v2.24.0
 	github.com/mmcloughlin/md4 v0.1.2
 	github.com/mutagen-io/mutagen v0.18.1
@@ -22,6 +21,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/hectane/go-acl v0.0.0-20230122075934-ca0b05cb1adb // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect

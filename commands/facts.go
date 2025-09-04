@@ -27,8 +27,11 @@ import (
 type ErrorType int
 
 const (
+	// ErrorTypeTemporary represents errors that are temporary and may resolve on retry
 	ErrorTypeTemporary ErrorType = iota
+	// ErrorTypePermanent represents errors that are permanent and will not resolve on retry
 	ErrorTypePermanent
+	// ErrorTypeConfiguration represents errors related to configuration issues
 	ErrorTypeConfiguration
 )
 
@@ -73,15 +76,6 @@ func processFactsWithEnhancedErrorHandling(ctx context.Context, gatherer *facts.
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
 
-	var (
-		successCount        = 0
-		temporaryErrorCount = 0
-		permanentErrorCount = 0
-		configErrorCount    = 0
-		retryableMachines   []*schemas.MachinesMachineV1
-		allMachineFacts     []*facts.MachineFacts
-	)
-
 	logger.Info("starting facts gathering with enhanced error handling",
 		slog.Int("total_machines", len(machines)))
 
@@ -91,135 +85,178 @@ func processFactsWithEnhancedErrorHandling(ctx context.Context, gatherer *facts.
 		return fmt.Errorf("critical failure during facts gathering: %w", err)
 	}
 
-	allMachineFacts = machineFacts
+	// Process initial results and categorize errors
+	stats := processInitialFactsResults(machineFacts, logger)
 
-	// Categorize errors and identify retryable machines
+	// Retry logic for temporary failures
+	if len(stats.retryableMachines) > 0 {
+		if err := processRetryLogic(ctx, gatherer, stats, logger); err != nil {
+			return err
+		}
+	}
+
+	// Final summary and validation
+	return processFinalResults(stats, len(machines), logger)
+}
+
+// FactsProcessingStats holds statistics during facts processing
+type FactsProcessingStats struct {
+	successCount        int
+	temporaryErrorCount int
+	permanentErrorCount int
+	configErrorCount    int
+	retryableMachines   []*schemas.MachinesMachineV1
+	allMachineFacts     []*facts.MachineFacts
+}
+
+// processInitialFactsResults categorizes errors and identifies retryable machines
+func processInitialFactsResults(machineFacts []*facts.MachineFacts, logger *logging.Logger) *FactsProcessingStats {
+	stats := &FactsProcessingStats{
+		allMachineFacts: machineFacts,
+	}
+
 	for _, machineFact := range machineFacts {
 		if machineFact.Error != nil {
-			errorType := categorizeError(machineFact.Error)
-			switch errorType {
-			case ErrorTypeTemporary:
-				logger.Warn("temporary error gathering facts",
-					slog.String("hostname", machineFact.Machine.Hostname),
-					slog.String("error", machineFact.Error.Error()),
-					slog.String("action", "will_retry"))
-				temporaryErrorCount++
-				retryableMachines = append(retryableMachines, machineFact.Machine)
-
-			case ErrorTypePermanent:
-				logger.Error("permanent error gathering facts",
-					slog.String("hostname", machineFact.Machine.Hostname),
-					slog.String("error", machineFact.Error.Error()),
-					slog.String("action", "skip"))
-				permanentErrorCount++
-
-			case ErrorTypeConfiguration:
-				logger.Error("configuration error - check machine settings",
-					slog.String("hostname", machineFact.Machine.Hostname),
-					slog.String("error", machineFact.Error.Error()),
-					slog.String("suggestion", "verify SSH configuration, keys, and network connectivity"))
-				configErrorCount++
-			}
+			processMachineError(machineFact, stats, logger)
 		} else {
-			successCount++
+			stats.successCount++
 			logger.Info("✅ successfully gathered facts from machine",
 				slog.String("hostname", machineFact.Machine.Hostname))
 		}
 	}
 
-	// Retry logic for temporary failures
-	if len(retryableMachines) > 0 {
-		logger.Info("retrying machines with temporary failures",
-			slog.Int("retry_count", len(retryableMachines)),
-			slog.String("retry_delay", "5s"))
+	return stats
+}
 
-		// Brief delay before retry to allow network conditions to improve
-		time.Sleep(5 * time.Second)
+// processMachineError handles error categorization for a single machine
+func processMachineError(machineFact *facts.MachineFacts, stats *FactsProcessingStats, logger *logging.Logger) {
+	errorType := categorizeError(machineFact.Error)
+	switch errorType {
+	case ErrorTypeTemporary:
+		logger.Warn("temporary error gathering facts",
+			slog.String("hostname", machineFact.Machine.Hostname),
+			slog.String("error", machineFact.Error.Error()),
+			slog.String("action", "will_retry"))
+		stats.temporaryErrorCount++
+		stats.retryableMachines = append(stats.retryableMachines, machineFact.Machine)
 
-		// Check if context is still valid
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("context cancelled during retry: %w", ctx.Err())
-		default:
-		}
+	case ErrorTypePermanent:
+		logger.Error("permanent error gathering facts",
+			slog.String("hostname", machineFact.Machine.Hostname),
+			slog.String("error", machineFact.Error.Error()),
+			slog.String("action", "skip"))
+		stats.permanentErrorCount++
 
-		retryFacts, err := gatherer.GatherFactsFromMachines(ctx, retryableMachines)
-		if err != nil {
-			logger.Warn("retry attempt failed",
-				slog.String("error", err.Error()),
-				slog.Int("machines_affected", len(retryableMachines)))
-		} else {
-			// Process retry results and update counts
-			for _, retryFact := range retryFacts {
-				if retryFact.Error == nil {
-					successCount++
-					temporaryErrorCount--
-					logger.Info("✅ retry successful",
-						slog.String("hostname", retryFact.Machine.Hostname))
+	case ErrorTypeConfiguration:
+		logger.Error("configuration error - check machine settings",
+			slog.String("hostname", machineFact.Machine.Hostname),
+			slog.String("error", machineFact.Error.Error()),
+			slog.String("suggestion", "verify SSH configuration, keys, and network connectivity"))
+		stats.configErrorCount++
+	}
+}
 
-					// Update the original machine facts with successful retry
-					for j, originalFact := range allMachineFacts {
-						if originalFact.Machine.Hostname == retryFact.Machine.Hostname {
-							allMachineFacts[j] = retryFact
-							break
-						}
-					}
-				} else {
-					// Categorize retry failure
-					errorType := categorizeError(retryFact.Error)
-					switch errorType {
-					case ErrorTypeTemporary:
-						logger.Warn("retry failed - still temporary error",
-							slog.String("hostname", retryFact.Machine.Hostname),
-							slog.String("error", retryFact.Error.Error()))
-					case ErrorTypeConfiguration:
-						logger.Error("retry revealed configuration error",
-							slog.String("hostname", retryFact.Machine.Hostname),
-							slog.String("error", retryFact.Error.Error()))
-						configErrorCount++
-						temporaryErrorCount--
-					default:
-						logger.Error("retry failed - permanent error",
-							slog.String("hostname", retryFact.Machine.Hostname),
-							slog.String("error", retryFact.Error.Error()))
-						permanentErrorCount++
-						temporaryErrorCount--
-					}
-				}
-			}
-		}
+// processRetryLogic handles retry attempts for machines with temporary failures
+func processRetryLogic(ctx context.Context, gatherer *facts.Gatherer, stats *FactsProcessingStats, logger *logging.Logger) error {
+	logger.Info("retrying machines with temporary failures",
+		slog.Int("retry_count", len(stats.retryableMachines)),
+		slog.String("retry_delay", "5s"))
+
+	// Brief delay before retry to allow network conditions to improve
+	time.Sleep(5 * time.Second)
+
+	// Check if context is still valid
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("context cancelled during retry: %w", ctx.Err())
+	default:
 	}
 
-	// Final summary with actionable information
-	totalFailures := temporaryErrorCount + permanentErrorCount + configErrorCount
+	retryFacts, err := gatherer.GatherFactsFromMachines(ctx, stats.retryableMachines)
+	if err != nil {
+		logger.Warn("retry attempt failed",
+			slog.String("error", err.Error()),
+			slog.Int("machines_affected", len(stats.retryableMachines)))
+		return nil
+	}
+
+	// Process retry results and update counts
+	processRetryResults(retryFacts, stats, logger)
+	return nil
+}
+
+// processRetryResults processes the results from retry attempts
+func processRetryResults(retryFacts []*facts.MachineFacts, stats *FactsProcessingStats, logger *logging.Logger) {
+	for _, retryFact := range retryFacts {
+		if retryFact.Error == nil {
+			processSuccessfulRetry(retryFact, stats, logger)
+		} else {
+			processFailedRetry(retryFact, stats, logger)
+		}
+	}
+}
+
+// processSuccessfulRetry handles a successful retry attempt
+func processSuccessfulRetry(retryFact *facts.MachineFacts, stats *FactsProcessingStats, logger *logging.Logger) {
+	stats.successCount++
+	stats.temporaryErrorCount--
+	logger.Info("✅ retry successful",
+		slog.String("hostname", retryFact.Machine.Hostname))
+
+	// Update the original machine facts with successful retry
+	for j, originalFact := range stats.allMachineFacts {
+		if originalFact.Machine.Hostname == retryFact.Machine.Hostname {
+			stats.allMachineFacts[j] = retryFact
+			break
+		}
+	}
+}
+
+// processFailedRetry handles a failed retry attempt
+func processFailedRetry(retryFact *facts.MachineFacts, stats *FactsProcessingStats, logger *logging.Logger) {
+	errorType := categorizeError(retryFact.Error)
+	switch errorType {
+	case ErrorTypeTemporary:
+		logger.Warn("retry failed - still temporary error",
+			slog.String("hostname", retryFact.Machine.Hostname),
+			slog.String("error", retryFact.Error.Error()))
+	case ErrorTypeConfiguration:
+		logger.Error("retry revealed configuration error",
+			slog.String("hostname", retryFact.Machine.Hostname),
+			slog.String("error", retryFact.Error.Error()))
+		stats.configErrorCount++
+		stats.temporaryErrorCount--
+	default:
+		logger.Error("retry failed - permanent error",
+			slog.String("hostname", retryFact.Machine.Hostname),
+			slog.String("error", retryFact.Error.Error()))
+		stats.permanentErrorCount++
+		stats.temporaryErrorCount--
+	}
+}
+
+// processFinalResults handles final summary and validation
+func processFinalResults(stats *FactsProcessingStats, totalMachines int, logger *logging.Logger) error {
+	totalFailures := stats.temporaryErrorCount + stats.permanentErrorCount + stats.configErrorCount
+
 	logger.Info("facts gathering completed",
-		slog.Int("successful", successCount),
-		slog.Int("temporary_failures", temporaryErrorCount),
-		slog.Int("permanent_failures", permanentErrorCount),
-		slog.Int("configuration_errors", configErrorCount),
-		slog.Int("total_machines", len(machines)),
-		slog.Float64("success_rate", float64(successCount)/float64(len(machines))*100))
+		slog.Int("successful", stats.successCount),
+		slog.Int("temporary_failures", stats.temporaryErrorCount),
+		slog.Int("permanent_failures", stats.permanentErrorCount),
+		slog.Int("configuration_errors", stats.configErrorCount),
+		slog.Int("total_machines", totalMachines),
+		slog.Float64("success_rate", float64(stats.successCount)/float64(totalMachines)*100))
 
 	// Provide actionable recommendations based on error types
-	if configErrorCount > 0 {
-		logger.Warn("configuration errors detected",
-			slog.Int("count", configErrorCount),
-			slog.String("recommendation", "check SSH keys, authentication, and network connectivity"))
-	}
-
-	if temporaryErrorCount > 0 {
-		logger.Warn("temporary failures detected",
-			slog.Int("count", temporaryErrorCount),
-			slog.String("recommendation", "check network stability and machine availability"))
-	}
+	provideActionableRecommendations(stats, logger)
 
 	// Fail if all machines failed
-	if successCount == 0 {
+	if stats.successCount == 0 {
 		return errors.New("failed to gather facts from any machine - check configurations and network connectivity")
 	}
 
 	// Warn if significant failure rate
-	failureRate := float64(totalFailures) / float64(len(machines))
+	failureRate := float64(totalFailures) / float64(totalMachines)
 	if failureRate > 0.5 {
 		logger.Warn("high failure rate detected",
 			slog.Float64("failure_rate", failureRate*100),
@@ -229,12 +266,27 @@ func processFactsWithEnhancedErrorHandling(ctx context.Context, gatherer *facts.
 	// Success with warnings if some machines failed
 	if totalFailures > 0 {
 		logger.Warn("facts gathering completed with some failures",
-			slog.Int("successful", successCount),
+			slog.Int("successful", stats.successCount),
 			slog.Int("failed", totalFailures),
 			slog.String("note", "proceeding with successful machines only"))
 	}
 
 	return nil
+}
+
+// provideActionableRecommendations provides recommendations based on error types
+func provideActionableRecommendations(stats *FactsProcessingStats, logger *logging.Logger) {
+	if stats.configErrorCount > 0 {
+		logger.Warn("configuration errors detected",
+			slog.Int("count", stats.configErrorCount),
+			slog.String("recommendation", "check SSH keys, authentication, and network connectivity"))
+	}
+
+	if stats.temporaryErrorCount > 0 {
+		logger.Warn("temporary failures detected",
+			slog.Int("count", stats.temporaryErrorCount),
+			slog.String("recommendation", "check network stability and machine availability"))
+	}
 }
 
 var factsCmd = &cobra.Command{

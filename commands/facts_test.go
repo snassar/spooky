@@ -415,10 +415,19 @@ func TestGetMachinesFromConfig(t *testing.T) {
 	// This test requires actual HCL files, so we'll test error conditions
 	t.Run("file not found", func(t *testing.T) {
 		// Change to a directory that doesn't have machines.hcl
-		originalDir, _ := os.Getwd()
+		originalDir, err := os.Getwd()
+		if err != nil {
+			t.Fatalf("failed to get current directory: %v", err)
+		}
 		tempDir := t.TempDir()
-		os.Chdir(tempDir)
-		defer os.Chdir(originalDir)
+		if err := os.Chdir(tempDir); err != nil {
+			t.Fatalf("failed to change to temp directory: %v", err)
+		}
+		defer func() {
+			if err := os.Chdir(originalDir); err != nil {
+				t.Errorf("failed to restore original directory: %v", err)
+			}
+		}()
 
 		machines, err := getMachinesFromConfig()
 		if err == nil {
@@ -445,10 +454,19 @@ func TestLoadProjectConfig(t *testing.T) {
 	// This test requires actual HCL files, so we'll test error conditions
 	t.Run("file not found", func(t *testing.T) {
 		// Change to a directory that doesn't have project.hcl
-		originalDir, _ := os.Getwd()
+		originalDir, err := os.Getwd()
+		if err != nil {
+			t.Fatalf("failed to get current directory: %v", err)
+		}
 		tempDir := t.TempDir()
-		os.Chdir(tempDir)
-		defer os.Chdir(originalDir)
+		if err := os.Chdir(tempDir); err != nil {
+			t.Fatalf("failed to change to temp directory: %v", err)
+		}
+		defer func() {
+			if err := os.Chdir(originalDir); err != nil {
+				t.Errorf("failed to restore original directory: %v", err)
+			}
+		}()
 
 		config, err := loadProjectConfig()
 		if err == nil {
@@ -472,6 +490,7 @@ func TestLoadSSHConfig(t *testing.T) {
 		}
 		if config == nil {
 			t.Errorf("expected default config but got nil")
+			return
 		}
 
 		// Verify default values
@@ -497,10 +516,19 @@ func TestParseMachinesHCL(t *testing.T) {
 	// This test requires actual HCL files, so we'll test error conditions
 	t.Run("file not found", func(t *testing.T) {
 		// Change to a directory that doesn't have machines.hcl
-		originalDir, _ := os.Getwd()
+		originalDir, err := os.Getwd()
+		if err != nil {
+			t.Fatalf("failed to get current directory: %v", err)
+		}
 		tempDir := t.TempDir()
-		os.Chdir(tempDir)
-		defer os.Chdir(originalDir)
+		if err := os.Chdir(tempDir); err != nil {
+			t.Fatalf("failed to change to temp directory: %v", err)
+		}
+		defer func() {
+			if err := os.Chdir(originalDir); err != nil {
+				t.Errorf("failed to restore original directory: %v", err)
+			}
+		}()
 
 		file, err := parseMachinesHCL()
 		if err == nil {

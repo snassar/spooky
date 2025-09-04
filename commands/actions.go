@@ -1523,8 +1523,8 @@ func (ae *ActionExecutor) createProgressReporter(action *schemas.ActionsActionV1
 				slog.String("action", action.Description),
 				slog.String("current_file", progress.CurrentFile),
 				slog.String("operation", progress.CurrentOperation),
-				slog.Int("files_processed", progress.FilesProcessed),
-				slog.Int("total_files", progress.TotalFiles),
+				slog.Int64("files_processed", progress.FilesProcessed),
+				slog.Int64("total_files", progress.TotalFiles),
 				slog.Float64("percentage", progress.Percentage),
 				slog.Int64("bytes_transferred", progress.BytesTransferred),
 				slog.Int64("bytes_saved", progress.BytesSaved))
