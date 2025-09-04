@@ -328,7 +328,22 @@ func (v *SimpleValidator) validateActionsBlockEssential(actions map[string]inter
 
 // validateActionEssential validates individual action with essential rules
 func (v *SimpleValidator) validateActionEssential(action map[string]interface{}, result *ValidationResult) {
-	// Required fields
+	// Validate required fields
+	v.validateRequiredActionFields(action, result)
+
+	// Validate type-specific requirements
+	v.validateActionTypeSpecific(action, result)
+
+	// Validate security constraints
+	v.validateActionSecurity(action, result)
+
+	// Validate range constraints
+	v.validateActionRanges(action, result)
+}
+
+// validateRequiredActionFields validates required action fields
+func (v *SimpleValidator) validateRequiredActionFields(action map[string]interface{}, result *ValidationResult) {
+	// Validate description
 	if description, exists := action["description"]; !exists || description == "" {
 		result.Errors = append(result.Errors, ValidationError{
 			Field:    "action.description",
@@ -337,6 +352,7 @@ func (v *SimpleValidator) validateActionEssential(action map[string]interface{},
 		})
 	}
 
+	// Validate type
 	if actionType, exists := action["type"]; !exists || actionType == "" {
 		result.Errors = append(result.Errors, ValidationError{
 			Field:    "action.type",
@@ -344,49 +360,77 @@ func (v *SimpleValidator) validateActionEssential(action map[string]interface{},
 			Severity: "error",
 		})
 	}
+}
 
-	// Type-specific validation
-	if actionType, exists := action["type"]; exists {
-		if typeStr, ok := actionType.(string); ok {
-			switch typeStr {
-			case "command":
-				if command, exists := action["command"]; !exists || command == "" {
-					result.Errors = append(result.Errors, ValidationError{
-						Field:    "action.command",
-						Message:  "command is required for command actions",
-						Severity: "error",
-					})
-				}
-			}
-		}
+// validateActionTypeSpecific validates type-specific action requirements
+func (v *SimpleValidator) validateActionTypeSpecific(action map[string]interface{}, result *ValidationResult) {
+	actionType, exists := action["type"]
+	if !exists {
+		return // Already validated in required fields
 	}
 
-	// Security validation (keep only essential)
+	typeStr, ok := actionType.(string)
+	if !ok {
+		return // Type validation will be handled elsewhere
+	}
+
+	switch typeStr {
+	case "command":
+		v.validateCommandAction(action, result)
+		// Add other action types as needed
+	}
+}
+
+// validateCommandAction validates command-specific action requirements
+func (v *SimpleValidator) validateCommandAction(action map[string]interface{}, result *ValidationResult) {
+	if command, exists := action["command"]; !exists || command == "" {
+		result.Errors = append(result.Errors, ValidationError{
+			Field:    "action.command",
+			Message:  "command is required for command actions",
+			Severity: "error",
+		})
+	}
+}
+
+// validateActionSecurity validates security constraints for actions
+func (v *SimpleValidator) validateActionSecurity(action map[string]interface{}, result *ValidationResult) {
 	if command, exists := action["command"]; exists {
 		if commandStr, ok := command.(string); ok {
-			if strings.ContainsAny(commandStr, ";&|$") {
-				result.Errors = append(result.Errors, ValidationError{
-					Field:    "action.command",
-					Value:    commandStr,
-					Message:  "shell operators (;&|$) are not allowed in commands for security reasons",
-					Severity: "error",
-				})
-			}
+			v.validateCommandSecurity(commandStr, result)
 		}
 	}
+}
 
-	// Range validation
+// validateCommandSecurity validates security constraints for commands
+func (v *SimpleValidator) validateCommandSecurity(commandStr string, result *ValidationResult) {
+	if strings.ContainsAny(commandStr, ";&|$") {
+		result.Errors = append(result.Errors, ValidationError{
+			Field:    "action.command",
+			Value:    commandStr,
+			Message:  "shell operators (;&|$) are not allowed in commands for security reasons",
+			Severity: "error",
+		})
+	}
+}
+
+// validateActionRanges validates range constraints for action fields
+func (v *SimpleValidator) validateActionRanges(action map[string]interface{}, result *ValidationResult) {
 	if timeout, exists := action["timeout"]; exists {
 		if timeoutVal, ok := timeout.(float64); ok {
-			if timeoutVal < 1 || timeoutVal > 3600 {
-				result.Errors = append(result.Errors, ValidationError{
-					Field:    "action.timeout",
-					Value:    timeoutVal,
-					Message:  "timeout must be between 1 and 3600 seconds",
-					Severity: "error",
-				})
-			}
+			v.validateTimeoutRange(timeoutVal, result)
 		}
+	}
+}
+
+// validateTimeoutRange validates timeout range constraints
+func (v *SimpleValidator) validateTimeoutRange(timeoutVal float64, result *ValidationResult) {
+	if timeoutVal < 1 || timeoutVal > 3600 {
+		result.Errors = append(result.Errors, ValidationError{
+			Field:    "action.timeout",
+			Value:    timeoutVal,
+			Message:  "timeout must be between 1 and 3600 seconds",
+			Severity: "error",
+		})
 	}
 }
 

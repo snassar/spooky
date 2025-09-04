@@ -125,29 +125,50 @@ func pingMachines(cmd *cobra.Command, args []string) error {
 
 // getMachinesWithNames gets machines with their names from HCL block labels
 func getMachinesWithNames() ([]MachineWithName, error) {
-	// We need to re-parse the HCL to get the machine names from block labels
-	// This is a simplified approach - in production, we'd modify getMachinesFromConfig
-	// to return both machines and their names
+	// Read and parse machines.hcl file
+	file, err := parseMachinesHCLFile()
+	if err != nil {
+		return nil, err
+	}
 
-	// Look for machines.hcl in current directory
+	// Extract machines block
+	machinesBlock, err := extractMachinesBlock(file)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract machine blocks
+	machineContent, err := extractMachineBlocks(machinesBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	// Process each machine block
+	return processMachineBlocks(machineContent)
+}
+
+// parseMachinesHCLFile reads and parses the machines.hcl file
+func parseMachinesHCLFile() (*hcl.File, error) {
 	machinesHCLPath := "machines.hcl"
 	if _, err := os.Stat(machinesHCLPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("machines.hcl not found in current directory")
 	}
 
-	// Read and parse machines.hcl using the HCL library properly
 	content, err := os.ReadFile(machinesHCLPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read machines.hcl: %w", err)
 	}
 
-	// Parse HCL using the library
 	file, diags := hclsyntax.ParseConfig(content, machinesHCLPath, hcl.Pos{Line: 1, Column: 1})
 	if diags.HasErrors() {
 		return nil, fmt.Errorf("failed to parse machines.hcl: %v", diags)
 	}
 
-	// Define the schema for machines block
+	return file, nil
+}
+
+// extractMachinesBlock extracts the machines block from the parsed HCL file
+func extractMachinesBlock(file *hcl.File) (*hcl.Block, error) {
 	schema := &hcl.BodySchema{
 		Blocks: []hcl.BlockHeaderSchema{
 			{
@@ -157,7 +178,6 @@ func getMachinesWithNames() ([]MachineWithName, error) {
 		},
 	}
 
-	// Extract the machines block
 	bodyContent, diags := file.Body.Content(schema)
 	if diags.HasErrors() {
 		return nil, fmt.Errorf("failed to decode machines block: %v", diags)
@@ -167,9 +187,11 @@ func getMachinesWithNames() ([]MachineWithName, error) {
 		return nil, fmt.Errorf("no machines block found in machines.hcl")
 	}
 
-	machinesBlock := bodyContent.Blocks[0]
+	return bodyContent.Blocks[0], nil
+}
 
-	// Define schema for machine blocks inside machines
+// extractMachineBlocks extracts machine blocks from the machines block
+func extractMachineBlocks(machinesBlock *hcl.Block) (*hcl.BodyContent, error) {
 	machineSchema := &hcl.BodySchema{
 		Blocks: []hcl.BlockHeaderSchema{
 			{
@@ -179,90 +201,24 @@ func getMachinesWithNames() ([]MachineWithName, error) {
 		},
 	}
 
-	// Extract machine blocks
 	machineContent, diags := machinesBlock.Body.Content(machineSchema)
 	if diags.HasErrors() {
 		return nil, fmt.Errorf("failed to decode machine blocks: %v", diags)
 	}
 
+	return machineContent, nil
+}
+
+// processMachineBlocks processes all machine blocks and returns MachineWithName slice
+func processMachineBlocks(machineContent *hcl.BodyContent) ([]MachineWithName, error) {
 	var machinesWithNames []MachineWithName
 
-	// Process each machine block to get the name and create the machine struct
 	for _, machineBlock := range machineContent.Blocks {
 		machineName := machineBlock.Labels[0]
 
-		// Create a new machine struct
-		machine := &schemas.MachinesMachineV1{
-			Description:       "",
-			Hostname:          machineName, // Use machine name as hostname by default
-			Port:              22,          // default
-			User:              "",
-			Authentication:    schemas.MachinesMachineAuthenticationV1{},
-			ConnectionTimeout: 30, // default
-			MaxRetries:        3,  // default
-			RetryDelay:        5,  // default
-			Facts:             schemas.MachinesMachineFactsV1{},
-		}
-
-		// Use a schema that allows authentication blocks
-		attrSchema := &hcl.BodySchema{
-			Attributes: []hcl.AttributeSchema{
-				{Name: "hostname", Required: false},
-				{Name: "port", Required: false},
-				{Name: "user", Required: true},
-			},
-			Blocks: []hcl.BlockHeaderSchema{
-				{
-					Type:       "authentication",
-					LabelNames: []string{"method"},
-				},
-			},
-		}
-
-		// Extract the machine content
-		content, diags := machineBlock.Body.Content(attrSchema)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to decode machine %s: %v", machineName, diags)
-		}
-
-		// Extract attributes
-		if hostnameAttr, exists := content.Attributes["hostname"]; exists {
-			var hostname string
-			if diags := gohcl.DecodeExpression(hostnameAttr.Expr, nil, &hostname); diags.HasErrors() {
-				return nil, fmt.Errorf("failed to decode hostname for machine %s: %v", machineName, diags)
-			}
-			machine.Hostname = hostname // Override default with explicit hostname
-		}
-
-		if portAttr, exists := content.Attributes["port"]; exists {
-			var port int
-			if diags := gohcl.DecodeExpression(portAttr.Expr, nil, &port); diags.HasErrors() {
-				return nil, fmt.Errorf("failed to decode port for machine %s: %v", machineName, diags)
-			}
-			machine.Port = port
-		}
-
-		if userAttr, exists := content.Attributes["user"]; exists {
-			var user string
-			if diags := gohcl.DecodeExpression(userAttr.Expr, nil, &user); diags.HasErrors() {
-				return nil, fmt.Errorf("failed to decode user for machine %s: %v", machineName, diags)
-			}
-			machine.User = user
-		}
-
-		// Validate required fields after parsing
-		if machine.User == "" {
-			return nil, fmt.Errorf("machine %s missing required user field in machines.hcl", machineName)
-		}
-
-		// Handle authentication blocks
-		if len(content.Blocks) > 0 {
-			authBlock := content.Blocks[0]
-			authConfig, err := utilities.ParseAuthenticationBlock(authBlock, machineName)
-			if err != nil {
-				return nil, err
-			}
-			machine.Authentication = *authConfig
+		machine, err := processMachineBlock(machineBlock, machineName)
+		if err != nil {
+			return nil, err
 		}
 
 		machinesWithNames = append(machinesWithNames, MachineWithName{
@@ -272,6 +228,127 @@ func getMachinesWithNames() ([]MachineWithName, error) {
 	}
 
 	return machinesWithNames, nil
+}
+
+// processMachineBlock processes a single machine block and returns the machine struct
+func processMachineBlock(machineBlock *hcl.Block, machineName string) (*schemas.MachinesMachineV1, error) {
+	// Create default machine struct
+	machine := createDefaultMachine(machineName)
+
+	// Extract machine content with schema
+	content, err := extractMachineContent(machineBlock, machineName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse machine attributes
+	if err := parseMachineAttributes(content, machine, machineName); err != nil {
+		return nil, err
+	}
+
+	// Validate required fields
+	if err := validateMachineFields(machine, machineName); err != nil {
+		return nil, err
+	}
+
+	// Handle authentication blocks
+	if err := parseAuthenticationBlocks(content, machine, machineName); err != nil {
+		return nil, err
+	}
+
+	return machine, nil
+}
+
+// createDefaultMachine creates a machine struct with default values
+func createDefaultMachine(machineName string) *schemas.MachinesMachineV1 {
+	return &schemas.MachinesMachineV1{
+		Description:       "",
+		Hostname:          machineName, // Use machine name as hostname by default
+		Port:              22,          // default
+		User:              "",
+		Authentication:    schemas.MachinesMachineAuthenticationV1{},
+		ConnectionTimeout: 30, // default
+		MaxRetries:        3,  // default
+		RetryDelay:        5,  // default
+		Facts:             schemas.MachinesMachineFactsV1{},
+	}
+}
+
+// extractMachineContent extracts content from a machine block using the appropriate schema
+func extractMachineContent(machineBlock *hcl.Block, machineName string) (*hcl.BodyContent, error) {
+	attrSchema := &hcl.BodySchema{
+		Attributes: []hcl.AttributeSchema{
+			{Name: "hostname", Required: false},
+			{Name: "port", Required: false},
+			{Name: "user", Required: true},
+		},
+		Blocks: []hcl.BlockHeaderSchema{
+			{
+				Type:       "authentication",
+				LabelNames: []string{"method"},
+			},
+		},
+	}
+
+	content, diags := machineBlock.Body.Content(attrSchema)
+	if diags.HasErrors() {
+		return nil, fmt.Errorf("failed to decode machine %s: %v", machineName, diags)
+	}
+
+	return content, nil
+}
+
+// parseMachineAttributes parses machine attributes from HCL content
+func parseMachineAttributes(content *hcl.BodyContent, machine *schemas.MachinesMachineV1, machineName string) error {
+	// Parse hostname
+	if hostnameAttr, exists := content.Attributes["hostname"]; exists {
+		var hostname string
+		if diags := gohcl.DecodeExpression(hostnameAttr.Expr, nil, &hostname); diags.HasErrors() {
+			return fmt.Errorf("failed to decode hostname for machine %s: %v", machineName, diags)
+		}
+		machine.Hostname = hostname // Override default with explicit hostname
+	}
+
+	// Parse port
+	if portAttr, exists := content.Attributes["port"]; exists {
+		var port int
+		if diags := gohcl.DecodeExpression(portAttr.Expr, nil, &port); diags.HasErrors() {
+			return fmt.Errorf("failed to decode port for machine %s: %v", machineName, diags)
+		}
+		machine.Port = port
+	}
+
+	// Parse user
+	if userAttr, exists := content.Attributes["user"]; exists {
+		var user string
+		if diags := gohcl.DecodeExpression(userAttr.Expr, nil, &user); diags.HasErrors() {
+			return fmt.Errorf("failed to decode user for machine %s: %v", machineName, diags)
+		}
+		machine.User = user
+	}
+
+	return nil
+}
+
+// validateMachineFields validates required machine fields
+func validateMachineFields(machine *schemas.MachinesMachineV1, machineName string) error {
+	if machine.User == "" {
+		return fmt.Errorf("machine %s missing required user field in machines.hcl", machineName)
+	}
+	return nil
+}
+
+// parseAuthenticationBlocks parses authentication blocks for a machine
+func parseAuthenticationBlocks(content *hcl.BodyContent, machine *schemas.MachinesMachineV1, machineName string) error {
+	if len(content.Blocks) > 0 {
+		authBlock := content.Blocks[0]
+		authConfig, err := utilities.ParseAuthenticationBlock(authBlock, machineName)
+		if err != nil {
+			return err
+		}
+		machine.Authentication = *authConfig
+	}
+	return nil
 }
 
 // pingMachine performs a ping operation on a single machine

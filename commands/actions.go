@@ -1270,79 +1270,104 @@ func extractVariableAttributes(variableBlock *hcl.Block) (*hcl.BodyContent, erro
 func parseVariableAttributes(attrContent *hcl.BodyContent, variableName string) (interface{}, error) {
 	// Check for encrypted_value first (highest priority)
 	if attr, exists := attrContent.Attributes["encrypted_value"]; exists {
-		// Try to decode as cty.Value first, then convert to Go type
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to evaluate encrypted_value for variable %s: %v", variableName, diags)
-		}
-
-		// Convert cty.Value to Go interface{}
-		if val.IsNull() {
-			return nil, nil
-		}
-
-		// For encrypted values, we expect an object/map
-		if val.Type().IsObjectType() {
-			result := make(map[string]interface{})
-			for key, value := range val.AsValueMap() {
-				if value.Type() == cty.String {
-					result[key] = value.AsString()
-				} else {
-					result[key] = value.AsString() // Fallback to string representation
-				}
-			}
-			return result, nil
-		}
-
-		// Fallback to string representation
-		return val.AsString(), nil
+		return parseEncryptedValueAttribute(attr, variableName)
 	}
 
 	// Check for plain value
 	if attr, exists := attrContent.Attributes["value"]; exists {
-		// Try to decode as cty.Value first, then convert to Go type
-		val, diags := attr.Expr.Value(nil)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to evaluate value for variable %s: %v", variableName, diags)
-		}
-
-		// Convert cty.Value to Go interface{}
-		if val.IsNull() {
-			return nil, nil
-		}
-
-		// Convert based on type
-		switch val.Type() {
-		case cty.String:
-			return val.AsString(), nil
-		case cty.Number:
-			// Convert number to float64 for simplicity
-			floatVal, _ := val.AsBigFloat().Float64()
-			return floatVal, nil
-		case cty.Bool:
-			return val.True(), nil
-		case cty.List(cty.String):
-			var result []string
-			for _, item := range val.AsValueSlice() {
-				result = append(result, item.AsString())
-			}
-			return result, nil
-		default:
-			return val.AsString(), nil // Fallback to string representation
-		}
+		return parseValueAttribute(attr, variableName)
 	}
 
 	// Check for description
 	if attr, exists := attrContent.Attributes["description"]; exists {
-		var description string
-		if err := gohcl.DecodeExpression(attr.Expr, nil, &description); err != nil {
-			return nil, fmt.Errorf("failed to decode description for variable %s: %v", variableName, err)
-		}
-		return description, nil
+		return parseDescriptionAttribute(attr, variableName)
 	}
 
 	// Return empty string if no value found
 	return "", nil
+}
+
+// parseEncryptedValueAttribute parses encrypted_value attribute
+func parseEncryptedValueAttribute(attr *hcl.Attribute, variableName string) (interface{}, error) {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return nil, fmt.Errorf("failed to evaluate encrypted_value for variable %s: %v", variableName, diags)
+	}
+
+	if val.IsNull() {
+		return nil, nil
+	}
+
+	// For encrypted values, we expect an object/map
+	if val.Type().IsObjectType() {
+		return parseEncryptedObjectValue(val)
+	}
+
+	// Fallback to string representation
+	return val.AsString(), nil
+}
+
+// parseEncryptedObjectValue parses encrypted object value into map
+func parseEncryptedObjectValue(val cty.Value) (map[string]interface{}, error) {
+	result := make(map[string]interface{})
+	for key, value := range val.AsValueMap() {
+		if value.Type() == cty.String {
+			result[key] = value.AsString()
+		} else {
+			result[key] = value.AsString() // Fallback to string representation
+		}
+	}
+	return result, nil
+}
+
+// parseValueAttribute parses value attribute with type conversion
+func parseValueAttribute(attr *hcl.Attribute, variableName string) (interface{}, error) {
+	val, diags := attr.Expr.Value(nil)
+	if diags.HasErrors() {
+		return nil, fmt.Errorf("failed to evaluate value for variable %s: %v", variableName, diags)
+	}
+
+	if val.IsNull() {
+		return nil, nil
+	}
+
+	return convertCtyValueToGoType(val)
+}
+
+// convertCtyValueToGoType converts cty.Value to appropriate Go type
+func convertCtyValueToGoType(val cty.Value) (interface{}, error) {
+	switch val.Type() {
+	case cty.String:
+		return val.AsString(), nil
+	case cty.Number:
+		// Convert number to float64 for simplicity
+		floatVal, _ := val.AsBigFloat().Float64()
+		return floatVal, nil
+	case cty.Bool:
+		return val.True(), nil
+	case cty.List(cty.String):
+		return convertStringList(val)
+	default:
+		return val.AsString(), nil // Fallback to string representation
+	}
+}
+
+// convertStringList converts cty list of strings to Go string slice
+func convertStringList(val cty.Value) ([]string, error) {
+	var result []string
+	for _, item := range val.AsValueSlice() {
+		result = append(result, item.AsString())
+	}
+	return result, nil
+}
+
+// parseDescriptionAttribute parses description attribute
+func parseDescriptionAttribute(attr *hcl.Attribute, variableName string) (string, error) {
+	var description string
+	if err := gohcl.DecodeExpression(attr.Expr, nil, &description); err != nil {
+		return "", fmt.Errorf("failed to decode description for variable %s: %v", variableName, err)
+	}
+	return description, nil
 }
 
 // buildTemplateContext creates a template context with all necessary data

@@ -786,99 +786,181 @@ func compareOID(a, b []int) bool {
 
 // decryptPKCS8Key attempts to decrypt a PKCS#8 encrypted private key
 func (sc *SSHClient) decryptPKCS8Key(keyData []byte, passphrase string) ([]byte, error) {
-	// Parse PEM to get the encrypted block
+	// Parse and validate PEM block
+	block, err := sc.parsePKCS8PEMBlock(keyData)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse PKCS#8 encrypted structure
+	encryptedKey, err := sc.parsePKCS8EncryptedStructure(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse PBES2 parameters
+	pbes2Params, err := sc.parsePBES2Parameters(encryptedKey.Algorithm.Parameters.FullBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse PBKDF2 parameters
+	pbkdf2Params, err := sc.parsePBKDF2Parameters(pbes2Params.KeyDerivationFunc.Parameters.FullBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse AES parameters
+	aesParams, keyLen, err := sc.parseAESParameters(pbes2Params.EncryptionScheme)
+	if err != nil {
+		return nil, err
+	}
+
+	// Derive key and decrypt
+	return sc.decryptWithAES(encryptedKey.EncryptedData, passphrase, pbkdf2Params, aesParams, keyLen)
+}
+
+// parsePKCS8PEMBlock parses and validates the PEM block for PKCS#8 encrypted key
+func (sc *SSHClient) parsePKCS8PEMBlock(keyData []byte) (*pem.Block, error) {
 	block, _ := pem.Decode(keyData)
 	if block == nil {
 		return nil, errors.New("failed to decode PEM block")
 	}
 
-	// Check if this is an ENCRYPTED PRIVATE KEY
 	if block.Type != "ENCRYPTED PRIVATE KEY" {
 		return nil, errors.New("not a PKCS#8 encrypted private key")
 	}
 
-	// Parse the PKCS#8 encrypted structure
+	return block, nil
+}
+
+// parsePKCS8EncryptedStructure parses the PKCS#8 encrypted key structure
+func (sc *SSHClient) parsePKCS8EncryptedStructure(blockBytes []byte) (struct {
+	Version       int
+	Algorithm     AlgorithmIdentifier
+	EncryptedData []byte `asn1:"tag:0"`
+}, error) {
 	var encryptedKey struct {
 		Version       int
 		Algorithm     AlgorithmIdentifier
 		EncryptedData []byte `asn1:"tag:0"`
 	}
 
-	_, err := asn1.Unmarshal(block.Bytes, &encryptedKey)
+	_, err := asn1.Unmarshal(blockBytes, &encryptedKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse PKCS#8 encrypted key structure")
+		return encryptedKey, errors.Wrap(err, "failed to parse PKCS#8 encrypted key structure")
 	}
 
-	// Check if it's PBES2 (Password-Based Encryption Scheme 2)
+	// Validate algorithm is PBES2
 	if !compareOID(encryptedKey.Algorithm.Algorithm, oidPBES2) {
-		return nil, errors.New("unsupported PKCS#8 encryption algorithm (only PBES2 supported)")
+		return encryptedKey, errors.New("unsupported PKCS#8 encryption algorithm (only PBES2 supported)")
 	}
 
-	// Parse PBES2 parameters
+	return encryptedKey, nil
+}
+
+// parsePBES2Parameters parses PBES2 parameters from ASN.1 data
+func (sc *SSHClient) parsePBES2Parameters(paramsData []byte) (struct {
+	KeyDerivationFunc AlgorithmIdentifier
+	EncryptionScheme  AlgorithmIdentifier
+}, error) {
 	var pbes2Params struct {
 		KeyDerivationFunc AlgorithmIdentifier
 		EncryptionScheme  AlgorithmIdentifier
 	}
 
-	_, err = asn1.Unmarshal(encryptedKey.Algorithm.Parameters.FullBytes, &pbes2Params)
+	_, err := asn1.Unmarshal(paramsData, &pbes2Params)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse PBES2 parameters")
+		return pbes2Params, errors.Wrap(err, "failed to parse PBES2 parameters")
 	}
 
-	// Check if it's PBKDF2 (Password-Based Key Derivation Function 2)
+	// Validate key derivation function is PBKDF2
 	if !compareOID(pbes2Params.KeyDerivationFunc.Algorithm, oidPBKDF2) {
-		return nil, errors.New("unsupported key derivation function (only PBKDF2 supported)")
+		return pbes2Params, errors.New("unsupported key derivation function (only PBKDF2 supported)")
 	}
 
-	// Parse PBKDF2 parameters
+	return pbes2Params, nil
+}
+
+// parsePBKDF2Parameters parses PBKDF2 parameters from ASN.1 data
+func (sc *SSHClient) parsePBKDF2Parameters(paramsData []byte) (struct {
+	Salt           []byte
+	IterationCount int
+	PRF            AlgorithmIdentifier `asn1:"optional"`
+}, error) {
 	var pbkdf2Params struct {
 		Salt           []byte
 		IterationCount int
 		PRF            AlgorithmIdentifier `asn1:"optional"`
 	}
 
-	_, err = asn1.Unmarshal(pbes2Params.KeyDerivationFunc.Parameters.FullBytes, &pbkdf2Params)
+	_, err := asn1.Unmarshal(paramsData, &pbkdf2Params)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse PBKDF2 parameters")
+		return pbkdf2Params, errors.Wrap(err, "failed to parse PBKDF2 parameters")
 	}
 
-	// Check if it's AES encryption
-	if !compareOID(pbes2Params.EncryptionScheme.Algorithm, oidAES256CBC) &&
-		!compareOID(pbes2Params.EncryptionScheme.Algorithm, oidAES128CBC) {
-		return nil, errors.New("unsupported encryption algorithm (only AES supported)")
+	return pbkdf2Params, nil
+}
+
+// parseAESParameters parses AES parameters and determines key length
+func (sc *SSHClient) parseAESParameters(encryptionScheme AlgorithmIdentifier) ([]byte, int, error) {
+	// Validate encryption algorithm is AES
+	if !compareOID(encryptionScheme.Algorithm, oidAES256CBC) &&
+		!compareOID(encryptionScheme.Algorithm, oidAES128CBC) {
+		return nil, 0, errors.New("unsupported encryption algorithm (only AES supported)")
 	}
 
 	// Parse AES parameters (IV)
 	var aesParams []byte
-	_, err = asn1.Unmarshal(pbes2Params.EncryptionScheme.Parameters.FullBytes, &aesParams)
+	_, err := asn1.Unmarshal(encryptionScheme.Parameters.FullBytes, &aesParams)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse AES parameters")
+		return nil, 0, errors.Wrap(err, "failed to parse AES parameters")
 	}
 
-	// Derive key using PBKDF2
+	// Determine key length
 	keyLen := 32 // AES-256
-	if compareOID(pbes2Params.EncryptionScheme.Algorithm, oidAES128CBC) {
+	if compareOID(encryptionScheme.Algorithm, oidAES128CBC) {
 		keyLen = 16 // AES-128
 	}
 
+	return aesParams, keyLen, nil
+}
+
+// decryptWithAES performs the actual AES decryption with PBKDF2 key derivation
+func (sc *SSHClient) decryptWithAES(encryptedData []byte, passphrase string, pbkdf2Params struct {
+	Salt           []byte
+	IterationCount int
+	PRF            AlgorithmIdentifier `asn1:"optional"`
+}, aesParams []byte, keyLen int) ([]byte, error) {
+	// Derive key using PBKDF2
 	derivedKey := pbkdf2.Key([]byte(passphrase), pbkdf2Params.Salt, pbkdf2Params.IterationCount, keyLen, sha256.New)
 
-	// Decrypt using AES
+	// Create AES cipher
 	cipherBlock, err := aes.NewCipher(derivedKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create AES cipher")
 	}
 
-	if len(encryptedKey.EncryptedData)%aes.BlockSize != 0 {
+	// Validate encrypted data length
+	if len(encryptedData)%aes.BlockSize != 0 {
 		return nil, errors.New("encrypted data is not a multiple of AES block size")
 	}
 
 	// Decrypt in CBC mode
 	mode := cipher.NewCBCDecrypter(cipherBlock, aesParams)
-	decrypted := make([]byte, len(encryptedKey.EncryptedData))
-	mode.CryptBlocks(decrypted, encryptedKey.EncryptedData)
+	decrypted := make([]byte, len(encryptedData))
+	mode.CryptBlocks(decrypted, encryptedData)
 
-	// Remove PKCS#7 padding
+	// Remove and validate PKCS#7 padding
+	return sc.removePKCS7Padding(decrypted)
+}
+
+// removePKCS7Padding removes and validates PKCS#7 padding
+func (sc *SSHClient) removePKCS7Padding(decrypted []byte) ([]byte, error) {
+	if len(decrypted) == 0 {
+		return nil, errors.New("decrypted data is empty")
+	}
+
 	paddingByte := decrypted[len(decrypted)-1]
 	if paddingByte > aes.BlockSize || paddingByte == 0 {
 		return nil, errors.New("invalid PKCS#7 padding")
