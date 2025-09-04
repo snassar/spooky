@@ -12,48 +12,113 @@ import (
 	"github.com/pkg/errors"
 )
 
-// SimpleSSHManager provides basic SSH functionality for Spooky
-type SimpleSSHManager struct {
+// Manager provides SSH functionality for Spooky
+type Manager struct {
 	ageEncryption *encryption.AgeEncryption
 	config        *schemas.SpookySSHV1
 }
 
-// NewSimpleSSHManager creates a new simple SSH manager
-func NewSimpleSSHManager(ageEncryption *encryption.AgeEncryption, config *schemas.SpookySSHV1) *SimpleSSHManager {
-	return &SimpleSSHManager{
+// NewSSHManager creates a new SSH manager
+func NewSSHManager(ageEncryption *encryption.AgeEncryption, config *schemas.SpookySSHV1) *Manager {
+	return &Manager{
 		ageEncryption: ageEncryption,
 		config:        config,
 	}
 }
 
 // createSSHConfig creates a new SSH configuration for the given machine
-func (sm *SimpleSSHManager) createSSHConfig(machine *schemas.MachinesMachineV1) *Config {
+func (sm *Manager) createSSHConfig(machine *schemas.MachinesMachineV1) *Config {
+	// Use default values if config is nil
+	var timeout, keepAlive, keyScanTimeout time.Duration
+	var keepAliveCount int
+	var knownHostsMode string
+
+	if sm.config != nil {
+		timeout = time.Duration(sm.config.Timeout) * time.Second
+		keepAlive = time.Duration(sm.config.KeepaliveInterval) * time.Second
+		keepAliveCount = sm.config.KeepaliveCount
+		keyScanTimeout = time.Duration(sm.config.KeyScanTimeout) * time.Second
+		knownHostsMode = sm.config.KnownHostsMode
+	} else {
+		// Default values
+		timeout = 30 * time.Second
+		keepAlive = 30 * time.Second
+		keepAliveCount = 3
+		keyScanTimeout = 5 * time.Second
+		knownHostsMode = "auto"
+	}
+
 	return &Config{
 		Host:           machine.Hostname,
 		Port:           machine.Port,
 		User:           machine.User,
-		Timeout:        time.Duration(sm.config.Timeout) * time.Second,
-		KeepAlive:      time.Duration(sm.config.KeepaliveInterval) * time.Second,
-		KeepAliveCount: sm.config.KeepaliveCount,
-		KeyScanTimeout: time.Duration(sm.config.KeyScanTimeout) * time.Second,
-		KnownHostsMode: sm.config.KnownHostsMode,
+		Timeout:        timeout,
+		KeepAlive:      keepAlive,
+		KeepAliveCount: keepAliveCount,
+		KeyScanTimeout: keyScanTimeout,
+		KnownHostsMode: knownHostsMode,
 		PubkeyAuth:     true,
 		PasswordAuth:   true,
 
 		// Proxy configuration
-		ProxyCommand: sm.config.ProxyCommand,
-		ProxyJump:    sm.config.ProxyJump,
+		ProxyCommand: func() string {
+			if sm.config != nil {
+				return sm.config.ProxyCommand
+			}
+			return ""
+		}(),
+		ProxyJump: func() string {
+			if sm.config != nil {
+				return sm.config.ProxyJump
+			}
+			return ""
+		}(),
 
 		// Compression configuration
-		Compression:      sm.config.Compression,
-		CompressionLevel: sm.config.CompressionLevel,
+		Compression: func() bool {
+			if sm.config != nil {
+				return sm.config.Compression
+			}
+			return false
+		}(),
+		CompressionLevel: func() int {
+			if sm.config != nil {
+				return sm.config.CompressionLevel
+			}
+			return 6
+		}(),
 
 		// TCP keepalive configuration
-		TCPKeepAlive:              sm.config.TCPKeepAlive,
-		TCPKeepAliveCount:         sm.config.TCPKeepAliveCount,
-		TCPKeepAliveIdle:          sm.config.TCPKeepAliveIdle,
-		TCPKeepAliveInterval:      sm.config.TCPKeepAliveInterval,
-		TCPKeepAliveProbeInterval: sm.config.TCPKeepAliveProbeInterval,
+		TCPKeepAlive: func() bool {
+			if sm.config != nil {
+				return sm.config.TCPKeepAlive
+			}
+			return true
+		}(),
+		TCPKeepAliveCount: func() int {
+			if sm.config != nil {
+				return sm.config.TCPKeepAliveCount
+			}
+			return 3
+		}(),
+		TCPKeepAliveIdle: func() time.Duration {
+			if sm.config != nil {
+				return time.Duration(sm.config.TCPKeepAliveIdle) * time.Second
+			}
+			return 30 * time.Second
+		}(),
+		TCPKeepAliveInterval: func() time.Duration {
+			if sm.config != nil {
+				return time.Duration(sm.config.TCPKeepAliveInterval) * time.Second
+			}
+			return 10 * time.Second
+		}(),
+		TCPKeepAliveProbeInterval: func() time.Duration {
+			if sm.config != nil {
+				return time.Duration(sm.config.TCPKeepAliveProbeInterval) * time.Second
+			}
+			return 5 * time.Second
+		}(),
 	}
 }
 
@@ -79,7 +144,12 @@ func (sm *SimpleSSHManager) createSSHConfig(machine *schemas.MachinesMachineV1) 
 //	fmt.Printf("Exit code: %d\n", result.ExitCode)
 //
 // Performance: 100ms-30s depending on command complexity and network latency
-func (sm *SimpleSSHManager) RunCommandOnMachine(ctx context.Context, machine *schemas.MachinesMachineV1, command string) (*schemas.CommandResult, error) {
+func (sm *Manager) RunCommandOnMachine(ctx context.Context, machine *schemas.MachinesMachineV1, command string) (*schemas.CommandResult, error) {
+	// Check if manager is properly initialized
+	if sm == nil {
+		return nil, errors.New("SSH manager is not initialized")
+	}
+
 	// Create SSH config
 	sshConfig := sm.createSSHConfig(machine)
 
@@ -103,20 +173,20 @@ func (sm *SimpleSSHManager) RunCommandOnMachine(ctx context.Context, machine *sc
 
 	// Connect to machine
 	if err := client.Connect(ctx); err != nil {
-		return nil, errors.Wrapf(err, "failed to connect to machine %s", machine.Hostname)
+		return nil, errors.Wrap(err, "failed to connect to target machine - check host configuration and network connectivity")
 	}
 
 	// Execute command
 	result, err := client.RunCommand(ctx, command)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to execute command on machine %s", machine.Hostname)
+		return nil, errors.Wrap(err, "failed to execute command on target machine - check command syntax and permissions")
 	}
 
 	return result, nil
 }
 
 // setupAuthentication configures authentication methods for the SSH client
-func (sm *SimpleSSHManager) setupAuthentication(config *Config, machine *schemas.MachinesMachineV1) error {
+func (sm *Manager) setupAuthentication(config *Config, machine *schemas.MachinesMachineV1) error {
 	auth := machine.Authentication
 	logger := logging.GetGlobalLogger()
 
@@ -159,7 +229,7 @@ func (sm *SimpleSSHManager) setupAuthentication(config *Config, machine *schemas
 }
 
 // setupPublicKeyAuth configures public key authentication
-func (sm *SimpleSSHManager) setupPublicKeyAuth(config *Config, auth *schemas.MachinesMachineAuthenticationV1) error {
+func (sm *Manager) setupPublicKeyAuth(config *Config, auth *schemas.MachinesMachineAuthenticationV1) error {
 	if auth.PublicKeyPath == "" {
 		return errors.New("no public key path provided")
 	}
@@ -179,7 +249,7 @@ func (sm *SimpleSSHManager) setupPublicKeyAuth(config *Config, auth *schemas.Mac
 }
 
 // setupPasswordAuth configures password authentication
-func (sm *SimpleSSHManager) setupPasswordAuth(config *Config, auth *schemas.MachinesMachineAuthenticationV1) error {
+func (sm *Manager) setupPasswordAuth(config *Config, auth *schemas.MachinesMachineAuthenticationV1) error {
 	if auth.Password.Value == "" {
 		return errors.New("no password provided")
 	}
@@ -194,7 +264,7 @@ func (sm *SimpleSSHManager) setupPasswordAuth(config *Config, auth *schemas.Mach
 }
 
 // setupCertificateAuth configures certificate authentication
-func (sm *SimpleSSHManager) setupCertificateAuth(config *Config, auth *schemas.MachinesMachineAuthenticationV1) error {
+func (sm *Manager) setupCertificateAuth(config *Config, auth *schemas.MachinesMachineAuthenticationV1) error {
 	if auth.PrivateKeyPath == "" || auth.CertificatePath == "" {
 		return errors.New("certificate authentication requires both private key and certificate paths")
 	}
@@ -214,7 +284,7 @@ func (sm *SimpleSSHManager) setupCertificateAuth(config *Config, auth *schemas.M
 }
 
 // decryptCredential handles decryption of credentials if they are encrypted
-func (sm *SimpleSSHManager) decryptCredential(value string, encrypted bool, credentialType string) (string, error) {
+func (sm *Manager) decryptCredential(value string, encrypted bool, credentialType string) (string, error) {
 	if !encrypted {
 		return value, nil
 	}
@@ -236,7 +306,7 @@ func (sm *SimpleSSHManager) decryptCredential(value string, encrypted bool, cred
 }
 
 // TestConnection tests the SSH connection to a machine
-func (sm *SimpleSSHManager) TestConnection(ctx context.Context, machine *schemas.MachinesMachineV1) error {
+func (sm *Manager) TestConnection(ctx context.Context, machine *schemas.MachinesMachineV1) error {
 	result, err := sm.RunCommandOnMachine(ctx, machine, "echo 'SSH connection test successful'")
 	if err != nil {
 		return errors.Wrapf(err, "failed to test connection to machine %s", machine.Hostname)
@@ -252,7 +322,7 @@ func (sm *SimpleSSHManager) TestConnection(ctx context.Context, machine *schemas
 }
 
 // UploadFileToMachine uploads a file to a specific machine
-func (sm *SimpleSSHManager) UploadFileToMachine(ctx context.Context, machine *schemas.MachinesMachineV1, localPath, remotePath string) error {
+func (sm *Manager) UploadFileToMachine(ctx context.Context, machine *schemas.MachinesMachineV1, localPath, remotePath string) error {
 	// Create SSH config
 	sshConfig := sm.createSSHConfig(machine)
 
@@ -276,19 +346,19 @@ func (sm *SimpleSSHManager) UploadFileToMachine(ctx context.Context, machine *sc
 
 	// Connect to machine
 	if err := client.Connect(ctx); err != nil {
-		return errors.Wrapf(err, "failed to connect to machine %s", machine.Hostname)
+		return errors.Wrap(err, "failed to connect to target machine - check host configuration and network connectivity")
 	}
 
 	// Upload file
 	if err := client.UploadFile(ctx, localPath, remotePath); err != nil {
-		return errors.Wrapf(err, "failed to upload file to machine %s", machine.Hostname)
+		return errors.Wrap(err, "failed to upload file to target machine - check file permissions and disk space")
 	}
 
 	return nil
 }
 
 // GetSSHClient gets an SSH client for a specific machine
-func (sm *SimpleSSHManager) GetSSHClient(hostname string, machine *schemas.MachinesMachineV1) (*Client, error) {
+func (sm *Manager) GetSSHClient(hostname string, machine *schemas.MachinesMachineV1) (*Client, error) {
 	// Create SSH config
 	sshConfig := sm.createSSHConfig(machine)
 

@@ -23,7 +23,7 @@ func TestNewGatherer(t *testing.T) {
 	}
 
 	// Test with actual instances
-	sshManager := ssh.NewSimpleSSHManager(nil, nil)
+	sshManager := ssh.NewSSHManager(nil, nil)
 	config := &schemas.ProjectV1{
 		Name:                    "test-project",
 		FactsTimeout:            30,
@@ -67,13 +67,13 @@ func TestGatherer_GatherFactsFromMachine_InputValidation(t *testing.T) {
 			errorMsg:    "machine hostname cannot be empty",
 		},
 		{
-			name: "valid machine (will fail due to nil SSH manager)",
+			name: "valid machine (will succeed with warnings due to nil SSH manager)",
 			machine: &schemas.MachinesMachineV1{
 				Hostname: "test-machine",
 				User:     "test-user",
 				Port:     22,
 			},
-			expectError: true, // Will fail due to nil SSH manager
+			expectError: false, // Will succeed but with warnings due to nil SSH manager
 		},
 	}
 

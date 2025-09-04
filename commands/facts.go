@@ -323,7 +323,7 @@ var gatherFactsCmd = &cobra.Command{
 		}
 
 		// Create SSH manager
-		sshManager := ssh.NewSimpleSSHManager(nil, sshConfig)
+		sshManager := ssh.NewSSHManager(nil, sshConfig)
 
 		// Create facts gatherer
 		gatherer := facts.NewGatherer(sshManager, projectConfig)
@@ -424,7 +424,7 @@ If no output file is specified, the facts will be exported to 'exported-facts.hc
 		}
 
 		// Create SSH manager
-		sshManager := ssh.NewSimpleSSHManager(nil, sshConfig)
+		sshManager := ssh.NewSSHManager(nil, sshConfig)
 
 		// Create facts gatherer
 		gatherer := facts.NewGatherer(sshManager, projectConfig)

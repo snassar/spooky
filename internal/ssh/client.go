@@ -166,7 +166,13 @@ func (sc *Client) Connect(ctx context.Context) error {
 
 	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
-		return errors.Wrapf(err, "failed to connect to %s - network connection failed", addr)
+		// Log sensitive connection details at debug level only
+		logger := logging.GetGlobalLogger()
+		logger.Debug("SSH connection failed",
+			slog.String("host", sc.config.Host),
+			slog.Int("port", sc.config.Port),
+			slog.String("error", err.Error()))
+		return errors.Wrap(err, "SSH connection failed - check network connectivity and host configuration")
 	}
 
 	// Create SSH connection
@@ -177,7 +183,14 @@ func (sc *Client) Connect(ctx context.Context) error {
 			// This is a best-effort cleanup
 			utilities.HandleCleanupError(closeErr, "ssh_connection", "close")
 		}
-		return errors.Wrapf(err, "failed to establish SSH connection to %s - authentication or protocol negotiation failed", addr)
+		// Log sensitive connection details at debug level only
+		logger := logging.GetGlobalLogger()
+		logger.Debug("SSH authentication/protocol failed",
+			slog.String("host", sc.config.Host),
+			slog.Int("port", sc.config.Port),
+			slog.String("user", sc.config.User),
+			slog.String("error", err.Error()))
+		return errors.Wrap(err, "SSH connection failed - check authentication configuration and protocol compatibility")
 	}
 
 	// Create SSH client

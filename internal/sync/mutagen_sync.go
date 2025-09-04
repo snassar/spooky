@@ -109,25 +109,25 @@ func (m *MutagenSyncEngine) validateSourceFile(sourcePath string, result *FileSy
 	sourceInfo, err := os.Stat(sourcePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			result.Error = fmt.Errorf("source file does not exist: %s", sourcePath)
+			result.Error = fmt.Errorf("source file does not exist: %s", utilities.SanitizePathForError(sourcePath))
 		} else if os.IsPermission(err) {
-			result.Error = fmt.Errorf("permission denied accessing source file: %s", sourcePath)
+			result.Error = fmt.Errorf("permission denied accessing source file: %s", utilities.SanitizePathForError(sourcePath))
 		} else {
-			result.Error = fmt.Errorf("failed to access source file %s: %w", sourcePath, err)
+			result.Error = fmt.Errorf("failed to access source file %s: %w", utilities.SanitizePathForError(sourcePath), err)
 		}
 		return nil, result.Error
 	}
 
 	// Ensure it's a regular file, not a directory
 	if sourceInfo.IsDir() {
-		result.Error = fmt.Errorf("source path is a directory, not a file: %s", sourcePath)
+		result.Error = fmt.Errorf("source path is a directory, not a file: %s", utilities.SanitizePathForError(sourcePath))
 		return nil, result.Error
 	}
 
 	// Check if file is readable
 	file, err := os.Open(sourcePath)
 	if err != nil {
-		result.Error = fmt.Errorf("source file is not readable: %s: %w", sourcePath, err)
+		result.Error = fmt.Errorf("source file is not readable: %s: %w", utilities.SanitizePathForError(sourcePath), err)
 		return nil, result.Error
 	}
 	if closeErr := file.Close(); closeErr != nil {

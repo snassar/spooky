@@ -445,7 +445,7 @@ func testAuthentication(machine *schemas.MachinesMachineV1, timeout int) string 
 	}
 
 	// Create SSH manager
-	manager := ssh.NewSimpleSSHManager(ageEncryption, sshConfig)
+	manager := ssh.NewSSHManager(ageEncryption, sshConfig)
 
 	// Test connection with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)

@@ -138,15 +138,15 @@ func validateSourceDirectory(sourcePath string) error {
 	sourceInfo, err := os.Stat(sourcePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("source directory does not exist: %s", sourcePath)
+			return fmt.Errorf("source directory does not exist: %s", utilities.SanitizePathForError(sourcePath))
 		}
 		if os.IsPermission(err) {
-			return fmt.Errorf("permission denied accessing source directory: %s", sourcePath)
+			return fmt.Errorf("permission denied accessing source directory: %s", utilities.SanitizePathForError(sourcePath))
 		}
-		return fmt.Errorf("failed to access source directory %s: %w", sourcePath, err)
+		return fmt.Errorf("failed to access source directory %s: %w", utilities.SanitizePathForError(sourcePath), err)
 	}
 	if !sourceInfo.IsDir() {
-		return fmt.Errorf("source path is not a directory: %s", sourcePath)
+		return fmt.Errorf("source path is not a directory: %s", utilities.SanitizePathForError(sourcePath))
 	}
 	return nil
 }
@@ -164,7 +164,7 @@ func prepareTargetDirectory(targetPath string) error {
 		return fmt.Errorf("failed to stat target directory: %w", err)
 	}
 	if !targetInfo.IsDir() {
-		return fmt.Errorf("target path is not a directory: %s", targetPath)
+		return fmt.Errorf("target path is not a directory: %s", utilities.SanitizePathForError(targetPath))
 	}
 	return nil
 }

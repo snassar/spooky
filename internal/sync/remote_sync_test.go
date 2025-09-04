@@ -47,7 +47,7 @@ func TestRemoteSyncEngine(t *testing.T) {
 
 	// Create a mock SSH manager (this would be mocked in a real test)
 	// For now, we'll just test the local file counting functionality
-	sshManager := &ssh.SimpleSSHManager{} // This won't work without proper initialization
+	sshManager := &ssh.Manager{} // This won't work without proper initialization
 
 	// Create remote sync engine
 	engine := NewRemoteSyncEngine(sshManager)
@@ -338,7 +338,7 @@ func TestProgressThreadSafety(t *testing.T) {
 
 func TestGetOptimalConcurrency(t *testing.T) {
 	// Create a mock SSH manager
-	sshManager := &ssh.SimpleSSHManager{}
+	sshManager := &ssh.Manager{}
 	engine := NewRemoteSyncEngine(sshManager)
 
 	// Test with explicit concurrency setting

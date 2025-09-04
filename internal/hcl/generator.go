@@ -102,6 +102,8 @@ func (hg *Generator) fieldToCty(field reflect.Value, fieldType reflect.StructFie
 	switch field.Kind() {
 	case reflect.Ptr:
 		return hg.handlePointerField(field, fieldType)
+	case reflect.Interface:
+		return hg.handleInterfaceField(field, fieldType)
 	case reflect.String:
 		return hg.handleStringField(field, fieldType)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -133,6 +135,48 @@ func (hg *Generator) handlePointerField(field reflect.Value, fieldType reflect.S
 		return cty.NilVal, nil
 	}
 	return hg.fieldToCty(field.Elem(), fieldType)
+}
+
+// handleInterfaceField handles interface{} type fields by examining the actual value
+func (hg *Generator) handleInterfaceField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+	if field.IsNil() {
+		// Check if there's a default value in the tag
+		if defaultValue := fieldType.Tag.Get("default"); defaultValue != "" {
+			return hg.parseDefaultValue(defaultValue, fieldType)
+		}
+		return cty.NilVal, nil
+	}
+
+	// Get the actual value stored in the interface
+	actualValue := field.Elem()
+
+	// Handle the actual type of the value
+	switch actualValue.Kind() {
+	case reflect.String:
+		return cty.StringVal(actualValue.String()), nil
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return cty.NumberIntVal(actualValue.Int()), nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return cty.NumberUIntVal(actualValue.Uint()), nil
+	case reflect.Float32, reflect.Float64:
+		return cty.NumberFloatVal(actualValue.Float()), nil
+	case reflect.Bool:
+		return cty.BoolVal(actualValue.Bool()), nil
+	case reflect.Slice:
+		return hg.handleSliceField(actualValue, fieldType)
+	case reflect.Map:
+		return hg.handleMapField(actualValue, fieldType)
+	case reflect.Struct:
+		return hg.handleStructField(actualValue)
+	case reflect.Ptr:
+		if actualValue.IsNil() {
+			return cty.NilVal, nil
+		}
+		return hg.handleInterfaceField(actualValue, fieldType)
+	default:
+		// For unsupported types, try to convert to string as a fallback
+		return cty.StringVal(fmt.Sprintf("%v", actualValue.Interface())), nil
+	}
 }
 
 // handleStringField handles string type fields

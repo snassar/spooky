@@ -184,7 +184,7 @@ func runAction(cmd *cobra.Command, args []string) error {
 		// Continue with nil encryption - SSH manager will handle this gracefully
 	}
 
-	sshManager := ssh.NewSimpleSSHManager(ageEncryption, sshConfig)
+	sshManager := ssh.NewSSHManager(ageEncryption, sshConfig)
 
 	// Create action executor
 	executor := NewActionExecutor(sshManager, projectConfig)
@@ -808,12 +808,12 @@ type ActionResult struct {
 
 // ActionExecutor handles the execution of actions across machines
 type ActionExecutor struct {
-	sshManager    *ssh.SimpleSSHManager
+	sshManager    *ssh.Manager
 	projectConfig *schemas.ProjectV1
 }
 
 // NewActionExecutor creates a new action executor
-func NewActionExecutor(sshManager *ssh.SimpleSSHManager, projectConfig *schemas.ProjectV1) *ActionExecutor {
+func NewActionExecutor(sshManager *ssh.Manager, projectConfig *schemas.ProjectV1) *ActionExecutor {
 	return &ActionExecutor{
 		sshManager:    sshManager,
 		projectConfig: projectConfig,

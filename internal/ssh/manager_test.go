@@ -11,9 +11,9 @@ import (
 // Mock encryption for testing - we'll create a simple test without encryption for most tests
 // and use real encryption for integration tests
 
-func TestSimpleSSHManager_SetupAuthentication(t *testing.T) {
+func TestSSHManager_SetupAuthentication(t *testing.T) {
 	t.Run("Public Key Authentication", func(t *testing.T) {
-		manager := &SimpleSSHManager{}
+		manager := &Manager{}
 		config := &Config{}
 		machine := &schemas.MachinesMachineV1{
 			Authentication: schemas.MachinesMachineAuthenticationV1{
@@ -32,7 +32,7 @@ func TestSimpleSSHManager_SetupAuthentication(t *testing.T) {
 	})
 
 	t.Run("Password Authentication", func(t *testing.T) {
-		manager := &SimpleSSHManager{}
+		manager := &Manager{}
 		config := &Config{}
 		machine := &schemas.MachinesMachineV1{
 			Authentication: schemas.MachinesMachineAuthenticationV1{
@@ -49,7 +49,7 @@ func TestSimpleSSHManager_SetupAuthentication(t *testing.T) {
 	})
 
 	t.Run("Certificate Authentication", func(t *testing.T) {
-		manager := &SimpleSSHManager{}
+		manager := &Manager{}
 		config := &Config{}
 		machine := &schemas.MachinesMachineV1{
 			Authentication: schemas.MachinesMachineAuthenticationV1{
@@ -69,7 +69,7 @@ func TestSimpleSSHManager_SetupAuthentication(t *testing.T) {
 	})
 
 	t.Run("No Authentication Method", func(t *testing.T) {
-		manager := &SimpleSSHManager{}
+		manager := &Manager{}
 		config := &Config{}
 		machine := &schemas.MachinesMachineV1{
 			Authentication: schemas.MachinesMachineAuthenticationV1{},
@@ -81,8 +81,8 @@ func TestSimpleSSHManager_SetupAuthentication(t *testing.T) {
 	})
 }
 
-func TestSimpleSSHManager_SetupPublicKeyAuth(t *testing.T) {
-	manager := &SimpleSSHManager{}
+func TestSSHManager_SetupPublicKeyAuth(t *testing.T) {
+	manager := &Manager{}
 	config := &Config{}
 
 	t.Run("Valid Public Key", func(t *testing.T) {
@@ -109,8 +109,8 @@ func TestSimpleSSHManager_SetupPublicKeyAuth(t *testing.T) {
 	})
 }
 
-func TestSimpleSSHManager_SetupPasswordAuth(t *testing.T) {
-	manager := &SimpleSSHManager{}
+func TestSSHManager_SetupPasswordAuth(t *testing.T) {
+	manager := &Manager{}
 	config := &Config{}
 
 	t.Run("Valid Password", func(t *testing.T) {
@@ -135,8 +135,8 @@ func TestSimpleSSHManager_SetupPasswordAuth(t *testing.T) {
 	})
 }
 
-func TestSimpleSSHManager_SetupCertificateAuth(t *testing.T) {
-	manager := &SimpleSSHManager{}
+func TestSSHManager_SetupCertificateAuth(t *testing.T) {
+	manager := &Manager{}
 	config := &Config{}
 
 	t.Run("Valid Certificate", func(t *testing.T) {
@@ -176,9 +176,9 @@ func TestSimpleSSHManager_SetupCertificateAuth(t *testing.T) {
 	})
 }
 
-func TestSimpleSSHManager_DecryptCredential(t *testing.T) {
+func TestSSHManager_DecryptCredential(t *testing.T) {
 	t.Run("Plain Credential", func(t *testing.T) {
-		manager := &SimpleSSHManager{}
+		manager := &Manager{}
 
 		result, err := manager.decryptCredential("plain-value", false, "test credential")
 		assert.NoError(t, err)
@@ -186,7 +186,7 @@ func TestSimpleSSHManager_DecryptCredential(t *testing.T) {
 	})
 
 	t.Run("Encrypted Credential - No Encryption Available", func(t *testing.T) {
-		manager := &SimpleSSHManager{}
+		manager := &Manager{}
 
 		result, err := manager.decryptCredential("encrypted-value", true, "test credential")
 		assert.Error(t, err)

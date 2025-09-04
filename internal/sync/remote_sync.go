@@ -21,12 +21,12 @@ import (
 
 // RemoteSyncEngine handles remote file synchronization using SSH and Mutagen's rsync engine
 type RemoteSyncEngine struct {
-	sshManager    *ssh.SimpleSSHManager
+	sshManager    *ssh.Manager
 	mutagenEngine *MutagenSyncEngine
 }
 
 // NewRemoteSyncEngine creates a new remote sync engine
-func NewRemoteSyncEngine(sshManager *ssh.SimpleSSHManager) *RemoteSyncEngine {
+func NewRemoteSyncEngine(sshManager *ssh.Manager) *RemoteSyncEngine {
 	return &RemoteSyncEngine{
 		sshManager:    sshManager,
 		mutagenEngine: NewMutagenSyncEngine(),

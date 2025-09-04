@@ -20,7 +20,7 @@ import (
 
 // Gatherer collects facts from remote machines
 type Gatherer struct {
-	sshManager *ssh.SimpleSSHManager
+	sshManager *ssh.Manager
 	config     *schemas.ProjectV1
 }
 
@@ -33,7 +33,7 @@ type Gatherer struct {
 //
 // Returns:
 //   - *Gatherer: A properly initialized facts gatherer ready for use
-func NewGatherer(sshManager *ssh.SimpleSSHManager, config *schemas.ProjectV1) *Gatherer {
+func NewGatherer(sshManager *ssh.Manager, config *schemas.ProjectV1) *Gatherer {
 	return &Gatherer{
 		sshManager: sshManager,
 		config:     config,
@@ -115,9 +115,12 @@ func (g *Gatherer) GatherFactsFromMachine(ctx context.Context, machine *schemas.
 
 // GatherFactsFromMachines collects facts from multiple machines in parallel
 func (g *Gatherer) GatherFactsFromMachines(ctx context.Context, machines []*schemas.MachinesMachineV1) ([]*MachineFacts, error) {
-	maxParallel := g.config.FactsParallelCollection
-	if maxParallel <= 0 {
-		maxParallel = 10 // Default parallel limit
+	maxParallel := 10 // Default parallel limit
+	if g.config != nil {
+		maxParallel = g.config.FactsParallelCollection
+		if maxParallel <= 0 {
+			maxParallel = 10 // Default parallel limit
+		}
 	}
 
 	// Create a semaphore to limit concurrent connections
@@ -141,9 +144,12 @@ func (g *Gatherer) GatherFactsFromMachines(ctx context.Context, machines []*sche
 	}
 
 	// Wait for all goroutines to complete
-	timeout := time.Duration(g.config.FactsTimeout) * time.Second
-	if timeout <= 0 {
-		timeout = 30 * time.Second // Default timeout
+	timeout := 30 * time.Second // Default timeout
+	if g.config != nil {
+		timeout = time.Duration(g.config.FactsTimeout) * time.Second
+		if timeout <= 0 {
+			timeout = 30 * time.Second // Default timeout
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)

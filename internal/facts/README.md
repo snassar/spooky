@@ -70,7 +70,7 @@ spooky facts export [output-file]
 
 ```go
 // Create facts gatherer
-sshManager := ssh.NewSimpleSSHManager(ageEncryption, sshConfig)
+sshManager := ssh.NewSSHManager(ageEncryption, sshConfig)
 gatherer := facts.NewGatherer(sshManager, projectConfig)
 
 // Gather facts from single machine
