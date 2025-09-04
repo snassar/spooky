@@ -135,14 +135,106 @@ func SyncDirectory(sourcePath, targetPath string, options *SyncOptions) (*FileSy
 	}
 }
 
+// logSyncOperation logs sync operation details if verbose mode is enabled
+func logSyncOperation(operation string, source, target string) {
+	logger := logging.GetGlobalLogger()
+	logger.Info(operation,
+		slog.String("source", source),
+		slog.String("target", target))
+}
+
+// logFileOperation logs file operation details if verbose mode is enabled
+func logFileOperation(operation, path string) {
+	logger := logging.GetGlobalLogger()
+	logger.Info(operation, slog.String("path", path))
+}
+
+// createDirectory creates a directory in the target location with proper permissions
+func createDirectory(targetPath string, sourceInfo os.FileInfo, options *SyncOptions) error {
+	if err := os.MkdirAll(targetPath, sourceInfo.Mode()); err != nil {
+		return fmt.Errorf("failed to create directory %s: %v", targetPath, err)
+	}
+
+	if options.Verbose {
+		logFileOperation("created directory", targetPath)
+	}
+
+	return nil
+}
+
+// processFile syncs a single file from source to target
+func processFile(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) error {
+	fileResult, err := SyncFile(sourcePath, targetPath, options)
+	if err != nil {
+		return fmt.Errorf("failed to sync file %s: %v", sourcePath, err)
+	}
+
+	result.BytesTransferred += fileResult.BytesTransferred
+	result.BytesSaved += fileResult.BytesSaved
+	result.Operations += fileResult.Operations
+
+	return nil
+}
+
+// removeOrphanedFile removes a file or directory that doesn't exist in source
+func removeOrphanedFile(path string, info os.FileInfo, options *SyncOptions) error {
+	if options.DryRun {
+		if options.Verbose {
+			logFileOperation("would remove file", path)
+		}
+		return nil
+	}
+
+	var err error
+	if info.IsDir() {
+		err = os.RemoveAll(path)
+	} else {
+		err = os.Remove(path)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to remove %s %s: %v",
+			map[bool]string{true: "directory", false: "file"}[info.IsDir()], path, err)
+	}
+
+	if options.Verbose {
+		logFileOperation("removed file", path)
+	}
+
+	return nil
+}
+
+// cleanupTargetFiles removes files in target that don't exist in source
+func cleanupTargetFiles(sourcePath, targetPath string, options *SyncOptions) error {
+	return filepath.Walk(targetPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return errors.Wrapf(err, "failed to walk target path %s", path)
+		}
+
+		// Skip root directory
+		if path == targetPath {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(targetPath, path)
+		if err != nil {
+			return fmt.Errorf("failed to calculate relative path: %v", err)
+		}
+
+		sourceFile := filepath.Join(sourcePath, relPath)
+		if _, err := os.Stat(sourceFile); os.IsNotExist(err) {
+			return removeOrphanedFile(path, info, options)
+		}
+
+		return nil
+	})
+}
+
 // syncOneWayReplica performs exact one-way replication (source → target)
 // Target becomes exact copy of source, overwriting any local changes
 func syncOneWayReplica(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
 	if options.Verbose {
-		logger := logging.GetGlobalLogger()
-		logger.Info("performing one-way replica sync",
-			slog.String("source", sourcePath),
-			slog.String("target", targetPath))
+		logSyncOperation("performing one-way replica sync", sourcePath, targetPath)
 	}
 
 	// Walk source directory and sync all files
@@ -165,27 +257,10 @@ func syncOneWayReplica(sourcePath, targetPath string, options *SyncOptions, resu
 		targetFile := filepath.Join(targetPath, relPath)
 
 		if info.IsDir() {
-			// Create directory in target
-			if err := os.MkdirAll(targetFile, info.Mode()); err != nil {
-				return fmt.Errorf("failed to create directory %s: %v", targetFile, err)
-			}
-			if options.Verbose {
-				logger := logging.GetGlobalLogger()
-				logger.Info("created directory", slog.String("path", targetFile))
-			}
+			return createDirectory(targetFile, info, options)
 		} else {
-			// Sync file using existing SyncFile function
-			fileResult, err := SyncFile(path, targetFile, options)
-			if err != nil {
-				return fmt.Errorf("failed to sync file %s: %v", path, err)
-			}
-
-			result.BytesTransferred += fileResult.BytesTransferred
-			result.BytesSaved += fileResult.BytesSaved
-			result.Operations += fileResult.Operations
+			return processFile(path, targetFile, options, result)
 		}
-
-		return nil
 	})
 
 	if err != nil {
@@ -194,49 +269,7 @@ func syncOneWayReplica(sourcePath, targetPath string, options *SyncOptions, resu
 	}
 
 	// Remove files in target that don't exist in source (cleanup)
-	err = filepath.Walk(targetPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return errors.Wrapf(err, "failed to walk target path %s", path)
-		}
-
-		// Skip root directory
-		if path == targetPath {
-			return nil
-		}
-
-		relPath, err := filepath.Rel(targetPath, path)
-		if err != nil {
-			return fmt.Errorf("failed to calculate relative path: %v", err)
-		}
-
-		sourceFile := filepath.Join(sourcePath, relPath)
-		if _, err := os.Stat(sourceFile); os.IsNotExist(err) {
-			if options.DryRun {
-				if options.Verbose {
-					logger := logging.GetGlobalLogger()
-					logger.Info("would remove file", slog.String("path", path))
-				}
-			} else {
-				if info.IsDir() {
-					if err := os.RemoveAll(path); err != nil {
-						return fmt.Errorf("failed to remove directory %s: %v", path, err)
-					}
-				} else {
-					if err := os.Remove(path); err != nil {
-						return fmt.Errorf("failed to remove file %s: %v", path, err)
-					}
-				}
-				if options.Verbose {
-					logger := logging.GetGlobalLogger()
-					logger.Info("removed file", slog.String("path", path))
-				}
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
+	if err := cleanupTargetFiles(sourcePath, targetPath, options); err != nil {
 		result.Error = errors.Wrap(err, "failed to cleanup target directory")
 		return result, result.Error
 	}
@@ -433,15 +466,24 @@ func preserveBothOwnerAndGroup(targetPath string, sourceStat *syscall.Stat_t) er
 	return errors.Wrapf(os.Chown(targetPath, uid, gid), "failed to preserve owner and group for %s", targetPath)
 }
 
-// preserveOwnerOnly preserves only the owner from source to target, keeping target's group
-func preserveOwnerOnly(targetPath string, sourceStat *syscall.Stat_t) error {
+// getTargetStat gets the target file's system-specific stat information
+func getTargetStat(targetPath string) (*syscall.Stat_t, error) {
 	targetInfo, err := os.Stat(targetPath)
 	if err != nil {
-		return errors.Wrapf(err, "failed to stat target file %s", targetPath)
+		return nil, errors.Wrapf(err, "failed to stat target file %s", targetPath)
 	}
 	targetStat, ok := targetInfo.Sys().(*syscall.Stat_t)
 	if !ok {
-		return errors.New("failed to get target system-specific file info")
+		return nil, errors.New("failed to get target system-specific file info")
+	}
+	return targetStat, nil
+}
+
+// preserveOwnerOnly preserves only the owner from source to target, keeping target's group
+func preserveOwnerOnly(targetPath string, sourceStat *syscall.Stat_t) error {
+	targetStat, err := getTargetStat(targetPath)
+	if err != nil {
+		return err
 	}
 
 	uid, err := utilities.SafeInt(int64(sourceStat.Uid))
@@ -457,13 +499,9 @@ func preserveOwnerOnly(targetPath string, sourceStat *syscall.Stat_t) error {
 
 // preserveGroupOnly preserves only the group from source to target, keeping target's owner
 func preserveGroupOnly(targetPath string, sourceStat *syscall.Stat_t) error {
-	targetInfo, err := os.Stat(targetPath)
+	targetStat, err := getTargetStat(targetPath)
 	if err != nil {
-		return errors.Wrapf(err, "failed to stat target file %s", targetPath)
-	}
-	targetStat, ok := targetInfo.Sys().(*syscall.Stat_t)
-	if !ok {
-		return errors.New("error getting target system-specific file info")
+		return err
 	}
 
 	targetUid, err := utilities.SafeInt(int64(targetStat.Uid))
