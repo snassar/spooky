@@ -11,23 +11,181 @@ import (
 )
 
 func TestExtractResourceBlock(t *testing.T) {
-	// This test would require creating actual HCL content and parsing it
-	// For now, we'll test the function signature and basic behavior
-	t.Run("function exists", func(t *testing.T) {
-		// The function should exist and be callable
-		// We can't easily test the full functionality without HCL parsing
-		// but we can ensure it's properly defined
-		// In Go, functions are never nil, so we just verify the test runs
-		t.Log("extractResourceBlock function is defined")
-	})
+	tests := []struct {
+		name         string
+		hclContent   string
+		resourceType string
+		fileName     string
+		expectError  bool
+		errorMsg     string
+	}{
+		{
+			name: "valid actions block",
+			hclContent: `
+actions {
+  action "test-action" {
+    description = "Test action"
+    type = "command"
+    command = "echo hello"
+  }
+}`,
+			resourceType: schemas.ResourceTypeActions,
+			fileName:     "actions.hcl",
+			expectError:  false,
+		},
+		{
+			name: "no actions block",
+			hclContent: `
+project {
+  name = "test"
+}`,
+			resourceType: schemas.ResourceTypeActions,
+			fileName:     "actions.hcl",
+			expectError:  true,
+			errorMsg:     "failed to decode actions block",
+		},
+		{
+			name: "multiple actions blocks",
+			hclContent: `
+actions {
+  action "test1" {
+    description = "Test 1"
+    type = "command"
+  }
+}
+
+actions {
+  action "test2" {
+    description = "Test 2"
+    type = "command"
+  }
+}`,
+			resourceType: schemas.ResourceTypeActions,
+			fileName:     "actions.hcl",
+			expectError:  true,
+			errorMsg:     "multiple actions blocks found",
+		},
+		{
+			name:         "empty content",
+			hclContent:   "",
+			resourceType: schemas.ResourceTypeActions,
+			fileName:     "actions.hcl",
+			expectError:  true,
+			errorMsg:     "no actions block found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file, diags := hclsyntax.ParseConfig([]byte(tt.hclContent), tt.fileName, hcl.Pos{Line: 1, Column: 1})
+			if diags.HasErrors() {
+				t.Fatalf("Failed to parse test HCL: %v", diags)
+			}
+
+			block, err := extractResourceBlock(file, tt.resourceType, tt.fileName)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("expected error message containing %q, got %q", tt.errorMsg, err.Error())
+				}
+				if block != nil {
+					t.Errorf("expected nil block on error, got %v", block)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if block == nil {
+					t.Errorf("expected block but got nil")
+				} else if block.Type != tt.resourceType {
+					t.Errorf("expected block type %q, got %q", tt.resourceType, block.Type)
+				}
+			}
+		})
+	}
 }
 
 func TestExtractActionsBlock(t *testing.T) {
-	// Similar to above, we'll test that the function exists
-	t.Run("function exists", func(t *testing.T) {
-		// In Go, functions are never nil, so we just verify the test runs
-		t.Log("extractActionsBlock function is defined")
-	})
+	tests := []struct {
+		name        string
+		hclContent  string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "valid actions block",
+			hclContent: `
+actions {
+  action "test-action" {
+    description = "Test action"
+    type = "command"
+    command = "echo hello"
+  }
+}`,
+			expectError: false,
+		},
+		{
+			name: "no actions block",
+			hclContent: `
+project {
+  name = "test"
+}`,
+			expectError: true,
+			errorMsg:    "failed to decode actions block",
+		},
+		{
+			name: "multiple actions blocks",
+			hclContent: `
+actions {
+  action "test1" {
+    description = "Test 1"
+    type = "command"
+  }
+}
+
+actions {
+  action "test2" {
+    description = "Test 2"
+    type = "command"
+  }
+}`,
+			expectError: true,
+			errorMsg:    "multiple actions blocks found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file, diags := hclsyntax.ParseConfig([]byte(tt.hclContent), "actions.hcl", hcl.Pos{Line: 1, Column: 1})
+			if diags.HasErrors() {
+				t.Fatalf("Failed to parse test HCL: %v", diags)
+			}
+
+			block, err := extractActionsBlock(file)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("expected error message containing %q, got %q", tt.errorMsg, err.Error())
+				}
+				if block != nil {
+					t.Errorf("expected nil block on error, got %v", block)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if block == nil {
+					t.Errorf("expected block but got nil")
+				} else if block.Type != schemas.ResourceTypeActions {
+					t.Errorf("expected block type %q, got %q", schemas.ResourceTypeActions, block.Type)
+				}
+			}
+		})
+	}
 }
 
 func TestFindAction(t *testing.T) {

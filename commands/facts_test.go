@@ -6,88 +6,512 @@ import (
 	"testing"
 
 	"spooky/internal/schemas"
+
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 )
 
 func TestExtractResourceBlock_Facts(t *testing.T) {
-	// This test would require creating actual HCL content and parsing it
-	// For now, we'll test the function signature and basic behavior
-	t.Run("function exists", func(t *testing.T) {
-		// The function should exist and be callable
-		// We can't easily test the full functionality without HCL parsing
-		// but we can ensure it's properly defined
-		// In Go, functions are never nil, so we just verify the test runs
-		t.Log("extractResourceBlock function is defined")
-	})
+	tests := []struct {
+		name         string
+		hclContent   string
+		resourceType string
+		fileName     string
+		expectError  bool
+		errorMsg     string
+	}{
+		{
+			name: "valid machines block",
+			hclContent: `
+machines {
+  machine "test-machine" {
+    hostname = "test.example.com"
+    user = "testuser"
+  }
+}`,
+			resourceType: schemas.ResourceTypeMachines,
+			fileName:     "machines.hcl",
+			expectError:  false,
+		},
+		{
+			name: "no machines block",
+			hclContent: `
+project {
+  name = "test"
+}`,
+			resourceType: schemas.ResourceTypeMachines,
+			fileName:     "machines.hcl",
+			expectError:  true,
+			errorMsg:     "failed to decode machines block",
+		},
+		{
+			name: "multiple machines blocks",
+			hclContent: `
+machines {
+  machine "test1" {
+    hostname = "test1.example.com"
+    user = "user1"
+  }
+}
+
+machines {
+  machine "test2" {
+    hostname = "test2.example.com"
+    user = "user2"
+  }
+}`,
+			resourceType: schemas.ResourceTypeMachines,
+			fileName:     "machines.hcl",
+			expectError:  true,
+			errorMsg:     "multiple machines blocks found",
+		},
+		{
+			name:         "empty content",
+			hclContent:   "",
+			resourceType: schemas.ResourceTypeMachines,
+			fileName:     "machines.hcl",
+			expectError:  true,
+			errorMsg:     "no machines block found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file, diags := hclsyntax.ParseConfig([]byte(tt.hclContent), tt.fileName, hcl.Pos{Line: 1, Column: 1})
+			if diags.HasErrors() {
+				t.Fatalf("Failed to parse test HCL: %v", diags)
+			}
+
+			block, err := extractResourceBlock(file, tt.resourceType, tt.fileName)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if !containsString(err.Error(), tt.errorMsg) {
+					t.Errorf("expected error message containing %q, got %q", tt.errorMsg, err.Error())
+				}
+				if block != nil {
+					t.Errorf("expected nil block on error, got %v", block)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if block == nil {
+					t.Errorf("expected block but got nil")
+				} else if block.Type != tt.resourceType {
+					t.Errorf("expected block type %q, got %q", tt.resourceType, block.Type)
+				}
+			}
+		})
+	}
 }
 
 func TestValidateMachinesBlock(t *testing.T) {
-	// Similar to above, we'll test that the function exists
-	t.Run("function exists", func(t *testing.T) {
-		// In Go, functions are never nil, so we just verify the test runs
-		t.Log("validateMachinesBlock function is defined")
-	})
+	tests := []struct {
+		name        string
+		hclContent  string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "valid machines block",
+			hclContent: `
+machines {
+  machine "test-machine" {
+    hostname = "test.example.com"
+    user = "testuser"
+  }
+}`,
+			expectError: false,
+		},
+		{
+			name: "no machines block",
+			hclContent: `
+project {
+  name = "test"
+}`,
+			expectError: true,
+			errorMsg:    "failed to decode machines block",
+		},
+		{
+			name: "multiple machines blocks",
+			hclContent: `
+machines {
+  machine "test1" {
+    hostname = "test1.example.com"
+    user = "user1"
+  }
+}
+
+machines {
+  machine "test2" {
+    hostname = "test2.example.com"
+    user = "user2"
+  }
+}`,
+			expectError: true,
+			errorMsg:    "multiple machines blocks found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file, diags := hclsyntax.ParseConfig([]byte(tt.hclContent), "machines.hcl", hcl.Pos{Line: 1, Column: 1})
+			if diags.HasErrors() {
+				t.Fatalf("Failed to parse test HCL: %v", diags)
+			}
+
+			block, err := validateMachinesBlock(file)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if !containsString(err.Error(), tt.errorMsg) {
+					t.Errorf("expected error message containing %q, got %q", tt.errorMsg, err.Error())
+				}
+				if block != nil {
+					t.Errorf("expected nil block on error, got %v", block)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if block == nil {
+					t.Errorf("expected block but got nil")
+				} else if block.Type != schemas.ResourceTypeMachines {
+					t.Errorf("expected block type %q, got %q", schemas.ResourceTypeMachines, block.Type)
+				}
+			}
+		})
+	}
 }
 
 func TestParseAttribute(t *testing.T) {
-	// This test would require creating actual HCL attributes
-	// For now, we'll test that the function exists
-	t.Run("function exists", func(t *testing.T) {
-		// In Go, functions are never nil, so we just verify the test runs
-		t.Log("parseAttribute function is defined")
-	})
+	tests := []struct {
+		name        string
+		hclContent  string
+		attrName    string
+		target      interface{}
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "parse string attribute",
+			hclContent: `
+machine "test" {
+  hostname = "test.example.com"
+}`,
+			attrName:    "hostname",
+			target:      new(string),
+			expectError: false,
+		},
+		{
+			name: "parse int attribute",
+			hclContent: `
+machine "test" {
+  port = 2222
+}`,
+			attrName:    "port",
+			target:      new(int),
+			expectError: false,
+		},
+		{
+			name: "parse bool attribute",
+			hclContent: `
+machine "test" {
+  enabled = true
+}`,
+			attrName:    "enabled",
+			target:      new(bool),
+			expectError: false,
+		},
+		{
+			name: "invalid attribute type",
+			hclContent: `
+machine "test" {
+  hostname = "test.example.com"
+}`,
+			attrName:    "hostname",
+			target:      new(int), // Wrong type
+			expectError: true,
+			errorMsg:    "failed to decode",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file, diags := hclsyntax.ParseConfig([]byte(tt.hclContent), "test.hcl", hcl.Pos{Line: 1, Column: 1})
+			if diags.HasErrors() {
+				t.Fatalf("Failed to parse test HCL: %v", diags)
+			}
+
+			// Extract the machine block
+			schema := &hcl.BodySchema{
+				Blocks: []hcl.BlockHeaderSchema{
+					{Type: "machine", LabelNames: []string{"name"}},
+				},
+			}
+			bodyContent, diags := file.Body.Content(schema)
+			if diags.HasErrors() {
+				t.Fatalf("Failed to extract machine block: %v", diags)
+			}
+
+			if len(bodyContent.Blocks) == 0 {
+				t.Fatalf("No machine block found")
+			}
+
+			machineBlock := bodyContent.Blocks[0]
+			machineSchema := &hcl.BodySchema{
+				Attributes: []hcl.AttributeSchema{
+					{Name: tt.attrName, Required: false},
+				},
+			}
+			machineContent, diags := machineBlock.Body.Content(machineSchema)
+			if diags.HasErrors() {
+				t.Fatalf("Failed to extract machine content: %v", diags)
+			}
+
+			attr, exists := machineContent.Attributes[tt.attrName]
+			if !exists {
+				t.Fatalf("Attribute %s not found", tt.attrName)
+			}
+
+			err := parseAttribute(attr, tt.target, "test", tt.attrName)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if !containsString(err.Error(), tt.errorMsg) {
+					t.Errorf("expected error message containing %q, got %q", tt.errorMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
 }
 
-func TestParseMachineAttributes(t *testing.T) {
-	// This test would require creating actual HCL blocks
-	// For now, we'll test that the function exists
-	t.Run("function exists", func(t *testing.T) {
-		// In Go, functions are never nil, so we just verify the test runs
-		t.Log("parseMachineAttributes function is defined")
-	})
+func TestParseMachineFromBlock(t *testing.T) {
+	tests := []struct {
+		name        string
+		hclContent  string
+		machineName string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "valid machine block",
+			hclContent: `
+machine "test-machine" {
+  hostname = "test.example.com"
+  user = "testuser"
+  port = 2222
+}`,
+			machineName: "test-machine",
+			expectError: false,
+		},
+		{
+			name: "machine with missing hostname",
+			hclContent: `
+machine "test-machine" {
+  user = "testuser"
+}`,
+			machineName: "test-machine",
+			expectError: true,
+			errorMsg:    "Missing required argument",
+		},
+		{
+			name: "machine with missing user",
+			hclContent: `
+machine "test-machine" {
+  hostname = "test.example.com"
+}`,
+			machineName: "test-machine",
+			expectError: true,
+			errorMsg:    "Missing required argument",
+		},
+		{
+			name: "machine with authentication block",
+			hclContent: `
+machine "test-machine" {
+  hostname = "test.example.com"
+  user = "testuser"
+  
+  authentication "publickey" {
+    public_key_path = "/path/to/key"
+    
+    passphrase {
+      value = "testpassphrase"
+      encrypted = false
+    }
+  }
+}`,
+			machineName: "test-machine",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file, diags := hclsyntax.ParseConfig([]byte(tt.hclContent), "test.hcl", hcl.Pos{Line: 1, Column: 1})
+			if diags.HasErrors() {
+				t.Fatalf("Failed to parse test HCL: %v", diags)
+			}
+
+			// Extract the machine block
+			schema := &hcl.BodySchema{
+				Blocks: []hcl.BlockHeaderSchema{
+					{Type: "machine", LabelNames: []string{"name"}},
+				},
+			}
+			bodyContent, diags := file.Body.Content(schema)
+			if diags.HasErrors() {
+				t.Fatalf("Failed to extract machine block: %v", diags)
+			}
+
+			if len(bodyContent.Blocks) == 0 {
+				t.Fatalf("No machine block found")
+			}
+
+			machineBlock := bodyContent.Blocks[0]
+			machine, err := parseMachineFromBlock(machineBlock, tt.machineName)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				} else if !containsString(err.Error(), tt.errorMsg) {
+					t.Errorf("expected error message containing %q, got %q", tt.errorMsg, err.Error())
+				}
+				if machine != nil {
+					t.Errorf("expected nil machine on error, got %v", machine)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if machine == nil {
+					t.Errorf("expected machine but got nil")
+				} else {
+					// Verify basic fields are set correctly
+					if machine.Hostname == "" && tt.name != "machine with missing hostname" {
+						t.Errorf("expected hostname to be set")
+					}
+					if machine.User == "" && tt.name != "machine with missing user" {
+						t.Errorf("expected user to be set")
+					}
+					if machine.Port == 0 {
+						t.Errorf("expected port to be set (default 22)")
+					}
+				}
+			}
+		})
+	}
 }
 
 func TestGetMachinesFromConfig(t *testing.T) {
-	// This test would require actual HCL files
-	// For now, we'll test that the function exists
-	t.Run("function exists", func(t *testing.T) {
-		// In Go, functions are never nil, so we just verify the test runs
-		t.Log("getMachinesFromConfig function is defined")
+	// This test requires actual HCL files, so we'll test error conditions
+	t.Run("file not found", func(t *testing.T) {
+		// Change to a directory that doesn't have machines.hcl
+		originalDir, _ := os.Getwd()
+		tempDir := t.TempDir()
+		os.Chdir(tempDir)
+		defer os.Chdir(originalDir)
+
+		machines, err := getMachinesFromConfig()
+		if err == nil {
+			t.Errorf("expected error when machines.hcl not found, got none")
+		}
+		if machines != nil {
+			t.Errorf("expected nil machines when error occurs, got %v", machines)
+		}
+		if !containsString(err.Error(), "machines.hcl not found") {
+			t.Errorf("expected error message about machines.hcl not found, got %q", err.Error())
+		}
 	})
 }
 
 func TestWriteFactsToFileExists(t *testing.T) {
-	// This test would require creating actual facts structures
-	// For now, we'll test that the function exists
-	t.Run("function exists", func(t *testing.T) {
-		// In Go, functions are never nil, so we just verify the test runs
-		t.Log("writeFactsToFile function is defined")
+	// This test is already implemented below as TestWriteFactsToFile
+	// We can remove this placeholder test since the real test exists
+	t.Run("placeholder removed - see TestWriteFactsToFile", func(t *testing.T) {
+		t.Log("TestWriteFactsToFile already exists with proper implementation")
 	})
 }
 
 func TestLoadProjectConfig(t *testing.T) {
-	// This test would require actual project.hcl files
-	// For now, we'll test that the function exists
-	t.Run("function exists", func(t *testing.T) {
-		// In Go, functions are never nil, so we just verify the test runs
-		t.Log("loadProjectConfig function is defined")
+	// This test requires actual HCL files, so we'll test error conditions
+	t.Run("file not found", func(t *testing.T) {
+		// Change to a directory that doesn't have project.hcl
+		originalDir, _ := os.Getwd()
+		tempDir := t.TempDir()
+		os.Chdir(tempDir)
+		defer os.Chdir(originalDir)
+
+		config, err := loadProjectConfig()
+		if err == nil {
+			t.Errorf("expected error when project.hcl not found, got none")
+		}
+		if config != nil {
+			t.Errorf("expected nil config when error occurs, got %v", config)
+		}
+		if !containsString(err.Error(), "project.hcl not found") {
+			t.Errorf("expected error message about project.hcl not found, got %q", err.Error())
+		}
 	})
 }
 
 func TestLoadSSHConfig(t *testing.T) {
-	// This test would require actual SSH configuration
-	// For now, we'll test that the function exists
-	t.Run("function exists", func(t *testing.T) {
-		// In Go, functions are never nil, so we just verify the test runs
-		t.Log("loadSSHConfig function is defined")
+	// This function returns a default SSH configuration, so we'll test that behavior
+	t.Run("returns default config", func(t *testing.T) {
+		config, err := loadSSHConfig()
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if config == nil {
+			t.Errorf("expected default config but got nil")
+		}
+
+		// Verify default values
+		if config.Timeout != 30 {
+			t.Errorf("expected Timeout 30, got %d", config.Timeout)
+		}
+		if config.KeepaliveInterval != 60 {
+			t.Errorf("expected KeepaliveInterval 60, got %d", config.KeepaliveInterval)
+		}
+		if config.KnownHostsMode != "accept-new" {
+			t.Errorf("expected KnownHostsMode 'accept-new', got %q", config.KnownHostsMode)
+		}
+		if config.Compression != false {
+			t.Errorf("expected Compression false, got %v", config.Compression)
+		}
+		if config.TCPKeepAlive != true {
+			t.Errorf("expected TCPKeepAlive true, got %v", config.TCPKeepAlive)
+		}
 	})
 }
 
 func TestParseMachinesHCL(t *testing.T) {
-	// This test would require actual machines.hcl files
-	// For now, we'll test that the function exists
-	t.Run("function exists", func(t *testing.T) {
-		// In Go, functions are never nil, so we just verify the test runs
-		t.Log("parseMachinesHCL function is defined")
+	// This test requires actual HCL files, so we'll test error conditions
+	t.Run("file not found", func(t *testing.T) {
+		// Change to a directory that doesn't have machines.hcl
+		originalDir, _ := os.Getwd()
+		tempDir := t.TempDir()
+		os.Chdir(tempDir)
+		defer os.Chdir(originalDir)
+
+		file, err := parseMachinesHCL()
+		if err == nil {
+			t.Errorf("expected error when machines.hcl not found, got none")
+		}
+		if file != nil {
+			t.Errorf("expected nil file when error occurs, got %v", file)
+		}
+		if !containsString(err.Error(), "machines.hcl not found") {
+			t.Errorf("expected error message about machines.hcl not found, got %q", err.Error())
+		}
 	})
 }
 
