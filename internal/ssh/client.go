@@ -364,74 +364,146 @@ func (sc *SSHClient) DownloadFile(ctx context.Context, remotePath, localPath str
 		return errors.New("SSH client not connected")
 	}
 
-	// Create session
-	session, err := sc.client.NewSession()
+	// Create and setup session
+	session, err := sc.createDownloadSession(remotePath)
 	if err != nil {
-		return errors.Wrap(err, "failed to create SSH session")
+		return err
 	}
-	defer func() {
-		if closeErr := session.Close(); closeErr != nil {
-			// Log the error but don't fail the function since we've already processed the data
-			// This is a best-effort cleanup
-			logger := logging.GetGlobalLogger()
-			logger.Warn("failed to close session during cleanup", slog.String("error", closeErr.Error()))
-		}
-	}()
+	defer sc.closeSession(session)
 
-	// Set up file transfer
-	stdout, err := session.StdoutPipe()
+	// Setup file transfer
+	stdout, err := sc.setupFileTransfer(session)
 	if err != nil {
-		return errors.Wrap(err, "failed to get stdout pipe")
-	}
-
-	// Start scp command
-	if err := session.Start(fmt.Sprintf("scp -f %s", remotePath)); err != nil {
-		return errors.Wrap(err, "failed to start scp command")
+		return err
 	}
 
 	// Create local file
+	localFile, err := sc.createLocalFile(localPath)
+	if err != nil {
+		return err
+	}
+	defer sc.closeLocalFile(localFile)
+
+	// Process file transfer
+	return sc.processFileTransfer(stdout, localFile, session)
+}
+
+// createDownloadSession creates and starts an SSH session for file download
+func (sc *SSHClient) createDownloadSession(remotePath string) (*ssh.Session, error) {
+	session, err := sc.client.NewSession()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create SSH session")
+	}
+
+	if err := session.Start(fmt.Sprintf("scp -f %s", remotePath)); err != nil {
+		session.Close()
+		return nil, errors.Wrap(err, "failed to start scp command")
+	}
+
+	return session, nil
+}
+
+// closeSession closes the SSH session with error logging
+func (sc *SSHClient) closeSession(session *ssh.Session) {
+	if closeErr := session.Close(); closeErr != nil {
+		// Log the error but don't fail the function since we've already processed the data
+		// This is a best-effort cleanup
+		logger := logging.GetGlobalLogger()
+		logger.Warn("failed to close session during cleanup", slog.String("error", closeErr.Error()))
+	}
+}
+
+// setupFileTransfer sets up the stdout pipe for file transfer
+func (sc *SSHClient) setupFileTransfer(session *ssh.Session) (io.Reader, error) {
+	stdout, err := session.StdoutPipe()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get stdout pipe")
+	}
+	return stdout, nil
+}
+
+// createLocalFile creates the local file for download
+func (sc *SSHClient) createLocalFile(localPath string) (*os.File, error) {
 	localFile, err := os.Create(localPath)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create local file: %s", localPath)
+		return nil, errors.Wrapf(err, "failed to create local file: %s", localPath)
 	}
-	defer func() {
-		if closeErr := localFile.Close(); closeErr != nil {
-			// Log the error but don't fail the function since we've already written the data
-			// This is a best-effort cleanup
-			logger := logging.GetGlobalLogger()
-			logger.Warn("failed to close local file during cleanup", slog.String("error", closeErr.Error()))
-		}
-	}()
+	return localFile, nil
+}
 
-	// Read file header
+// closeLocalFile closes the local file with error logging
+func (sc *SSHClient) closeLocalFile(localFile *os.File) {
+	if closeErr := localFile.Close(); closeErr != nil {
+		// Log the error but don't fail the function since we've already written the data
+		// This is a best-effort cleanup
+		logger := logging.GetGlobalLogger()
+		logger.Warn("failed to close local file during cleanup", slog.String("error", closeErr.Error()))
+	}
+}
+
+// processFileTransfer handles the actual file transfer process
+func (sc *SSHClient) processFileTransfer(stdout io.Reader, localFile *os.File, session *ssh.Session) error {
+	// Read and parse file header
+	fileSize, err := sc.parseFileHeader(stdout)
+	if err != nil {
+		return err
+	}
+
+	// Send acknowledgment
+	if err := sc.sendAcknowledgment(); err != nil {
+		return err
+	}
+
+	// Copy file content
+	if err := sc.copyFileContent(stdout, localFile, fileSize); err != nil {
+		return err
+	}
+
+	// Send final acknowledgment
+	if err := sc.sendAcknowledgment(); err != nil {
+		return errors.Wrap(err, "failed to send final acknowledgment")
+	}
+
+	return session.Wait()
+}
+
+// parseFileHeader reads and parses the SCP file header
+func (sc *SSHClient) parseFileHeader(stdout io.Reader) (int64, error) {
 	scanner := bufio.NewScanner(stdout)
 	if !scanner.Scan() {
-		return errors.New("failed to read file header")
+		return 0, errors.New("failed to read file header")
 	}
 
 	header := scanner.Text()
 	if !strings.HasPrefix(header, "C") {
-		return errors.New("invalid file header")
+		return 0, errors.New("invalid file header")
 	}
 
 	// Parse file info
 	parts := strings.Fields(header)
 	if len(parts) != 3 {
-		return errors.New("invalid file header format")
+		return 0, errors.New("invalid file header format")
 	}
 
 	// Extract file size
 	fileSize, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil {
-		return errors.Wrap(err, "failed to parse file size")
+		return 0, errors.Wrap(err, "failed to parse file size")
 	}
 
-	// Send acknowledgment
+	return fileSize, nil
+}
+
+// sendAcknowledgment sends an acknowledgment to the remote host
+func (sc *SSHClient) sendAcknowledgment() error {
 	if _, err := fmt.Fprint(os.Stdout, "\x00"); err != nil {
 		return errors.Wrap(err, "failed to send acknowledgment")
 	}
+	return nil
+}
 
-	// Copy file content
+// copyFileContent copies the file content from remote to local
+func (sc *SSHClient) copyFileContent(stdout io.Reader, localFile *os.File, fileSize int64) error {
 	written, err := io.CopyN(localFile, stdout, fileSize)
 	if err != nil {
 		return errors.Wrap(err, "failed to copy file content")
@@ -441,12 +513,7 @@ func (sc *SSHClient) DownloadFile(ctx context.Context, remotePath, localPath str
 		return errors.New("incomplete file transfer")
 	}
 
-	// Send acknowledgment
-	if _, err := fmt.Fprint(os.Stdout, "\x00"); err != nil {
-		return errors.Wrap(err, "failed to send final acknowledgment")
-	}
-
-	return session.Wait()
+	return nil
 }
 
 // CopyFile copies a file from local to remote using SCP

@@ -241,23 +241,9 @@ func (r *RemoteSyncEngine) syncFileToRemote(ctx context.Context, localPath, remo
 		TargetPath: remotePath,
 	}
 
-	// Update progress
-	progress.CurrentFile = filepath.Base(localPath)
-	progress.CurrentOperation = "syncing"
-	if options.ProgressReport != nil {
-		options.ProgressReport(progress)
-	}
-
-	// Create a temporary local copy of the remote file for Mutagen to work with
-	tempRemotePath := localPath + ".remote"
-	defer func() {
-		if removeErr := os.Remove(tempRemotePath); removeErr != nil {
-			// Log the error but don't fail the function since this is cleanup
-			// This is a best-effort cleanup
-			logger := logging.GetGlobalLogger()
-			logger.Warn("failed to remove temporary file during cleanup", slog.String("error", removeErr.Error()))
-		}
-	}() // Clean up temp file
+	// Update progress and setup cleanup
+	tempRemotePath := r.setupSyncProgressAndCleanup(localPath, options, progress)
+	defer r.cleanupTempFile(tempRemotePath)
 
 	// Check if remote file exists and download it if needed
 	remoteExists, err := r.downloadRemoteFileIfExists(ctx, options.Machine, remotePath, tempRemotePath)
@@ -266,56 +252,21 @@ func (r *RemoteSyncEngine) syncFileToRemote(ctx context.Context, localPath, remo
 		return result, result.Error
 	}
 
+	// Handle conflict detection in safe mode
 	if remoteExists && options.SyncMode == SyncModeOneWaySafe {
-		// Check for conflicts in safe mode
-		localInfo, err := os.Stat(localPath)
-		if err != nil {
-			result.Error = fmt.Errorf("failed to stat local file: %v", err)
+		if conflict, err := r.checkForConflicts(localPath, tempRemotePath, remotePath, options); err != nil {
+			result.Error = err
 			return result, result.Error
-		}
-
-		remoteInfo, err := os.Stat(tempRemotePath)
-		if err != nil {
-			result.Error = fmt.Errorf("failed to stat remote file: %v", err)
-			return result, result.Error
-		}
-
-		if remoteInfo.ModTime().After(localInfo.ModTime()) {
-			// Remote is newer, preserve it (conflict)
-			if options.Verbose {
-				logger := logging.GetGlobalLogger()
-				logger.Info("conflict detected, preserving remote file", slog.String("path", remotePath))
-			}
+		} else if conflict {
 			result.Conflicts = append(result.Conflicts, remotePath)
 			return result, nil
 		}
 	}
 
-	// Use Mutagen's rsync engine to sync the files locally
-	if remoteExists {
-		// Sync local file to temp remote file using Mutagen
-		syncResult, err := r.mutagenEngine.SyncFile(localPath, tempRemotePath, options.SyncOptions)
-		if err != nil {
-			result.Error = fmt.Errorf("failed to sync file using Mutagen: %v", err)
-			return result, result.Error
-		}
-
-		// Copy sync statistics
-		result.BytesTransferred = syncResult.BytesTransferred
-		result.BytesSaved = syncResult.BytesSaved
-		result.Operations = syncResult.Operations
-	} else {
-		// New file, just copy it
-		if err := copyFile(localPath, tempRemotePath, options.SyncOptions); err != nil {
-			result.Error = fmt.Errorf("failed to copy new file: %v", err)
-			return result, result.Error
-		}
-
-		// Get file size for statistics
-		if info, err := os.Stat(localPath); err == nil {
-			result.BytesTransferred = info.Size()
-			result.Operations = 1
-		}
+	// Perform file synchronization
+	if err := r.performFileSync(localPath, tempRemotePath, remoteExists, options, result); err != nil {
+		result.Error = err
+		return result, result.Error
 	}
 
 	// Upload the synced file to the remote machine
@@ -324,14 +275,98 @@ func (r *RemoteSyncEngine) syncFileToRemote(ctx context.Context, localPath, remo
 		return result, result.Error
 	}
 
-	// Update progress
+	// Update progress and mark success
+	r.updateSyncProgress(progress, options)
+	result.Success = true
+	return result, nil
+}
+
+// setupSyncProgressAndCleanup initializes progress tracking and returns temp file path
+func (r *RemoteSyncEngine) setupSyncProgressAndCleanup(localPath string, options *RemoteSyncOptions, progress *SyncProgress) string {
+	progress.CurrentFile = filepath.Base(localPath)
+	progress.CurrentOperation = "syncing"
+	if options.ProgressReport != nil {
+		options.ProgressReport(progress)
+	}
+	return localPath + ".remote"
+}
+
+// cleanupTempFile removes the temporary remote file
+func (r *RemoteSyncEngine) cleanupTempFile(tempRemotePath string) {
+	if removeErr := os.Remove(tempRemotePath); removeErr != nil {
+		// Log the error but don't fail the function since this is cleanup
+		// This is a best-effort cleanup
+		logger := logging.GetGlobalLogger()
+		logger.Warn("failed to remove temporary file during cleanup", slog.String("error", removeErr.Error()))
+	}
+}
+
+// checkForConflicts checks for file conflicts in safe mode
+func (r *RemoteSyncEngine) checkForConflicts(localPath, tempRemotePath, remotePath string, options *RemoteSyncOptions) (bool, error) {
+	localInfo, err := os.Stat(localPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to stat local file: %v", err)
+	}
+
+	remoteInfo, err := os.Stat(tempRemotePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to stat remote file: %v", err)
+	}
+
+	if remoteInfo.ModTime().After(localInfo.ModTime()) {
+		// Remote is newer, preserve it (conflict)
+		if options.Verbose {
+			logger := logging.GetGlobalLogger()
+			logger.Info("conflict detected, preserving remote file", slog.String("path", remotePath))
+		}
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// performFileSync handles the actual file synchronization logic
+func (r *RemoteSyncEngine) performFileSync(localPath, tempRemotePath string, remoteExists bool, options *RemoteSyncOptions, result *FileSyncResult) error {
+	if remoteExists {
+		return r.syncExistingFile(localPath, tempRemotePath, options, result)
+	}
+	return r.copyNewFile(localPath, tempRemotePath, options, result)
+}
+
+// syncExistingFile syncs an existing file using Mutagen
+func (r *RemoteSyncEngine) syncExistingFile(localPath, tempRemotePath string, options *RemoteSyncOptions, result *FileSyncResult) error {
+	syncResult, err := r.mutagenEngine.SyncFile(localPath, tempRemotePath, options.SyncOptions)
+	if err != nil {
+		return fmt.Errorf("failed to sync file using Mutagen: %v", err)
+	}
+
+	// Copy sync statistics
+	result.BytesTransferred = syncResult.BytesTransferred
+	result.BytesSaved = syncResult.BytesSaved
+	result.Operations = syncResult.Operations
+	return nil
+}
+
+// copyNewFile copies a new file and sets up statistics
+func (r *RemoteSyncEngine) copyNewFile(localPath, tempRemotePath string, options *RemoteSyncOptions, result *FileSyncResult) error {
+	if err := copyFile(localPath, tempRemotePath, options.SyncOptions); err != nil {
+		return fmt.Errorf("failed to copy new file: %v", err)
+	}
+
+	// Get file size for statistics
+	if info, err := os.Stat(localPath); err == nil {
+		result.BytesTransferred = info.Size()
+		result.Operations = 1
+	}
+	return nil
+}
+
+// updateSyncProgress updates the progress counter and reports if needed
+func (r *RemoteSyncEngine) updateSyncProgress(progress *SyncProgress, options *RemoteSyncOptions) {
 	progress.FilesProcessed++
 	if options.ProgressReport != nil {
 		options.ProgressReport(progress)
 	}
-
-	result.Success = true
-	return result, nil
 }
 
 // downloadRemoteFileIfExists downloads a remote file to a local path if it exists
