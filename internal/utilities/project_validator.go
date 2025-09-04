@@ -151,6 +151,8 @@ type ExpectedItem struct {
 }
 
 // getExpectedFiles returns the expected files configuration
+//
+//nolint:dupl // Different data structures for files vs directories - acceptable duplication
 func (pv *ProjectValidator) getExpectedFiles() map[string]map[string]interface{} {
 	expectedFiles := []ExpectedItem{
 		{
@@ -190,10 +192,12 @@ func (pv *ProjectValidator) getExpectedFiles() map[string]map[string]interface{}
 		},
 	}
 
-	return pv.convertExpectedItemsToMap(expectedFiles)
+	return pv.buildExpectedItemsMap(expectedFiles)
 }
 
 // getExpectedDirectories returns the expected directories configuration
+//
+//nolint:dupl // Different data structures for files vs directories - acceptable duplication
 func (pv *ProjectValidator) getExpectedDirectories() map[string]map[string]interface{} {
 	expectedDirs := []ExpectedItem{
 		{
@@ -233,7 +237,12 @@ func (pv *ProjectValidator) getExpectedDirectories() map[string]map[string]inter
 		},
 	}
 
-	return pv.convertExpectedItemsToMap(expectedDirs)
+	return pv.buildExpectedItemsMap(expectedDirs)
+}
+
+// buildExpectedItemsMap is a helper function to reduce duplication in getExpectedFiles and getExpectedDirectories
+func (pv *ProjectValidator) buildExpectedItemsMap(items []ExpectedItem) map[string]map[string]interface{} {
+	return pv.convertExpectedItemsToMap(items)
 }
 
 // convertExpectedItemsToMap converts a slice of ExpectedItem to the expected map format

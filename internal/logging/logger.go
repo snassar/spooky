@@ -359,13 +359,8 @@ func (l *Logger) LogToDatabase(entry LogEntry) error {
 	return errors.Wrap(err, "failed to insert log entry to database")
 }
 
-// QueryLogs retrieves log entries from the database
-func (l *Logger) QueryLogs(query LogQuery) ([]LogEntry, error) {
-	if l.db == nil {
-		return nil, errors.New("database logging not enabled")
-	}
-
-	// Build query with conditions
+// buildLogQueryConditions builds the WHERE clause and arguments for log queries
+func (l *Logger) buildLogQueryConditions(query LogQuery) (string, []interface{}) {
 	whereClause := "WHERE 1=1"
 	args := []interface{}{}
 
@@ -398,6 +393,18 @@ func (l *Logger) QueryLogs(query LogQuery) ([]LogEntry, error) {
 		whereClause += " AND timestamp <= ?"
 		args = append(args, query.EndTime.Format(time.RFC3339))
 	}
+
+	return whereClause, args
+}
+
+// QueryLogs retrieves log entries from the database
+func (l *Logger) QueryLogs(query LogQuery) ([]LogEntry, error) {
+	if l.db == nil {
+		return nil, errors.New("database logging not enabled")
+	}
+
+	// Build query with conditions
+	whereClause, args := l.buildLogQueryConditions(query)
 
 	// Execute query
 	rows, err := l.db.Query(`

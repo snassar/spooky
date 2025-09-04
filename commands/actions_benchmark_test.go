@@ -7,9 +7,7 @@ import (
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 )
 
-// BenchmarkExtractVariablesBlock benchmarks the extractVariablesBlock function
-func BenchmarkExtractVariablesBlock(b *testing.B) {
-	hclContent := `
+const testVariablesHCL = `
 variables {
   variable "test_var1" {
     value = "test_value1"
@@ -30,6 +28,19 @@ variables {
     }
   }
 }`
+
+const testSingleVariableHCL = `
+variables {
+  variable "test_var" {
+    value = "test_string"
+    description = "Test description"
+    encrypted = false
+  }
+}`
+
+// BenchmarkExtractVariablesBlock benchmarks the extractVariablesBlock function
+func BenchmarkExtractVariablesBlock(b *testing.B) {
+	hclContent := testVariablesHCL
 
 	file, diags := hclsyntax.ParseConfig([]byte(hclContent), "test.hcl", hcl.Pos{Line: 1, Column: 1})
 	if diags.HasErrors() {
@@ -47,27 +58,7 @@ variables {
 
 // BenchmarkExtractVariableBlocks benchmarks the extractVariableBlocks function
 func BenchmarkExtractVariableBlocks(b *testing.B) {
-	hclContent := `
-variables {
-  variable "test_var1" {
-    value = "test_value1"
-    description = "Test variable 1"
-  }
-  variable "test_var2" {
-    value = 42
-    description = "Test variable 2"
-  }
-  variable "test_var3" {
-    value = true
-    description = "Test variable 3"
-  }
-  variable "test_var4" {
-    encrypted_value = {
-      data = "AGE1-ENCRYPTED-DATA"
-      format = "armored"
-    }
-  }
-}`
+	hclContent := testVariablesHCL
 
 	file, diags := hclsyntax.ParseConfig([]byte(hclContent), "test.hcl", hcl.Pos{Line: 1, Column: 1})
 	if diags.HasErrors() {
@@ -90,27 +81,7 @@ variables {
 
 // BenchmarkProcessVariableBlocks benchmarks the processVariableBlocks function
 func BenchmarkProcessVariableBlocks(b *testing.B) {
-	hclContent := `
-variables {
-  variable "test_var1" {
-    value = "test_value1"
-    description = "Test variable 1"
-  }
-  variable "test_var2" {
-    value = 42
-    description = "Test variable 2"
-  }
-  variable "test_var3" {
-    value = true
-    description = "Test variable 3"
-  }
-  variable "test_var4" {
-    encrypted_value = {
-      data = "AGE1-ENCRYPTED-DATA"
-      format = "armored"
-    }
-  }
-}`
+	hclContent := testVariablesHCL
 
 	file, diags := hclsyntax.ParseConfig([]byte(hclContent), "test.hcl", hcl.Pos{Line: 1, Column: 1})
 	if diags.HasErrors() {
@@ -138,14 +109,7 @@ variables {
 
 // BenchmarkParseVariableAttributes benchmarks the parseVariableAttributes function
 func BenchmarkParseVariableAttributes(b *testing.B) {
-	hclContent := `
-variables {
-  variable "test_var" {
-    value = "test_string"
-    description = "Test description"
-    encrypted = false
-  }
-}`
+	hclContent := testSingleVariableHCL
 
 	file, diags := hclsyntax.ParseConfig([]byte(hclContent), "test.hcl", hcl.Pos{Line: 1, Column: 1})
 	if diags.HasErrors() {
@@ -178,27 +142,7 @@ variables {
 
 // BenchmarkFullVariableProcessing benchmarks the complete variable processing pipeline
 func BenchmarkFullVariableProcessing(b *testing.B) {
-	hclContent := `
-variables {
-  variable "test_var1" {
-    value = "test_value1"
-    description = "Test variable 1"
-  }
-  variable "test_var2" {
-    value = 42
-    description = "Test variable 2"
-  }
-  variable "test_var3" {
-    value = true
-    description = "Test variable 3"
-  }
-  variable "test_var4" {
-    encrypted_value = {
-      data = "AGE1-ENCRYPTED-DATA"
-      format = "armored"
-    }
-  }
-}`
+	hclContent := testVariablesHCL
 
 	file, diags := hclsyntax.ParseConfig([]byte(hclContent), "test.hcl", hcl.Pos{Line: 1, Column: 1})
 	if diags.HasErrors() {

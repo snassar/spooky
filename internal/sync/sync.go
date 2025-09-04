@@ -120,16 +120,61 @@ func SyncFile(sourcePath, targetPath string, options *SyncOptions) (*FileSyncRes
 //   - SyncModeOneWaySafe: Safe one-way sync with conflict preservation
 //   - SyncModeTwoWaySafe: Bidirectional sync with conflict detection
 //   - SyncModeTwoWayResolved: Bidirectional sync with source winning conflicts
-func SyncDirectory(sourcePath, targetPath string, options *SyncOptions) (*FileSyncResult, error) {
-	// Input validation
+//
+// validateSyncPaths validates source and target paths for synchronization
+func validateSyncPaths(sourcePath, targetPath string) error {
 	if sourcePath == "" {
-		return nil, fmt.Errorf("source path cannot be empty")
+		return fmt.Errorf("source path cannot be empty")
 	}
 	if targetPath == "" {
-		return nil, fmt.Errorf("target path cannot be empty")
+		return fmt.Errorf("target path cannot be empty")
 	}
 	if sourcePath == targetPath {
-		return nil, fmt.Errorf("source and target paths cannot be identical")
+		return fmt.Errorf("source and target paths cannot be identical")
+	}
+	return nil
+}
+
+// validateSourceDirectory validates that the source directory exists and is accessible
+func validateSourceDirectory(sourcePath string) error {
+	sourceInfo, err := os.Stat(sourcePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("source directory does not exist: %s", sourcePath)
+		} else if os.IsPermission(err) {
+			return fmt.Errorf("permission denied accessing source directory: %s", sourcePath)
+		} else {
+			return fmt.Errorf("failed to access source directory %s: %w", sourcePath, err)
+		}
+	}
+	if !sourceInfo.IsDir() {
+		return fmt.Errorf("source path is not a directory: %s", sourcePath)
+	}
+	return nil
+}
+
+// prepareTargetDirectory creates and validates the target directory
+func prepareTargetDirectory(targetPath string) error {
+	// Create target directory if it doesn't exist
+	if err := os.MkdirAll(targetPath, 0o755); err != nil {
+		return fmt.Errorf("failed to create target directory: %w", err)
+	}
+
+	// Validate target directory exists and is accessible
+	targetInfo, err := os.Stat(targetPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat target directory: %w", err)
+	}
+	if !targetInfo.IsDir() {
+		return fmt.Errorf("target path is not a directory: %s", targetPath)
+	}
+	return nil
+}
+
+func SyncDirectory(sourcePath, targetPath string, options *SyncOptions) (*FileSyncResult, error) {
+	// Input validation
+	if err := validateSyncPaths(sourcePath, targetPath); err != nil {
+		return nil, err
 	}
 
 	// Use default options if none provided
@@ -143,37 +188,15 @@ func SyncDirectory(sourcePath, targetPath string, options *SyncOptions) (*FileSy
 		TargetPath: targetPath,
 	}
 
-	// Validate source directory exists and is accessible
-	sourceInfo, err := os.Stat(sourcePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			result.Error = fmt.Errorf("source directory does not exist: %s", sourcePath)
-		} else if os.IsPermission(err) {
-			result.Error = fmt.Errorf("permission denied accessing source directory: %s", sourcePath)
-		} else {
-			result.Error = fmt.Errorf("failed to access source directory %s: %w", sourcePath, err)
-		}
-		return result, result.Error
-	}
-	if !sourceInfo.IsDir() {
-		result.Error = fmt.Errorf("source path is not a directory: %s", sourcePath)
+	// Validate source directory
+	if err := validateSourceDirectory(sourcePath); err != nil {
+		result.Error = err
 		return result, result.Error
 	}
 
-	// Create target directory if it doesn't exist
-	if err := os.MkdirAll(targetPath, 0o755); err != nil {
-		result.Error = fmt.Errorf("failed to create target directory: %w", err)
-		return result, result.Error
-	}
-
-	// Validate target directory exists and is accessible
-	targetInfo, err := os.Stat(targetPath)
-	if err != nil {
-		result.Error = fmt.Errorf("failed to stat target directory: %w", err)
-		return result, result.Error
-	}
-	if !targetInfo.IsDir() {
-		result.Error = fmt.Errorf("target path is not a directory: %s", targetPath)
+	// Prepare target directory
+	if err := prepareTargetDirectory(targetPath); err != nil {
+		result.Error = err
 		return result, result.Error
 	}
 

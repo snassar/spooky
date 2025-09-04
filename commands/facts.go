@@ -315,8 +315,8 @@ func parseAttribute(attr *hcl.Attribute, target interface{}, machineName, attrNa
 	return nil
 }
 
-// parseMachineAttributes extracts and parses machine attributes from a machine block
-func parseMachineAttributes(machineBlock *hcl.Block, machineName string) (*schemas.MachinesMachineV1, error) {
+// parseMachineFromBlock extracts and parses machine attributes from a machine block
+func parseMachineFromBlock(machineBlock *hcl.Block, machineName string) (*schemas.MachinesMachineV1, error) {
 	logger := logging.GetGlobalLogger()
 	logger.Debug("processing machine", slog.String("machine_name", machineName))
 
@@ -449,7 +449,7 @@ func getMachinesFromConfig() ([]*schemas.MachinesMachineV1, error) {
 	var machines []*schemas.MachinesMachineV1
 	for _, machineBlock := range machineContent.Blocks {
 		machineName := machineBlock.Labels[0]
-		machine, err := parseMachineAttributes(machineBlock, machineName)
+		machine, err := parseMachineFromBlock(machineBlock, machineName)
 		if err != nil {
 			return nil, err
 		}
