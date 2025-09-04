@@ -119,9 +119,6 @@ func TestSyncDirectory_NonExistentSource(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected error for non-existent source directory")
 	}
-	if result == nil {
-		t.Errorf("expected result even on error")
-	}
 	if result.Error == nil {
 		t.Errorf("expected result.Error to be set")
 	}
@@ -140,9 +137,6 @@ func TestSyncDirectory_FileAsSource(t *testing.T) {
 	result, err := SyncDirectory(sourceFile, targetDir, nil)
 	if err == nil {
 		t.Errorf("expected error for file as source directory")
-	}
-	if result == nil {
-		t.Errorf("expected result even on error")
 	}
 	if result.Error == nil {
 		t.Errorf("expected result.Error to be set")
