@@ -37,6 +37,38 @@ lint:
     golangci-lint run
     echo "✅ Linting complete"
 
+# Run staticcheck for advanced static analysis
+staticcheck:
+    #!/usr/bin/env bash
+    echo "🔍 Running staticcheck..."
+    export PATH=$PATH:$(go env GOPATH)/bin
+    staticcheck ./...
+    echo "✅ Staticcheck complete"
+
+# Run golint for Go style guide enforcement
+golint:
+    #!/usr/bin/env bash
+    echo "🔍 Running golint..."
+    export PATH=$PATH:$(go env GOPATH)/bin
+    golint ./...
+    echo "✅ Golint complete"
+
+# Run errcheck for unchecked error detection
+errcheck:
+    #!/usr/bin/env bash
+    echo "🔍 Running errcheck..."
+    export PATH=$PATH:$(go env GOPATH)/bin
+    errcheck ./...
+    echo "✅ Errcheck complete"
+
+# Run ineffassign for ineffective assignment detection
+ineffassign:
+    #!/usr/bin/env bash
+    echo "🔍 Running ineffassign..."
+    export PATH=$PATH:$(go env GOPATH)/bin
+    ineffassign ./...
+    echo "✅ Ineffassign complete"
+
 # Format code with gofmt
 fmt:
     #!/usr/bin/env bash
@@ -53,7 +85,7 @@ imports:
     echo "✅ Import organization complete"
 
 # Run all code quality checks
-check: fmt imports lint
+check: fmt imports lint staticcheck golint errcheck ineffassign
     #!/usr/bin/env bash
     echo "✅ All code quality checks complete"
 
@@ -77,8 +109,36 @@ install-dev:
     #!/usr/bin/env bash
     echo "📦 Installing development dependencies..."
     go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+    go install honnef.co/go/tools/cmd/staticcheck@latest
     go install golang.org/x/tools/cmd/goimports@latest
+    go install golang.org/x/lint/golint@latest
+    go install github.com/kisielk/errcheck@latest
+    go install github.com/gordonklaus/ineffassign@latest
     echo "✅ Development dependencies installed"
+
+# Setup development environment with all linting tools
+setup-dev:
+    #!/usr/bin/env bash
+    echo "🚀 Setting up development environment..."
+    echo "📦 Installing Go linting tools..."
+    go install honnef.co/go/tools/cmd/staticcheck@latest
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+    go install golang.org/x/tools/cmd/goimports@latest
+    go install golang.org/x/lint/golint@latest
+    go install github.com/kisielk/errcheck@latest
+    go install github.com/gordonklaus/ineffassign@latest
+    echo "✅ Development environment setup complete"
+    echo "🔧 Available tools:"
+    echo "  - staticcheck: Advanced static analysis"
+    echo "  - golangci-lint: Comprehensive linting"
+    echo "  - goimports: Import organization"
+    echo "  - golint: Go style guide enforcement"
+    echo "  - errcheck: Unchecked error detection"
+    echo "  - ineffassign: Ineffective assignment detection"
+    echo ""
+    echo "💡 Note: Make sure $(go env GOPATH)/bin is in your PATH"
+    echo "   Add this to your shell profile:"
+    echo "   export PATH=\$PATH:\$(go env GOPATH)/bin"
 
 # Create test project
 test-project name:
@@ -205,15 +265,68 @@ clean-test-bundles:
 stats:
     #!/usr/bin/env bash
     echo "📊 Project Statistics:"
-    echo "Go files (excluding test bundles): $(find . -name "*.go" -not -path "./tools/spooky-test-bundle-generator/bundles/*" | wc -l)"
-    echo "Total lines (excluding test bundles): $(find . -name "*.go" -not -path "./tools/spooky-test-bundle-generator/bundles/*" | xargs wc -l | tail -1)"
-    echo "Test files (excluding test bundles): $(find . -name "*_test.go" -not -path "./tools/spooky-test-bundle-generator/bundles/*" | wc -l)"
-    echo "Documentation files: $(find . -name "*.md" | wc -l)"
-    echo "Build artifacts: $(find build/ -type f 2>/dev/null | wc -l || echo 0)"
-    echo "Test artifacts: $(find testing/ -type f 2>/dev/null | wc -l || echo 0)"
+    echo ""
+    
+    # Count files
+    TOTAL_GO_FILES=$(find . -name "*.go" -not -path "./tools/spooky-test-bundle-generator/bundles/*" | wc -l)
+    TEST_FILES=$(find . -name "*_test.go" -not -path "./tools/spooky-test-bundle-generator/bundles/*" | wc -l)
+    PROD_FILES=$((TOTAL_GO_FILES - TEST_FILES))
+    
+    echo "📁 File Counts:"
+    echo "  Go files (excluding test bundles): $TOTAL_GO_FILES"
+    echo "  Production files: $PROD_FILES"
+    echo "  Test files: $TEST_FILES"
+    echo "  Documentation files: $(find . -name "*.md" | wc -l)"
+    echo ""
+    
+    # Count lines of code
+    TOTAL_LINES=$(find . -name "*.go" -not -path "./tools/spooky-test-bundle-generator/bundles/*" | xargs wc -l | tail -1 | awk '{print $1}')
+    TEST_LINES=$(find . -name "*_test.go" -not -path "./tools/spooky-test-bundle-generator/bundles/*" | xargs wc -l | tail -1 | awk '{print $1}')
+    PROD_LINES=$((TOTAL_LINES - TEST_LINES))
+    
+    # Calculate percentages using awk
+    PROD_PERCENT=$(awk "BEGIN {printf \"%.1f\", $PROD_LINES * 100 / $TOTAL_LINES}")
+    TEST_PERCENT=$(awk "BEGIN {printf \"%.1f\", $TEST_LINES * 100 / $TOTAL_LINES}")
+    
+    echo "📏 Lines of Code:"
+    echo "  Total lines: $TOTAL_LINES"
+    echo "  Production code: $PROD_LINES ($PROD_PERCENT%)"
+    echo "  Test code: $TEST_LINES ($TEST_PERCENT%)"
+    echo ""
+    
+    # Directory breakdown
+    echo "📂 Production Code by Directory:"
+    echo "  main.go: $(wc -l main.go | awk '{print $1}')"
+    echo "  commands/: $(find ./commands -name "*.go" -not -name "*_test.go" | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}' || echo 0)"
+    echo "  internal/: $(find ./internal -name "*.go" -not -name "*_test.go" | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}' || echo 0)"
+    echo ""
+    
+    # Internal package breakdown
+    echo "📦 Internal Package Breakdown:"
+    for dir in internal/*/; do
+        if [ -d "$dir" ]; then
+            pkg=$(basename "$dir")
+            lines=$(find "$dir" -name "*.go" -not -name "*_test.go" | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}' || echo 0)
+            if [ "$lines" -gt 0 ]; then
+                echo "  $pkg/: $lines"
+            fi
+        fi
+    done
+    echo ""
+    
+    # Test breakdown
+    echo "🧪 Test Code by Directory:"
+    echo "  commands/: $(find ./commands -name "*_test.go" | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}' || echo 0)"
+    echo "  internal/: $(find ./internal -name "*_test.go" | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}' || echo 0)"
+    echo ""
+    
+    # Other artifacts
+    echo "🔧 Build Artifacts:"
+    echo "  Build files: $(find build/ -type f 2>/dev/null | wc -l || echo 0)"
+    echo "  Test artifacts: $(find testing/ -type f 2>/dev/null | wc -l || echo 0)"
     echo ""
     echo "📦 Test Bundle Files (excluded from main stats):"
-    echo "Test bundle Go files: $(find ./tools/spooky-test-bundle-generator/bundles -name "*.go" 2>/dev/null | wc -l || echo 0)"
+    echo "  Test bundle Go files: $(find ./tools/spooky-test-bundle-generator/bundles -name "*.go" 2>/dev/null | wc -l || echo 0)"
 
 # Show all available commands
 list:
