@@ -240,30 +240,28 @@ func loadSSHConfig() (*schemas.SpookySSHV1, error) {
 	}, nil
 }
 
-// getMachinesFromConfig gets machines from the configuration
-func getMachinesFromConfig() ([]*schemas.MachinesMachineV1, error) {
-	logger := logging.GetGlobalLogger()
-	logger.Debug("loading machines configuration")
-
-	// Look for machines.hcl in current directory
+// parseMachinesHCL parses the machines.hcl file and returns the parsed HCL file
+func parseMachinesHCL() (*hcl.File, error) {
 	machinesHCLPath := "machines.hcl"
 	if _, err := os.Stat(machinesHCLPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("machines.hcl not found in current directory")
 	}
 
-	// Read and parse machines.hcl using the HCL library properly
 	content, err := os.ReadFile(machinesHCLPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read machines.hcl: %w", err)
 	}
 
-	// Parse HCL using the library
 	file, diags := hclsyntax.ParseConfig(content, machinesHCLPath, hcl.Pos{Line: 1, Column: 1})
 	if diags.HasErrors() {
 		return nil, fmt.Errorf("failed to parse machines.hcl: %v", diags)
 	}
 
-	// Define the schema for machines block
+	return file, nil
+}
+
+// validateMachinesBlock validates and extracts the machines block from the HCL file
+func validateMachinesBlock(file *hcl.File) (*hcl.Block, error) {
 	schema := &hcl.BodySchema{
 		Blocks: []hcl.BlockHeaderSchema{
 			{
@@ -273,7 +271,6 @@ func getMachinesFromConfig() ([]*schemas.MachinesMachineV1, error) {
 		},
 	}
 
-	// Extract the machines block
 	bodyContent, diags := file.Body.Content(schema)
 	if diags.HasErrors() {
 		return nil, fmt.Errorf("failed to decode machines block: %v", diags)
@@ -287,7 +284,129 @@ func getMachinesFromConfig() ([]*schemas.MachinesMachineV1, error) {
 		return nil, fmt.Errorf("multiple machines blocks found in machines.hcl")
 	}
 
-	machinesBlock := bodyContent.Blocks[0]
+	return bodyContent.Blocks[0], nil
+}
+
+// parseAttribute is a generic helper function to parse HCL attributes
+func parseAttribute(attr *hcl.Attribute, target interface{}, machineName, attrName string) error {
+	diags := gohcl.DecodeExpression(attr.Expr, nil, target)
+	if diags.HasErrors() {
+		return fmt.Errorf("failed to decode %s for machine %s: %v", attrName, machineName, diags)
+	}
+	return nil
+}
+
+// parseMachineAttributes extracts and parses machine attributes from a machine block
+func parseMachineAttributes(machineBlock *hcl.Block, machineName string) (*schemas.MachinesMachineV1, error) {
+	logger := logging.GetGlobalLogger()
+	logger.Debug("processing machine", slog.String("machine_name", machineName))
+
+	// Create a new machine struct with defaults
+	machine := &schemas.MachinesMachineV1{
+		Description:       "",
+		Hostname:          "",
+		Port:              22, // default
+		User:              "",
+		Authentication:    schemas.MachinesMachineAuthenticationV1{},
+		ConnectionTimeout: 30, // default
+		MaxRetries:        3,  // default
+		RetryDelay:        5,  // default
+		Facts:             schemas.MachinesMachineFactsV1{},
+	}
+
+	// Define schema for machine attributes and blocks
+	machineSchema := &hcl.BodySchema{
+		Attributes: []hcl.AttributeSchema{
+			{Name: "hostname", Required: true},
+			{Name: "port", Required: false},
+			{Name: "user", Required: true},
+		},
+		Blocks: []hcl.BlockHeaderSchema{
+			{
+				Type:       "authentication",
+				LabelNames: []string{"method"},
+			},
+		},
+	}
+
+	// Extract the machine content
+	machineContent, diags := machineBlock.Body.Content(machineSchema)
+	if diags.HasErrors() {
+		return nil, fmt.Errorf("failed to decode machine %s: %v", machineName, diags)
+	}
+
+	// Parse attributes using the generic helper
+	attributeParsers := map[string]func() error{
+		"hostname": func() error {
+			if attr, exists := machineContent.Attributes["hostname"]; exists {
+				return parseAttribute(attr, &machine.Hostname, machineName, "hostname")
+			}
+			return nil
+		},
+		"port": func() error {
+			if attr, exists := machineContent.Attributes["port"]; exists {
+				return parseAttribute(attr, &machine.Port, machineName, "port")
+			}
+			return nil
+		},
+		"user": func() error {
+			if attr, exists := machineContent.Attributes["user"]; exists {
+				return parseAttribute(attr, &machine.User, machineName, "user")
+			}
+			return nil
+		},
+	}
+
+	// Execute attribute parsers
+	for _, parser := range attributeParsers {
+		if err := parser(); err != nil {
+			return nil, err
+		}
+	}
+
+	// Handle authentication block
+	if len(machineContent.Blocks) > 0 {
+		authBlock := machineContent.Blocks[0]
+		authConfig, err := utilities.ParseAuthenticationBlock(authBlock, machineName)
+		if err != nil {
+			return nil, err
+		}
+		machine.Authentication = *authConfig
+	}
+
+	// Validate required fields
+	if machine.Hostname == "" {
+		return nil, fmt.Errorf("machine %s missing required hostname", machineName)
+	}
+	if machine.User == "" {
+		return nil, fmt.Errorf("machine %s missing required user", machineName)
+	}
+
+	logger.Debug("successfully parsed machine",
+		slog.String("machine_name", machineName),
+		slog.String("user", machine.User),
+		slog.String("hostname", machine.Hostname),
+		slog.Int("port", machine.Port))
+
+	return machine, nil
+}
+
+// getMachinesFromConfig gets machines from the configuration
+func getMachinesFromConfig() ([]*schemas.MachinesMachineV1, error) {
+	logger := logging.GetGlobalLogger()
+	logger.Debug("loading machines configuration")
+
+	// Parse the HCL file
+	file, err := parseMachinesHCL()
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate and extract machines block
+	machinesBlock, err := validateMachinesBlock(file)
+	if err != nil {
+		return nil, err
+	}
 
 	// Define schema for machine blocks inside machines
 	machineSchema := &hcl.BodySchema{
@@ -307,96 +426,14 @@ func getMachinesFromConfig() ([]*schemas.MachinesMachineV1, error) {
 
 	logger.Debug("found machine blocks", slog.Int("count", len(machineContent.Blocks)))
 
-	// Create machines slice
-	var machines []*schemas.MachinesMachineV1
-
 	// Process each machine block
+	var machines []*schemas.MachinesMachineV1
 	for _, machineBlock := range machineContent.Blocks {
 		machineName := machineBlock.Labels[0]
-		logger.Debug("processing machine", slog.String("machine_name", machineName))
-
-		// Create a new machine struct
-		machine := &schemas.MachinesMachineV1{
-			Description:       "",
-			Hostname:          "",
-			Port:              22, // default
-			User:              "",
-			Authentication:    schemas.MachinesMachineAuthenticationV1{},
-			ConnectionTimeout: 30, // default
-			MaxRetries:        3,  // default
-			RetryDelay:        5,  // default
-			Facts:             schemas.MachinesMachineFactsV1{},
+		machine, err := parseMachineAttributes(machineBlock, machineName)
+		if err != nil {
+			return nil, err
 		}
-
-		// Use a schema that allows authentication blocks
-		machineSchema := &hcl.BodySchema{
-			Attributes: []hcl.AttributeSchema{
-				{Name: "hostname", Required: true},
-				{Name: "port", Required: false},
-				{Name: "user", Required: true},
-			},
-			Blocks: []hcl.BlockHeaderSchema{
-				{
-					Type:       "authentication",
-					LabelNames: []string{"method"},
-				},
-			},
-		}
-
-		// Extract the machine content
-		machineContent, diags := machineBlock.Body.Content(machineSchema)
-		if diags.HasErrors() {
-			return nil, fmt.Errorf("failed to decode machine %s: %v", machineName, diags)
-		}
-
-		// Extract attributes
-		if hostnameAttr, exists := machineContent.Attributes["hostname"]; exists {
-			var hostname string
-			if diags := gohcl.DecodeExpression(hostnameAttr.Expr, nil, &hostname); diags.HasErrors() {
-				return nil, fmt.Errorf("failed to decode hostname for machine %s: %v", machineName, diags)
-			}
-			machine.Hostname = hostname
-		}
-
-		if portAttr, exists := machineContent.Attributes["port"]; exists {
-			var port int
-			if diags := gohcl.DecodeExpression(portAttr.Expr, nil, &port); diags.HasErrors() {
-				return nil, fmt.Errorf("failed to decode port for machine %s: %v", machineName, diags)
-			}
-			machine.Port = port
-		}
-
-		if userAttr, exists := machineContent.Attributes["user"]; exists {
-			var user string
-			if diags := gohcl.DecodeExpression(userAttr.Expr, nil, &user); diags.HasErrors() {
-				return nil, fmt.Errorf("failed to decode user for machine %s: %v", machineName, diags)
-			}
-			machine.User = user
-		}
-
-		// Handle authentication block
-		if len(machineContent.Blocks) > 0 {
-			authBlock := machineContent.Blocks[0]
-			authConfig, err := utilities.ParseAuthenticationBlock(authBlock, machineName)
-			if err != nil {
-				return nil, err
-			}
-			machine.Authentication = *authConfig
-		}
-
-		// Validate required fields
-		if machine.Hostname == "" {
-			return nil, fmt.Errorf("machine %s missing required hostname", machineName)
-		}
-		if machine.User == "" {
-			return nil, fmt.Errorf("machine %s missing required user", machineName)
-		}
-
-		logger.Debug("successfully parsed machine",
-			slog.String("machine_name", machineName),
-			slog.String("user", machine.User),
-			slog.String("hostname", machine.Hostname),
-			slog.Int("port", machine.Port))
 		machines = append(machines, machine)
 	}
 
