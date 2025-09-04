@@ -3,6 +3,8 @@ package commands
 import (
 	"fmt"
 
+	"spooky/internal/version"
+
 	"github.com/spf13/cobra"
 )
 
@@ -10,8 +12,8 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Show spooky version information",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("spooky v0.1.0")
-		fmt.Println("Automation and configuration management tool")
+		versionInfo := version.GetFullVersionInfo()
+		fmt.Println(versionInfo.String())
 	},
 }
 
