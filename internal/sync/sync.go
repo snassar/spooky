@@ -415,86 +415,114 @@ func copyFile(src, dst string, options *SyncOptions) error {
 	return errors.Wrapf(err, "failed to copy data from %s to %s", src, dst)
 }
 
-// preserveAttributes preserves file attributes from source to target
-func preserveAttributes(sourcePath, targetPath string, options *SyncOptions) error {
-	if !options.PreservePerms && !options.PreserveOwner && !options.PreserveGroup {
-		return nil // No attributes to preserve
+// preservePermissions preserves file permissions from source to target
+func preservePermissions(targetPath string, sourceMode os.FileMode) error {
+	return errors.Wrapf(os.Chmod(targetPath, sourceMode), "failed to preserve permissions for %s", targetPath)
+}
+
+// preserveBothOwnerAndGroup preserves both owner and group from source to target
+func preserveBothOwnerAndGroup(targetPath string, sourceStat *syscall.Stat_t) error {
+	uid, err := utilities.SafeInt(int64(sourceStat.Uid))
+	if err != nil {
+		return errors.Wrap(err, "UID value out of bounds")
+	}
+	gid, err := utilities.SafeInt(int64(sourceStat.Gid))
+	if err != nil {
+		return errors.Wrap(err, "GID value out of bounds")
+	}
+	return errors.Wrapf(os.Chown(targetPath, uid, gid), "failed to preserve owner and group for %s", targetPath)
+}
+
+// preserveOwnerOnly preserves only the owner from source to target, keeping target's group
+func preserveOwnerOnly(targetPath string, sourceStat *syscall.Stat_t) error {
+	targetInfo, err := os.Stat(targetPath)
+	if err != nil {
+		return errors.Wrapf(err, "failed to stat target file %s", targetPath)
+	}
+	targetStat, ok := targetInfo.Sys().(*syscall.Stat_t)
+	if !ok {
+		return errors.New("failed to get target system-specific file info")
 	}
 
+	uid, err := utilities.SafeInt(int64(sourceStat.Uid))
+	if err != nil {
+		return errors.Wrap(err, "UID value out of bounds")
+	}
+	targetGid, err := utilities.SafeInt(int64(targetStat.Gid))
+	if err != nil {
+		return errors.Wrap(err, "target GID value out of bounds")
+	}
+	return errors.Wrapf(os.Chown(targetPath, uid, targetGid), "failed to preserve owner for %s", targetPath)
+}
+
+// preserveGroupOnly preserves only the group from source to target, keeping target's owner
+func preserveGroupOnly(targetPath string, sourceStat *syscall.Stat_t) error {
+	targetInfo, err := os.Stat(targetPath)
+	if err != nil {
+		return errors.Wrapf(err, "failed to stat target file %s", targetPath)
+	}
+	targetStat, ok := targetInfo.Sys().(*syscall.Stat_t)
+	if !ok {
+		return errors.New("error getting target system-specific file info")
+	}
+
+	targetUid, err := utilities.SafeInt(int64(targetStat.Uid))
+	if err != nil {
+		return errors.Wrap(err, "target UID value out of bounds")
+	}
+	gid, err := utilities.SafeInt(int64(sourceStat.Gid))
+	if err != nil {
+		return errors.Wrap(err, "GID value out of bounds")
+	}
+	return errors.Wrapf(os.Chown(targetPath, targetUid, gid), "failed to preserve group for %s", targetPath)
+}
+
+// preserveOwnerAndGroup preserves owner and/or group based on options
+func preserveOwnerAndGroup(sourcePath, targetPath string, options *SyncOptions, sourceStat *syscall.Stat_t) error {
+	if !options.PreserveOwner && !options.PreserveGroup {
+		return nil
+	}
+
+	if options.PreserveOwner && options.PreserveGroup {
+		return preserveBothOwnerAndGroup(targetPath, sourceStat)
+	} else if options.PreserveOwner {
+		return preserveOwnerOnly(targetPath, sourceStat)
+	} else if options.PreserveGroup {
+		return preserveGroupOnly(targetPath, sourceStat)
+	}
+
+	return nil
+}
+
+// preserveAttributes preserves file attributes from source to target
+func preserveAttributes(sourcePath, targetPath string, options *SyncOptions) error {
+	// Early return if no attributes to preserve
+	if !options.PreservePerms && !options.PreserveOwner && !options.PreserveGroup {
+		return nil
+	}
+
+	// Get source file info once
 	sourceInfo, err := os.Stat(sourcePath)
 	if err != nil {
 		return errors.Wrapf(err, "failed to stat source file %s", sourcePath)
 	}
 
+	// Preserve permissions if requested
 	if options.PreservePerms {
-		if err := os.Chmod(targetPath, sourceInfo.Mode()); err != nil {
-			return errors.Wrapf(err, "failed to preserve permissions for %s", targetPath)
+		if err := preservePermissions(targetPath, sourceInfo.Mode()); err != nil {
+			return err
 		}
 	}
 
+	// Preserve owner/group if requested
 	if options.PreserveOwner || options.PreserveGroup {
-		stat, ok := sourceInfo.Sys().(*syscall.Stat_t)
+		sourceStat, ok := sourceInfo.Sys().(*syscall.Stat_t)
 		if !ok {
 			return errors.New("failed to get system-specific file info")
 		}
 
-		if options.PreserveOwner && options.PreserveGroup {
-			// Safe conversion from uint32 to int
-			uid, err := utilities.SafeInt(int64(stat.Uid))
-			if err != nil {
-				return errors.Wrap(err, "UID value out of bounds")
-			}
-			gid, err := utilities.SafeInt(int64(stat.Gid))
-			if err != nil {
-				return errors.Wrap(err, "GID value out of bounds")
-			}
-			if err := os.Chown(targetPath, uid, gid); err != nil {
-				return errors.Wrapf(err, "failed to preserve owner and group for %s", targetPath)
-			}
-		} else if options.PreserveOwner {
-			// Get current group of target
-			targetInfo, err := os.Stat(targetPath)
-			if err != nil {
-				return errors.Wrapf(err, "failed to stat target file %s", targetPath)
-			}
-			targetStat, ok := targetInfo.Sys().(*syscall.Stat_t)
-			if !ok {
-				return errors.New("failed to get target system-specific file info")
-			}
-			// Safe conversion from uint32 to int
-			uid, err := utilities.SafeInt(int64(stat.Uid))
-			if err != nil {
-				return errors.Wrap(err, "UID value out of bounds")
-			}
-			targetGid, err := utilities.SafeInt(int64(targetStat.Gid))
-			if err != nil {
-				return errors.Wrap(err, "target GID value out of bounds")
-			}
-			if err := os.Chown(targetPath, uid, targetGid); err != nil {
-				return errors.Wrapf(err, "failed to preserve owner for %s", targetPath)
-			}
-		} else if options.PreserveGroup {
-			// Get current owner of target
-			targetInfo, err := os.Stat(targetPath)
-			if err != nil {
-				return errors.Wrapf(err, "failed to stat target file %s", targetPath)
-			}
-			targetStat, ok := targetInfo.Sys().(*syscall.Stat_t)
-			if !ok {
-				return errors.New("error getting target system-specific file info")
-			}
-			// Safe conversion from uint32 to int
-			targetUid, err := utilities.SafeInt(int64(targetStat.Uid))
-			if err != nil {
-				return errors.Wrap(err, "target UID value out of bounds")
-			}
-			gid, err := utilities.SafeInt(int64(stat.Gid))
-			if err != nil {
-				return errors.Wrap(err, "GID value out of bounds")
-			}
-			if err := os.Chown(targetPath, targetUid, gid); err != nil {
-				return errors.Wrapf(err, "failed to preserve group for %s", targetPath)
-			}
+		if err := preserveOwnerAndGroup(sourcePath, targetPath, options, sourceStat); err != nil {
+			return err
 		}
 	}
 
