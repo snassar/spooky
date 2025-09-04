@@ -2,6 +2,7 @@ package utilities
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 )
@@ -65,7 +66,9 @@ func (eh *ErrorHandler) HandleError(err error, severity ErrorSeverity, message s
 	switch severity {
 	case SeverityInfo:
 		if eh.verbose {
-			fmt.Printf("ℹ️  %s: %v\n", message, err)
+			slog.Info("error handler info",
+				slog.String("message", message),
+				slog.String("error", err.Error()))
 		}
 	case SeverityWarning:
 		eh.warnings = append(eh.warnings, errorInfo)

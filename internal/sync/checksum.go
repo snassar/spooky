@@ -1,8 +1,8 @@
 package sync
 
 import (
-	"fmt"
 	"io"
+	"log/slog"
 	"os"
 
 	"github.com/mmcloughlin/md4"
@@ -18,8 +18,9 @@ func FileChecksum(fn string) ([]byte, error) {
 		if closeErr := f.Close(); closeErr != nil {
 			// Log the error but don't fail the function since we've already read the data
 			// This is a best-effort cleanup
-			// Note: Using fmt.Printf for logging since this package doesn't import logging
-			fmt.Printf("warning: failed to close file during cleanup: %v\n", closeErr)
+			slog.Warn("failed to close file during cleanup",
+				slog.String("file", fn),
+				slog.String("error", closeErr.Error()))
 		}
 	}()
 	h := md4.New()
