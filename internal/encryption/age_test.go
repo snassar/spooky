@@ -103,7 +103,7 @@ func TestAgeKeyGenerationAndLoading(t *testing.T) {
 			t.Error("No identities loaded")
 		}
 
-		fmt.Printf("Loaded %d identities\n", ae.GetIdentitiesCount())
+		t.Logf("Loaded %d identities", ae.GetIdentitiesCount())
 	})
 
 	// Test loading recipients
@@ -117,7 +117,7 @@ func TestAgeKeyGenerationAndLoading(t *testing.T) {
 			t.Error("No recipients loaded")
 		}
 
-		fmt.Printf("Loaded %d recipients\n", ae.GetRecipientsCount())
+		t.Logf("Loaded %d recipients", ae.GetRecipientsCount())
 	})
 
 	// Test full encryption/decryption cycle
@@ -144,7 +144,7 @@ func TestAgeKeyGenerationAndLoading(t *testing.T) {
 		if len(encrypted) > 100 {
 			truncated = encrypted[:100] + "..."
 		}
-		fmt.Printf("Encrypted: %s\n", truncated)
+		t.Logf("Encrypted: %s", truncated)
 
 		// Verify it looks encrypted
 		if !ae.IsEncrypted(encrypted) {
@@ -162,7 +162,7 @@ func TestAgeKeyGenerationAndLoading(t *testing.T) {
 			t.Errorf("Decryption failed: expected '%s', got '%s'", plaintext, decrypted)
 		}
 
-		fmt.Printf("Successfully encrypted and decrypted: %s\n", plaintext)
+		t.Logf("Successfully encrypted and decrypted: %s", plaintext)
 	})
 
 	// Test validation
@@ -212,7 +212,7 @@ func TestAgeKeyLoadingFromDirectory(t *testing.T) {
 			t.Errorf("Expected at least 2 identities, got %d", identityCount)
 		}
 
-		fmt.Printf("Loaded %d identities from directory\n", identityCount)
+		t.Logf("Loaded %d identities from directory", identityCount)
 	})
 }
 
@@ -345,8 +345,8 @@ func TestAgePathFunctions(t *testing.T) {
 			t.Error("Default recipients path should contain 'recipients'")
 		}
 
-		fmt.Printf("Default identities path: %s\n", identitiesPath)
-		fmt.Printf("Default recipients path: %s\n", recipientsPath)
+		t.Logf("Default identities path: %s", identitiesPath)
+		t.Logf("Default recipients path: %s", recipientsPath)
 	})
 
 	t.Run("GetProjectAgePaths with nil config", func(t *testing.T) {
@@ -458,7 +458,7 @@ func TestDirectoryBasedRecipients(t *testing.T) {
 			t.Errorf("Expected %d recipients, got %d", expectedCount, recipientCount)
 		}
 
-		fmt.Printf("Loaded %d recipients from directory\n", recipientCount)
+		t.Logf("Loaded %d recipients from directory", recipientCount)
 	})
 }
 
