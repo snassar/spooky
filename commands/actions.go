@@ -532,7 +532,26 @@ func extractActionAttributes(actionBlock *hcl.Block) (*hcl.BodyContent, error) {
 
 // parseActionAttributes parses all attributes for an action
 func parseActionAttributes(action *schemas.ActionsActionV1, attrContent *hcl.BodyContent, actionName string) error {
-	// Parse each attribute type
+	// Parse basic attributes
+	if err := parseBasicAttributes(action, attrContent, actionName); err != nil {
+		return err
+	}
+
+	// Parse template deploy specific attributes
+	if err := parseTemplateDeployAttributes(action, attrContent, actionName); err != nil {
+		return err
+	}
+
+	// Parse file sync specific attributes
+	if err := parseFileSyncAttributes(action, attrContent, actionName); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// parseBasicAttributes parses basic action attributes
+func parseBasicAttributes(action *schemas.ActionsActionV1, attrContent *hcl.BodyContent, actionName string) error {
 	if err := parseStringAttribute(attrContent, "description", &action.Description, actionName); err != nil {
 		return err
 	}
@@ -557,8 +576,11 @@ func parseActionAttributes(action *schemas.ActionsActionV1, attrContent *hcl.Bod
 	if err := parseBoolAttribute(attrContent, "sudo", &action.Sudo, actionName); err != nil {
 		return err
 	}
+	return nil
+}
 
-	// Parse template deploy specific fields
+// parseTemplateDeployAttributes parses template deploy specific attributes
+func parseTemplateDeployAttributes(action *schemas.ActionsActionV1, attrContent *hcl.BodyContent, actionName string) error {
 	if err := parseStringAttribute(attrContent, "source", &action.Source, actionName); err != nil {
 		return err
 	}
@@ -580,8 +602,11 @@ func parseActionAttributes(action *schemas.ActionsActionV1, attrContent *hcl.Bod
 	if err := parseStringAttribute(attrContent, "group", &action.Group, actionName); err != nil {
 		return err
 	}
+	return nil
+}
 
-	// Parse file sync specific fields
+// parseFileSyncAttributes parses file sync specific attributes
+func parseFileSyncAttributes(action *schemas.ActionsActionV1, attrContent *hcl.BodyContent, actionName string) error {
 	if err := parseStringAttribute(attrContent, "sync_source", &action.SyncSource, actionName); err != nil {
 		return err
 	}
@@ -594,7 +619,6 @@ func parseActionAttributes(action *schemas.ActionsActionV1, attrContent *hcl.Bod
 	if err := parseBoolAttribute(attrContent, "sync_preserve", &action.SyncPreserve, actionName); err != nil {
 		return err
 	}
-
 	return nil
 }
 
