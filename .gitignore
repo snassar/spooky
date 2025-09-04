@@ -68,8 +68,8 @@ documentation/codeflow/
 documentation/research/
 documentation/schemafiles/
 
-# Testing directories
-testing/
+# Testing directories (root level only)
+^testing/
 
 # Test bundle generator output (deeply nested duplicates)
 tools/spooky-test-bundle-generator/bundles/
