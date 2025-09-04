@@ -223,6 +223,64 @@ Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`
 - Log errors with appropriate detail levels
 - Return structured error information
 
+## Code Quality and Refactoring
+
+### Refactoring Patterns
+
+The project follows established refactoring patterns to maintain code quality:
+
+**Function Decomposition:**
+- Break large functions (>50 lines) into smaller, focused helper functions
+- Each function should have a single responsibility
+- Target cyclomatic complexity ≤ 10 (acceptable up to 15 for complex operations)
+
+**Helper Function Naming:**
+- `extract*` functions for data extraction logic
+- `parse*` functions for parsing and validation logic  
+- `process*` functions for data processing and transformation
+- `validate*` functions for validation logic
+
+**Common Refactoring Patterns:**
+- Extract method for long functions with clear responsibilities
+- Extract constant for magic numbers or strings used multiple times
+- Simplify conditionals for complex nested if statements
+- Consolidate duplicate code into reusable functions
+
+### Testing Patterns
+
+**Unit Testing:**
+- Create comprehensive tests for all extracted helper functions
+- Test both success and error cases
+- Use table-driven tests for multiple scenarios
+- Include benchmarks for performance-critical functions
+
+**Test Structure:**
+```go
+func TestFunctionName(t *testing.T) {
+    tests := []struct {
+        name        string
+        input       InputType
+        expected    ExpectedType
+        expectError bool
+        errorMsg    string
+    }{
+        // Test cases
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            // Test implementation
+        })
+    }
+}
+```
+
+**Benchmark Testing:**
+- Create benchmarks for performance-critical functions
+- Use `-benchmem` flag to measure memory allocation
+- Target sub-microsecond performance for simple operations
+- Document performance characteristics
+
 ## Performance Considerations
 
 ### Resource Loading
@@ -238,6 +296,12 @@ Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`
 - Use efficient algorithms and data structures
 - Cache results when appropriate
 - Optimize for common use cases
+
+### Performance Validation
+
+- Run benchmarks after refactoring to ensure no regression
+- Monitor memory allocation patterns
+- Validate performance characteristics in CI/CD pipeline
 
 ## Security Guidelines
 

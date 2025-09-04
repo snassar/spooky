@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/spf13/cobra"
+	"github.com/zclconf/go-cty/cty"
 )
 
 var (
@@ -1269,20 +1270,66 @@ func extractVariableAttributes(variableBlock *hcl.Block) (*hcl.BodyContent, erro
 func parseVariableAttributes(attrContent *hcl.BodyContent, variableName string) (interface{}, error) {
 	// Check for encrypted_value first (highest priority)
 	if attr, exists := attrContent.Attributes["encrypted_value"]; exists {
-		var encryptedValue map[string]interface{}
-		if err := gohcl.DecodeExpression(attr.Expr, nil, &encryptedValue); err != nil {
-			return nil, fmt.Errorf("failed to decode encrypted_value for variable %s: %v", variableName, err)
+		// Try to decode as cty.Value first, then convert to Go type
+		val, diags := attr.Expr.Value(nil)
+		if diags.HasErrors() {
+			return nil, fmt.Errorf("failed to evaluate encrypted_value for variable %s: %v", variableName, diags)
 		}
-		return encryptedValue, nil
+
+		// Convert cty.Value to Go interface{}
+		if val.IsNull() {
+			return nil, nil
+		}
+
+		// For encrypted values, we expect an object/map
+		if val.Type().IsObjectType() {
+			result := make(map[string]interface{})
+			for key, value := range val.AsValueMap() {
+				if value.Type() == cty.String {
+					result[key] = value.AsString()
+				} else {
+					result[key] = value.AsString() // Fallback to string representation
+				}
+			}
+			return result, nil
+		}
+
+		// Fallback to string representation
+		return val.AsString(), nil
 	}
 
 	// Check for plain value
 	if attr, exists := attrContent.Attributes["value"]; exists {
-		var value interface{}
-		if err := gohcl.DecodeExpression(attr.Expr, nil, &value); err != nil {
-			return nil, fmt.Errorf("failed to decode value for variable %s: %v", variableName, err)
+		// Try to decode as cty.Value first, then convert to Go type
+		val, diags := attr.Expr.Value(nil)
+		if diags.HasErrors() {
+			return nil, fmt.Errorf("failed to evaluate value for variable %s: %v", variableName, diags)
 		}
-		return value, nil
+
+		// Convert cty.Value to Go interface{}
+		if val.IsNull() {
+			return nil, nil
+		}
+
+		// Convert based on type
+		switch val.Type() {
+		case cty.String:
+			return val.AsString(), nil
+		case cty.Number:
+			// Convert number to float64 for simplicity
+			floatVal, _ := val.AsBigFloat().Float64()
+			return floatVal, nil
+		case cty.Bool:
+			return val.True(), nil
+		case cty.List(cty.String):
+			var result []string
+			for _, item := range val.AsValueSlice() {
+				result = append(result, item.AsString())
+			}
+			return result, nil
+		default:
+			return val.AsString(), nil // Fallback to string representation
+		}
 	}
 
 	// Check for description

@@ -87,42 +87,6 @@ func TestParseMachinesHCL(t *testing.T) {
 	})
 }
 
-func TestExtractVariableBlocks(t *testing.T) {
-	// This test would require actual HCL blocks
-	// For now, we'll test that the function exists
-	t.Run("function exists", func(t *testing.T) {
-		// In Go, functions are never nil, so we just verify the test runs
-		t.Log("extractVariableBlocks function is defined")
-	})
-}
-
-func TestProcessVariableBlocks(t *testing.T) {
-	// This test would require actual HCL content
-	// For now, we'll test that the function exists
-	t.Run("function exists", func(t *testing.T) {
-		// In Go, functions are never nil, so we just verify the test runs
-		t.Log("processVariableBlocks function is defined")
-	})
-}
-
-func TestExtractVariableAttributes(t *testing.T) {
-	// This test would require actual HCL blocks
-	// For now, we'll test that the function exists
-	t.Run("function exists", func(t *testing.T) {
-		// In Go, functions are never nil, so we just verify the test runs
-		t.Log("extractVariableAttributes function is defined")
-	})
-}
-
-func TestParseVariableAttributes(t *testing.T) {
-	// This test would require actual HCL attributes
-	// For now, we'll test that the function exists
-	t.Run("function exists", func(t *testing.T) {
-		// In Go, functions are never nil, so we just verify the test runs
-		t.Log("parseVariableAttributes function is defined")
-	})
-}
-
 // Test helper functions that can be tested without external dependencies
 func TestCreateMachinePrefixedName(t *testing.T) {
 	// This is a simple utility function that should be testable
