@@ -13,6 +13,53 @@ build:
     go build -o build/spooky .
     echo "✅ Build complete: ./build/spooky"
 
+# Build the spooky binary with ScalVer version injection
+build-version version="0.20250905.0":
+    #!/usr/bin/env bash
+    echo "🔨 Building spooky binary with ScalVer version: {{version}}..."
+    
+    # Get build metadata
+    BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    GIT_COMMIT=""
+    GIT_BRANCH=""
+    if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
+        GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "")
+        GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+    fi
+    GO_VERSION=$(go version | cut -d' ' -f3)
+    
+    # Create output directory
+    mkdir -p build
+    
+    # Build flags for version injection
+    LDFLAGS="-X spooky/internal/version.buildInfo=dev"
+    LDFLAGS="$LDFLAGS -X spooky/internal/version.buildTime=$BUILD_TIME"
+    LDFLAGS="$LDFLAGS -X spooky/internal/version.goVersion=$GO_VERSION"
+    LDFLAGS="$LDFLAGS -X spooky/internal/version.buildVersion={{version}}"
+    
+    if [ -n "$GIT_COMMIT" ]; then
+        LDFLAGS="$LDFLAGS -X spooky/internal/version.gitCommit=$GIT_COMMIT"
+    fi
+    
+    if [ -n "$GIT_BRANCH" ]; then
+        LDFLAGS="$LDFLAGS -X spooky/internal/version.gitBranch=$GIT_BRANCH"
+    fi
+    
+    echo "Build time: $BUILD_TIME"
+    echo "Git commit: ${GIT_COMMIT:-'not available'}"
+    echo "Git branch: ${GIT_BRANCH:-'not available'}"
+    echo "Go version: $GO_VERSION"
+    
+    # Build the binary
+    go build -ldflags "$LDFLAGS" -o build/spooky main.go
+    
+    echo "✅ Build complete: ./build/spooky"
+    
+    # Test the version command
+    echo ""
+    echo "Testing version command:"
+    ./build/spooky version
+
 # Run all tests
 test:
     #!/usr/bin/env bash
