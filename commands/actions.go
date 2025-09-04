@@ -884,27 +884,9 @@ func (ae *ActionExecutor) runTemplateDeployAction(ctx context.Context, action *s
 	}
 
 	// Create template context
-	templateContext := &templates.TemplateContext{
-		Variables: variables,
-		Machines:  make(map[string]interface{}),
-		Facts:     make(map[string]interface{}),
-		Environment: map[string]string{
-			"HOSTNAME": machine.Hostname,
-			"USER":     machine.User,
-		},
-		Project: map[string]interface{}{
-			"name":        ae.projectConfig.Name,
-			"description": ae.projectConfig.Description,
-		},
-	}
-
-	// Add machine information to context
-	// Note: machine.Variables is not implemented in the current schema
-	// This is a placeholder for future enhancement
-	templateContext.Machines[machine.Hostname] = map[string]interface{}{
-		"hostname": machine.Hostname,
-		"user":     machine.User,
-		"port":     machine.Port,
+	templateContext, err := ae.buildTemplateContext(variables, machine)
+	if err != nil {
+		return fmt.Errorf("failed to build template context: %w", err)
 	}
 
 	// Create transparent decryptor for template rendering
@@ -935,17 +917,8 @@ func (ae *ActionExecutor) runTemplateDeployAction(ctx context.Context, action *s
 	}
 
 	// Create backup if requested
-	if action.Backup {
-		logger.Debug("Creating backup of existing file", slog.String("destination", action.Destination))
-		backupCmd := fmt.Sprintf("cp %s %s.backup.$(date +%%Y%%m%%d_%%H%%M%%S)", action.Destination, action.Destination)
-		result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, backupCmd)
-		if err != nil {
-			logger.Warn("failed to create backup, continuing with deployment",
-				slog.String("error", err.Error()))
-		} else if result.ExitCode != 0 {
-			logger.Warn("backup command returned non-zero exit code, continuing with deployment",
-				slog.Int("exit_code", result.ExitCode))
-		}
+	if err := ae.createBackupIfNeeded(ctx, action, machine); err != nil {
+		return fmt.Errorf("failed to create backup: %w", err)
 	}
 
 	// Upload rendered content to destination
@@ -968,44 +941,8 @@ func (ae *ActionExecutor) runTemplateDeployAction(ctx context.Context, action *s
 	}
 
 	// Set file attributes (permissions, owner, group)
-	if action.Permissions != "" || action.Owner != "" || action.Group != "" {
-		logger.Debug("Setting file attributes",
-			slog.String("permissions", action.Permissions),
-			slog.String("owner", action.Owner),
-			slog.String("group", action.Group))
-
-		// Set permissions
-		if action.Permissions != "" {
-			chmodCmd := fmt.Sprintf("chmod %s %s", action.Permissions, action.Destination)
-			result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, chmodCmd)
-			if err != nil {
-				logger.Warn("failed to set file permissions", slog.String("error", err.Error()))
-			} else if result.ExitCode != 0 {
-				logger.Warn("chmod command returned non-zero exit code", slog.Int("exit_code", result.ExitCode))
-			}
-		}
-
-		// Set owner
-		if action.Owner != "" {
-			chownCmd := fmt.Sprintf("chown %s %s", action.Owner, action.Destination)
-			result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, chownCmd)
-			if err != nil {
-				logger.Warn("failed to set file owner", slog.String("error", err.Error()))
-			} else if result.ExitCode != 0 {
-				logger.Warn("chown command returned non-zero exit code", slog.Int("exit_code", result.ExitCode))
-			}
-		}
-
-		// Set group
-		if action.Group != "" {
-			chgrpCmd := fmt.Sprintf("chgrp %s %s", action.Group, action.Destination)
-			result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, chgrpCmd)
-			if err != nil {
-				logger.Warn("failed to set file group", slog.String("error", err.Error()))
-			} else if result.ExitCode != 0 {
-				logger.Warn("chgrp command returned non-zero exit code", slog.Int("exit_code", result.ExitCode))
-			}
-		}
+	if err := ae.setFileAttributes(ctx, action, machine); err != nil {
+		return fmt.Errorf("failed to set file attributes: %w", err)
 	}
 
 	logger.Info("✅ Template deployed successfully",
@@ -1295,6 +1232,155 @@ func parseVariableAttributes(attrContent *hcl.BodyContent, variableName string) 
 
 	// Return empty string if no value found
 	return "", nil
+}
+
+// buildTemplateContext creates a template context with all necessary data
+func (ae *ActionExecutor) buildTemplateContext(variables map[string]interface{}, machine *schemas.MachinesMachineV1) (*templates.TemplateContext, error) {
+	templateContext := &templates.TemplateContext{
+		Variables:   variables,
+		Machines:    make(map[string]interface{}),
+		Facts:       make(map[string]interface{}),
+		Environment: ae.buildEnvironmentContext(machine),
+		Project:     ae.buildProjectContext(),
+	}
+
+	// Add machine information to context
+	templateContext.Machines[machine.Hostname] = ae.buildMachineContext(machine)
+
+	return templateContext, nil
+}
+
+// buildEnvironmentContext creates the environment context for template rendering
+func (ae *ActionExecutor) buildEnvironmentContext(machine *schemas.MachinesMachineV1) map[string]string {
+	return map[string]string{
+		"HOSTNAME": machine.Hostname,
+		"USER":     machine.User,
+	}
+}
+
+// buildProjectContext creates the project context for template rendering
+func (ae *ActionExecutor) buildProjectContext() map[string]interface{} {
+	return map[string]interface{}{
+		"name":        ae.projectConfig.Name,
+		"description": ae.projectConfig.Description,
+	}
+}
+
+// buildMachineContext creates the machine context for template rendering
+func (ae *ActionExecutor) buildMachineContext(machine *schemas.MachinesMachineV1) map[string]interface{} {
+	// Note: machine.Variables is not implemented in the current schema
+	// This is a placeholder for future enhancement
+	return map[string]interface{}{
+		"hostname": machine.Hostname,
+		"user":     machine.User,
+		"port":     machine.Port,
+	}
+}
+
+// createBackupIfNeeded creates a backup of the destination file if backup is requested
+func (ae *ActionExecutor) createBackupIfNeeded(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
+	if !action.Backup {
+		return nil
+	}
+
+	logger := logging.GetGlobalLogger()
+	logger.Debug("Creating backup of existing file", slog.String("destination", action.Destination))
+
+	backupCmd := fmt.Sprintf("cp %s %s.backup.$(date +%%Y%%m%%d_%%H%%M%%S)", action.Destination, action.Destination)
+	result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, backupCmd)
+	if err != nil {
+		logger.Warn("failed to create backup, continuing with deployment",
+			slog.String("error", err.Error()))
+	} else if result.ExitCode != 0 {
+		logger.Warn("backup command returned non-zero exit code, continuing with deployment",
+			slog.Int("exit_code", result.ExitCode))
+	}
+
+	return nil
+}
+
+// setFileAttributes sets file permissions, owner, and group if specified
+func (ae *ActionExecutor) setFileAttributes(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
+	if action.Permissions == "" && action.Owner == "" && action.Group == "" {
+		return nil
+	}
+
+	logger := logging.GetGlobalLogger()
+	logger.Debug("Setting file attributes",
+		slog.String("permissions", action.Permissions),
+		slog.String("owner", action.Owner),
+		slog.String("group", action.Group))
+
+	// Set permissions
+	if err := ae.setFilePermissions(ctx, action, machine); err != nil {
+		return err
+	}
+
+	// Set owner
+	if err := ae.setFileOwner(ctx, action, machine); err != nil {
+		return err
+	}
+
+	// Set group
+	if err := ae.setFileGroup(ctx, action, machine); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// setFilePermissions sets file permissions if specified
+func (ae *ActionExecutor) setFilePermissions(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
+	if action.Permissions == "" {
+		return nil
+	}
+
+	logger := logging.GetGlobalLogger()
+	chmodCmd := fmt.Sprintf("chmod %s %s", action.Permissions, action.Destination)
+	result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, chmodCmd)
+	if err != nil {
+		logger.Warn("failed to set file permissions", slog.String("error", err.Error()))
+	} else if result.ExitCode != 0 {
+		logger.Warn("chmod command returned non-zero exit code", slog.Int("exit_code", result.ExitCode))
+	}
+
+	return nil
+}
+
+// setFileOwner sets file owner if specified
+func (ae *ActionExecutor) setFileOwner(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
+	if action.Owner == "" {
+		return nil
+	}
+
+	logger := logging.GetGlobalLogger()
+	chownCmd := fmt.Sprintf("chown %s %s", action.Owner, action.Destination)
+	result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, chownCmd)
+	if err != nil {
+		logger.Warn("failed to set file owner", slog.String("error", err.Error()))
+	} else if result.ExitCode != 0 {
+		logger.Warn("chown command returned non-zero exit code", slog.Int("exit_code", result.ExitCode))
+	}
+
+	return nil
+}
+
+// setFileGroup sets file group if specified
+func (ae *ActionExecutor) setFileGroup(ctx context.Context, action *schemas.ActionsActionV1, machine *schemas.MachinesMachineV1) error {
+	if action.Group == "" {
+		return nil
+	}
+
+	logger := logging.GetGlobalLogger()
+	chgrpCmd := fmt.Sprintf("chgrp %s %s", action.Group, action.Destination)
+	result, err := ae.sshManager.RunCommandOnMachine(ctx, machine, chgrpCmd)
+	if err != nil {
+		logger.Warn("failed to set file group", slog.String("error", err.Error()))
+	} else if result.ExitCode != 0 {
+		logger.Warn("chgrp command returned non-zero exit code", slog.Int("exit_code", result.ExitCode))
+	}
+
+	return nil
 }
 
 // createProgressReporter creates a progress reporting function for file synchronization
