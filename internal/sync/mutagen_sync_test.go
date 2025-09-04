@@ -16,7 +16,7 @@ func TestNewMutagenSyncEngine(t *testing.T) {
 	}
 }
 
-func TestMutagenSyncEngine_SyncFile_InputValidation(t *testing.T) {
+func TestMutagenSyncEngine_File_InputValidation(t *testing.T) {
 	engine := NewMutagenSyncEngine()
 
 	tests := []struct {
@@ -51,7 +51,7 @@ func TestMutagenSyncEngine_SyncFile_InputValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := engine.SyncFile(tt.sourcePath, tt.targetPath, nil)
+			result, err := engine.File(tt.sourcePath, tt.targetPath, nil)
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("expected error but got none")

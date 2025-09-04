@@ -60,10 +60,9 @@ func (ae *AgeEncryption) loadIdentities() error {
 	if info.IsDir() {
 		// Load all identity files from directory
 		return ae.loadIdentitiesFromDirectory()
-	} else {
-		// Load single identity file
-		return ae.loadIdentityFromFile(ae.identitiesPath)
 	}
+	// Load single identity file
+	return ae.loadIdentityFromFile(ae.identitiesPath)
 }
 
 // loadIdentitiesFromDirectory loads all identity files from a directory
@@ -165,10 +164,9 @@ func (ae *AgeEncryption) loadRecipients() error {
 	if info.IsDir() {
 		// Load all recipient files from directory
 		return ae.loadRecipientsFromDirectory()
-	} else {
-		// Load single recipient file
-		return ae.loadRecipientsFromFile(ae.recipientsPath)
 	}
+	// Load single recipient file
+	return ae.loadRecipientsFromFile(ae.recipientsPath)
 }
 
 // loadRecipientsFromDirectory loads all recipient files from a directory

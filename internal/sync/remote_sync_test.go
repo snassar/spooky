@@ -50,7 +50,7 @@ func TestRemoteSyncEngine(t *testing.T) {
 	engine := NewRemoteSyncEngine(sshManager)
 
 	// Test file counting
-	progress := &SyncProgress{
+	progress := &Progress{
 		CurrentFile:      "",
 		TotalFiles:       0,
 		CurrentOperation: "scanning",
@@ -69,8 +69,8 @@ func TestRemoteSyncEngine(t *testing.T) {
 	t.Logf("Successfully counted %d files in test directory", progress.TotalFiles)
 }
 
-func TestSyncProgress(t *testing.T) {
-	progress := &SyncProgress{
+func TestProgress(t *testing.T) {
+	progress := &Progress{
 		CurrentFile:      "test.txt",
 		FilesProcessed:   5,
 		TotalFiles:       10,
@@ -92,15 +92,15 @@ func TestSyncProgress(t *testing.T) {
 	t.Logf("Progress: %d/%d files (%.1f%%)", progress.FilesProcessed, progress.TotalFiles, progress.Percentage)
 }
 
-func TestRemoteSyncOptions(t *testing.T) {
+func TestRemoteOptions(t *testing.T) {
 	// Test creating remote sync options
-	options := &RemoteSyncOptions{
-		SyncOptions: DefaultSyncOptions(),
+	options := &RemoteOptions{
+		Options: DefaultOptions(),
 		Machine: &schemas.MachinesMachineV1{
 			Hostname: "test.example.com",
 			User:     "testuser",
 		},
-		ProgressReport: func(progress *SyncProgress) {
+		ProgressReport: func(progress *Progress) {
 			// Test progress reporter
 			t.Logf("Progress update: %s", progress.CurrentOperation)
 		},

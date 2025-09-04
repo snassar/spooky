@@ -58,7 +58,7 @@ func (sm *SimpleSSHManager) createSSHConfig(machine *schemas.MachinesMachineV1) 
 	}
 }
 
-// ExecuteCommandOnMachine executes a command on a remote machine via SSH.
+// RunCommandOnMachine executes a command on the specified machine.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control
@@ -73,7 +73,7 @@ func (sm *SimpleSSHManager) createSSHConfig(machine *schemas.MachinesMachineV1) 
 //
 // Example usage:
 //
-//	result, err := sshManager.ExecuteCommandOnMachine(ctx, machine, "ls -la /etc")
+//	result, err := sshManager.RunCommandOnMachine(ctx, machine, "ls -la /etc")
 //	if err != nil {
 //	    return fmt.Errorf("failed to execute command: %w", err)
 //	}

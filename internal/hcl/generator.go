@@ -10,8 +10,8 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-// HCLGenerator is a generic utility for converting Go structs to HCL format
-type HCLGenerator struct {
+// Generator is a generic utility for converting Go structs to HCL format
+type Generator struct {
 	// Configuration options
 	UseDefaults bool // Whether to include fields with default values
 	IndentSize  int  // Number of spaces for indentation
@@ -20,9 +20,9 @@ type HCLGenerator struct {
 	sharedUtils *SharedHCLUtils
 }
 
-// NewHCLGenerator creates a new HCL generator with default settings
-func NewHCLGenerator() *HCLGenerator {
-	return &HCLGenerator{
+// NewGenerator creates a new HCL generator with default settings
+func NewGenerator() *Generator {
+	return &Generator{
 		UseDefaults: true,
 		IndentSize:  2,
 		sharedUtils: NewSharedHCLUtils(),
@@ -30,7 +30,7 @@ func NewHCLGenerator() *HCLGenerator {
 }
 
 // ToHCL converts any Go struct to HCL string with a custom block name
-func (hg *HCLGenerator) ToHCL(config interface{}, blockName string) (string, error) {
+func (hg *Generator) ToHCL(config interface{}, blockName string) (string, error) {
 	// Convert the config to HCL using the HCL library
 	hclFile := hclwrite.NewEmptyFile()
 
@@ -53,7 +53,7 @@ func (hg *HCLGenerator) ToHCL(config interface{}, blockName string) (string, err
 }
 
 // structToCty converts a Go struct to cty.Value, respecting schema tags
-func (hg *HCLGenerator) structToCty(config interface{}) (cty.Value, error) {
+func (hg *Generator) structToCty(config interface{}) (cty.Value, error) {
 	v := reflect.ValueOf(config)
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
@@ -98,7 +98,7 @@ func (hg *HCLGenerator) structToCty(config interface{}) (cty.Value, error) {
 }
 
 // fieldToCty converts a struct field to cty.Value, respecting schema tags
-func (hg *HCLGenerator) fieldToCty(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+func (hg *Generator) fieldToCty(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
 	switch field.Kind() {
 	case reflect.Ptr:
 		return hg.handlePointerField(field, fieldType)
@@ -124,7 +124,7 @@ func (hg *HCLGenerator) fieldToCty(field reflect.Value, fieldType reflect.Struct
 }
 
 // handlePointerField handles pointer type fields
-func (hg *HCLGenerator) handlePointerField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+func (hg *Generator) handlePointerField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
 	if field.IsNil() {
 		// Check if there's a default value in the tag
 		if defaultValue := fieldType.Tag.Get("default"); defaultValue != "" {
@@ -136,7 +136,7 @@ func (hg *HCLGenerator) handlePointerField(field reflect.Value, fieldType reflec
 }
 
 // handleStringField handles string type fields
-func (hg *HCLGenerator) handleStringField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+func (hg *Generator) handleStringField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
 	value := field.String()
 	if value == "" {
 		// Check for default value
@@ -148,7 +148,7 @@ func (hg *HCLGenerator) handleStringField(field reflect.Value, fieldType reflect
 }
 
 // handleIntField handles integer type fields
-func (hg *HCLGenerator) handleIntField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+func (hg *Generator) handleIntField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
 	value := field.Int()
 	if value == 0 {
 		// Check for default value
@@ -160,7 +160,7 @@ func (hg *HCLGenerator) handleIntField(field reflect.Value, fieldType reflect.St
 }
 
 // handleUintField handles unsigned integer type fields
-func (hg *HCLGenerator) handleUintField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+func (hg *Generator) handleUintField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
 	value := field.Uint()
 	if value == 0 {
 		// Check for default value
@@ -172,7 +172,7 @@ func (hg *HCLGenerator) handleUintField(field reflect.Value, fieldType reflect.S
 }
 
 // handleFloatField handles float type fields
-func (hg *HCLGenerator) handleFloatField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+func (hg *Generator) handleFloatField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
 	value := field.Float()
 	if value == 0 {
 		// Check for default value
@@ -184,7 +184,7 @@ func (hg *HCLGenerator) handleFloatField(field reflect.Value, fieldType reflect.
 }
 
 // handleBoolField handles boolean type fields
-func (hg *HCLGenerator) handleBoolField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+func (hg *Generator) handleBoolField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
 	value := field.Bool()
 	if !value {
 		// Check for default value
@@ -196,7 +196,7 @@ func (hg *HCLGenerator) handleBoolField(field reflect.Value, fieldType reflect.S
 }
 
 // handleStructField handles struct type fields
-func (hg *HCLGenerator) handleStructField(field reflect.Value) (cty.Value, error) {
+func (hg *Generator) handleStructField(field reflect.Value) (cty.Value, error) {
 	// Handle nested structs
 	if field.CanInterface() {
 		return hg.structToCty(field.Interface())
@@ -205,7 +205,7 @@ func (hg *HCLGenerator) handleStructField(field reflect.Value) (cty.Value, error
 }
 
 // handleSliceField handles slice type fields
-func (hg *HCLGenerator) handleSliceField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+func (hg *Generator) handleSliceField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
 	if field.Len() == 0 {
 		return cty.ListValEmpty(cty.String), nil
 	}
@@ -222,7 +222,7 @@ func (hg *HCLGenerator) handleSliceField(field reflect.Value, fieldType reflect.
 }
 
 // handleMapField handles map type fields
-func (hg *HCLGenerator) handleMapField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
+func (hg *Generator) handleMapField(field reflect.Value, fieldType reflect.StructField) (cty.Value, error) {
 	if field.Len() == 0 {
 		return cty.MapValEmpty(cty.String), nil
 	}
@@ -241,7 +241,7 @@ func (hg *HCLGenerator) handleMapField(field reflect.Value, fieldType reflect.St
 }
 
 // parseDefaultValue parses a default value string based on the field type
-func (hg *HCLGenerator) parseDefaultValue(defaultValue string, fieldType reflect.StructField) (cty.Value, error) {
+func (hg *Generator) parseDefaultValue(defaultValue string, fieldType reflect.StructField) (cty.Value, error) {
 	// Handle special default values
 	switch defaultValue {
 	case "true":
@@ -279,7 +279,7 @@ func (hg *HCLGenerator) parseDefaultValue(defaultValue string, fieldType reflect
 }
 
 // shouldIncludeField determines if a field should be included in HCL output
-func (hg *HCLGenerator) shouldIncludeField(field reflect.Value, fieldType reflect.StructField) bool {
+func (hg *Generator) shouldIncludeField(field reflect.Value, fieldType reflect.StructField) bool {
 	if !hg.UseDefaults {
 		return false
 	}
@@ -298,26 +298,26 @@ func (hg *HCLGenerator) shouldIncludeField(field reflect.Value, fieldType reflec
 }
 
 // ctyValueToHCL converts a cty.Value to HCL and writes it to the body
-func (hg *HCLGenerator) ctyValueToHCL(value cty.Value, body *hclwrite.Body, blockName string) error {
+func (hg *Generator) ctyValueToHCL(value cty.Value, body *hclwrite.Body, blockName string) error {
 	return hg.sharedUtils.CtyValueToHCL(value, body, blockName)
 }
 
 // GenerateHCL is a convenience function for quick HCL generation
 func GenerateHCL(config interface{}, blockName string) (string, error) {
-	generator := NewHCLGenerator()
+	generator := NewGenerator()
 	return generator.ToHCL(config, blockName)
 }
 
 // GenerateHCLWithDefaults is a convenience function that includes default values
 func GenerateHCLWithDefaults(config interface{}, blockName string) (string, error) {
-	generator := NewHCLGenerator()
+	generator := NewGenerator()
 	generator.UseDefaults = true
 	return generator.ToHCL(config, blockName)
 }
 
 // GenerateHCLWithoutDefaults is a convenience function that excludes default values
 func GenerateHCLWithoutDefaults(config interface{}, blockName string) (string, error) {
-	generator := NewHCLGenerator()
+	generator := NewGenerator()
 	generator.UseDefaults = false
 	return generator.ToHCL(config, blockName)
 }

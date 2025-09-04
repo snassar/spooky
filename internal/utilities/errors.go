@@ -103,7 +103,7 @@ func (e *HCLDirectoryError) Unwrap() error {
 	return ErrHCLDirectoryError
 }
 
-// Helper functions for creating typed errors
+// NewHCLSyntaxError creates a new HCL syntax error.
 func NewHCLSyntaxError(file, message string, line, column int, token string) error {
 	return errors.WithStack(&HCLSyntaxError{
 		File:    file,
@@ -114,6 +114,7 @@ func NewHCLSyntaxError(file, message string, line, column int, token string) err
 	})
 }
 
+// NewHCLValidationError creates a new HCL validation error.
 func NewHCLValidationError(file, blockType, field string, value interface{}, rule, message, severity string) error {
 	return errors.WithStack(&HCLValidationError{
 		File:      file,
@@ -126,6 +127,7 @@ func NewHCLValidationError(file, blockType, field string, value interface{}, rul
 	})
 }
 
+// NewHCLFileError creates a new HCL file error.
 func NewHCLFileError(filePath, operation, message string) error {
 	return errors.WithStack(&HCLFileError{
 		FilePath:  filePath,
@@ -134,6 +136,7 @@ func NewHCLFileError(filePath, operation, message string) error {
 	})
 }
 
+// NewHCLBlockError creates a new HCL block error.
 func NewHCLBlockError(file, blockType, blockName, message string) error {
 	return errors.WithStack(&HCLBlockError{
 		File:      file,
@@ -143,6 +146,7 @@ func NewHCLBlockError(file, blockType, blockName, message string) error {
 	})
 }
 
+// NewHCLDirectoryError creates a new HCL directory error.
 func NewHCLDirectoryError(directory, operation, message string, fileCount int) error {
 	return errors.WithStack(&HCLDirectoryError{
 		Directory: directory,

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestSyncFile_InputValidation(t *testing.T) {
+func TestFile_InputValidation(t *testing.T) {
 	tests := []struct {
 		name        string
 		sourcePath  string
@@ -39,7 +39,7 @@ func TestSyncFile_InputValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := SyncFile(tt.sourcePath, tt.targetPath, nil)
+			result, err := File(tt.sourcePath, tt.targetPath, nil)
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("expected error but got none")
@@ -58,7 +58,7 @@ func TestSyncFile_InputValidation(t *testing.T) {
 	}
 }
 
-func TestSyncDirectory_InputValidation(t *testing.T) {
+func TestDirectory_InputValidation(t *testing.T) {
 	tests := []struct {
 		name        string
 		sourcePath  string
@@ -91,7 +91,7 @@ func TestSyncDirectory_InputValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := SyncDirectory(tt.sourcePath, tt.targetPath, nil)
+			result, err := Directory(tt.sourcePath, tt.targetPath, nil)
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("expected error but got none")
@@ -110,12 +110,12 @@ func TestSyncDirectory_InputValidation(t *testing.T) {
 	}
 }
 
-func TestSyncDirectory_NonExistentSource(t *testing.T) {
+func TestDirectory_NonExistentSource(t *testing.T) {
 	tempDir := t.TempDir()
 	nonExistentDir := filepath.Join(tempDir, "nonexistent")
 	targetDir := filepath.Join(tempDir, "target")
 
-	result, err := SyncDirectory(nonExistentDir, targetDir, nil)
+	result, err := Directory(nonExistentDir, targetDir, nil)
 	if err == nil {
 		t.Errorf("expected error for non-existent source directory")
 	}
@@ -124,7 +124,7 @@ func TestSyncDirectory_NonExistentSource(t *testing.T) {
 	}
 }
 
-func TestSyncDirectory_FileAsSource(t *testing.T) {
+func TestDirectory_FileAsSource(t *testing.T) {
 	tempDir := t.TempDir()
 	sourceFile := filepath.Join(tempDir, "source.txt")
 	targetDir := filepath.Join(tempDir, "target")
@@ -134,7 +134,7 @@ func TestSyncDirectory_FileAsSource(t *testing.T) {
 		t.Fatalf("failed to create test file: %v", err)
 	}
 
-	result, err := SyncDirectory(sourceFile, targetDir, nil)
+	result, err := Directory(sourceFile, targetDir, nil)
 	if err == nil {
 		t.Errorf("expected error for file as source directory")
 	}
@@ -143,10 +143,10 @@ func TestSyncDirectory_FileAsSource(t *testing.T) {
 	}
 }
 
-func TestDefaultSyncOptions(t *testing.T) {
-	options := DefaultSyncOptions()
+func TestDefaultOptions(t *testing.T) {
+	options := DefaultOptions()
 	if options == nil {
-		t.Fatal("DefaultSyncOptions returned nil")
+		t.Fatal("DefaultOptions returned nil")
 	}
 
 	// Check default values
@@ -171,18 +171,18 @@ func TestDefaultSyncOptions(t *testing.T) {
 	if options.Verbose {
 		t.Error("expected Verbose to be false")
 	}
-	if options.SyncMode != SyncModeOneWayReplica {
-		t.Errorf("expected SyncMode %s, got %s", SyncModeOneWayReplica, options.SyncMode)
+	if options.Mode != ModeOneWayReplica {
+		t.Errorf("expected Mode %s, got %s", ModeOneWayReplica, options.Mode)
 	}
 }
 
-func TestSyncModes(t *testing.T) {
+func TestModes(t *testing.T) {
 	// Test that all sync modes are properly defined
-	expectedModes := []SyncMode{
-		SyncModeOneWayReplica,
-		SyncModeOneWaySafe,
-		SyncModeTwoWaySafe,
-		SyncModeTwoWayResolved,
+	expectedModes := []Mode{
+		ModeOneWayReplica,
+		ModeOneWaySafe,
+		ModeTwoWaySafe,
+		ModeTwoWayResolved,
 	}
 
 	for _, mode := range expectedModes {

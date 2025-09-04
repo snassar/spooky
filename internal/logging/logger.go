@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // Import for side effects only.
 )
 
 // LogConfig represents logging configuration from HCL schemas

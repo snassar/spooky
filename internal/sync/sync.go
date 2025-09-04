@@ -13,42 +13,38 @@ import (
 	"github.com/pkg/errors"
 )
 
-// SyncMode defines the synchronization directionality and conflict resolution
-type SyncMode string
+// Mode defines the synchronization directionality and conflict resolution
+type Mode string
 
 const (
-	// SyncModeOneWayReplica: Exact one-way replication (alpha → beta)
-	// Beta becomes exact copy of alpha, overwriting any local changes
-	SyncModeOneWayReplica SyncMode = "one-way-replica"
+	// ModeOneWayReplica performs one-way replica synchronization.
+	ModeOneWayReplica Mode = "one-way-replica"
 
-	// SyncModeOneWaySafe: Safe one-way sync (alpha → beta)
-	// Changes only propagate from alpha to beta, conflicts are preserved
-	SyncModeOneWaySafe SyncMode = "one-way-safe"
+	// ModeOneWaySafe performs one-way safe synchronization.
+	ModeOneWaySafe Mode = "one-way-safe"
 
-	// SyncModeTwoWaySafe: Bidirectional sync with conflict detection
-	// Both endpoints can modify, conflicts are detected and preserved
-	SyncModeTwoWaySafe SyncMode = "two-way-safe"
+	// ModeTwoWaySafe performs two-way safe synchronization.
+	ModeTwoWaySafe Mode = "two-way-safe"
 
-	// SyncModeTwoWayResolved: Bidirectional sync with alpha winning conflicts
-	// Both endpoints can modify, alpha always wins conflicts
-	SyncModeTwoWayResolved SyncMode = "two-way-resolved"
+	// ModeTwoWayResolved performs two-way resolved synchronization.
+	ModeTwoWayResolved Mode = "two-way-resolved"
 )
 
-// SyncOptions configures file synchronization behavior
-type SyncOptions struct {
-	BlockLength   int32    // Block size for rsync algorithm
-	CreateBackup  bool     // Create backup before overwriting
-	PreservePerms bool     // Preserve file permissions
-	PreserveOwner bool     // Preserve file owner
-	PreserveGroup bool     // Preserve file group
-	DryRun        bool     // Show what would be done without doing it
-	Verbose       bool     // Show detailed progress
-	SyncMode      SyncMode // Synchronization mode and directionality
+// Options configures file synchronization behavior
+type Options struct {
+	BlockLength   int32 // Block size for rsync algorithm
+	CreateBackup  bool  // Create backup before overwriting
+	PreservePerms bool  // Preserve file permissions
+	PreserveOwner bool  // Preserve file owner
+	PreserveGroup bool  // Preserve file group
+	DryRun        bool  // Show what would be done without doing it
+	Verbose       bool  // Show detailed progress
+	Mode          Mode  // Synchronization mode and directionality
 }
 
-// DefaultSyncOptions returns default synchronization options
-func DefaultSyncOptions() *SyncOptions {
-	return &SyncOptions{
+// DefaultOptions returns default synchronization options
+func DefaultOptions() *Options {
+	return &Options{
 		BlockLength:   DefaultBlockLength,
 		CreateBackup:  true,
 		PreservePerms: true,
@@ -56,7 +52,7 @@ func DefaultSyncOptions() *SyncOptions {
 		PreserveGroup: false,
 		DryRun:        false,
 		Verbose:       false,
-		SyncMode:      SyncModeOneWayReplica, // Default to exact replication for deployments
+		Mode:          ModeOneWayReplica, // Default to exact replication for deployments
 	}
 }
 
@@ -72,7 +68,7 @@ type FileSyncResult struct {
 	Conflicts        []string // List of conflicts detected (for bidirectional modes)
 }
 
-// SyncFile efficiently synchronizes a source file to a target location
+// File efficiently synchronizes a source file to a target location
 // using Mutagen's proven rsync algorithm to minimize data transfer.
 // This is the main entry point for file synchronization operations.
 //
@@ -86,7 +82,7 @@ type FileSyncResult struct {
 //   - error: Any error that occurred during synchronization
 //
 // The function uses Mutagen's rsync implementation for efficient delta synchronization.
-func SyncFile(sourcePath, targetPath string, options *SyncOptions) (*FileSyncResult, error) {
+func File(sourcePath, targetPath string, options *Options) (*FileSyncResult, error) {
 	// Input validation
 	if sourcePath == "" {
 		return nil, fmt.Errorf("source path cannot be empty")
@@ -100,10 +96,10 @@ func SyncFile(sourcePath, targetPath string, options *SyncOptions) (*FileSyncRes
 
 	// Use Mutagen's rsync implementation directly
 	engine := NewMutagenSyncEngine()
-	return engine.SyncFile(sourcePath, targetPath, options)
+	return engine.File(sourcePath, targetPath, options)
 }
 
-// SyncDirectory synchronizes entire directories with support for different modes.
+// Directory synchronizes entire directories with support for different modes.
 // It provides comprehensive directory synchronization with conflict resolution strategies.
 //
 // Parameters:
@@ -116,10 +112,10 @@ func SyncFile(sourcePath, targetPath string, options *SyncOptions) (*FileSyncRes
 //   - error: Any error that occurred during synchronization
 //
 // Supported sync modes:
-//   - SyncModeOneWayReplica: Exact one-way replication (source → target)
-//   - SyncModeOneWaySafe: Safe one-way sync with conflict preservation
-//   - SyncModeTwoWaySafe: Bidirectional sync with conflict detection
-//   - SyncModeTwoWayResolved: Bidirectional sync with source winning conflicts
+//   - ModeOneWayReplica: Exact one-way replication (source → target)
+//   - ModeOneWaySafe: Safe one-way sync with conflict preservation
+//   - ModeTwoWaySafe: Bidirectional sync with conflict detection
+//   - ModeTwoWayResolved: Bidirectional sync with source winning conflicts
 //
 // validateSyncPaths validates source and target paths for synchronization
 func validateSyncPaths(sourcePath, targetPath string) error {
@@ -141,11 +137,11 @@ func validateSourceDirectory(sourcePath string) error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("source directory does not exist: %s", sourcePath)
-		} else if os.IsPermission(err) {
-			return fmt.Errorf("permission denied accessing source directory: %s", sourcePath)
-		} else {
-			return fmt.Errorf("failed to access source directory %s: %w", sourcePath, err)
 		}
+		if os.IsPermission(err) {
+			return fmt.Errorf("permission denied accessing source directory: %s", sourcePath)
+		}
+		return fmt.Errorf("failed to access source directory %s: %w", sourcePath, err)
 	}
 	if !sourceInfo.IsDir() {
 		return fmt.Errorf("source path is not a directory: %s", sourcePath)
@@ -171,7 +167,10 @@ func prepareTargetDirectory(targetPath string) error {
 	return nil
 }
 
-func SyncDirectory(sourcePath, targetPath string, options *SyncOptions) (*FileSyncResult, error) {
+// Directory synchronizes files and directories between source and target paths.
+// It validates input paths, determines the appropriate sync method based on the target,
+// and returns a FileSyncResult containing sync statistics and any errors encountered.
+func Directory(sourcePath, targetPath string, options *Options) (*FileSyncResult, error) {
 	// Input validation
 	if err := validateSyncPaths(sourcePath, targetPath); err != nil {
 		return nil, err
@@ -179,7 +178,7 @@ func SyncDirectory(sourcePath, targetPath string, options *SyncOptions) (*FileSy
 
 	// Use default options if none provided
 	if options == nil {
-		options = DefaultSyncOptions()
+		options = DefaultOptions()
 	}
 
 	// Initialize result structure
@@ -201,17 +200,17 @@ func SyncDirectory(sourcePath, targetPath string, options *SyncOptions) (*FileSy
 	}
 
 	// Perform directory synchronization based on mode
-	switch options.SyncMode {
-	case SyncModeOneWayReplica:
+	switch options.Mode {
+	case ModeOneWayReplica:
 		return syncOneWayReplica(sourcePath, targetPath, options, result)
-	case SyncModeOneWaySafe:
+	case ModeOneWaySafe:
 		return syncOneWaySafe(sourcePath, targetPath, options, result)
-	case SyncModeTwoWaySafe:
+	case ModeTwoWaySafe:
 		return syncTwoWaySafe(sourcePath, targetPath, options, result)
-	case SyncModeTwoWayResolved:
+	case ModeTwoWayResolved:
 		return syncTwoWayResolved(sourcePath, targetPath, options, result)
 	default:
-		result.Error = fmt.Errorf("unknown sync mode: %s", options.SyncMode)
+		result.Error = fmt.Errorf("unknown sync mode: %s", options.Mode)
 		return result, result.Error
 	}
 }
@@ -231,7 +230,7 @@ func logFileOperation(operation, path string) {
 }
 
 // createDirectory creates a directory in the target location with proper permissions
-func createDirectory(targetPath string, sourceInfo os.FileInfo, options *SyncOptions) error {
+func createDirectory(targetPath string, sourceInfo os.FileInfo, options *Options) error {
 	if err := os.MkdirAll(targetPath, sourceInfo.Mode()); err != nil {
 		return fmt.Errorf("failed to create directory %s: %v", targetPath, err)
 	}
@@ -244,8 +243,8 @@ func createDirectory(targetPath string, sourceInfo os.FileInfo, options *SyncOpt
 }
 
 // processFile syncs a single file from source to target
-func processFile(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) error {
-	fileResult, err := SyncFile(sourcePath, targetPath, options)
+func processFile(sourcePath, targetPath string, options *Options, result *FileSyncResult) error {
+	fileResult, err := File(sourcePath, targetPath, options)
 	if err != nil {
 		return fmt.Errorf("failed to sync file %s: %v", sourcePath, err)
 	}
@@ -258,7 +257,7 @@ func processFile(sourcePath, targetPath string, options *SyncOptions, result *Fi
 }
 
 // removeOrphanedFile removes a file or directory that doesn't exist in source
-func removeOrphanedFile(path string, info os.FileInfo, options *SyncOptions) error {
+func removeOrphanedFile(path string, info os.FileInfo, options *Options) error {
 	if options.DryRun {
 		if options.Verbose {
 			logFileOperation("would remove file", path)
@@ -286,7 +285,7 @@ func removeOrphanedFile(path string, info os.FileInfo, options *SyncOptions) err
 }
 
 // cleanupTargetFiles removes files in target that don't exist in source
-func cleanupTargetFiles(sourcePath, targetPath string, options *SyncOptions) error {
+func cleanupTargetFiles(sourcePath, targetPath string, options *Options) error {
 	return filepath.Walk(targetPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return errors.Wrapf(err, "failed to walk target path %s", path)
@@ -313,7 +312,7 @@ func cleanupTargetFiles(sourcePath, targetPath string, options *SyncOptions) err
 
 // syncOneWayReplica performs exact one-way replication (source → target)
 // Target becomes exact copy of source, overwriting any local changes
-func syncOneWayReplica(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
+func syncOneWayReplica(sourcePath, targetPath string, options *Options, result *FileSyncResult) (*FileSyncResult, error) {
 	if options.Verbose {
 		logSyncOperation("performing one-way replica sync", sourcePath, targetPath)
 	}
@@ -339,9 +338,8 @@ func syncOneWayReplica(sourcePath, targetPath string, options *SyncOptions, resu
 
 		if info.IsDir() {
 			return createDirectory(targetFile, info, options)
-		} else {
-			return processFile(path, targetFile, options, result)
 		}
+		return processFile(path, targetFile, options, result)
 	})
 
 	if err != nil {
@@ -361,7 +359,7 @@ func syncOneWayReplica(sourcePath, targetPath string, options *SyncOptions, resu
 
 // syncOneWaySafe performs safe one-way sync (source → target)
 // Changes only propagate from source to target, conflicts are preserved
-func syncOneWaySafe(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
+func syncOneWaySafe(sourcePath, targetPath string, options *Options, result *FileSyncResult) (*FileSyncResult, error) {
 	if options.Verbose {
 		logger := logging.GetGlobalLogger()
 		logger.Info("performing one-way safe sync",
@@ -406,7 +404,7 @@ func syncOneWaySafe(sourcePath, targetPath string, options *SyncOptions, result 
 			}
 
 			// No conflict, sync the file
-			fileResult, err := SyncFile(path, targetFile, options)
+			fileResult, err := File(path, targetFile, options)
 			if err != nil {
 				return fmt.Errorf("failed to sync file %s: %v", path, err)
 			}
@@ -449,8 +447,8 @@ func applyCombinedResults(result *FileSyncResult, combined *FileSyncResult) {
 }
 
 // syncTwoWayGeneric performs bidirectional sync with configurable conflict resolution
-func syncTwoWayGeneric(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult,
-	sourceToTargetFn, targetToSourceFn func(string, string, *SyncOptions, *FileSyncResult) (*FileSyncResult, error)) (*FileSyncResult, error) {
+func syncTwoWayGeneric(sourcePath, targetPath string, options *Options, result *FileSyncResult,
+	sourceToTargetFn, targetToSourceFn func(string, string, *Options, *FileSyncResult) (*FileSyncResult, error)) (*FileSyncResult, error) {
 
 	// First, sync source → target
 	sourceToTarget, err := sourceToTargetFn(sourcePath, targetPath, options, &FileSyncResult{
@@ -481,7 +479,7 @@ func syncTwoWayGeneric(sourcePath, targetPath string, options *SyncOptions, resu
 
 // syncTwoWaySafe performs bidirectional sync with conflict detection
 // Both endpoints can modify, conflicts are detected and preserved
-func syncTwoWaySafe(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
+func syncTwoWaySafe(sourcePath, targetPath string, options *Options, result *FileSyncResult) (*FileSyncResult, error) {
 	if options.Verbose {
 		logger := logging.GetGlobalLogger()
 		logger.Info("performing two-way safe sync",
@@ -494,7 +492,7 @@ func syncTwoWaySafe(sourcePath, targetPath string, options *SyncOptions, result 
 
 // syncTwoWayResolved performs bidirectional sync with source winning conflicts
 // Both endpoints can modify, source always wins conflicts
-func syncTwoWayResolved(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) (*FileSyncResult, error) {
+func syncTwoWayResolved(sourcePath, targetPath string, options *Options, result *FileSyncResult) (*FileSyncResult, error) {
 	if options.Verbose {
 		logger := logging.GetGlobalLogger()
 		logger.Info("performing two-way resolved sync (source wins)",
@@ -506,7 +504,7 @@ func syncTwoWayResolved(sourcePath, targetPath string, options *SyncOptions, res
 }
 
 // copyFile performs a simple file copy
-func copyFile(src, dst string, options *SyncOptions) error {
+func copyFile(src, dst string, options *Options) error {
 	source, err := os.Open(src)
 	if err != nil {
 		return errors.Wrapf(err, "failed to open source file %s", src)
@@ -599,7 +597,7 @@ func preserveGroupOnly(targetPath string, sourceStat *syscall.Stat_t) error {
 		return err
 	}
 
-	targetUid, err := utilities.SafeInt(int64(targetStat.Uid))
+	targetUID, err := utilities.SafeInt(int64(targetStat.Uid))
 	if err != nil {
 		return errors.Wrap(err, "target UID value out of bounds")
 	}
@@ -607,11 +605,11 @@ func preserveGroupOnly(targetPath string, sourceStat *syscall.Stat_t) error {
 	if err != nil {
 		return errors.Wrap(err, "GID value out of bounds")
 	}
-	return errors.Wrapf(os.Chown(targetPath, targetUid, gid), "failed to preserve group for %s", targetPath)
+	return errors.Wrapf(os.Chown(targetPath, targetUID, gid), "failed to preserve group for %s", targetPath)
 }
 
 // preserveOwnerAndGroup preserves owner and/or group based on options
-func preserveOwnerAndGroup(sourcePath, targetPath string, options *SyncOptions, sourceStat *syscall.Stat_t) error {
+func preserveOwnerAndGroup(sourcePath, targetPath string, options *Options, sourceStat *syscall.Stat_t) error {
 	if !options.PreserveOwner && !options.PreserveGroup {
 		return nil
 	}
@@ -628,7 +626,7 @@ func preserveOwnerAndGroup(sourcePath, targetPath string, options *SyncOptions, 
 }
 
 // preserveAttributes preserves file attributes from source to target
-func preserveAttributes(sourcePath, targetPath string, options *SyncOptions) error {
+func preserveAttributes(sourcePath, targetPath string, options *Options) error {
 	// Early return if no attributes to preserve
 	if !options.PreservePerms && !options.PreserveOwner && !options.PreserveGroup {
 		return nil

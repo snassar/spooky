@@ -13,7 +13,7 @@ const (
 	LevelFatal = "fatal"
 )
 
-// Standardized log level mapping
+// LogLevelMap maps log level names to their numeric values.
 var LogLevelMap = map[string]slog.Level{
 	LevelDebug: slog.LevelDebug,
 	LevelInfo:  slog.LevelInfo,

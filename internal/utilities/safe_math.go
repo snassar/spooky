@@ -7,7 +7,9 @@ import (
 )
 
 var (
-	ErrOverflow    = errors.New("integer overflow detected")
+	// ErrOverflow indicates an arithmetic overflow error.
+	ErrOverflow = errors.New("integer overflow detected")
+	// ErrOutOfBounds indicates a value is out of acceptable bounds.
 	ErrOutOfBounds = errors.New("value out of bounds")
 )
 

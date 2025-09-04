@@ -29,7 +29,7 @@ func NewMutagenSyncEngine() *MutagenSyncEngine {
 	}
 }
 
-// SyncFile efficiently synchronizes a source file to a target location using Mutagen's rsync algorithm.
+// File efficiently synchronizes a source file to a target location using Mutagen's rsync algorithm.
 // It performs intelligent delta synchronization to minimize data transfer.
 //
 // Parameters:
@@ -45,7 +45,7 @@ func NewMutagenSyncEngine() *MutagenSyncEngine {
 //   - New files (target doesn't exist)
 //   - Identical files (no sync needed)
 //   - Different files (delta sync using rsync algorithm)
-func (m *MutagenSyncEngine) SyncFile(sourcePath, targetPath string, options *SyncOptions) (*FileSyncResult, error) {
+func (m *MutagenSyncEngine) File(sourcePath, targetPath string, options *Options) (*FileSyncResult, error) {
 	// Input validation
 	if sourcePath == "" {
 		return nil, fmt.Errorf("source path cannot be empty")
@@ -59,7 +59,7 @@ func (m *MutagenSyncEngine) SyncFile(sourcePath, targetPath string, options *Syn
 
 	// Use default options if none provided
 	if options == nil {
-		options = DefaultSyncOptions()
+		options = DefaultOptions()
 	}
 
 	// Initialize result structure
@@ -198,7 +198,7 @@ func (m *MutagenSyncEngine) checkTargetFile(targetPath string, result *FileSyncR
 // Returns:
 //   - *FileSyncResult: Updated result with operation details
 //   - error: Any error that occurred during the operation
-func (m *MutagenSyncEngine) handleNewFile(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
+func (m *MutagenSyncEngine) handleNewFile(sourcePath, targetPath string, options *Options, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
 	if options.DryRun {
 		return m.handleDryRunNewFile(sourcePath, targetPath, options, result, sourceInfo)
 	}
@@ -219,7 +219,7 @@ func (m *MutagenSyncEngine) handleNewFile(sourcePath, targetPath string, options
 }
 
 // handleDryRunNewFile handles dry run for new files
-func (m *MutagenSyncEngine) handleDryRunNewFile(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
+func (m *MutagenSyncEngine) handleDryRunNewFile(sourcePath, targetPath string, options *Options, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
 	if options.Verbose {
 		logger := logging.GetGlobalLogger()
 		logger.Info("would copy file (new file)",
@@ -255,7 +255,7 @@ func (m *MutagenSyncEngine) createTargetDirectory(targetPath string) error {
 }
 
 // copyNewFile copies a new file to the target location
-func (m *MutagenSyncEngine) copyNewFile(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult, sourceInfo os.FileInfo) error {
+func (m *MutagenSyncEngine) copyNewFile(sourcePath, targetPath string, options *Options, result *FileSyncResult, sourceInfo os.FileInfo) error {
 	if err := copyFile(sourcePath, targetPath, options); err != nil {
 		return fmt.Errorf("failed to copy file: %v", err)
 	}
@@ -267,7 +267,7 @@ func (m *MutagenSyncEngine) copyNewFile(sourcePath, targetPath string, options *
 }
 
 // filesAreIdentical checks if source and target files are identical
-func (m *MutagenSyncEngine) filesAreIdentical(sourcePath, targetPath string, result *FileSyncResult, sourceInfo, targetInfo os.FileInfo, options *SyncOptions) bool {
+func (m *MutagenSyncEngine) filesAreIdentical(sourcePath, targetPath string, result *FileSyncResult, sourceInfo, targetInfo os.FileInfo, options *Options) bool {
 	// Quick size check first
 	if sourceInfo.Size() != targetInfo.Size() {
 		return false
@@ -299,7 +299,7 @@ func (m *MutagenSyncEngine) filesAreIdentical(sourcePath, targetPath string, res
 }
 
 // syncDifferentFiles handles syncing files that are different
-func (m *MutagenSyncEngine) syncDifferentFiles(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
+func (m *MutagenSyncEngine) syncDifferentFiles(sourcePath, targetPath string, options *Options, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
 	if options.DryRun {
 		return m.handleDryRunSync(sourcePath, targetPath, options, result, sourceInfo)
 	}
@@ -314,7 +314,7 @@ func (m *MutagenSyncEngine) syncDifferentFiles(sourcePath, targetPath string, op
 }
 
 // handleDryRunSync handles dry run for file syncing
-func (m *MutagenSyncEngine) handleDryRunSync(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
+func (m *MutagenSyncEngine) handleDryRunSync(sourcePath, targetPath string, options *Options, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
 	if options.Verbose {
 		logger := logging.GetGlobalLogger()
 		logger.Info("would sync file using Mutagen rsync algorithm",
@@ -328,7 +328,7 @@ func (m *MutagenSyncEngine) handleDryRunSync(sourcePath, targetPath string, opti
 }
 
 // createBackupIfNeeded creates a backup of the target file if requested
-func (m *MutagenSyncEngine) createBackupIfNeeded(targetPath string, options *SyncOptions, result *FileSyncResult) error {
+func (m *MutagenSyncEngine) createBackupIfNeeded(targetPath string, options *Options, result *FileSyncResult) error {
 	if !options.CreateBackup {
 		return nil
 	}
@@ -347,7 +347,7 @@ func (m *MutagenSyncEngine) createBackupIfNeeded(targetPath string, options *Syn
 }
 
 // performMutagenSync performs the actual file synchronization using Mutagen's rsync algorithm
-func (m *MutagenSyncEngine) performMutagenSync(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
+func (m *MutagenSyncEngine) performMutagenSync(sourcePath, targetPath string, options *Options, result *FileSyncResult, sourceInfo os.FileInfo) (*FileSyncResult, error) {
 	if options.Verbose {
 		logger := logging.GetGlobalLogger()
 		logger.Info("using Mutagen rsync to sync files")
@@ -428,7 +428,7 @@ func (m *MutagenSyncEngine) openSyncFiles(sourcePath, targetPath string, result 
 }
 
 // generateSignature generates the signature of the target file
-func (m *MutagenSyncEngine) generateSignature(targetFile *os.File, options *SyncOptions, result *FileSyncResult) (*rsync.Signature, error) {
+func (m *MutagenSyncEngine) generateSignature(targetFile *os.File, options *Options, result *FileSyncResult) (*rsync.Signature, error) {
 	// Convert int32 to uint64 safely
 	if options.BlockLength < 0 {
 		result.Error = fmt.Errorf("block length cannot be negative")
@@ -569,7 +569,7 @@ func (m *MutagenSyncEngine) adjustLastBlockSize(op *rsync.Operation, signature *
 }
 
 // updateResultStatistics updates the result with operation statistics
-func (m *MutagenSyncEngine) updateResultStatistics(result *FileSyncResult, literalBytes, copyBytes int64, operations []*rsync.Operation, options *SyncOptions) {
+func (m *MutagenSyncEngine) updateResultStatistics(result *FileSyncResult, literalBytes, copyBytes int64, operations []*rsync.Operation, options *Options) {
 	result.BytesTransferred = literalBytes
 	result.BytesSaved = copyBytes
 	result.Operations = len(operations)
@@ -632,7 +632,7 @@ func (m *MutagenSyncEngine) applyDeltaOperations(targetFile *os.File, operations
 }
 
 // preserveFileAttributes preserves file attributes if requested
-func (m *MutagenSyncEngine) preserveFileAttributes(sourcePath, targetPath string, options *SyncOptions, result *FileSyncResult) error {
+func (m *MutagenSyncEngine) preserveFileAttributes(sourcePath, targetPath string, options *Options, result *FileSyncResult) error {
 	if !options.PreservePerms && !options.PreserveOwner && !options.PreserveGroup {
 		return nil
 	}

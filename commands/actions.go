@@ -727,10 +727,9 @@ func determineTargetMachines(action *schemas.ActionsActionV1, machines []*schema
 	var targetNames []string
 
 	// Use override targets if specified
+	targetNames = action.Targets
 	if len(overrideTargets) > 0 {
 		targetNames = overrideTargets
-	} else {
-		targetNames = action.Targets
 	}
 
 	if len(targetNames) == 0 {
@@ -821,7 +820,9 @@ func NewActionExecutor(sshManager *ssh.SimpleSSHManager, projectConfig *schemas.
 	}
 }
 
-// ExecuteAction executes an action across target machines
+// RunAction executes an action across target machines.
+// It takes a context, action configuration, list of target machines, and a dry-run flag.
+// Returns a slice of action results and any error that occurred during execution.
 func (ae *ActionExecutor) RunAction(ctx context.Context, action *schemas.ActionsActionV1, machines []*schemas.MachinesMachineV1, dryRun bool) ([]*ActionResult, error) {
 	var results []*ActionResult
 

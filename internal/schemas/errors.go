@@ -86,7 +86,7 @@ func (e *SchemaParseError) Unwrap() error {
 	return ErrSchemaParseFailed
 }
 
-// Helper functions for creating typed errors
+// NewSchemaNotFoundError creates a new schema not found error.
 func NewSchemaNotFoundError(schemaName string, available []string) error {
 	return errors.WithStack(&SchemaNotFoundError{
 		SchemaName: schemaName,
@@ -94,6 +94,7 @@ func NewSchemaNotFoundError(schemaName string, available []string) error {
 	})
 }
 
+// NewSchemaValidationError creates a new schema validation error.
 func NewSchemaValidationError(schemaName, field string, value interface{}, rule, message string) error {
 	return errors.WithStack(&SchemaValidationError{
 		SchemaName: schemaName,
@@ -104,6 +105,7 @@ func NewSchemaValidationError(schemaName, field string, value interface{}, rule,
 	})
 }
 
+// NewSchemaVersionError creates a new schema version error.
 func NewSchemaVersionError(schemaName, expected, actual string, compatibility []string) error {
 	return errors.WithStack(&SchemaVersionError{
 		SchemaName:    schemaName,
@@ -113,6 +115,7 @@ func NewSchemaVersionError(schemaName, expected, actual string, compatibility []
 	})
 }
 
+// NewSchemaParseError creates a new schema parse error.
 func NewSchemaParseError(schemaName, filePath, message string, line, column int) error {
 	return errors.WithStack(&SchemaParseError{
 		SchemaName: schemaName,

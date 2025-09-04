@@ -88,7 +88,7 @@ func (eh *ErrorHandler) HandleWarning(err error, message string, context map[str
 	eh.HandleError(err, SeverityWarning, message, context)
 }
 
-// HandleError handles an error-level error
+// HandleErrorLevel handles errors based on their severity level.
 func (eh *ErrorHandler) HandleErrorLevel(err error, message string, context map[string]interface{}) {
 	eh.HandleError(err, SeverityError, message, context)
 }

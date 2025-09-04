@@ -14,6 +14,7 @@ var (
 	logLevel   string
 )
 
+// RootCmd represents the root command of the spooky CLI.
 var RootCmd = &cobra.Command{
 	Use:   "spooky",
 	Short: "Automation and configuration management tool",

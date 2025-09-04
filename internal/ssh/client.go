@@ -30,7 +30,7 @@ import (
 	"spooky/internal/schemas"
 )
 
-// SSHClient represents a comprehensive SSH client for Spooky.
+// Client represents a comprehensive SSH client for Spooky.
 //
 // Authentication Methods Supported:
 // - Public key authentication (with optional passphrase)
@@ -57,8 +57,8 @@ import (
 //
 // All credentials must be pre-configured in the machine configuration.
 // Sensitive values can be encrypted using age encryption.
-type SSHClient struct {
-	config     *SSHConfig
+type Client struct {
+	config     *Config
 	client     *ssh.Client
 	session    *ssh.Session
 	agentConn  agent.Agent
@@ -66,8 +66,8 @@ type SSHClient struct {
 	mu         sync.Mutex
 }
 
-// SSHConfig holds SSH connection configuration
-type SSHConfig struct {
+// Config holds SSH connection configuration
+type Config struct {
 	Host                      string
 	Port                      int
 	User                      string
@@ -109,8 +109,8 @@ type SSHConfig struct {
 	Stderr io.Writer
 }
 
-// NewSSHClient creates a new SSH client with the given configuration
-func NewSSHClient(config *SSHConfig) (*SSHClient, error) {
+// NewClient creates a new SSH client with the given configuration
+func NewClient(config *Config) (*Client, error) {
 	if config == nil {
 		return nil, errors.New("SSH config cannot be nil")
 	}
@@ -132,7 +132,7 @@ func NewSSHClient(config *SSHConfig) (*SSHClient, error) {
 		config.KeyScanTimeout = 10 * time.Second
 	}
 
-	client := &SSHClient{
+	client := &Client{
 		config: config,
 	}
 
@@ -145,12 +145,12 @@ func NewSSHClient(config *SSHConfig) (*SSHClient, error) {
 }
 
 // Connect establishes an SSH connection
-func (sc *SSHClient) Connect(ctx context.Context) error {
+func (sc *Client) Connect(ctx context.Context) error {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 
 	// Create SSH client config
-	sshConfig, err := sc.createSSHConfig()
+	sshConfig, err := sc.createConfig()
 	if err != nil {
 		return errors.Wrap(err, "failed to create SSH config - connection cannot be established")
 	}
@@ -192,7 +192,7 @@ func (sc *SSHClient) Connect(ctx context.Context) error {
 }
 
 // Disconnect closes the SSH connection
-func (sc *SSHClient) Disconnect() error {
+func (sc *Client) Disconnect() error {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 
@@ -216,7 +216,7 @@ func (sc *SSHClient) Disconnect() error {
 }
 
 // RunCommand executes a command on the remote host with configurable timeout
-func (sc *SSHClient) RunCommand(ctx context.Context, command string) (*schemas.CommandResult, error) {
+func (sc *Client) RunCommand(ctx context.Context, command string) (*schemas.CommandResult, error) {
 	if sc.client == nil {
 		return nil, errors.New("SSH client not connected")
 	}
@@ -225,11 +225,10 @@ func (sc *SSHClient) RunCommand(ctx context.Context, command string) (*schemas.C
 	var timeoutCtx context.Context
 	var cancel context.CancelFunc
 
+	timeoutCtx = ctx
 	if _, ok := ctx.Deadline(); !ok && sc.config.Timeout > 0 {
 		timeoutCtx, cancel = context.WithTimeout(ctx, sc.config.Timeout)
 		defer cancel()
-	} else {
-		timeoutCtx = ctx
 	}
 
 	// Create session
@@ -286,7 +285,7 @@ func (sc *SSHClient) RunCommand(ctx context.Context, command string) (*schemas.C
 }
 
 // UploadFile uploads a file to the remote host
-func (sc *SSHClient) UploadFile(ctx context.Context, localPath, remotePath string) error {
+func (sc *Client) UploadFile(ctx context.Context, localPath, remotePath string) error {
 	if sc.client == nil {
 		return errors.New("SSH client not connected")
 	}
@@ -359,7 +358,7 @@ func (sc *SSHClient) UploadFile(ctx context.Context, localPath, remotePath strin
 }
 
 // DownloadFile downloads a file from the remote host
-func (sc *SSHClient) DownloadFile(ctx context.Context, remotePath, localPath string) error {
+func (sc *Client) DownloadFile(ctx context.Context, remotePath, localPath string) error {
 	if sc.client == nil {
 		return errors.New("SSH client not connected")
 	}
@@ -389,7 +388,7 @@ func (sc *SSHClient) DownloadFile(ctx context.Context, remotePath, localPath str
 }
 
 // createDownloadSession creates and starts an SSH session for file download
-func (sc *SSHClient) createDownloadSession(remotePath string) (*ssh.Session, error) {
+func (sc *Client) createDownloadSession(remotePath string) (*ssh.Session, error) {
 	session, err := sc.client.NewSession()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create SSH session")
@@ -404,7 +403,7 @@ func (sc *SSHClient) createDownloadSession(remotePath string) (*ssh.Session, err
 }
 
 // closeSession closes the SSH session with error logging
-func (sc *SSHClient) closeSession(session *ssh.Session) {
+func (sc *Client) closeSession(session *ssh.Session) {
 	if closeErr := session.Close(); closeErr != nil {
 		// Log the error but don't fail the function since we've already processed the data
 		// This is a best-effort cleanup
@@ -414,7 +413,7 @@ func (sc *SSHClient) closeSession(session *ssh.Session) {
 }
 
 // setupFileTransfer sets up the stdout pipe for file transfer
-func (sc *SSHClient) setupFileTransfer(session *ssh.Session) (io.Reader, error) {
+func (sc *Client) setupFileTransfer(session *ssh.Session) (io.Reader, error) {
 	stdout, err := session.StdoutPipe()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get stdout pipe")
@@ -423,7 +422,7 @@ func (sc *SSHClient) setupFileTransfer(session *ssh.Session) (io.Reader, error) 
 }
 
 // createLocalFile creates the local file for download
-func (sc *SSHClient) createLocalFile(localPath string) (*os.File, error) {
+func (sc *Client) createLocalFile(localPath string) (*os.File, error) {
 	localFile, err := os.Create(localPath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create local file: %s", localPath)
@@ -432,7 +431,7 @@ func (sc *SSHClient) createLocalFile(localPath string) (*os.File, error) {
 }
 
 // closeLocalFile closes the local file with error logging
-func (sc *SSHClient) closeLocalFile(localFile *os.File) {
+func (sc *Client) closeLocalFile(localFile *os.File) {
 	if closeErr := localFile.Close(); closeErr != nil {
 		// Log the error but don't fail the function since we've already written the data
 		// This is a best-effort cleanup
@@ -442,7 +441,7 @@ func (sc *SSHClient) closeLocalFile(localFile *os.File) {
 }
 
 // processFileTransfer handles the actual file transfer process
-func (sc *SSHClient) processFileTransfer(stdout io.Reader, localFile *os.File, session *ssh.Session) error {
+func (sc *Client) processFileTransfer(stdout io.Reader, localFile *os.File, session *ssh.Session) error {
 	// Read and parse file header
 	fileSize, err := sc.parseFileHeader(stdout)
 	if err != nil {
@@ -468,7 +467,7 @@ func (sc *SSHClient) processFileTransfer(stdout io.Reader, localFile *os.File, s
 }
 
 // parseFileHeader reads and parses the SCP file header
-func (sc *SSHClient) parseFileHeader(stdout io.Reader) (int64, error) {
+func (sc *Client) parseFileHeader(stdout io.Reader) (int64, error) {
 	scanner := bufio.NewScanner(stdout)
 	if !scanner.Scan() {
 		return 0, errors.New("failed to read file header")
@@ -495,7 +494,7 @@ func (sc *SSHClient) parseFileHeader(stdout io.Reader) (int64, error) {
 }
 
 // sendAcknowledgment sends an acknowledgment to the remote host
-func (sc *SSHClient) sendAcknowledgment() error {
+func (sc *Client) sendAcknowledgment() error {
 	if _, err := fmt.Fprint(os.Stdout, "\x00"); err != nil {
 		return errors.Wrap(err, "failed to send acknowledgment")
 	}
@@ -503,7 +502,7 @@ func (sc *SSHClient) sendAcknowledgment() error {
 }
 
 // copyFileContent copies the file content from remote to local
-func (sc *SSHClient) copyFileContent(stdout io.Reader, localFile *os.File, fileSize int64) error {
+func (sc *Client) copyFileContent(stdout io.Reader, localFile *os.File, fileSize int64) error {
 	written, err := io.CopyN(localFile, stdout, fileSize)
 	if err != nil {
 		return errors.Wrap(err, "failed to copy file content")
@@ -517,7 +516,7 @@ func (sc *SSHClient) copyFileContent(stdout io.Reader, localFile *os.File, fileS
 }
 
 // CopyFile copies a file from local to remote using SCP
-func (sc *SSHClient) CopyFile(localPath, remotePath string) error {
+func (sc *Client) CopyFile(localPath, remotePath string) error {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 
@@ -597,7 +596,7 @@ func (sc *SSHClient) CopyFile(localPath, remotePath string) error {
 }
 
 // CopyFileContent copies file content (string) to remote path using SCP
-func (sc *SSHClient) CopyFileContent(content, remotePath string, permissions os.FileMode) error {
+func (sc *Client) CopyFileContent(content, remotePath string, permissions os.FileMode) error {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 
@@ -657,7 +656,7 @@ func (sc *SSHClient) CopyFileContent(content, remotePath string, permissions os.
 }
 
 // SetFileAttributes sets file permissions, owner, and group on a remote file
-func (sc *SSHClient) SetFileAttributes(remotePath, permissions, owner, group string) error {
+func (sc *Client) SetFileAttributes(remotePath, permissions, owner, group string) error {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 
@@ -706,8 +705,8 @@ func (sc *SSHClient) SetFileAttributes(remotePath, permissions, owner, group str
 	return nil
 }
 
-// createSSHConfig creates the SSH client configuration
-func (sc *SSHClient) createSSHConfig() (*ssh.ClientConfig, error) {
+// createConfig creates the SSH client configuration
+func (sc *Client) createConfig() (*ssh.ClientConfig, error) {
 	config := &ssh.ClientConfig{
 		User:            sc.config.User,
 		HostKeyCallback: sc.knownHosts,
@@ -750,7 +749,7 @@ func (sc *SSHClient) createSSHConfig() (*ssh.ClientConfig, error) {
 }
 
 // loadPrivateKey loads and decrypts the private key
-func (sc *SSHClient) loadPrivateKey() (ssh.Signer, error) {
+func (sc *Client) loadPrivateKey() (ssh.Signer, error) {
 	// Extract key data from configuration
 	keyData, err := sc.extractKeyData()
 	if err != nil {
@@ -776,7 +775,7 @@ func (sc *SSHClient) loadPrivateKey() (ssh.Signer, error) {
 }
 
 // extractKeyData extracts key data from configuration (file path or direct data)
-func (sc *SSHClient) extractKeyData() ([]byte, error) {
+func (sc *Client) extractKeyData() ([]byte, error) {
 	if sc.config.PrivateKeyPath != "" {
 		keyData, err := os.ReadFile(sc.config.PrivateKeyPath)
 		if err != nil {
@@ -793,7 +792,7 @@ func (sc *SSHClient) extractKeyData() ([]byte, error) {
 }
 
 // validateKeyData validates key data and rejects legacy DES-encrypted formats
-func (sc *SSHClient) validateKeyData(keyData []byte) error {
+func (sc *Client) validateKeyData(keyData []byte) error {
 	// Security-critical: Validate key data
 	if len(keyData) == 0 {
 		return errors.New("private key data is empty - authentication cannot proceed")
@@ -817,7 +816,7 @@ func (sc *SSHClient) validateKeyData(keyData []byte) error {
 }
 
 // tryModernParsing attempts modern SSH parsing with passphrase and custom PKCS#8 decryption
-func (sc *SSHClient) tryModernParsing(keyData []byte) (ssh.Signer, error) {
+func (sc *Client) tryModernParsing(keyData []byte) (ssh.Signer, error) {
 	// Try parsing with passphrase first - this handles PKCS#8 and other modern formats
 	signer, err := ssh.ParsePrivateKeyWithPassphrase(keyData, []byte(sc.config.Passphrase))
 	if err == nil {
@@ -848,7 +847,7 @@ func (sc *SSHClient) tryModernParsing(keyData []byte) (ssh.Signer, error) {
 }
 
 // parsePEMBlock parses PEM block and handles different key types
-func (sc *SSHClient) parsePEMBlock(keyData []byte) (ssh.Signer, error) {
+func (sc *Client) parsePEMBlock(keyData []byte) (ssh.Signer, error) {
 	// Parse PEM to get block and handle rest data
 	block, rest := pem.Decode(keyData)
 	if block == nil {
@@ -867,7 +866,7 @@ func (sc *SSHClient) parsePEMBlock(keyData []byte) (ssh.Signer, error) {
 }
 
 // handlePEMBlockType handles specific PEM block types
-func (sc *SSHClient) handlePEMBlockType(block *pem.Block) (ssh.Signer, error) {
+func (sc *Client) handlePEMBlockType(block *pem.Block) (ssh.Signer, error) {
 	switch block.Type {
 	case "RSA PRIVATE KEY", "DSA PRIVATE KEY", "EC PRIVATE KEY":
 		// Traditional private keys - only support unencrypted format
@@ -890,7 +889,7 @@ func (sc *SSHClient) handlePEMBlockType(block *pem.Block) (ssh.Signer, error) {
 }
 
 // parseTraditionalKey parses traditional private key formats (RSA, DSA, EC)
-func (sc *SSHClient) parseTraditionalKey(block *pem.Block) (ssh.Signer, error) {
+func (sc *Client) parseTraditionalKey(block *pem.Block) (ssh.Signer, error) {
 	signer, err := ssh.ParsePrivateKey(pem.EncodeToMemory(block))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse traditional private key - key format may be corrupted")
@@ -899,7 +898,7 @@ func (sc *SSHClient) parseTraditionalKey(block *pem.Block) (ssh.Signer, error) {
 }
 
 // parseOpenSSHKey parses OpenSSH private key format
-func (sc *SSHClient) parseOpenSSHKey(block *pem.Block) (ssh.Signer, error) {
+func (sc *Client) parseOpenSSHKey(block *pem.Block) (ssh.Signer, error) {
 	signer, err := ssh.ParsePrivateKey(pem.EncodeToMemory(block))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse OpenSSH private key - key format may be corrupted")
@@ -908,7 +907,7 @@ func (sc *SSHClient) parseOpenSSHKey(block *pem.Block) (ssh.Signer, error) {
 }
 
 // parsePKCS8Key parses PKCS#8 private key format
-func (sc *SSHClient) parsePKCS8Key(block *pem.Block) (ssh.Signer, error) {
+func (sc *Client) parsePKCS8Key(block *pem.Block) (ssh.Signer, error) {
 	signer, err := ssh.ParsePrivateKey(pem.EncodeToMemory(block))
 	if err != nil {
 		// If direct parsing fails, it might be encrypted PKCS#8
@@ -947,7 +946,7 @@ func compareOID(a, b []int) bool {
 }
 
 // decryptPKCS8Key attempts to decrypt a PKCS#8 encrypted private key
-func (sc *SSHClient) decryptPKCS8Key(keyData []byte, passphrase string) ([]byte, error) {
+func (sc *Client) decryptPKCS8Key(keyData []byte, passphrase string) ([]byte, error) {
 	// Parse and validate PEM block
 	block, err := sc.parsePKCS8PEMBlock(keyData)
 	if err != nil {
@@ -983,7 +982,7 @@ func (sc *SSHClient) decryptPKCS8Key(keyData []byte, passphrase string) ([]byte,
 }
 
 // parsePKCS8PEMBlock parses and validates the PEM block for PKCS#8 encrypted key
-func (sc *SSHClient) parsePKCS8PEMBlock(keyData []byte) (*pem.Block, error) {
+func (sc *Client) parsePKCS8PEMBlock(keyData []byte) (*pem.Block, error) {
 	block, _ := pem.Decode(keyData)
 	if block == nil {
 		return nil, errors.New("failed to decode PEM block")
@@ -997,7 +996,7 @@ func (sc *SSHClient) parsePKCS8PEMBlock(keyData []byte) (*pem.Block, error) {
 }
 
 // parsePKCS8EncryptedStructure parses the PKCS#8 encrypted key structure
-func (sc *SSHClient) parsePKCS8EncryptedStructure(blockBytes []byte) (struct {
+func (sc *Client) parsePKCS8EncryptedStructure(blockBytes []byte) (struct {
 	Version       int
 	Algorithm     AlgorithmIdentifier
 	EncryptedData []byte `asn1:"tag:0"`
@@ -1022,7 +1021,7 @@ func (sc *SSHClient) parsePKCS8EncryptedStructure(blockBytes []byte) (struct {
 }
 
 // parsePBES2Parameters parses PBES2 parameters from ASN.1 data
-func (sc *SSHClient) parsePBES2Parameters(paramsData []byte) (struct {
+func (sc *Client) parsePBES2Parameters(paramsData []byte) (struct {
 	KeyDerivationFunc AlgorithmIdentifier
 	EncryptionScheme  AlgorithmIdentifier
 }, error) {
@@ -1045,7 +1044,7 @@ func (sc *SSHClient) parsePBES2Parameters(paramsData []byte) (struct {
 }
 
 // parsePBKDF2Parameters parses PBKDF2 parameters from ASN.1 data
-func (sc *SSHClient) parsePBKDF2Parameters(paramsData []byte) (struct {
+func (sc *Client) parsePBKDF2Parameters(paramsData []byte) (struct {
 	Salt           []byte
 	IterationCount int
 	PRF            AlgorithmIdentifier `asn1:"optional"`
@@ -1065,7 +1064,7 @@ func (sc *SSHClient) parsePBKDF2Parameters(paramsData []byte) (struct {
 }
 
 // parseAESParameters parses AES parameters and determines key length
-func (sc *SSHClient) parseAESParameters(encryptionScheme AlgorithmIdentifier) ([]byte, int, error) {
+func (sc *Client) parseAESParameters(encryptionScheme AlgorithmIdentifier) ([]byte, int, error) {
 	// Validate encryption algorithm is AES
 	if !compareOID(encryptionScheme.Algorithm, oidAES256CBC) &&
 		!compareOID(encryptionScheme.Algorithm, oidAES128CBC) {
@@ -1089,7 +1088,7 @@ func (sc *SSHClient) parseAESParameters(encryptionScheme AlgorithmIdentifier) ([
 }
 
 // decryptWithAES performs the actual AES decryption with PBKDF2 key derivation
-func (sc *SSHClient) decryptWithAES(encryptedData []byte, passphrase string, pbkdf2Params struct {
+func (sc *Client) decryptWithAES(encryptedData []byte, passphrase string, pbkdf2Params struct {
 	Salt           []byte
 	IterationCount int
 	PRF            AlgorithmIdentifier `asn1:"optional"`
@@ -1118,7 +1117,7 @@ func (sc *SSHClient) decryptWithAES(encryptedData []byte, passphrase string, pbk
 }
 
 // removePKCS7Padding removes and validates PKCS#7 padding
-func (sc *SSHClient) removePKCS7Padding(decrypted []byte) ([]byte, error) {
+func (sc *Client) removePKCS7Padding(decrypted []byte) ([]byte, error) {
 	if len(decrypted) == 0 {
 		return nil, errors.New("decrypted data is empty")
 	}
@@ -1140,7 +1139,7 @@ func (sc *SSHClient) removePKCS7Padding(decrypted []byte) ([]byte, error) {
 }
 
 // connectToAgent connects to the SSH agent
-func (sc *SSHClient) connectToAgent() (agent.Agent, error) {
+func (sc *Client) connectToAgent() (agent.Agent, error) {
 	if sc.agentConn != nil {
 		return sc.agentConn, nil
 	}
@@ -1163,7 +1162,7 @@ func (sc *SSHClient) connectToAgent() (agent.Agent, error) {
 }
 
 // initKnownHosts initializes the known hosts callback
-func (sc *SSHClient) initKnownHosts() error {
+func (sc *Client) initKnownHosts() error {
 	var knownHostsFiles []string
 
 	// Add user-specified known hosts files
@@ -1214,7 +1213,7 @@ func (sc *SSHClient) initKnownHosts() error {
 }
 
 // createAcceptNewCallback creates a host key callback that mimics OpenSSH's "accept-new" behavior
-func (sc *SSHClient) createAcceptNewCallback(knownHostsFiles []string) ssh.HostKeyCallback {
+func (sc *Client) createAcceptNewCallback(knownHostsFiles []string) ssh.HostKeyCallback {
 	// Try to load existing known hosts
 	existingCallback, err := knownhosts.New(knownHostsFiles...)
 	if err != nil {
@@ -1246,7 +1245,7 @@ func (sc *SSHClient) createAcceptNewCallback(knownHostsFiles []string) ssh.HostK
 }
 
 // setupSession configures a session for command execution
-func (sc *SSHClient) setupSession(session *ssh.Session) error {
+func (sc *Client) setupSession(session *ssh.Session) error {
 	// Set environment variables
 	for key, value := range sc.config.Environment {
 		if err := session.Setenv(key, value); err != nil {
@@ -1269,7 +1268,7 @@ func (sc *SSHClient) setupSession(session *ssh.Session) error {
 }
 
 // keepAlive sends keepalive packets
-func (sc *SSHClient) keepAlive() {
+func (sc *Client) keepAlive() {
 	ticker := time.NewTicker(sc.config.KeepAlive)
 	defer ticker.Stop()
 
